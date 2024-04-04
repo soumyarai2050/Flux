@@ -27,6 +27,7 @@ const TableWidget = (props) => {
     const [rows, setRows] = useState(props.rows);
     const [headCells, setHeadCells] = useState(props.tableColumns);
     const [commonkeys, setCommonkeys] = useState(props.commonKeyCollections);
+    // index of the item in row
     const [selectedRow, setSelectedRow] = useState();
     const [selectedRows, setSelectedRows] = useState([]);
     const [data, setData] = useState(props.data);
@@ -56,7 +57,7 @@ const TableWidget = (props) => {
     }, [props.collections, data, props.xpath])
 
     useEffect(() => {
-        let commonKeyCollections = getCommonKeyCollections(rows, headCells, hide)
+        let commonKeyCollections = getCommonKeyCollections(rows, headCells, hide, false, props.widgetType === 'repeatedRoot' ? true : false);
         setCommonkeys(commonKeyCollections);
     }, [rows, headCells, props.mode, hide])
 
@@ -100,7 +101,7 @@ const TableWidget = (props) => {
     const handleChangeRowsPerPage = (event) => {
         const size = parseInt(event.target.value, 10);
         setRowsPerPage(size);
-	PageSizeCache.setPageSize(props.name, size);
+        PageSizeCache.setPageSize(props.name, size);
         setPage(0);
         PageCache.setPage(props.name, 0);
     };
@@ -148,22 +149,35 @@ const TableWidget = (props) => {
     }
 
     const onSave = () => {
-        props.onUpdate(data);
+        if (props.widgetType === 'repeatedRoot') {
+            const updatedObj = data.find(obj => obj[DB_ID] === selectedRows[0]);
+            if (updatedObj) {
+                props.onUpdate(updatedObj);
+            } else {
+                console.error('updatedObj not found');
+            }
+        } else {
+            props.onUpdate(data);
+        }
         setOpen(false);
         setOpenModalPopup(false);
     }
 
     const onRowClick = (e, index, xpath) => {
         if (props.mode === Modes.EDIT_MODE) {
-            let selectedIndex = 0;
             setOpen(true);
-            let updatedRows = generateRowsFromTree(rowTrees, props.collections, props.xpath);
-            updatedRows.forEach((row, i) => {
-                if (row['data-id'] === index) {
-                    selectedIndex = i;
+            if (props.widgetType === 'repeatedRoot') {
+                const idx = rowTrees.findIndex(row => row[DB_ID] === index);
+                if (idx !== -1) {
+                    setSelectedRow(idx);
                 }
-            })
-            setSelectedRow(selectedIndex);
+            } else {
+                let updatedRows = generateRowsFromTree(rowTrees, props.collections, props.xpath);
+                const idx = updatedRows.findIndex(row => row['data-id'] === index);
+                if (idx !== -1) {
+                    setSelectedRow(idx);
+                }
+            }
             setTimeout(() => {
                 let modalId = props.name + '_modal';
                 if (props.xpath) {
@@ -176,22 +190,42 @@ const TableWidget = (props) => {
         }
     }
 
-    const onRowSelect = (e, index) => {
+    const onRowSelect = (e, rowId) => {
         if (props.mode !== Modes.EDIT_MODE) {
+            let updatedSelectedRows;
             if (e.ctrlKey) {
-                if (selectedRows.filter(row => row === index).length === 0) {
-                    setSelectedRows([...selectedRows, index]);
+                if (selectedRows.find(row => row === rowId)) {
+                    // rowId already selected. unselect the row
+                    updatedSelectedRows = selectedRows.filter(row => row !== rowId);
+                } else {
+                    // new selected row. add it to selected array
+                    updatedSelectedRows = [...selectedRows, rowId];
                 }
             } else {
-                setSelectedRows([index]);
+                updatedSelectedRows = [rowId];
+            }
+            setSelectedRows(updatedSelectedRows);
+            if (props.widgetType === 'repeatedRoot') {
+                if (updatedSelectedRows.length === 1) {
+                    props.onSelectRow(rowId);
+                } else {
+                    props.onSelectRow(null);
+                }
             }
         }
     }
 
-    const onRowDisselect = (e, index) => {
+    const onRowDisselect = (e, rowId) => {
         if (props.mode !== Modes.EDIT_MODE) {
-            let updatedData = selectedRows.filter(row => row !== index);
-            setSelectedRows(updatedData);
+            const updatedSelectedRows = selectedRows.filter(row => row !== rowId);
+            setSelectedRows(updatedSelectedRows);
+            if (props.widgetType === 'repeatedRoot') {
+                if (updatedSelectedRows.length === 1) {
+                    props.onSelectRow(updatedSelectedRows[0]);
+                } else {
+                    props.onSelectRow(null);
+                }
+            }
         }
     }
 
@@ -215,12 +249,24 @@ const TableWidget = (props) => {
     }
 
     const onUpdate = (updatedData, type) => {
+        // add and remove only supported on non-repeated widgets
         if (type === 'add' || type === 'remove') {
             setOpen(false);
             props.onUpdate(updatedData);
             props.onUserChange(null, null, userChanges);
         } else {
-            setData(updatedData);
+            if (props.widgetType === 'repeatedRoot') {
+                const idx = data.findIndex(obj => obj[DB_ID] === selectedRows[0]);
+                console.log(idx);
+                if (idx !== -1) {
+                    const updatedArray = cloneDeep(data);
+                    updatedArray[idx] = updatedData;
+                    setData(updatedArray);
+                }
+            } else {
+                console.error('else case');
+                setData(updatedData);
+            }
         }
     }
 
@@ -275,6 +321,7 @@ const TableWidget = (props) => {
     }
 
     const onTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes) => {
+        let updatedData;
         if (value === '') {
             value = null;
         }
@@ -283,7 +330,12 @@ const TableWidget = (props) => {
                 value = value * 1;
             }
         }
-        let updatedData = cloneDeep(data);
+        if (props.widgetType === 'repeatedRoot') {
+            updatedData = cloneDeep(data.find(obj => obj[DB_ID] === selectedRows[0]));
+        } else {
+            updatedData = cloneDeep(data);
+        }
+        // let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, value);
@@ -293,28 +345,52 @@ const TableWidget = (props) => {
     }, [data, props.onUpdate, props.onUserChange])
 
     const onSelectItemChange = useCallback((e, dataxpath, xpath) => {
-        let updatedData = cloneDeep(data);
+        let updatedData;
+        if (props.widgetType === 'repeatedRoot') {
+            updatedData = cloneDeep(data.find(obj => obj[DB_ID] === selectedRows[0]));
+        } else {
+            updatedData = cloneDeep(data);
+        }
+        // let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, e.target.value);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, e.target.value);
     }, [data, props.onUpdate, props.onUserChange])
 
     const onCheckboxChange = useCallback((e, dataxpath, xpath) => {
-        let updatedData = cloneDeep(data);
+        let updatedData;
+        if (props.widgetType === 'repeatedRoot') {
+            updatedData = cloneDeep(data.find(obj => obj[DB_ID] === selectedRows[0]));
+        } else {
+            updatedData = cloneDeep(data);
+        }
+        // let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, e.target.checked);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, e.target.checked);
     }, [data, props.onUpdate, props.onUserChange])
 
     const onAutocompleteOptionChange = useCallback((e, value, dataxpath, xpath) => {
-        let updatedData = cloneDeep(data);
+        let updatedData;
+        if (props.widgetType === 'repeatedRoot') {
+            updatedData = cloneDeep(data.find(obj => obj[DB_ID] === selectedRows[0]));
+        } else {
+            updatedData = cloneDeep(data);
+        }
+        // let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, value);
     }, [data, props.onUpdate, props.onUserChange])
 
     const onDateTimeChange = useCallback((dataxpath, xpath, value) => {
-        let updatedData = cloneDeep(data);
+        let updatedData;
+        if (props.widgetType === 'repeatedRoot') {
+            updatedData = cloneDeep(data.find(obj => obj[DB_ID] === selectedRows[0]));
+        } else {
+            updatedData = cloneDeep(data);
+        }
+        // let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, value);
@@ -472,7 +548,7 @@ const TableWidget = (props) => {
         <WidgetContainer
             name={props.headerProps.name}
             title={props.headerProps.title}
-            mode={props.headerProps.mode}
+            mode={props.widgetType === 'repeatedRoot' ? selectedRows.length === 1 ? props.headerProps.mode : null : props.headerProps.mode}
             layout={props.headerProps.layout}
             menu={menu}
             onChangeMode={props.headerProps.onChangeMode}
@@ -540,6 +616,7 @@ const TableWidget = (props) => {
                                                 index={props.index}
                                                 forceUpdate={props.forceUpdate}
                                                 truncateDateTime={props.truncateDateTime}
+                                                widgetType={props.widgetType}
                                             />
                                         )
                                     })}
@@ -576,13 +653,14 @@ const TableWidget = (props) => {
                     }}
                     name={props.name}
                     schema={props.schema}
-                    data={data}
-                    originalData={props.originalData}
+                    data={props.widgetType === 'repeatedRoot' ? selectedRow !== null ? data[selectedRow] : {} : data}
+                    originalData={props.widgetType === 'repeatedRoot' ? selectedRow !== null ? props.originalData[selectedRow] : {} : props.originalData}
                     mode={props.mode}
                     onUpdate={onUpdate}
                     xpath={props.xpath}
-                    subtree={rowTrees[selectedRow]}
+                    subtree={props.widgetType === 'repeatedRoot' ? null : rowTrees[selectedRow]}
                     onUserChange={onUserChange}
+                    scrollLock={false}
                 />
                 <Dialog
                     open={openModalPopup}

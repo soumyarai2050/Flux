@@ -1,12 +1,15 @@
-import { cloneDeep, values } from "lodash";
-import { applyGetAllWebsocketUpdate } from "../workerUtils";
+import { cloneDeep } from "lodash";
+import { applyGetAllWebsocketUpdate, sortAlertArray } from "../workerUtils";
 
-onmessage = (e) => {
-    const { getAllDict, storedArray } = e.data;
-    const updatedArray = cloneDeep(storedArray);
-    values(getAllDict).forEach(obj => {
-        applyGetAllWebsocketUpdate(updatedArray, obj);
+onmessage = (event) => {
+    const { getAllDict, storedArray, uiLimit = null, isAlertModel = false } = event.data;
+    let updatedArray = cloneDeep(storedArray);
+    Object.values(getAllDict).forEach(obj => {
+        updatedArray = applyGetAllWebsocketUpdate(updatedArray, obj, uiLimit, isAlertModel);
     })
+    if (isAlertModel) {
+        sortAlertArray(updatedArray);
+    }
     postMessage([updatedArray]);
 }
 

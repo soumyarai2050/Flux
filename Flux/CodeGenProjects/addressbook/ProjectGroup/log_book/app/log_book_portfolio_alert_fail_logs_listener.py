@@ -7,7 +7,7 @@ from typing import List, Dict
 
 os.environ["DBType"] = "beanie"
 # project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     portfolio_alert_fail_log, simulator_portfolio_alert_fail_log)
 from FluxPythonUtils.email_adapter.email_handler import EmailHandler
 from FluxPythonUtils.email_adapter.email_client import EmailClient, EmailUser

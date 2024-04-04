@@ -268,3 +268,16 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                         msg_list.append(msg_name)
 
         return msg_list
+
+    def _get_override_default_get_all_crud(self, widget_ui_option_value: Dict):
+        override_default_crud_option_fld_val_list = (
+            widget_ui_option_value.get(BaseJSLayoutPlugin.widget_ui_option_override_default_crud_field))
+        get_all_override_default_crud = None
+        if override_default_crud_option_fld_val_list:
+            for override_default_crud_option_fld_val in override_default_crud_option_fld_val_list:
+                ui_crud_type = (
+                    override_default_crud_option_fld_val.get(
+                        BaseJSLayoutPlugin.widget_ui_option_override_default_crud_ui_crud_type_field))
+                if ui_crud_type == "GET_ALL":
+                    get_all_override_default_crud = override_default_crud_option_fld_val
+        return get_all_override_default_crud

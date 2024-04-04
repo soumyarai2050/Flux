@@ -5,24 +5,24 @@ import pytest
 import signal
 
 from FluxPythonUtils.scripts.utility_functions import get_pid_from_port
-from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
 
 
 def _test_executor_crash_recovery(
         buy_symbol, sell_symbol, pair_strat_,
         expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
-        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
         strat_state_to_handle, refresh_sec):
     # making limits suitable for this test
-    expected_strat_limits_.max_open_orders_per_side = 10
+    expected_strat_limits_.max_open_chores_per_side = 10
     expected_strat_limits_.residual_restriction.max_residual = 105000
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_wait_sec = 4 * refresh_sec
 
     created_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     if strat_state_to_handle != StratState.StratState_ACTIVE:
         created_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
@@ -46,13 +46,13 @@ def _test_executor_crash_recovery(
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_web_client.trade_simulator_reload_config_query_client()
+        executor_web_client.barter_simulator_reload_config_query_client()
 
         if strat_state_to_handle == StratState.StratState_ACTIVE:
-            total_order_count_for_each_side = 1
-            place_sanity_orders_for_executor(
-                buy_symbol, sell_symbol, total_order_count_for_each_side, last_trade_fixture_list,
-                top_of_book_list_, residual_wait_sec, executor_web_client)
+            total_chore_count_for_each_side = 1
+            place_sanity_chores_for_executor(
+                buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+                residual_wait_sec, executor_web_client)
         port: int = created_pair_strat.port
 
         for _ in range(10):
@@ -125,16 +125,14 @@ def _test_executor_crash_recovery(
                 config_dict["symbol_configs"][symbol]["fill_percent"] = 50
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-            new_executor_web_client.trade_simulator_reload_config_query_client()
+            new_executor_web_client.barter_simulator_reload_config_query_client()
 
-            # To update tob without triggering any order
-            run_buy_top_of_book(buy_symbol, sell_symbol, new_executor_web_client,
-                                top_of_book_list_[0], avoid_order_trigger=True)
+            update_market_depth(new_executor_web_client)
 
-            total_order_count_for_each_side = 1
-            place_sanity_orders_for_executor(
-                buy_symbol, sell_symbol, total_order_count_for_each_side, last_trade_fixture_list,
-                top_of_book_list_, residual_wait_sec, new_executor_web_client, place_after_recovery=True)
+            total_chore_count_for_each_side = 1
+            place_sanity_chores_for_executor(
+                buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+                residual_wait_sec, new_executor_web_client, place_after_recovery=True)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -149,7 +147,7 @@ def _test_executor_crash_recovery(
 def test_executor_crash_recovery(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     symbols_n_strat_state_list = []
     strat_state_list = [StratState.StratState_ACTIVE, StratState.StratState_READY, StratState.StratState_PAUSED,
                         StratState.StratState_SNOOZED, StratState.StratState_ERROR, StratState.StratState_DONE]
@@ -161,8 +159,8 @@ def test_executor_crash_recovery(
         results = [executor.submit(_test_executor_crash_recovery, buy_symbol, sell_symbol,
                                    deepcopy(pair_strat_),
                                    deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
-                                   deepcopy(symbol_overview_obj_list), deepcopy(top_of_book_list_),
-                                   deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
+                                   deepcopy(symbol_overview_obj_list),
+                                   deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    handle_strat_state, refresh_sec_update_fixture)
                    for buy_symbol, sell_symbol, handle_strat_state in symbols_n_strat_state_list]
 
@@ -171,21 +169,21 @@ def test_executor_crash_recovery(
                 raise Exception(future.exception())
 
 
-def _activate_pair_strat_n_place_sanity_orders(
+def _activate_pair_strat_n_place_sanity_chores(
         buy_symbol, sell_symbol, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list,
-        strat_state_to_handle, refresh_sec, total_order_count_for_each_side_=1):
+        last_barter_fixture_list, market_depth_basemodel_list,
+        strat_state_to_handle, refresh_sec, total_chore_count_for_each_side_=1):
     # making limits suitable for this test
-    expected_strat_limits_.max_open_orders_per_side = 10
+    expected_strat_limits_.max_open_chores_per_side = 10
     expected_strat_limits_.residual_restriction.max_residual = 105000
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_wait_sec = 4 * refresh_sec
 
     created_pair_strat, executor_web_client = (
-    create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                       expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                       market_depth_basemodel_list, top_of_book_list_))
+    create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                       expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                       market_depth_basemodel_list))
 
     if strat_state_to_handle != StratState.StratState_ACTIVE:
         created_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
@@ -209,12 +207,12 @@ def _activate_pair_strat_n_place_sanity_orders(
             config_dict["symbol_configs"][symbol_]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_web_client.trade_simulator_reload_config_query_client()
+        executor_web_client.barter_simulator_reload_config_query_client()
 
         if strat_state_to_handle == StratState.StratState_ACTIVE:
-            place_sanity_orders_for_executor(
-                buy_symbol, sell_symbol, total_order_count_for_each_side_, last_trade_fixture_list,
-                top_of_book_list_, residual_wait_sec, executor_web_client)
+            place_sanity_chores_for_executor(
+                buy_symbol, sell_symbol, total_chore_count_for_each_side_, last_barter_fixture_list,
+                residual_wait_sec, executor_web_client)
     except AssertionError as e_:
         raise AssertionError(e_)
     except Exception as e_:
@@ -227,9 +225,9 @@ def _activate_pair_strat_n_place_sanity_orders(
     return created_pair_strat, executor_web_client, strat_state_to_handle
 
 
-def _check_place_orders_post_pair_strat_n_executor_recovery(
+def _check_place_chores_post_pair_strat_n_executor_recovery(
         updated_pair_strat: PairStratBaseModel,
-        top_of_book_list_, last_trade_fixture_list, refresh_sec, total_order_count_for_each_side=2):
+        last_barter_fixture_list, refresh_sec, total_chore_count_for_each_side=2):
     residual_wait_sec = 4 * refresh_sec
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{updated_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -246,15 +244,13 @@ def _check_place_orders_post_pair_strat_n_executor_recovery(
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        new_executor_web_client.trade_simulator_reload_config_query_client()
+        new_executor_web_client.barter_simulator_reload_config_query_client()
 
-        # To update tob without triggering any order
-        run_buy_top_of_book(buy_symbol, sell_symbol, new_executor_web_client,
-                            top_of_book_list_[0], avoid_order_trigger=True)
+        update_market_depth(new_executor_web_client)
 
-        place_sanity_orders_for_executor(
-            buy_symbol, sell_symbol, total_order_count_for_each_side, last_trade_fixture_list,
-            top_of_book_list_, residual_wait_sec, new_executor_web_client, place_after_recovery=True)
+        place_sanity_chores_for_executor(
+            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            residual_wait_sec, new_executor_web_client, place_after_recovery=True)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -269,7 +265,7 @@ def _check_place_orders_post_pair_strat_n_executor_recovery(
 def test_pair_strat_n_executor_crash_recovery(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     pair_strat_n_strat_state_tuple_list: List[Tuple[PairStratBaseModel, StratState]] = []
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
@@ -279,14 +275,14 @@ def test_pair_strat_n_executor_crash_recovery(
     for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(strat_state_list)]):
         symbols_n_strat_state_list.append((symbol_tuple[0], symbol_tuple[1], strat_state_list[index]))
 
-    total_order_count_for_each_side_ = 1
+    total_chore_count_for_each_side_ = 1
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_strat_state_list)) as executor:
-        results = [executor.submit(_activate_pair_strat_n_place_sanity_orders, buy_symbol, sell_symbol,
+        results = [executor.submit(_activate_pair_strat_n_place_sanity_chores, buy_symbol, sell_symbol,
                                    deepcopy(pair_strat_),
                                    deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
-                                   deepcopy(symbol_overview_obj_list), deepcopy(top_of_book_list_),
-                                   deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
-                                   strat_state_to_handle, refresh_sec_update_fixture, total_order_count_for_each_side_)
+                                   deepcopy(symbol_overview_obj_list),
+                                   deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
+                                   strat_state_to_handle, refresh_sec_update_fixture, total_chore_count_for_each_side_)
                    for buy_symbol, sell_symbol, strat_state_to_handle in symbols_n_strat_state_list]
 
         for future in concurrent.futures.as_completed(results):
@@ -304,12 +300,11 @@ def test_pair_strat_n_executor_crash_recovery(
         if strat_state_to_handle == StratState.StratState_ACTIVE:
             active_pair_strat_id = pair_strat.id
     recovered_active_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat_id)
-    total_order_count_for_each_side = 2
+    total_chore_count_for_each_side = 2
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        results = [executor.submit(_check_place_orders_post_pair_strat_n_executor_recovery, recovered_active_strat,
-                                   deepcopy(top_of_book_list_),
-                                   deepcopy(last_trade_fixture_list), residual_wait_sec,
-                                   total_order_count_for_each_side)]
+        results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_active_strat,
+                                   deepcopy(last_barter_fixture_list), residual_wait_sec,
+                                   total_chore_count_for_each_side)]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -419,57 +414,56 @@ def check_all_cache(pair_strat_n_strat_state_tuple_list: List[Tuple[PairStratBas
                  f"cached symbol_side_snapshot: {cached_symbol_side_snapshot_list}, "
                  f"stored symbol_side_snapshot: {symbol_side_snapshot_list}")
 
-            # checking order_journal
-            order_journal_list: List[OrderJournalBaseModel] = (
-                executor_http_client.get_all_order_journal_client())
-            cached_order_journal_list: List[OrderJournalBaseModel] = (
-                executor_http_client.get_order_journals_from_cache_query_client())
-            assert order_journal_list == cached_order_journal_list, \
-                ("Mismatched: cached order_journal is not same as stored order_journal, "
-                 f"cached order_journal: {cached_order_journal_list}, "
-                 f"stored order_journal: {order_journal_list}")
+            # checking chore_journal
+            chore_journal_list: List[ChoreJournalBaseModel] = (
+                executor_http_client.get_all_chore_journal_client())
+            cached_chore_journal_list: List[ChoreJournalBaseModel] = (
+                executor_http_client.get_chore_journals_from_cache_query_client())
+            assert chore_journal_list == cached_chore_journal_list, \
+                ("Mismatched: cached chore_journal is not same as stored chore_journal, "
+                 f"cached chore_journal: {cached_chore_journal_list}, "
+                 f"stored chore_journal: {chore_journal_list}")
 
-            # checking order_snapshot
-            order_snapshot_list: List[OrderSnapshotBaseModel] = (
-                executor_http_client.get_all_order_snapshot_client())
-            cached_order_snapshot_list: List[OrderSnapshotBaseModel] = (
-                executor_http_client.get_order_snapshots_from_cache_query_client())
-            assert order_snapshot_list == cached_order_snapshot_list, \
-                ("Mismatched: cached order_snapshot is not same as stored order_snapshot, "
-                 f"cached order_snapshot: {cached_order_snapshot_list}, "
-                 f"stored order_snapshot: {order_snapshot_list}")
+            # checking chore_snapshot
+            chore_snapshot_list: List[ChoreSnapshotBaseModel] = (
+                executor_http_client.get_all_chore_snapshot_client())
+            cached_chore_snapshot_list: List[ChoreSnapshotBaseModel] = (
+                executor_http_client.get_chore_snapshots_from_cache_query_client())
+            assert chore_snapshot_list == cached_chore_snapshot_list, \
+                ("Mismatched: cached chore_snapshot is not same as stored chore_snapshot, "
+                 f"cached chore_snapshot: {cached_chore_snapshot_list}, "
+                 f"stored chore_snapshot: {chore_snapshot_list}")
 
 
 @pytest.mark.recovery
 def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     """
-    Creates 8 strats, activates and places one order each side, then converts pair of strats
+    Creates 8 strats, activates and places one chore each side, then converts pair of strats
     to PAUSE, ERROR and READY, then kills pair strat and executors then recovers all and activates all again
-    and places 2 orders each side per strat and kills pair strat and executors again and again recovers and places
-    1 order each side per strat again
+    and places 2 chores each side per strat and kills pair strat and executors again and again recovers and places
+    1 chore each side per strat again
     """
     pair_strat_n_strat_state_tuple_list: List[Tuple[PairStratBaseModel, StratState]] = []
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
     symbols_n_strat_state_list = []
 
-    # Starting 8 strats - all active and places 1 order each side
+    # Starting 8 strats - all active and places 1 chore each side
     strat_state_list = [StratState.StratState_ACTIVE]*6 + [StratState.StratState_READY]*2
     for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(strat_state_list)]):
         symbols_n_strat_state_list.append((symbol_tuple[0], symbol_tuple[1], strat_state_list[index]))
 
-    total_order_count_for_each_side_ = 1
+    total_chore_count_for_each_side_ = 1
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_strat_state_list)) as executor:
-        results = [executor.submit(_activate_pair_strat_n_place_sanity_orders, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_),
-                                   deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
-                                   deepcopy(symbol_overview_obj_list), deepcopy(top_of_book_list_),
-                                   deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
+        results = [executor.submit(_activate_pair_strat_n_place_sanity_chores, buy_symbol, sell_symbol,
+                                   deepcopy(pair_strat_), deepcopy(expected_strat_limits_),
+                                   deepcopy(expected_strat_status_), deepcopy(symbol_overview_obj_list),
+                                   deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    strat_state_to_handle, refresh_sec_update_fixture,
-                                   total_order_count_for_each_side_)
+                                   total_chore_count_for_each_side_)
                    for buy_symbol, sell_symbol, strat_state_to_handle in symbols_n_strat_state_list]
 
         for future in concurrent.futures.as_completed(results):
@@ -517,12 +511,11 @@ def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
         recovered_active_strat = email_book_service_native_web_client.get_pair_strat_client(pair_strat.id)
         recovered_active_strat_list.append(recovered_active_strat)
 
-    total_order_count_for_each_side = 1
+    total_chore_count_for_each_side = 1
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(recovered_active_strat_list)) as executor:
-        results = [executor.submit(_check_place_orders_post_pair_strat_n_executor_recovery, recovered_pair_strat,
-                                   deepcopy(top_of_book_list_),
-                                   deepcopy(last_trade_fixture_list), residual_wait_sec,
-                                   total_order_count_for_each_side)
+        results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_pair_strat,
+                                   deepcopy(last_barter_fixture_list), residual_wait_sec,
+                                   total_chore_count_for_each_side)
                    for recovered_pair_strat in recovered_active_strat_list]
 
         for future in concurrent.futures.as_completed(results):
@@ -536,10 +529,9 @@ def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
     check_all_cache(pair_strat_n_strat_state_tuple_list)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_n_strat_state_tuple_list)) as executor:
-        results = [executor.submit(_check_place_orders_post_pair_strat_n_executor_recovery, recovered_pair_strat,
-                                   deepcopy(top_of_book_list_),
-                                   deepcopy(last_trade_fixture_list), residual_wait_sec,
-                                   total_order_count_for_each_side)
+        results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_pair_strat,
+                                   deepcopy(last_barter_fixture_list), residual_wait_sec,
+                                   total_chore_count_for_each_side)
                    for recovered_pair_strat, _ in pair_strat_n_strat_state_tuple_list]
 
         for future in concurrent.futures.as_completed(results):
@@ -551,7 +543,7 @@ def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
 def test_recover_snoozed_n_activate_strat_after_recovery(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -566,12 +558,11 @@ def test_recover_snoozed_n_activate_strat_after_recovery(
 
     active_strat, executor_web_client = move_snoozed_pair_strat_to_ready_n_then_active(
         stored_pair_strat_basemodel, market_depth_basemodel_list,
-        symbol_overview_obj_list, top_of_book_list_,
-        expected_strat_limits_, expected_strat_status_)
+        symbol_overview_obj_list, expected_strat_limits_, expected_strat_status_)
 
-    # running Last Trade
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    print(f"LastTrade created: buy_symbol: {leg1_symbol}, sell_symbol: {leg2_symbol}")
+    # running Last Barter
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    print(f"LastBarter created: buy_symbol: {leg1_symbol}, sell_symbol: {leg2_symbol}")
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -584,12 +575,12 @@ def test_recover_snoozed_n_activate_strat_after_recovery(
             config_dict["symbol_configs"][symbol_]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_web_client.trade_simulator_reload_config_query_client()
+        executor_web_client.barter_simulator_reload_config_query_client()
 
-        total_order_count_for_each_side_ = 1
-        place_sanity_orders_for_executor(
-            leg1_symbol, leg2_symbol, total_order_count_for_each_side_, last_trade_fixture_list,
-            top_of_book_list_, residual_wait_sec, executor_web_client)
+        total_chore_count_for_each_side_ = 1
+        place_sanity_chores_for_executor(
+            leg1_symbol, leg2_symbol, total_chore_count_for_each_side_, last_barter_fixture_list,
+            residual_wait_sec, executor_web_client)
     except AssertionError as e_:
         raise AssertionError(e_)
     except Exception as e_:
@@ -601,7 +592,7 @@ def test_recover_snoozed_n_activate_strat_after_recovery(
 
 
 def _test_post_pair_strat_crash_recovery(updated_pair_strat: PairStratBaseModel, executor_web_client,
-        top_of_book_list_, last_trade_fixture_list, refresh_sec):
+                                         last_barter_fixture_list, refresh_sec):
     residual_wait_sec = 4 * refresh_sec
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{updated_pair_strat.id}_simulate_config.yaml"
@@ -620,12 +611,12 @@ def _test_post_pair_strat_crash_recovery(updated_pair_strat: PairStratBaseModel,
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_web_client.trade_simulator_reload_config_query_client()
+        executor_web_client.barter_simulator_reload_config_query_client()
 
-        total_order_count_for_each_side = 2
-        place_sanity_orders_for_executor(
-            buy_symbol, sell_symbol, total_order_count_for_each_side, last_trade_fixture_list,
-            top_of_book_list_, residual_wait_sec, executor_web_client, place_after_recovery=True)
+        total_chore_count_for_each_side = 2
+        place_sanity_chores_for_executor(
+            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            residual_wait_sec, executor_web_client, place_after_recovery=True)
 
         new_portfolio_status: PortfolioStatusBaseModel = (
             email_book_service_native_web_client.get_portfolio_status_client(1))
@@ -665,7 +656,7 @@ def _test_post_pair_strat_crash_recovery(updated_pair_strat: PairStratBaseModel,
 def test_pair_strat_crash_recovery(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     activated_strat_n_executor_http_client_tuple_list: List[Tuple[PairStrat, StreetBookServiceHttpClient]] = []
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
@@ -676,15 +667,15 @@ def test_pair_strat_crash_recovery(
     for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(strat_state_list)]):
         symbols_n_strat_state_list.append((symbol_tuple[0], symbol_tuple[1], strat_state_list[index]))
 
-    total_order_count_for_each_side_ = 1
+    total_chore_count_for_each_side_ = 1
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_strat_state_list)) as executor:
-        results = [executor.submit(_activate_pair_strat_n_place_sanity_orders, buy_symbol, sell_symbol,
+        results = [executor.submit(_activate_pair_strat_n_place_sanity_chores, buy_symbol, sell_symbol,
                                    deepcopy(pair_strat_),
                                    deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
-                                   deepcopy(symbol_overview_obj_list), deepcopy(top_of_book_list_),
-                                   deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
+                                   deepcopy(symbol_overview_obj_list),
+                                   deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    strat_state_to_handle, refresh_sec_update_fixture,
-                                   total_order_count_for_each_side_)
+                                   total_chore_count_for_each_side_)
                    for buy_symbol, sell_symbol, strat_state_to_handle in symbols_n_strat_state_list]
 
         for future in concurrent.futures.as_completed(results):
@@ -750,12 +741,11 @@ def test_pair_strat_crash_recovery(
         if strat_state_to_handle == StratState.StratState_ACTIVE:
             active_pair_strat_id = pair_strat.id
     recovered_active_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat_id)
-    total_order_count_for_each_side = 2
+    total_chore_count_for_each_side = 2
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        results = [executor.submit(_check_place_orders_post_pair_strat_n_executor_recovery, recovered_active_strat,
-                                   deepcopy(top_of_book_list_),
-                                   deepcopy(last_trade_fixture_list), residual_wait_sec,
-                                   total_order_count_for_each_side)]
+        results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_active_strat,
+                                   deepcopy(last_barter_fixture_list), residual_wait_sec,
+                                   total_chore_count_for_each_side)]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -766,13 +756,13 @@ def test_pair_strat_crash_recovery(
 def test_update_pair_strat_from_pair_strat_log_book(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
-        expected_order_limits_, refresh_sec_update_fixture):
+        market_depth_basemodel_list, last_barter_fixture_list,
+        expected_chore_limits_, refresh_sec_update_fixture):
     """
     INFO: created strat and activates it with low max_single_leg_notional so consumable_notional becomes low and
-    order_limits.min_order_notional is made higher than consumable_notional intentionally.
-    After this pair_strat engine process is killed and since executor service is still up, triggers place order
-    which results in getting rejected as strat is found as Done because of consumable_notional < ol.min_order_notional
+    chore_limits.min_chore_notional is made higher than consumable_notional intentionally.
+    After this pair_strat engine process is killed and since executor service is still up, triggers place chore
+    which results in getting rejected as strat is found as Done because of consumable_notional < ol.min_chore_notional
     and pair_start is tried to be updated as Done but pair_strat engine is down so executor logs this
     as log to be handled by pair_strat log analyzer once pair_strat is up. pair_strat is restarted and
     then test checks state must be Done
@@ -781,9 +771,9 @@ def test_update_pair_strat_from_pair_strat_log_book(
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    expected_order_limits_.min_order_notional = 1000
-    expected_order_limits_.id = 1
-    email_book_service_native_web_client.put_order_limits_client(expected_order_limits_)
+    expected_chore_limits_.min_chore_notional = 1000
+    expected_chore_limits_.id = 1
+    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_)
 
     # create pair_strat
     expected_strat_limits_.max_single_leg_notional = 100
@@ -792,7 +782,7 @@ def test_update_pair_strat_from_pair_strat_log_book(
 
     activated_pair_strat, executor_web_client = create_n_activate_strat(
         leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, top_of_book_list_, market_depth_basemodel_list)
+        symbol_overview_obj_list, market_depth_basemodel_list)
 
     time.sleep(5)
 
@@ -808,11 +798,11 @@ def test_update_pair_strat_from_pair_strat_log_book(
     else:
         assert False, f"Unexpected: Can't kill process - Can't find any pid from port {activated_pair_strat.port}"
 
-    total_order_count_for_each_side = 1
-    place_sanity_orders_for_executor(
-        leg1_symbol, leg2_symbol, total_order_count_for_each_side, last_trade_fixture_list,
-        top_of_book_list_, residual_wait_sec, executor_web_client, place_after_recovery=True,
-        expect_no_order=True)
+    total_chore_count_for_each_side = 1
+    place_sanity_chores_for_executor(
+        leg1_symbol, leg2_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+        residual_wait_sec, executor_web_client, place_after_recovery=True,
+        expect_no_chore=True)
 
     time.sleep(5)
     pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],
@@ -826,11 +816,11 @@ def test_update_pair_strat_from_pair_strat_log_book(
 
 
 @pytest.mark.recovery
-def test_recover_kill_switch_when_trading_server_has_enabled(
+def test_recover_kill_switch_when_bartering_server_has_enabled(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_trade_fixture_list,
-        market_depth_basemodel_list, top_of_book_list_, refresh_sec_update_fixture):
+        symbol_overview_obj_list, last_barter_fixture_list,
+        market_depth_basemodel_list, refresh_sec_update_fixture):
 
     config_file_path = STRAT_EXECUTOR / "data" / f"kill_switch_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -868,13 +858,13 @@ def test_recover_kill_switch_when_trading_server_has_enabled(
             ("Kill Switch must be triggered and enabled after restart according to test configuration but "
              "kill switch found False")
 
-        # validating if trading_link.trigger_kill_switch got called
-        check_str = "Called TradingLink.TradingLink.trigger_kill_switch"
+        # validating if bartering_link.trigger_kill_switch got called
+        check_str = "Called BarteringLink.BarteringLink.trigger_kill_switch"
         portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
         for alert in portfolio_alert.alerts:
             if re.search(check_str, alert.alert_brief):
                 assert False, \
-                    ("TradingLink.trigger_kill_switch must not have been triggered when kill switch is enabled in"
+                    ("BarteringLink.trigger_kill_switch must not have been triggered when kill switch is enabled in"
                      "db by start-up check")
 
     except AssertionError as e:
@@ -890,11 +880,11 @@ def test_recover_kill_switch_when_trading_server_has_enabled(
 
 
 @pytest.mark.recovery
-def test_recover_kill_switch_when_trading_server_has_disabled(
+def test_recover_kill_switch_when_bartering_server_has_disabled(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_trade_fixture_list,
-        market_depth_basemodel_list, top_of_book_list_, refresh_sec_update_fixture):
+        symbol_overview_obj_list, last_barter_fixture_list,
+        market_depth_basemodel_list, refresh_sec_update_fixture):
 
     residual_wait_sec = 4 * refresh_sec_update_fixture
     system_control = SystemControlBaseModel(_id=1, kill_switch=True)
@@ -935,8 +925,8 @@ def test_recover_kill_switch_when_trading_server_has_disabled(
         assert system_control.kill_switch, \
             "Kill Switch must be unchanged after restart but found changed, kill_switch found as False"
 
-        # validating if trading_link.trigger_kill_switch got called
-        check_str = "Called TradingLink.trigger_kill_switch"
+        # validating if bartering_link.trigger_kill_switch got called
+        check_str = "Called BarteringLink.trigger_kill_switch"
         portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
         for alert in portfolio_alert.alerts:
             if re.search(check_str, alert.alert_brief):

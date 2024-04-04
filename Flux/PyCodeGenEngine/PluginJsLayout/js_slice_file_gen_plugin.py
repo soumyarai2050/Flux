@@ -161,7 +161,14 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             if message.proto.name not in self.dependent_to_abbreviated_relation_msg_name_dict.values():
                 if message.proto.name in self.repeated_layout_msg_name_list:
                     # Repeated case
-                    output_str += "import { getErrorDetails, applyWebSocketUpdate } from '../utils';\n\n"
+                    output_str += ("import { getErrorDetails, applyWebSocketUpdate, clearxpath, addxpath")
+                    if BaseJSLayoutPlugin.is_option_enabled(message,
+                                                            BaseJSLayoutPlugin.flux_msg_widget_ui_data_element):
+                        option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+                            message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+                        if option_dict.get("is_model_alert_type"):
+                            output_str += ", sortAlertArray"
+                    output_str += " } from '../utils';\n\n"
                 else:
                     # Independent case
                     output_str += "import {\n"
@@ -199,17 +206,32 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                       " async (payload, { rejectWithValue }) => " + "{\n"
         if (not self.current_message_is_dependent and
                 self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
+            widget_ui_option_value = JsSliceFileGenPlugin.get_complex_option_value_from_proto(
+                message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element)
+            get_all_override_default_crud = self._get_override_default_get_all_crud(widget_ui_option_value)
             if (message_name in self.repeated_layout_msg_name_list and
                     JsSliceFileGenPlugin.is_option_enabled(message, JsSliceFileGenPlugin.flux_msg_ui_get_all_limit)):
-                output_str += "    const { url, uiLimit } = payload;\n"
-                output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
-                output_str += ("    return axios.get(`${serverUrl}/" +
-                               f"get-all-{message_name_snake_cased}?limit_obj_count="
-                               "${uiLimit}`)\n")
+                if get_all_override_default_crud:
+                    output_str += "    const { url, uiLimit, endpoint, param } = payload;\n"
+                    output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+                    output_str += ("    return axios.get(`${serverUrl}/${endpoint}?"
+                                   "limit_obj_count=${uiLimit}&${param}`)\n")
+                else:
+                    output_str += "    const { url, uiLimit } = payload;\n"
+                    output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+                    output_str += ("    return axios.get(`${serverUrl}/" +
+                                   f"get-all-{message_name_snake_cased}?limit_obj_count="
+                                   "${uiLimit}`)\n")
             else:
-                output_str += "    const { url } = payload;\n"
-                output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
-                output_str += "    return axios.get(`${serverUrl}/" + f"get-all-{message_name_snake_cased}`)\n"
+                if get_all_override_default_crud:
+                    output_str += "    const { endpoint, param } = payload;\n"
+                    output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+                    output_str += "    return axios.get(`${serverUrl}/${endpoint}?${param}`)\n"
+                else:
+                    output_str += "    const { url } = payload;\n"
+                    output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+                    output_str += "    return axios.get(`${serverUrl}/" + (
+                        f"get-all-{message_name_snake_cased}`)\n")
         else:
             if (message_name in self.repeated_layout_msg_name_list and
                     JsSliceFileGenPlugin.is_option_enabled(message, JsSliceFileGenPlugin.flux_msg_ui_get_all_limit)):
@@ -366,17 +388,14 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         elif self.current_message_is_dependent:
             output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
         elif message_name in self.repeated_layout_msg_name_list:
-            output_str += f"            state.{message_name_camel_cased} = action.payload;\n"
+            output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [getAll{message_name}.rejected]: (state, action) => " + "{\n"
         output_str += "            let { code, message, detail, status } = action.payload;\n"
         output_str += "            state.error = { code, message, detail, status };\n"
         output_str += f"            state.loading = false;\n"
-        if message_name in self.repeated_layout_msg_name_list:
-            output_str += "        }\n"
-        else:
-            output_str += "        },\n"
+        output_str += "        },\n"
         if message_name in self.dependent_to_abbreviated_relation_msg_name_dict:
             output_str += (f"        [getAll{message_name}Background"
                            ".fulfilled]: (state, action) => {\n")
@@ -409,15 +428,22 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.error = null;\n"
         output_str += "        },\n"
         output_str += f"        [create{message_name}.fulfilled]: (state, action) => " + "{\n"
-        output_str += f"            state.{message_name_camel_cased} = action.payload;\n"
-        output_str += f"            state.modified{message_name} = action.payload;\n"
-        if message_name in self.dependent_to_abbreviated_relation_msg_name_dict.values():
-            output_str += f"            state.selected{message_name}Id = action.payload[DB_ID];\n"
-        elif self.current_message_is_dependent:
-            output_str += f"            state.{message_name_camel_cased}Array = " \
-                          f"[...state.{message_name_camel_cased}Array, action.payload];\n"
-        elif not self.current_message_is_dependent and message_name != self.__ui_layout_msg_name:
-            output_str += f"            state.selected{message_name}Id = action.payload[DB_ID];\n"
+        if message_name in self.repeated_layout_msg_name_list:
+            output_str += (f"            state.{message_name_camel_cased}Array = "
+                           f"[...state.{message_name_camel_cased}Array, action.payload];\n")
+            output_str += f"            state.{message_name_camel_cased} = " + "{};\n"
+            output_str += f"            state.modified{message_name} = " + "{};\n"
+            output_str += f"            state.selected{message_name}Id = null;\n"
+        else:
+            output_str += f"            state.{message_name_camel_cased} = action.payload;\n"
+            output_str += f"            state.modified{message_name} = action.payload;\n"
+            if message_name in self.dependent_to_abbreviated_relation_msg_name_dict.values():
+                output_str += f"            state.selected{message_name}Id = action.payload[DB_ID];\n"
+            elif self.current_message_is_dependent:
+                output_str += f"            state.{message_name_camel_cased}Array = " \
+                              f"[...state.{message_name_camel_cased}Array, action.payload];\n"
+            elif not self.current_message_is_dependent and message_name != self.__ui_layout_msg_name:
+                output_str += f"            state.selected{message_name}Id = action.payload[DB_ID];\n"
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [create{message_name}.rejected]: (state, action) => " + "{\n"
@@ -437,6 +463,11 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.error = null;\n"
         output_str += "        },\n"
         output_str += f"        [update{message_name}.fulfilled]: (state, action) => " + "{\n"
+        if message_name in self.repeated_layout_msg_name_list:
+            output_str += f"            const idx = state.{message_name_camel_cased}Array.findIndex(obj => obj[DB_ID] === action.payload[DB_ID]);\n"
+            output_str += "            if (idx !== -1) {\n"
+            output_str += f"                state.{message_name_camel_cased}Array[idx] = action.payload;\n"
+            output_str += "            }\n"
         output_str += f"            state.{message_name_camel_cased} = action.payload;\n"
         output_str += f"            state.modified{message_name} = action.payload;\n"
         output_str += f"            state.loading = false;\n"
@@ -563,13 +594,10 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         message_name_camel_cased = capitalized_to_camel_case(message_name)
         output_str += "/* initial redux state */\n"
         output_str += f"const initialState = " + "{\n"
-        if message_name not in self.repeated_layout_msg_name_list:
-            output_str += f"    {message_name_camel_cased}Array: [],\n"
-            output_str += f"    {message_name_camel_cased}: " + "{},\n"
-            output_str += f"    modified{message_name}: " + "{},\n"
-            output_str += f"    selected{message_name}Id: null,\n"
-        else:
-            output_str += f"    {message_name_camel_cased}: " + "[],\n"
+        output_str += f"    {message_name_camel_cased}Array: [],\n"
+        output_str += f"    {message_name_camel_cased}: " + "{},\n"
+        output_str += f"    modified{message_name}: " + "{},\n"
+        output_str += f"    selected{message_name}Id: null,\n"
         if message_name == self.__ui_layout_msg_name:
             output_str += "    loading: true,\n"
         else:
@@ -601,8 +629,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += self.handle_get_all_export_out_str(message, message_name_camel_cased)
         if message_name not in self.repeated_layout_msg_name_list:
             output_str += self.handle_get_export_out_str(message_name, message_name_camel_cased)
-            output_str += self.handle_create_export_out_str(message, message_name_camel_cased)
-            output_str += self.handle_update_export_out_str(message, message_name, message_name_camel_cased)
+        output_str += self.handle_create_export_out_str(message, message_name_camel_cased)
+        output_str += self.handle_update_export_out_str(message, message_name, message_name_camel_cased)
         output_str += self.handle_additional_async_helper_actions(message)
         output_str += f"const {message_name_camel_cased}Slice = createSlice(" + "{\n"
         output_str += f"    name: '{message_name_camel_cased}',\n"
@@ -768,14 +796,30 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"            state.modified{message_name} = initialState.modified{message_name};\n"
             output_str += "        },\n"
         else:
-            output_str += f"        set{message_name}Ws: (state, action) => "+"{\n"
-            output_str += "            const { dict, uiLimit } = action.payload;\n"
-            output_str += f"            let updated{message_name} = state.{message_name_camel_cased};\n"
-            output_str += "            _.values(dict).forEach(v => {\n"
-            output_str += f"                updated{message_name} = applyWebSocketUpdate(updated{message_name}, " \
-                          f"v, uiLimit);\n"
-            output_str += "            })\n"
-            output_str += f"            state.{message_name_camel_cased} = updated{message_name};\n"
+            output_str += f"        set{message_name}ArrayWs: (state, action) => "+"{\n"
+            output_str += "            const { data } = action.payload;\n"
+            # output_str += f"            let updated{message_name}Array = state.{message_name_camel_cased}Array;\n"
+            # output_str += "            Object.values(dict).forEach(v => {\n"
+            # output_str += (f"                updated{message_name}Array = applyWebSocketUpdate("
+            #                f"updated{message_name}Array, v, uiLimit, true);\n")
+            # output_str += "            })\n"
+            # if BaseJSLayoutPlugin.is_option_enabled(message,
+            #                                         BaseJSLayoutPlugin.flux_msg_widget_ui_data_element):
+            #     option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+            #         message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+            #     if option_dict.get("is_model_alert_type"):
+            #         output_str += f"            sortAlertArray(updated{message_name}Array);\n"
+            # output_str += f"            state.{message_name_camel_cased}Array = updated{message_name}Array;\n"
+            output_str += f"            state.{message_name_camel_cased}Array = data;\n"
+            output_str += "        },\n"
+            output_str += f"        set{message_name}: (state, action) => " + "{\n"
+            output_str += f"            state.{message_name_camel_cased} = action.payload;\n"
+            output_str += "        },\n"
+            output_str += f"        setModified{message_name}: (state, action) => " + "{\n"
+            output_str += f"            state.modified{message_name} = action.payload;\n"
+            output_str += "        },\n"
+            output_str += f"        setSelected{message_name}Id: (state, action) => " + "{\n"
+            output_str += f"            state.selected{message_name}Id = action.payload;\n"
             output_str += "        },\n"
             if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
                 output_str += (f"        reset{message_name}: (state, action) => "
@@ -840,8 +884,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += self.handle_get_all_out_str(message, message_name_camel_cased)
         if message_name not in self.repeated_layout_msg_name_list:
             output_str += self.handle_get_out_str(message_name, message_name_camel_cased)
-            output_str += self.handle_create_out_str(message_name, message_name_camel_cased)
-            output_str += self.handle_update_out_str(message, message_name, message_name_camel_cased)
+        output_str += self.handle_create_out_str(message_name, message_name_camel_cased)
+        output_str += self.handle_update_out_str(message, message_name, message_name_camel_cased)
         output_str += "    }\n"
         output_str += "})\n\n"
         output_str += f"export default {message_name_camel_cased}Slice.reducer;\n\n"
@@ -866,12 +910,14 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "\n"
             output_str += "} = " + f"{message_name_camel_cased}Slice.actions;\n"
         else:
-            output_str += "export const { " + f"set{message_name}Ws, resetError" \
-                          f", setUserChanges, setDiscardedChanges, setActiveChanges"
+            output_str += "export const {\n"
+            output_str += (f"    set{message_name}ArrayWs, set{message_name}, setModified{message_name}, "
+                           f"setSelected{message_name}Id,\n")
+            output_str += "    resetError, setUserChanges, setDiscardedChanges, setActiveChanges, setOpenWsPopup\n"
             if (message_name in self.repeated_layout_msg_name_list and
                     self._get_ui_msg_dependent_msg_name_from_another_proto(message)):
                 output_str += f", setUrl, reset{message_name}"
-            output_str += " }" + f" = {message_name_camel_cased}Slice.actions;\n"
+            output_str += "}" + f" = {message_name_camel_cased}Slice.actions;\n"
 
         return output_str
 

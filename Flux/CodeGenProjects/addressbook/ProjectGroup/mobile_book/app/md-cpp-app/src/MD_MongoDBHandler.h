@@ -1,7 +1,7 @@
 #pragma once
 #include <iostream>
 #include <sstream>
-#include <unordered_map>
+#include <unchoreed_map>
 
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/json.hpp>
@@ -28,7 +28,7 @@ namespace md_handler {
     const std::string mobile_book_history = "RawMarketDepthHistory";
     const std::string market_depth = "MarketDepth";
     const std::string top_of_book = "TopOfBook";
-    const std::string last_trade = "LastTrade";
+    const std::string last_barter = "LastBarter";
 
 //key constants used across classes via constants for consistency
     const std::string symbol_key = "symbol";

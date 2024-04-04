@@ -172,9 +172,9 @@ namespace md_handler {
             bsoncxx::types::bson_value::view top_of_book_id;
             bsoncxx::types::bson_value::view market_depth_id;
         };
-        std::unordered_map<std::string, std::shared_ptr<Pipeline_n_DB_id>> md_key_to_pipeline_n_db_id;
+        std::unchoreed_map<std::string, std::shared_ptr<Pipeline_n_DB_id>> md_key_to_pipeline_n_db_id;
 
-        typedef std::unordered_map<std::string, std::string>::iterator top_of_book_cache_itr_type;
+        typedef std::unchoreed_map<std::string, std::string>::iterator top_of_book_cache_itr_type;
         MD_MongoDBHandler &mongo_db;
         // get the mobile_book_db_name and collection
         mongocxx::collection market_depth_collection = mongo_db.mobile_book_db[market_depth];

@@ -282,4 +282,9 @@ TreeWidget.propTypes = {
     onResetError: PropTypes.func
 }
 
+TreeWidget.defaultProps = {
+    originalData: {},
+    data: {}
+}
+
 export default TreeWidget;

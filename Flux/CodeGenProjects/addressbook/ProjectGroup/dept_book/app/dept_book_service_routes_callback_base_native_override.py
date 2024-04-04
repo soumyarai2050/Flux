@@ -4,7 +4,7 @@ from pendulum import DateTime
 from Flux.CodeGenProjects.dept_book.generated.Pydentic.dept_book_service_model_imports import *
 from Flux.CodeGenProjects.dept_book.generated.FastApi.dept_book_service_routes_callback import \
     DeptBookServiceRoutesCallback
-from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.dept_book_service_helper import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import *
 
 
 class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallback):
@@ -28,14 +28,14 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                                                           end_date_time: DateTime | None = None):
         from Flux.CodeGenProjects.dept_book.generated.FastApi.dept_book_service_http_routes import \
             underlying_read_bar_data_http
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import get_vwap_projection_from_bar_data_agg_pipeline
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import get_vwap_projection_from_bar_data_agg_pipeline
         bar_data_projection_list = await underlying_read_bar_data_http(
             get_vwap_projection_from_bar_data_agg_pipeline(symbol, exch_id, start_date_time, end_date_time),
             projection_model=BarDataProjectionContainerForVwap)
         return bar_data_projection_list
 
     async def get_vwap_projection_from_bar_data_query_ws_pre(self):
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import get_vwap_projection_from_bar_data_agg_pipeline
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import get_vwap_projection_from_bar_data_agg_pipeline
         return get_vwap_projection_from_bar_data_filter_callable, get_vwap_projection_from_bar_data_agg_pipeline
 
     async def get_vwap_n_vwap_change_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData],
@@ -44,7 +44,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                                                                         end_date_time: DateTime | None = None):
         from Flux.CodeGenProjects.dept_book.generated.FastApi.dept_book_service_http_routes import \
             underlying_read_bar_data_http
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import (
             get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline)
         bar_data_projection_list = await underlying_read_bar_data_http(
             get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, start_date_time,
@@ -53,7 +53,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         return bar_data_projection_list
 
     async def get_vwap_n_vwap_change_projection_from_bar_data_query_ws_pre(self):
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import (
             get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline)
         return (get_vwap_n_vwap_change_projection_from_bar_data_filter_callable,
                 get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline)
@@ -63,14 +63,14 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                                                                  end_date_time: DateTime | None = None):
         from Flux.CodeGenProjects.dept_book.generated.FastApi.dept_book_service_http_routes import \
             underlying_read_bar_data_http
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import get_vwap_change_projection_from_bar_data_agg_pipeline
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import get_vwap_change_projection_from_bar_data_agg_pipeline
         bar_data_projection_list = await underlying_read_bar_data_http(
             get_vwap_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, start_date_time, end_date_time),
             projection_model=BarDataProjectionContainerForVwapChange)
         return bar_data_projection_list
 
     async def get_vwap_change_projection_from_bar_data_query_ws_pre(self):
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import get_vwap_change_projection_from_bar_data_agg_pipeline
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import get_vwap_change_projection_from_bar_data_agg_pipeline
         return (get_vwap_change_projection_from_bar_data_filter_callable,
                 get_vwap_change_projection_from_bar_data_agg_pipeline)
 
@@ -79,14 +79,14 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                                                              end_date_time: DateTime | None = None):
         from Flux.CodeGenProjects.dept_book.generated.FastApi.dept_book_service_http_routes import \
             underlying_read_bar_data_http
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import get_premium_projection_from_bar_data_agg_pipeline
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import get_premium_projection_from_bar_data_agg_pipeline
         bar_data_projection_list = await underlying_read_bar_data_http(
             get_premium_projection_from_bar_data_agg_pipeline(symbol, exch_id, start_date_time, end_date_time),
             projection_model=BarDataProjectionContainerForPremium)
         return bar_data_projection_list
 
     async def get_premium_projection_from_bar_data_query_ws_pre(self):
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import get_premium_projection_from_bar_data_agg_pipeline
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import get_premium_projection_from_bar_data_agg_pipeline
         return get_premium_projection_from_bar_data_filter_callable, get_premium_projection_from_bar_data_agg_pipeline
 
     async def get_premium_n_premium_change_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData],
@@ -95,7 +95,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                                                                               end_date_time: DateTime | None = None):
         from Flux.CodeGenProjects.dept_book.generated.FastApi.dept_book_service_http_routes import \
             underlying_read_bar_data_http
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import \
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import \
             get_premium_n_premium_change_projection_from_bar_data_agg_pipeline
         bar_data_projection_list = await underlying_read_bar_data_http(
             get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, start_date_time,
@@ -104,7 +104,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         return bar_data_projection_list
 
     async def get_premium_n_premium_change_projection_from_bar_data_query_ws_pre(self):
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import \
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import \
             get_premium_n_premium_change_projection_from_bar_data_agg_pipeline
         return (get_premium_n_premium_change_projection_from_bar_data_filter_callable,
                 get_premium_n_premium_change_projection_from_bar_data_agg_pipeline)
@@ -115,7 +115,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                                                                     end_date_time: DateTime | None = None):
         from Flux.CodeGenProjects.dept_book.generated.FastApi.dept_book_service_http_routes import \
             underlying_read_bar_data_http
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import \
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import \
             get_premium_change_projection_from_bar_data_agg_pipeline
         bar_data_projection_list = await underlying_read_bar_data_http(
             get_premium_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, start_date_time, end_date_time),
@@ -123,7 +123,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         return bar_data_projection_list
 
     async def get_premium_change_projection_from_bar_data_query_ws_pre(self):
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.dept_book.app.aggregate import \
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import \
             get_premium_change_projection_from_bar_data_agg_pipeline
         return (get_premium_change_projection_from_bar_data_filter_callable,
                 get_premium_change_projection_from_bar_data_agg_pipeline)

@@ -22,18 +22,23 @@ cache_override_type: "bare"
 
 # to be used in pair_strat_log_book to take out counts of created from waiting queue to execute create in db
 portfolio_alert_configs:
-  transaction_counts_per_call: 5
-  transaction_timeout_secs: 2  # secs
+  transaction_counts_per_call_for_server: 200
+  transaction_counts_per_call_for_tail_ex: 100
+  transaction_timeout_secs: 5  # secs
 strat_alert_config:
-  transaction_counts_per_call: 5
-  transaction_timeout_secs: 2  # secs
+  transaction_counts_per_call_for_server: 200
+  transaction_counts_per_call_for_tail_ex: 100
+  transaction_timeout_secs: 5  # secs
 raw_perf_data_config:
-  transaction_counts_per_call: 500
+  transaction_counts_per_call_for_server: 500
+  transaction_counts_per_call_for_tail_ex: 200
   transaction_timeout_secs: 60  # secs
-
+max_fetch_from_patch_queue_for_tail_ex: 25
+max_fetch_from_patch_queue_for_server: 50
 # to be used in loop wait in script to update performance analysis data
 raw_performance_data_processor_loop_wait: 2  # sec
 
+regex_list_refresh_time_wait: 30
 is_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
 

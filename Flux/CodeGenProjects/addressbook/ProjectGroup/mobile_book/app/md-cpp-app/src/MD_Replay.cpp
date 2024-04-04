@@ -1,11 +1,11 @@
 #include "MD_MongoDBHandler.h"
 #include "MD_HistoryManager.h"
-#include "MD_LastTradeHandler.h"
+#include "MD_LastBarterHandler.h"
 #include "MD_DepthHandler.h"
 #include "MD_ManageSubscriptionSymbols.h"
 #include "MD_TopOfBookPublisher.h"
 
-std::unordered_map<std::string, std::string> md_handler::MD_TopOfBookPublisher::top_of_book_cache;
+std::unchoreed_map<std::string, std::string> md_handler::MD_TopOfBookPublisher::top_of_book_cache;
 
 
 mongocxx::instance md_handler::MD_MongoDBHandler::inst{};
@@ -24,8 +24,8 @@ int main()
         std::cout << symbol << std::endl;
 
     md_handler::MD_DepthHandler marketDepthHandler(mongo_db);
-    md_handler::MD_LastTradeHandler lastTradeHandler(mongo_db);
-    md_handler::MD_HistoryManager marketDataHistoryManager(mongo_db, marketDepthHandler, lastTradeHandler);
+    md_handler::MD_LastBarterHandler lastBarterHandler(mongo_db);
+    md_handler::MD_HistoryManager marketDataHistoryManager(mongo_db, marketDepthHandler, lastBarterHandler);
     marketDataHistoryManager.replay(md_handler::ReplyType::NOW_ACCELERATE);
     return 0;
 }

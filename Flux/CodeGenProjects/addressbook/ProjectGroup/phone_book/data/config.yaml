@@ -10,6 +10,7 @@ main_server_beanie_port: "8020"
 main_server_cache_port: "8030"
 min_refresh_interval: 20
 custom_logger_lvls:
+  - DB: 25
   - TIMING: 15
   - JUNK: 5
 

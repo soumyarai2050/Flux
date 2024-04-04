@@ -54,7 +54,7 @@ ui_coordinates:
     y: 97
     w: 18
     h: 14
-  LastTrade:
+  LastBarter:
     x: 0
     y: 111
     w: 18
@@ -64,12 +64,12 @@ ui_coordinates:
     y: 125
     w: 18
     h: 20
-  OrderSnapshot:
+  ChoreSnapshot:
     x: 0
     y: 145
     w: 18
     h: 20
-  OrderJournal:
+  ChoreJournal:
     x: 0
     y: 165
     w: 18

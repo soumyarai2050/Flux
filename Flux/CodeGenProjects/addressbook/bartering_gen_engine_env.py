@@ -8,7 +8,7 @@ import sys
 from Flux.code_gen_engine_env import CodeGenEngineEnvManager
 
 
-class TradingGenEngineEnv(CodeGenEngineEnvManager):
+class BarteringGenEngineEnv(CodeGenEngineEnvManager):
 
     def __init__(self):
         super().__init__()

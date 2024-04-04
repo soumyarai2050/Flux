@@ -97,7 +97,8 @@ class CppWebSocketServerPlugin(BaseProtoPlugin):
         for message in self.root_message_list:
             message_name: str = message.proto.name
             message_name_snake_cased: str = convert_camel_case_to_specific_case(message_name)
-            if CppWebSocketServerPlugin.is_option_enabled(message, CppWebSocketServerPlugin.flux_msg_json_root):
+            if (CppWebSocketServerPlugin.is_option_enabled(message, CppWebSocketServerPlugin.flux_msg_json_root) or
+                    CppWebSocketServerPlugin.is_option_enabled(message, CppWebSocketServerPlugin.flux_msg_json_root_time_series)):
                 for field in message.fields:
                     field_name: str = field.proto.name
                     field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
@@ -118,9 +119,9 @@ class CppWebSocketServerPlugin(BaseProtoPlugin):
 
                         output_content += "\t\tbool NewClientCallBack(UserDataType &user_data, int16_t " \
                                           "new_client_web_socket_id) override {\n"
-                        output_content += f"\t\t\t{package_name}::{message_name} root_model_obj = user_data;\n\n"
+                        # output_content += f"\t\t\t{package_name}::{message_name} root_model_obj = user_data;\n\n"
                         output_content += "\t\t\t// Use the publish function with RootModelType\n"
-                        output_content += "\t\t\treturn this->publish(root_model_obj, new_client_web_socket_id);\n"
+                        output_content += "\t\t\treturn this->publish(user_data, new_client_web_socket_id);\n"
                         output_content += "\t\t}\n\t};\n\n"
 
                         output_content += "\ttemplate <typename UserDataType>\n"
@@ -139,9 +140,9 @@ class CppWebSocketServerPlugin(BaseProtoPlugin):
 
                         output_content += "\t\tbool NewClientCallBack(UserDataType &user_data, int16_t " \
                                           "new_client_web_socket_id) override {\n"
-                        output_content += f"\t\t\t{package_name}::{message_name}List root_model_list_obj = user_data;\n\n"
+                        # output_content += f"\t\t\t{package_name}::{message_name}List root_model_list_obj = user_data;\n\n"
                         output_content += "\t\t\t// Use the publish function with RootModelListType\n"
-                        output_content += "\t\t\treturn this->publish(root_model_list_obj, new_client_web_socket_id);\n"
+                        output_content += "\t\t\treturn this->publish(user_data, new_client_web_socket_id);\n"
                         output_content += "\t\t}\n\t};\n\n"
                         break
 

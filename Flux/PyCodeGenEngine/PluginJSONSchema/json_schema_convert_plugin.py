@@ -98,7 +98,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_mapping_src
     ]
     # used to handle option fields having msg_n_field names in set value
-    flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val = ["alert_bubble_source", "alert_bubble_color", "bind_id_fld", "dynamic_widget_title_fld"]
+    flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val = ["alert_bubble_source", "alert_bubble_color", "bind_id_fld", "dynamic_widget_title_fld", "query_param_field_src", "query_src_model_name"]
+    # @LOW todo: query_param_field_src should have same query_src_model_name as src model
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -354,7 +355,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             option_value_colan_sep = option_val.split(":")
             if len(option_value_colan_sep) != 2:
                 err_str = (f"Unsupported option value in {option_name} option, Option value having mapping "
-                           f"syntax using ':' in value must have instance of ':' only once")
+                           f"syntax using ':' in value must have instance of ':' only once;;; option_val: {option_val}")
                 logging.exception(err_str)
                 raise Exception(err_str)
 
@@ -657,8 +658,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
         return json_msg_str
 
-    @staticmethod
-    def parse_python_type_to_json_type_str(value: str) -> str | int | bool | float:
+    def parse_python_type_to_json_type_str(self, value: str) -> str | int | bool | float:
         if isinstance(value, bool):
             return "true" if value else "false"
         elif isinstance(value, str):
@@ -864,12 +864,21 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
             for key, value in option_value.items():
                 if isinstance(value, list):
-                    output_str += self._get_json_formatted_value_str_for_list_n_dict(value, indent_count,
-                                                                                     True)
+                    if key in JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val:
+                        for idx, v in enumerate(value):
+                            v = f"{self.__underlying_handle_options_value_having_msg_fld_name(v, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}"
+                            value[idx] = v
+                    output_str += " " * (indent_count*2) + f'"{key}": [\n'
+                    indent_count += 1
+                    output_str += self._get_json_formatted_value_str_for_list_n_dict(value, indent_count)
+                    indent_count -= 1
+                    output_str += " " * (indent_count * 2) + f']'
                 elif isinstance(value, dict):
                     output_str += self._get_json_formatted_value_str_for_list_n_dict(value, indent_count,
                                                                                      add_dict_key=key)
                 elif isinstance(value, str):
+                    if key in JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val:
+                        value = f"{self.__underlying_handle_options_value_having_msg_fld_name(value, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}"
                     output_str += (" " * (indent_count*2) + f'"{key}": '
                                    f'{self.parse_python_type_to_json_type_str(self.parse_string_to_original_types(value))}')
                 elif isinstance(value, bool):
@@ -909,6 +918,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 indent_count -= 1
                 output_str += " " * (indent_count * 2) + '}'
             elif isinstance(value, str):
+                if key in JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val:
+                    value = f"{self.__underlying_handle_options_value_having_msg_fld_name(value, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}"
                 output_str += " " * (indent_count * 2) + (f'"{key}": '
                               f'{self.parse_python_type_to_json_type_str(self.parse_string_to_original_types(value))}')
             elif isinstance(value, bool):
@@ -936,7 +947,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             for option_value in option_value_dict_or_list:
                 output_str += (" " * ((indent_count*2) + 2) +
                                self._get_json_complex_key_value_dict_str(option_value, indent_count))
-            output_str = " " * (indent_count*2) + f']'
+            output_str += " " * (indent_count*2) + f']'
         output_str += ",\n"
         return output_str
 
@@ -952,10 +963,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
         if "i" not in widget_ui_data_option_value_dict:
             widget_ui_data_option_value_dict["i"] = f"{self.__case_style_convert_method(message.proto.name)}"
-        for option_fld in JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val:
-            if option_fld in widget_ui_data_option_value_dict:
-                widget_ui_data_option_value_dict[option_fld] = \
-                    f"{self.__underlying_handle_options_value_having_msg_fld_name(widget_ui_data_option_value_dict[option_fld], JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}"
 
         indent_count = 2
         json_msg_str = self._get_json_complex_key_value_str(widget_ui_data_key, widget_ui_data_option_value_dict,

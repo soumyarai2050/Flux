@@ -8,12 +8,12 @@ import copy
 os.environ["DBType"] = "beanie"
 
 # Project Imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
-from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 
 
 @pytest.fixture()
@@ -65,7 +65,7 @@ def db_names_list(leg1_leg2_symbol_list):
 
 
 @pytest.fixture
-def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, expected_portfolio_status_,
+def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, expected_portfolio_status_,
                          expected_system_control_, db_names_list):
     # deleting existing executors
     clean_executors_and_today_activated_symbol_side_lock_file()
@@ -75,13 +75,13 @@ def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, exp
     clear_cache_in_model()
 
     # updating portfolio_alert
-    renew_portfolio_alert()
+    clean_portfolio_alert()
 
     # updating strat_collection
     renew_strat_collection()
 
     # setting limits
-    set_n_verify_limits(expected_order_limits_, expected_portfolio_limits_)
+    set_n_verify_limits(expected_chore_limits_, expected_portfolio_limits_)
 
     # creating portfolio_status
     create_n_verify_portfolio_status(copy.deepcopy(expected_portfolio_status_))
@@ -104,12 +104,12 @@ def market_depth_basemodel_list():
     input_data = []
 
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
-        for side, px, qty, dev in [("BID", 109, 90, -1), ("ASK", 121, 70, 1)]:
+        for side, px, qty, dev in [("BID", 99, 90, -1), ("ASK", 121, 70, 1)]:
             input_data.extend([
                 {
                     "symbol": symbol,
-                    "exch_time": "2023-02-13T20:30:30.165Z",
-                    "arrival_time": "2023-02-13T20:30:30.165Z",
+                    "exch_time": get_utc_date_time(),
+                    "arrival_time": get_utc_date_time(),
                     "side": side,
                     "px": px,
                     "qty": qty+10,
@@ -119,8 +119,8 @@ def market_depth_basemodel_list():
                 },
                 {
                     "symbol": symbol,
-                    "exch_time": "2023-02-13T20:30:30.165Z",
-                    "arrival_time": "2023-02-13T20:30:30.165Z",
+                    "exch_time": get_utc_date_time(),
+                    "arrival_time": get_utc_date_time(),
                     "side": side,
                     "px": px+(dev*1),
                     "qty": qty-20,
@@ -130,8 +130,8 @@ def market_depth_basemodel_list():
                 },
                 {
                     "symbol": symbol,
-                    "exch_time": "2023-02-13T20:30:30.165Z",
-                    "arrival_time": "2023-02-13T20:30:30.165Z",
+                    "exch_time": get_utc_date_time(),
+                    "arrival_time": get_utc_date_time(),
                     "side": side,
                     "px": px+(dev*2),
                     "qty": qty+10,
@@ -141,8 +141,8 @@ def market_depth_basemodel_list():
                 },
                 {
                     "symbol": symbol,
-                    "exch_time": "2023-02-13T20:30:30.165Z",
-                    "arrival_time": "2023-02-13T20:30:30.165Z",
+                    "exch_time": get_utc_date_time(),
+                    "arrival_time": get_utc_date_time(),
                     "side": side,
                     "px": px+(dev*3),
                     "qty": qty-20,
@@ -152,8 +152,8 @@ def market_depth_basemodel_list():
                 },
                 {
                     "symbol": symbol,
-                    "exch_time": "2023-02-13T20:30:30.165Z",
-                    "arrival_time": "2023-02-13T20:30:30.165Z",
+                    "exch_time": get_utc_date_time(),
+                    "arrival_time": get_utc_date_time(),
                     "side": side,
                     "px": px+(dev*4),
                     "qty": qty+20,
@@ -170,7 +170,7 @@ def market_depth_basemodel_list():
 
 @pytest.fixture()
 def top_of_book_list_():
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
+    leg1_last_barter_px, leg2_last_barter_px = get_both_side_last_barter_px()
     input_data = [
         {
             "symbol": "CB_Sec_1",
@@ -184,15 +184,15 @@ def top_of_book_list_():
                 "qty": 40,
                 "last_update_date_time": "2023-02-13T20:30:31.165Z"
             },
-            "last_trade": {
-                "px": leg1_last_trade_px,
+            "last_barter": {
+                "px": leg1_last_barter_px,
                 "qty": 150,
                 "last_update_date_time": "2023-02-13T20:30:35.165Z"
             },
-            "total_trading_security_size": 100,
-            "market_trade_volume": [
+            "total_bartering_security_size": 100,
+            "market_barter_volume": [
                 {
-                    "participation_period_last_trade_qty_sum": 90,
+                    "participation_period_last_barter_qty_sum": 90,
                     "applicable_period_seconds": 180
                 }
             ],
@@ -210,15 +210,15 @@ def top_of_book_list_():
                 "qty": 40,
                 "last_update_date_time": "2023-02-13T20:30:31.165Z"
             },
-            "last_trade": {
-                "px": leg2_last_trade_px,
+            "last_barter": {
+                "px": leg2_last_barter_px,
                 "qty": 150,
                 "last_update_date_time": "2023-02-13T20:30:35.165Z"
             },
-            "total_trading_security_size": 100,
-            "market_trade_volume": [
+            "total_bartering_security_size": 100,
+            "market_barter_volume": [
                 {
-                    "participation_period_last_trade_qty_sum": 90,
+                    "participation_period_last_barter_qty_sum": 90,
                     "applicable_period_seconds": 180
                 }
             ],
@@ -237,7 +237,7 @@ def pair_securities_with_sides_():
 
 
 @pytest.fixture()
-def last_trade_fixture_list():
+def last_barter_fixture_list():
     input_data = []
     for index, symbol_n_px in enumerate([("CB_Sec_1", 116), ("EQT_Sec_1", 117)]):
         symbol, px = symbol_n_px
@@ -247,12 +247,12 @@ def last_trade_fixture_list():
                     "symbol": symbol,
                     "exch_id": "Exch"
                 },
-                "exch_time": "2023-03-10T09:19:12.019Z",
-                "arrival_time": "2023-03-10T09:19:12.019Z",
+                "exch_time": get_utc_date_time(),
+                "arrival_time": get_utc_date_time(),
                 "px": px,
                 "qty": 150,
-                "market_trade_volume": {
-                    "participation_period_last_trade_qty_sum": 0,
+                "market_barter_volume": {
+                    "participation_period_last_barter_qty_sum": 0,
                     "applicable_period_seconds": 0
                 }
             }
@@ -272,7 +272,7 @@ def symbol_overview_obj_list():
               "conv_px": 90,
               "closing_px": 95,
               "open_px": 95,
-              "last_update_date_time": "2023-03-12T13:11:22.329Z",
+              "last_update_date_time": get_utc_date_time(),
               "force_publish": False
             })
         )
@@ -284,7 +284,7 @@ def expected_strat_status_(pair_securities_with_sides_):
     yield StratStatusBaseModel(**{
       "total_buy_qty": 0,
       "total_sell_qty": 0,
-      "total_order_qty": 0,
+      "total_chore_qty": 0,
       "total_open_buy_qty": 0,
       "total_open_sell_qty": 0,
       "avg_open_buy_px": 0,
@@ -315,7 +315,7 @@ def expected_strat_status_(pair_securities_with_sides_):
 @pytest.fixture()
 def expected_strat_limits_():
     yield StratLimitsBaseModel(**{
-      "max_open_orders_per_side": 5,
+      "max_open_chores_per_side": 5,
       "max_single_leg_notional": 300000,
       "max_open_single_leg_notional": 300000,
       "max_net_filled_notional": 160000,
@@ -324,9 +324,9 @@ def expected_strat_limits_():
       "cancel_rate": {
         "max_cancel_rate": 60,
         "applicable_period_seconds": 0,
-        "waived_min_orders": 5
+        "waived_min_chores": 5
       },
-      "market_trade_volume_participation": {
+      "market_barter_volume_participation": {
         "max_participation_rate": 40,
         "applicable_period_seconds": 180
       },
@@ -344,10 +344,10 @@ def expected_strat_limits_():
 
 
 @pytest.fixture()
-def expected_order_limits_():
-    yield OrderLimitsBaseModel(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=4,
-                               max_order_qty=500, min_order_notional=100, max_order_notional=90_000,
-                               min_order_notional_allowance=1000)
+def expected_chore_limits_():
+    yield ChoreLimitsBaseModel(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
+                               max_chore_qty=500, min_chore_notional=100, max_chore_notional=90_000,
+                               min_chore_notional_allowance=1000)
 
 
 @pytest.fixture()
@@ -381,13 +381,13 @@ def expected_brokers_(leg1_leg2_symbol_list) -> List[BrokerOptional]:
 
 @pytest.fixture()
 def expected_portfolio_limits_(expected_brokers_):
-    rolling_max_order_count = RollingMaxOrderCountOptional(max_rolling_tx_count=15, rolling_tx_count_period_seconds=2)
-    rolling_max_reject_count = RollingMaxOrderCountOptional(max_rolling_tx_count=15, rolling_tx_count_period_seconds=2)
+    rolling_max_chore_count = RollingMaxChoreCountOptional(max_rolling_tx_count=15, rolling_tx_count_period_seconds=2)
+    rolling_max_reject_count = RollingMaxChoreCountOptional(max_rolling_tx_count=15, rolling_tx_count_period_seconds=2)
 
     print(expected_brokers_, type(expected_brokers_))
     portfolio_limits_obj = PortfolioLimitsBaseModel(_id=1, max_open_baskets=20, max_open_notional_per_side=2_000_000,
                                                     max_gross_n_open_notional=2_400_000,
-                                                    rolling_max_order_count=rolling_max_order_count,
+                                                    rolling_max_chore_count=rolling_max_chore_count,
                                                     rolling_max_reject_count=rolling_max_reject_count,
                                                     eligible_brokers=expected_brokers_)
     return portfolio_limits_obj
@@ -396,7 +396,7 @@ def expected_portfolio_limits_(expected_brokers_):
 @pytest.fixture()
 def pair_strat_(pair_securities_with_sides_):
     yield PairStratBaseModel(**{
-        "last_active_date_time": "2023-02-13T20:30:31.165Z",
+        "last_active_date_time": get_utc_date_time(),
         "frequency": 1,
         "pair_strat_params": {
             "strat_mode": StratMode.StratMode_Normal,
@@ -420,19 +420,19 @@ def pair_strat_(pair_securities_with_sides_):
     })
 
 
-def empty_pair_side_trading_brief_obj(symbol: str, side: str, sec_type: str | None = SecurityType.TICKER):
-    return PairSideTradingBriefOptional(**{
+def empty_pair_side_bartering_brief_obj(symbol: str, side: str, sec_type: str | None = SecurityType.TICKER):
+    return PairSideBarteringBriefOptional(**{
         "security": {
           "sec_id": symbol,
           "sec_type": sec_type
         },
         "side": side,
         "last_update_date_time": DateTime.utcnow(),
-        "consumable_open_orders": 0,
+        "consumable_open_chores": 0,
         "consumable_notional": 0,
         "consumable_open_notional": 0,
         "consumable_concentration": 0,
-        "participation_period_order_qty_sum": 0,
+        "participation_period_chore_qty_sum": 0,
         "consumable_cxl_qty": 0,
         "indicative_consumable_participation_qty": 0,
         "residual_qty": 0,
@@ -445,12 +445,12 @@ def empty_pair_side_trading_brief_obj(symbol: str, side: str, sec_type: str | No
 
 @pytest.fixture()
 def expected_strat_brief_(pair_securities_with_sides_):
-    pair_buy_side_trading_brief = empty_pair_side_trading_brief_obj(pair_securities_with_sides_["security1"]["sec_id"],
+    pair_buy_side_bartering_brief = empty_pair_side_bartering_brief_obj(pair_securities_with_sides_["security1"]["sec_id"],
                                                                     pair_securities_with_sides_["side1"])
-    pair_sell_side_trading_brief = empty_pair_side_trading_brief_obj(pair_securities_with_sides_["security2"]["sec_id"],
+    pair_sell_side_bartering_brief = empty_pair_side_bartering_brief_obj(pair_securities_with_sides_["security2"]["sec_id"],
                                                                      pair_securities_with_sides_["side2"])
-    yield StratBriefBaseModel(pair_buy_side_trading_brief=pair_buy_side_trading_brief,
-                              pair_sell_side_trading_brief=pair_sell_side_trading_brief,
+    yield StratBriefBaseModel(pair_buy_side_bartering_brief=pair_buy_side_bartering_brief,
+                              pair_sell_side_bartering_brief=pair_sell_side_bartering_brief,
                               consumable_nett_filled_notional=160_000)
 
 
@@ -474,7 +474,7 @@ def expected_symbol_side_snapshot_():
             "avg_cxled_px": 0,
             "total_cxled_notional": 0,
             "last_update_date_time": "2023-02-13T20:30:35.165Z",
-            "order_count": 0
+            "chore_count": 0
         }),
         SymbolSideSnapshotBaseModel(**{
             "security": {
@@ -493,7 +493,7 @@ def expected_symbol_side_snapshot_():
             "avg_cxled_px": 0,
             "total_cxled_notional": 0,
             "last_update_date_time": "2023-02-13T20:30:36.165Z",
-            "order_count": 0
+            "chore_count": 0
         })
     ]
 
@@ -516,38 +516,38 @@ def expected_system_control_():
 
 
 @pytest.fixture()
-def buy_order_(pair_securities_with_sides_):
-    yield OrderJournalBaseModel(**{
-        "order": {
-            "order_id": "O1",
+def buy_chore_(pair_securities_with_sides_):
+    yield ChoreJournalBaseModel(**{
+        "chore": {
+            "chore_id": "O1",
             "security": pair_securities_with_sides_["security1"],
             "side": pair_securities_with_sides_["side1"],
             "px": 100,
             "qty": 90,
-            "order_notional": 0,
-            "underlying_account": "trading_account",
+            "chore_notional": 0,
+            "underlying_account": "bartering_account",
             "text": [
               "test_string"
             ]
         },
-        "order_event_date_time": DateTime.utcnow(),
-        "order_event": "OE_NEW"
+        "chore_event_date_time": DateTime.utcnow(),
+        "chore_event": "OE_NEW"
     })
 
 
 @pytest.fixture()
-def expected_buy_order_snapshot_(pair_securities_with_sides_):
-    yield OrderSnapshotBaseModel(**{
-        "order_brief": {
-            "order_id": "O1",
+def expected_buy_chore_snapshot_(pair_securities_with_sides_):
+    yield ChoreSnapshotBaseModel(**{
+        "chore_brief": {
+            "chore_id": "O1",
             "security": pair_securities_with_sides_["security1"],
             "side": pair_securities_with_sides_["side1"],
             "px": 0,
             "qty": 0,
-            "order_notional": 0,
-            "underlying_account": "trading_account",
+            "chore_notional": 0,
+            "underlying_account": "bartering_account",
             "text": [],
-            "exchange": "trading_exchange"
+            "exchange": "bartering_exchange"
         },
         "filled_qty": 0,
         "avg_fill_px": 0,
@@ -559,69 +559,69 @@ def expected_buy_order_snapshot_(pair_securities_with_sides_):
         "cxled_notional": 0,
         "last_update_date_time": DateTime.utcnow(),
         "create_date_time": DateTime.utcnow(),
-        "order_status": "OE_UNACK"
+        "chore_status": "OE_UNACK"
     })
 
 
 @pytest.fixture()
 def buy_fill_journal_(pair_securities_with_sides_):
     yield FillsJournalBaseModel(**{
-        "order_id": "O1",
+        "chore_id": "O1",
         "fill_px": 90,
         "fill_qty": 50,
         "fill_notional": 0,
         "fill_symbol": pair_securities_with_sides_["security1"]["sec_id"],
         "fill_side": pair_securities_with_sides_["side1"],
-        "underlying_account": "trading_account",
+        "underlying_account": "bartering_account",
         "fill_date_time": DateTime.utcnow(),
         "fill_id": "F1"
     })
 
 
 @pytest.fixture()
-def order_cxl_request(email_book_service_web_client_, buy_order_):
-    placed_order_ack_obj = copy.deepcopy(buy_order_)
-    placed_order_ack_obj.order_event = "OE_CXL"
+def chore_cxl_request(email_book_service_web_client_, buy_chore_):
+    placed_chore_ack_obj = copy.deepcopy(buy_chore_)
+    placed_chore_ack_obj.chore_event = "OE_CXL"
 
-    created_order_journal_obj = \
-        email_book_service_web_client_.create_order_journal_client(placed_order_ack_obj)
+    created_chore_journal_obj = \
+        email_book_service_web_client_.create_chore_journal_client(placed_chore_ack_obj)
 
-    yield created_order_journal_obj
+    yield created_chore_journal_obj
 
 
 @pytest.fixture()
-def sell_order_(pair_securities_with_sides_):
-    yield OrderJournalBaseModel(**{
-        "order": {
-            "order_id": "O2",
+def sell_chore_(pair_securities_with_sides_):
+    yield ChoreJournalBaseModel(**{
+        "chore": {
+            "chore_id": "O2",
             "security": pair_securities_with_sides_["security2"],
             "side": pair_securities_with_sides_["side2"],
             "px": 110,
             "qty": 70,
-            "order_notional": 0,
-            "underlying_account": "trading_account",
+            "chore_notional": 0,
+            "underlying_account": "bartering_account",
             "text": [
               "test_string"
             ]
         },
-        "order_event_date_time": DateTime.utcnow(),
-        "order_event": "OE_NEW"
+        "chore_event_date_time": DateTime.utcnow(),
+        "chore_event": "OE_NEW"
     })
 
 
 @pytest.fixture()
-def expected_sell_order_snapshot_(pair_securities_with_sides_):
-    yield OrderSnapshotBaseModel(**{
-        "order_brief": {
-            "order_id": "O2",
+def expected_sell_chore_snapshot_(pair_securities_with_sides_):
+    yield ChoreSnapshotBaseModel(**{
+        "chore_brief": {
+            "chore_id": "O2",
             "security": pair_securities_with_sides_["security2"],
             "side": pair_securities_with_sides_["side2"],
             "px": 0,
             "qty": 0,
-            "order_notional": 0,
-            "underlying_account": "trading_account",
+            "chore_notional": 0,
+            "underlying_account": "bartering_account",
             "text": [],
-            "exchange": "trading_exchange"
+            "exchange": "bartering_exchange"
         },
         "filled_qty": 0,
         "avg_fill_px": 0,
@@ -633,20 +633,20 @@ def expected_sell_order_snapshot_(pair_securities_with_sides_):
         "cxled_notional": 0,
         "last_update_date_time": DateTime.utcnow(),
         "create_date_time": DateTime.utcnow(),
-        "order_status": "OE_UNACK"
+        "chore_status": "OE_UNACK"
     })
 
 
 @pytest.fixture()
 def sell_fill_journal_(pair_securities_with_sides_):
     yield FillsJournalBaseModel(**{
-        "order_id": "O2",
+        "chore_id": "O2",
         "fill_px": 120,
         "fill_qty": 30,
         "fill_notional": 0,
         "fill_symbol": pair_securities_with_sides_["security2"]["sec_id"],
         "fill_side": pair_securities_with_sides_["side2"],
-        "underlying_account": "trading_account",
+        "underlying_account": "bartering_account",
         "fill_date_time": DateTime.utcnow(),
         "fill_id": "F2"
     })
@@ -660,9 +660,9 @@ def sample_alert():
           "alert_count": 0,
           "alert_brief": "Sample Alert",
           "alert_details": "Fixture for sample alert",
-          "impacted_order": [
+          "impacted_chore": [
             {
-              "order_id": "O1",
+              "chore_id": "O1",
               "security": {
                 "sec_id": "CB_Sec_1",
                 "sec_type": SecurityType.TICKER
@@ -670,8 +670,8 @@ def sample_alert():
               "side": Side.BUY,
               "px": 10,
               "qty": 10,
-              "order_notional": 100,
-              "underlying_account": "trading_account",
+              "chore_notional": 100,
+              "underlying_account": "bartering_account",
               "text": [
                 "sample alert"
               ]

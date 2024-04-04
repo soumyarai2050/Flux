@@ -1,7 +1,7 @@
 from typing import Dict
 
-from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.yahoo_finance_base import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.yahoo_finance_base import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import configure_logger
 
 
@@ -44,7 +44,7 @@ class SymbolOverviewLoader(YahooFinanceBase):
                 symbol_overview.volume = ticker.info.get("volume")
                 symbol_overview.high = ticker.info.get("dayHigh")
                 symbol_overview.low = ticker.info.get("dayLow")
-                symbol_overview.last_update_date_time = ticker.info.get("lastTradeDate")
+                symbol_overview.last_update_date_time = ticker.info.get("lastBarterDate")
 
                 if symbol in self.symbol_to_symbol_overview_dict:
                     # instead of create this time use put_symbol_overview_client

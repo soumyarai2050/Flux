@@ -1,11 +1,12 @@
 import inspect
 
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.aggregate import get_ongoing_pair_strat_filter
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import \
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
+    get_ongoing_or_all_pair_strats_by_sec_id, get_ongoing_pair_strat_filter)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import \
     EmailBookServiceHttpClient
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import (
-    get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_strat_db_updates)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
+    get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_strat_db_updates, UpdateType)
 from FluxPythonUtils.scripts.utility_functions import (
     YAMLConfigurationManager, get_symbol_side_key)
 
@@ -30,11 +31,6 @@ street_book_config_yaml_dict = (
     YAMLConfigurationManager.load_yaml_configurations(str(street_book_config_yaml_path)))
 
 update_portfolio_status_lock: Lock = Lock()
-
-
-class UpdateType(StrEnum):
-    JOURNAL_TYPE = auto()
-    SNAPSHOT_TYPE = auto()
 
 
 def patch_portfolio_status(overall_buy_notional: float | None, overall_sell_notional: float | None) -> None:
@@ -109,22 +105,22 @@ def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> Po
         eligible_brokers = []
     # else using provided value
 
-    rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
-    rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
+    rolling_max_chore_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
+    rolling_max_reject_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
 
     portfolio_limits_obj = PortfolioLimits(_id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
                                            max_gross_n_open_notional=2_400_000,
-                                           rolling_max_order_count=rolling_max_order_count,
+                                           rolling_max_chore_count=rolling_max_chore_count,
                                            rolling_max_reject_count=rolling_max_reject_count,
                                            eligible_brokers=eligible_brokers,
                                            eligible_brokers_update_count=0)
     return portfolio_limits_obj
 
 
-def get_new_order_limits() -> OrderLimits:
-    ord_limit_obj: OrderLimits = OrderLimits(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                                             max_order_qty=500, min_order_notional=100,
-                                             max_order_notional=90_000)
+def get_new_chore_limits() -> ChoreLimits:
+    ord_limit_obj: ChoreLimits = ChoreLimits(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
+                                             max_chore_qty=500, min_chore_notional=100,
+                                             max_chore_notional=90_000)
     return ord_limit_obj
 
 
@@ -150,13 +146,13 @@ def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
 
 # caller must take any locks as required for any read-write consistency - function operates without lock
 async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairStrat], List[PairStrat]]:
-    from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_routes import \
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_routes import \
         underlying_read_pair_strat_http
     read_pair_strat_filter = get_ongoing_pair_strat_filter(sec_id)
     pair_strats: List[PairStrat] = await underlying_read_pair_strat_http(read_pair_strat_filter)
 
-    match_level_1_pair_strats: List[PairStrat] = list()
-    match_level_2_pair_strats: List[PairStrat] = list()
+    match_level_1_pair_strats: List[PairStrat] = []
+    match_level_2_pair_strats: List[PairStrat] = []
     for pair_strat in pair_strats:
         match_level: int = get_match_level(pair_strat, sec_id, side)
         if match_level == 1:
@@ -269,7 +265,7 @@ def guaranteed_call_pair_strat_client(pydantic_basemodel_type: Type | None, clie
             raise Exception(f"guaranteed_call_pair_strat_client called from {calframe[1][3]} failed "
                             f"with exception: {e}")
         log_str = pair_strat_client_call_log_str(pydantic_basemodel_type, client_callable, **kwargs)
-        logging.info(log_str)
+        logging.db(log_str)
 
 
 class MDShellEnvData(BaseModel):
@@ -319,3 +315,7 @@ def create_md_shell_script(md_shell_env_data: MDShellEnvData, generation_start_f
         fl.write("else\n")
         fl.write("        ./run.sh\n")
         fl.write("fi\n")
+
+
+def get_reset_log_book_cache_wrapper_pattern():
+    return "-~-"

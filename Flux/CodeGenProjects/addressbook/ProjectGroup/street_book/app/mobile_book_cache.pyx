@@ -1,4 +1,4 @@
-# tob_cython.pyx
+# mobile_book_cache.pyx
 import copy
 
 from libc.stdint cimport int64_t, int32_t
@@ -20,16 +20,16 @@ cdef extern from "<mutex>" namespace "std":
         void lock()
         void unlock()
 
-cdef class MarketTradeVolume:
+cdef class MarketBarterVolume:
     cdef public str _id
-    cdef public int64_t participation_period_last_trade_qty_sum
+    cdef public int64_t participation_period_last_barter_qty_sum
     cdef public int32_t applicable_period_seconds
 
-    def __init__(self, _id, participation_period_last_trade_qty_sum=None, applicable_period_seconds=None):
+    def __init__(self, _id, participation_period_last_barter_qty_sum=None, applicable_period_seconds=None):
         self._id = _id
-        if participation_period_last_trade_qty_sum is None:
-            participation_period_last_trade_qty_sum = 0
-        self.participation_period_last_trade_qty_sum = participation_period_last_trade_qty_sum
+        if participation_period_last_barter_qty_sum is None:
+            participation_period_last_barter_qty_sum = 0
+        self.participation_period_last_barter_qty_sum = participation_period_last_barter_qty_sum
         if applicable_period_seconds is None:
             applicable_period_seconds = 0
         self.applicable_period_seconds = applicable_period_seconds
@@ -59,28 +59,28 @@ cdef class TopOfBook:
     cdef public str symbol
     cdef public Quote bid_quote
     cdef public Quote ask_quote
-    cdef public Quote last_trade
-    cdef public int64_t total_trading_security_size
-    cdef public list market_trade_volume
+    cdef public Quote last_barter
+    cdef public int64_t total_bartering_security_size
+    cdef public list market_barter_volume
     cdef public object last_update_date_time
 
     def __cinit__(self):
         self.m_mutex = new mutex()
 
-    def __init__(self, _id, symbol, bid_quote=None, ask_quote=None, last_trade=None,
-                 total_trading_security_size=None, market_trade_volume=None, last_update_date_time=None):
+    def __init__(self, _id, symbol, bid_quote=None, ask_quote=None, last_barter=None,
+                 total_bartering_security_size=None, market_barter_volume=None, last_update_date_time=None):
         self._id = _id
         self.symbol = symbol
         self.bid_quote = bid_quote
         self.ask_quote = ask_quote
-        self.last_trade = last_trade
-        if total_trading_security_size is None:
-            total_trading_security_size = 0
-        self.total_trading_security_size = total_trading_security_size
-        if market_trade_volume:
-            self.market_trade_volume = market_trade_volume
+        self.last_barter = last_barter
+        if total_bartering_security_size is None:
+            total_bartering_security_size = 0
+        self.total_bartering_security_size = total_bartering_security_size
+        if market_barter_volume:
+            self.market_barter_volume = market_barter_volume
         else:
-            self.market_trade_volume = []
+            self.market_barter_volume = []
         self.last_update_date_time = last_update_date_time
 
     def __dealloc__(self):
@@ -102,7 +102,6 @@ cdef class MarketDepth:
     cdef public TickType side
     cdef public float px
     cdef public int64_t qty
-    cdef public float premium
     cdef public int32_t position
     cdef public str market_maker
     cdef public bint is_smart_depth
@@ -113,7 +112,7 @@ cdef class MarketDepth:
     def __cinit__(self):
         self.m_mutex = new mutex()
 
-    def __init__(self, _id, symbol, exch_time, arrival_time, side, position, px=None, qty=None, premium=None,
+    def __init__(self, _id, symbol, exch_time, arrival_time, side, position, px=None, qty=None,
                  market_maker=None, is_smart_depth=None, cumulative_notional=None, cumulative_qty=None,
                  cumulative_avg_px=None):
         self._id = _id
@@ -123,7 +122,6 @@ cdef class MarketDepth:
         self.side = TickType.BID if side == "BID" else TickType.ASK
         self.px = px if px is not None else 0.0
         self.qty = qty if qty is not None else 0
-        self.premium = premium if premium is not None else 0.0
         self.position = position
         self.market_maker = market_maker if market_maker is not None else ""
         self.is_smart_depth = 1 if is_smart_depth else 0
@@ -256,7 +254,7 @@ cpdef enum TickType:
     FINAL_IPO_LAST,
     NOT_SET
 
-cdef class LastTrade:
+cdef class LastBarter:
     cdef mutex * m_mutex
     cdef public int32_t _id
     cdef public SymbolNExchId symbol_n_exch_id
@@ -265,12 +263,12 @@ cdef class LastTrade:
     cdef public float px
     cdef public int64_t qty
     cdef public float premium
-    cdef public MarketTradeVolume market_trade_volume
+    cdef public MarketBarterVolume market_barter_volume
 
     def __cinit__(self):
         self.m_mutex = new mutex()
 
-    def __init__(self, _id, symbol_n_exch_id, exch_time, arrival_time, px, qty, premium, market_trade_volume):
+    def __init__(self, _id, symbol_n_exch_id, exch_time, arrival_time, px, qty, premium, market_barter_volume):
         self._id = _id
         self.symbol_n_exch_id = symbol_n_exch_id
         self.exch_time = exch_time
@@ -278,7 +276,7 @@ cdef class LastTrade:
         self.px = px
         self.qty = qty
         self.premium = premium
-        self.market_trade_volume = market_trade_volume
+        self.market_barter_volume = market_barter_volume
 
     def __dealloc__(self):
         del self.m_mutex
@@ -295,7 +293,7 @@ cdef class MobileBookContainer:
     cdef public list bid_market_depths
     cdef public list ask_market_depths
     cdef public TopOfBook top_of_book
-    cdef public LastTrade last_trade
+    cdef public LastBarter last_barter
 
     def __init__(self, str symbol):
         self.symbol = symbol
@@ -304,10 +302,10 @@ cdef class MobileBookContainer:
 
     cpdef bint set_top_of_book(
             self, _id, symbol, bid_quote_px=None, bid_quote_qty=None, bid_quote_premium=None,
-            ask_quote_px=None, ask_quote_qty=None, ask_quote_premium=None, last_trade_px=None, last_trade_qty=None,
-            last_trade_premium=None, bid_quote_last_update_date_time=None,
-            ask_quote_last_update_date_time=None, last_trade_last_update_date_time=None,
-            total_trading_security_size=None, market_trade_volume=None, last_update_date_time=None):
+            ask_quote_px=None, ask_quote_qty=None, ask_quote_premium=None, last_barter_px=None, last_barter_qty=None,
+            last_barter_premium=None, bid_quote_last_update_date_time=None,
+            ask_quote_last_update_date_time=None, last_barter_last_update_date_time=None,
+            total_bartering_security_size=None, market_barter_volume=None, last_update_date_time=None):
         if self.top_of_book is None:
             bid_quote = None
             if bid_quote_px or bid_quote_qty or bid_quote_premium or bid_quote_last_update_date_time:
@@ -315,11 +313,11 @@ cdef class MobileBookContainer:
             ask_quote = None
             if ask_quote_px or ask_quote_qty or ask_quote_premium or ask_quote_last_update_date_time:
                 ask_quote = Quote(ask_quote_px, ask_quote_qty, ask_quote_premium, ask_quote_last_update_date_time)
-            last_trade = None
-            if last_trade_px or last_trade_qty or last_trade_premium or last_trade_last_update_date_time:
-                last_trade = Quote(last_trade_px, last_trade_qty, last_trade_premium, last_trade_last_update_date_time)
-            self.top_of_book = TopOfBook(_id, symbol, bid_quote, ask_quote, last_trade,
-                                         total_trading_security_size, market_trade_volume, last_update_date_time)
+            last_barter = None
+            if last_barter_px or last_barter_qty or last_barter_premium or last_barter_last_update_date_time:
+                last_barter = Quote(last_barter_px, last_barter_qty, last_barter_premium, last_barter_last_update_date_time)
+            self.top_of_book = TopOfBook(_id, symbol, bid_quote, ask_quote, last_barter,
+                                         total_bartering_security_size, market_barter_volume, last_update_date_time)
             return True
         return False
 
@@ -328,6 +326,9 @@ cdef class MobileBookContainer:
             self.top_of_book.symbol = symbol_
             return True
         return False
+
+    cpdef Quote get_top_of_book_bid_quote(self):
+        return self.top_of_book.bid_quote
 
     cpdef bint set_top_of_book_bid_quote(self, px=None, qty=None, premium=None, last_update_date_time=None):
         if (self.top_of_book.bid_quote is None or
@@ -343,10 +344,10 @@ cdef class MobileBookContainer:
             return True
         return False
 
-    cpdef bint set_top_of_book_last_trade(self, px=None, qty=None, premium=None, last_update_date_time=None):
-        if (self.top_of_book.last_trade is None or
-                last_update_date_time > self.top_of_book.last_trade.last_update_date_time):
-            self.top_of_book.last_trade = Quote(px, qty, premium, last_update_date_time)
+    cpdef bint set_top_of_book_last_barter(self, px=None, qty=None, premium=None, last_update_date_time=None):
+        if (self.top_of_book.last_barter is None or
+                last_update_date_time > self.top_of_book.last_barter.last_update_date_time):
+            self.top_of_book.last_barter = Quote(px, qty, premium, last_update_date_time)
             return True
         return False
 
@@ -374,6 +375,9 @@ cdef class MobileBookContainer:
             return True
         return False
 
+    cpdef Quote get_top_of_book_ask_quote(self):
+        return self.top_of_book.ask_quote
+
     cpdef bint set_top_of_book_ask_quote_px(self, float px):
         if self.top_of_book and self.top_of_book.ask_quote:
             self.top_of_book.ask_quote.px = px
@@ -398,76 +402,79 @@ cdef class MobileBookContainer:
             return True
         return False
 
-    cpdef bint set_top_of_book_last_trade_px(self, float px):
-        if self.top_of_book and self.top_of_book.last_trade:
-            self.top_of_book.last_trade.px = px
+    cpdef Quote get_top_of_book_last_barter(self):
+        return self.top_of_book.last_barter
+
+    cpdef bint set_top_of_book_last_barter_px(self, float px):
+        if self.top_of_book and self.top_of_book.last_barter:
+            self.top_of_book.last_barter.px = px
             return True
         return False
 
-    cpdef bint set_top_of_book_last_trade_qty(self, int qty):
-        if self.top_of_book and self.top_of_book.last_trade:
-            self.top_of_book.last_trade.qty = qty
+    cpdef bint set_top_of_book_last_barter_qty(self, int qty):
+        if self.top_of_book and self.top_of_book.last_barter:
+            self.top_of_book.last_barter.qty = qty
             return True
         return False
 
-    cpdef bint set_top_of_book_last_trade_premium(self, float premium):
-        if self.top_of_book and self.top_of_book.last_trade:
-            self.top_of_book.last_trade.premium = premium
+    cpdef bint set_top_of_book_last_barter_premium(self, float premium):
+        if self.top_of_book and self.top_of_book.last_barter:
+            self.top_of_book.last_barter.premium = premium
             return True
         return False
 
-    cpdef bint set_top_of_book_last_trade_last_update_date_time(self, object last_update_date_time):
-        if self.top_of_book and self.top_of_book.last_trade:
-            self.top_of_book.last_trade.last_update_date_time = last_update_date_time
+    cpdef bint set_top_of_book_last_barter_last_update_date_time(self, object last_update_date_time):
+        if self.top_of_book and self.top_of_book.last_barter:
+            self.top_of_book.last_barter.last_update_date_time = last_update_date_time
             return True
         return False
 
-    cpdef bint set_top_of_book_total_trading_security_size(self, int64_t total_trading_security_size):
+    cpdef bint set_top_of_book_total_bartering_security_size(self, int64_t total_bartering_security_size):
         if self.top_of_book:
-            self.top_of_book.total_trading_security_size = total_trading_security_size
+            self.top_of_book.total_bartering_security_size = total_bartering_security_size
             return True
         return False
 
-    cpdef bint set_top_of_book_market_trade_volume(
-            self, str _id, int64_t participation_period_last_trade_qty_sum,
+    cpdef bint set_top_of_book_market_barter_volume(
+            self, str _id, int64_t participation_period_last_barter_qty_sum,
             int32_t applicable_period_seconds):
         if self.top_of_book:
-            if not self.top_of_book.market_trade_volume:
-                self.top_of_book.market_trade_volume = []
-                market_trade_volume = MarketTradeVolume(_id, participation_period_last_trade_qty_sum,
+            if not self.top_of_book.market_barter_volume:
+                self.top_of_book.market_barter_volume = []
+                market_barter_volume = MarketBarterVolume(_id, participation_period_last_barter_qty_sum,
                                                         applicable_period_seconds)
-                self.top_of_book.market_trade_volume.append(market_trade_volume)
+                self.top_of_book.market_barter_volume.append(market_barter_volume)
                 return True
             else:
-                for existing_market_trade_volume in self.top_of_book.market_trade_volume:
-                    if _id == existing_market_trade_volume._id:
-                        logging.error(f"market_trade_volume object with _id: {_id} already exists in "
-                                      f"stored list of market_trade_volume objects in top_of_book - ignoring "
+                for existing_market_barter_volume in self.top_of_book.market_barter_volume:
+                    if _id == existing_market_barter_volume._id:
+                        logging.error(f"market_barter_volume object with _id: {_id} already exists in "
+                                      f"stored list of market_barter_volume objects in top_of_book - ignoring "
                                       f"this update, use set  method for specific update instead")
                         return False
                 else:
-                    market_trade_volume = MarketTradeVolume(_id, participation_period_last_trade_qty_sum,
+                    market_barter_volume = MarketBarterVolume(_id, participation_period_last_barter_qty_sum,
                                                             applicable_period_seconds)
-                    self.top_of_book.market_trade_volume.append(market_trade_volume)
+                    self.top_of_book.market_barter_volume.append(market_barter_volume)
                     return True
         return False
 
-    cpdef bint set_top_of_book_market_trade_volume_participation_period_last_trade_qty_sum(
-            self, str _id, int64_t participation_period_last_trade_qty_sum):
-        if self.top_of_book and self.top_of_book.market_trade_volume:
-            for market_trade_volume in self.top_of_book.market_trade_volume:
-                if market_trade_volume._id == _id:
-                    market_trade_volume.participation_period_last_trade_qty_sum = (
-                        participation_period_last_trade_qty_sum)
+    cpdef bint set_top_of_book_market_barter_volume_participation_period_last_barter_qty_sum(
+            self, str _id, int64_t participation_period_last_barter_qty_sum):
+        if self.top_of_book and self.top_of_book.market_barter_volume:
+            for market_barter_volume in self.top_of_book.market_barter_volume:
+                if market_barter_volume._id == _id:
+                    market_barter_volume.participation_period_last_barter_qty_sum = (
+                        participation_period_last_barter_qty_sum)
                     return True
         return False
 
-    cpdef bint set_top_of_book_market_trade_volume_applicable_period_seconds(
+    cpdef bint set_top_of_book_market_barter_volume_applicable_period_seconds(
             self, str _id, int32_t applicable_period_seconds):
-        if self.top_of_book and self.top_of_book.market_trade_volume:
-            for market_trade_volume in self.top_of_book.market_trade_volume:
-                if market_trade_volume._id == _id:
-                    market_trade_volume.applicable_period_seconds = applicable_period_seconds
+        if self.top_of_book and self.top_of_book.market_barter_volume:
+            for market_barter_volume in self.top_of_book.market_barter_volume:
+                if market_barter_volume._id == _id:
+                    market_barter_volume.applicable_period_seconds = applicable_period_seconds
                     return True
         return False
 
@@ -484,90 +491,111 @@ cdef class MobileBookContainer:
 
     cpdef void print_tob_obj(self):
         tob_obj = self.top_of_book
-        print(f"TOB obj: {tob_obj._id}, {tob_obj.symbol}, Bid Quote: {tob_obj.bid_quote.px}, {tob_obj.bid_quote.qty}, "
-              f"{tob_obj.bid_quote.premium}, Ask Quote: {tob_obj.ask_quote.px}, {tob_obj.ask_quote.qty}, "
-              f"{tob_obj.ask_quote.premium}, Last Trade: {tob_obj.last_trade.px}, {tob_obj.last_trade.qty}, "
-              f"{tob_obj.last_trade.premium}, {tob_obj.total_trading_security_size}, MTV: {tob_obj.market_trade_volume}")
+        print_str = ""
+        if tob_obj:
+            print_str += f"TOB obj: {tob_obj._id}, symbol: {tob_obj.symbol}"
+        if tob_obj.bid_quote:
+            print_str += (f", Bid Quote: {tob_obj.bid_quote.px}, {tob_obj.bid_quote.qty}, "
+                          f"{tob_obj.bid_quote.premium}, {tob_obj.bid_quote.last_update_date_time}")
+        if tob_obj.ask_quote:
+            print_str += (f", ASK Quote: {tob_obj.ask_quote.px}, {tob_obj.ask_quote.qty}, "
+                          f"{tob_obj.ask_quote.premium}, {tob_obj.ask_quote.last_update_date_time}")
+        if tob_obj.last_barter:
+            print_str += (f", LastBarter Quote: {tob_obj.last_barter.px}, {tob_obj.last_barter.qty}, "
+                          f"{tob_obj.last_barter.premium}, {tob_obj.last_barter.last_update_date_time}")
+        print_str += f", total_bartering_security_size: {tob_obj.total_bartering_security_size}"
+        if tob_obj.market_barter_volume:
+            print_str += f", MarketBarterVolume: "
+            for market_barter_vol in tob_obj.market_barter_volume:
+                print_str += (f"id: {market_barter_vol._id}, participation_period_last_barter_qty_sum: "
+                              f"{market_barter_vol.participation_period_last_barter_qty_sum}, applicable_period_seconds: "
+                              f"{market_barter_vol.applicable_period_seconds}")
+                if market_barter_vol != tob_obj.market_barter_volume[-1]:
+                    print_str += ", "
+        print_str += f", last_update_date_time: {tob_obj.last_update_date_time}"
+        print(print_str)
+        logging.info(print_str)
 
-    cpdef bint set_last_trade(self, _id, symbol, exch_id, exch_time, arrival_time, px, qty,
-                             premium, market_trade_volume):
-        if self.last_trade is None:
+    cpdef bint set_last_barter(self, _id, symbol, exch_id, exch_time, arrival_time, px, qty,
+                             premium, market_barter_volume):
+        if self.last_barter is None:
             symbol_n_exch_id = SymbolNExchId(symbol, exch_id)
-            self.last_trade = LastTrade(_id, symbol_n_exch_id, exch_time, arrival_time, px,
-                                        qty, premium, market_trade_volume)
+            self.last_barter = LastBarter(_id, symbol_n_exch_id, exch_time, arrival_time, px,
+                                        qty, premium, market_barter_volume)
+            print(f"PY: Created LastBarter with market_barter_vol: {market_barter_volume._id, market_barter_volume.participation_period_last_barter_qty_sum, market_barter_volume.applicable_period_seconds}")
             return True
         return False
 
-    cpdef bint set_last_trade_symbol(self, str symbol):
-        if self.last_trade:
-            self.last_trade.symbol_n_exch_id.symbol = symbol
+    cpdef bint set_last_barter_symbol(self, str symbol):
+        if self.last_barter:
+            self.last_barter.symbol_n_exch_id.symbol = symbol
             return True
         return False
 
-    cpdef bint set_last_trade_exch_id(self, str exch_id):
-        if self.last_trade:
-            self.last_trade.symbol_n_exch_id.exch_id = exch_id
+    cpdef bint set_last_barter_exch_id(self, str exch_id):
+        if self.last_barter:
+            self.last_barter.symbol_n_exch_id.exch_id = exch_id
             return True
         return False
 
-    cpdef bint set_last_trade_exch_time(self, object exch_time):
-        if self.last_trade:
-            self.last_trade.symbol_n_exch_id.exch_time = exch_time
+    cpdef bint set_last_barter_exch_time(self, object exch_time):
+        if self.last_barter:
+            self.last_barter.exch_time = exch_time
             return True
         return False
 
-    cpdef bint set_last_trade_arrival_time(self, object arrival_time):
-        if self.last_trade:
-            self.last_trade.symbol_n_exch_id.arrival_time = arrival_time
+    cpdef bint set_last_barter_arrival_time(self, object arrival_time):
+        if self.last_barter:
+            self.last_barter.arrival_time = arrival_time
             return True
         return False
 
-    cpdef bint set_last_trade_px(self, float px):
-        if self.last_trade:
-            self.last_trade.symbol_n_exch_id.px = px
+    cpdef bint set_last_barter_px(self, float px):
+        if self.last_barter:
+            self.last_barter.px = px
             return True
         return False
 
-    cpdef bint set_last_trade_qty(self, int64_t qty):
-        if self.last_trade:
-            self.last_trade.symbol_n_exch_id.qty = qty
+    cpdef bint set_last_barter_qty(self, int64_t qty):
+        if self.last_barter:
+            self.last_barter.qty = qty
             return True
         return False
 
-    cpdef bint set_last_trade_premium(self, float premium):
-        if self.last_trade:
-            self.last_trade.symbol_n_exch_id.premium = premium
+    cpdef bint set_last_barter_premium(self, float premium):
+        if self.last_barter:
+            self.last_barter.premium = premium
             return True
         return False
 
-    cpdef bint set_last_trade_market_trade_volume_participation_period_last_trade_qty_sum(
-            self, int64_t participation_period_last_trade_qty_sum):
-        if self.last_trade:
-            self.last_trade.market_trade_volume.participation_period_last_trade_qty_sum = (
-                participation_period_last_trade_qty_sum)
+    cpdef bint set_last_barter_market_barter_volume_participation_period_last_barter_qty_sum(
+            self, int64_t participation_period_last_barter_qty_sum):
+        if self.last_barter:
+            self.last_barter.market_barter_volume.participation_period_last_barter_qty_sum = (
+                participation_period_last_barter_qty_sum)
             return True
         return False
 
-    cpdef bint set_last_trade_market_trade_volume_applicable_period_seconds(
+    cpdef bint set_last_barter_market_barter_volume_applicable_period_seconds(
             self, int64_t applicable_period_seconds):
-        if self.last_trade:
-            self.last_trade.market_trade_volume.applicable_period_seconds = applicable_period_seconds
+        if self.last_barter:
+            self.last_barter.market_barter_volume.applicable_period_seconds = applicable_period_seconds
             return True
         return False
 
-    cpdef LastTrade get_last_trade(self):
-        return self.last_trade
+    cpdef LastBarter get_last_barter(self):
+        return self.last_barter
 
-    cpdef void print_last_trade_obj(self):
-        last_trade = self.last_trade
-        print(f"LastTrade: _id: {last_trade._id}, symbol: {last_trade.symbol_n_exch_id.symbol}, "
-              f"exch_id: {last_trade.symbol_n_exch_id.exch_id}, exch_time: {last_trade.exch_time}, "
-              f"arrival_time: {last_trade.arrival_time}, px: {last_trade.px}, qty: {last_trade.qty}, "
-              f"premium: {last_trade.premium}, market_trade_volume: _id: {last_trade.market_trade_volume._id}, "
-              f"market_trade_volume: participation_period_last_trade_qty_sum: "
-              f"{last_trade.market_trade_volume.participation_period_last_trade_qty_sum}, "
-              f"market_trade_volume: applicable_period_seconds: "
-              f"{last_trade.market_trade_volume.applicable_period_seconds}")
+    cpdef void print_last_barter_obj(self):
+        last_barter = self.last_barter
+        print(f"LastBarter: _id: {last_barter._id}, symbol: {last_barter.symbol_n_exch_id.symbol}, "
+              f"exch_id: {last_barter.symbol_n_exch_id.exch_id}, exch_time: {last_barter.exch_time}, "
+              f"arrival_time: {last_barter.arrival_time}, px: {last_barter.px}, qty: {last_barter.qty}, "
+              f"premium: {last_barter.premium}, market_barter_volume: _id: {last_barter.market_barter_volume._id}, "
+              f"market_barter_volume: participation_period_last_barter_qty_sum: "
+              f"{last_barter.market_barter_volume.participation_period_last_barter_qty_sum}, "
+              f"market_barter_volume: applicable_period_seconds: "
+              f"{last_barter.market_barter_volume.applicable_period_seconds}")
 
     cpdef bint check_has_allowed_bid_px(self, position, px):
         # Checking if passed px is less than px of market depth above current position
@@ -618,7 +646,7 @@ cdef class MobileBookContainer:
         return True
 
     cpdef bint check_no_market_depth_already_exists_on_position_and_has_allowed_px(
-            self, market_depth_list, _id, symbol, exch_time, arrival_time, side, px, qty, premium, position,
+            self, market_depth_list, _id, symbol, exch_time, arrival_time, side, px, qty, position,
             market_maker=None, is_smart_depth=None, cumulative_notional=None,
             cumulative_qty=None, cumulative_avg_px=None):
         if market_depth_list[position] is not None:
@@ -633,36 +661,36 @@ cdef class MobileBookContainer:
         if side == "BID" or side == TickType.BID:
             if not self.check_has_allowed_bid_px(position, px):
                 logging.error("Unexpected: px is not allowed depending on bid position;;; passed args: "
-                              f"{_id, symbol, exch_time, arrival_time, side, px, qty, premium, position, market_maker, is_smart_depth, cumulative_notional, cumulative_qty, cumulative_avg_px}")
+                              f"{_id, symbol, exch_time, arrival_time, side, px, qty, position, market_maker, is_smart_depth, cumulative_notional, cumulative_qty, cumulative_avg_px}")
                 return False
         elif side == "ASK" or side == TickType.ASK:
             if not self.check_has_allowed_ask_px(position, px):
                 logging.error("Unexpected: px is not allowed depending on ask position;;; passed args: "
-                              f"{_id, symbol, exch_time, arrival_time, side, px, qty, premium, position, market_maker, is_smart_depth, cumulative_notional, cumulative_qty, cumulative_avg_px}")
+                              f"{_id, symbol, exch_time, arrival_time, side, px, qty, position, market_maker, is_smart_depth, cumulative_notional, cumulative_qty, cumulative_avg_px}")
                 return False
         return True
 
     cpdef bint set_bid_market_depth(self, _id, symbol, exch_time, arrival_time, side, position, px=None, qty=None,
-                                    premium=None, market_maker=None, is_smart_depth=None, cumulative_notional=None,
+                                    market_maker=None, is_smart_depth=None, cumulative_notional=None,
                                     cumulative_qty=None, cumulative_avg_px=None):
         if self.check_no_market_depth_already_exists_on_position_and_has_allowed_px(
-                self.bid_market_depths, _id, symbol, exch_time, arrival_time, side, px, qty, premium, position,
+                self.bid_market_depths, _id, symbol, exch_time, arrival_time, side, px, qty, position,
                 market_maker, is_smart_depth, cumulative_notional, cumulative_qty, cumulative_avg_px):
             self.bid_market_depths[position] = (
-                MarketDepth(_id, symbol, exch_time, arrival_time, side, position, px, qty, premium,
+                MarketDepth(_id, symbol, exch_time, arrival_time, side, position, px, qty,
                             market_maker, is_smart_depth, cumulative_notional,
                             cumulative_qty, cumulative_avg_px))
             return True
         return False
 
     cpdef bint set_ask_market_depth(self, _id, symbol, exch_time, arrival_time, side, position, px=None, qty=None,
-                                    premium=None, market_maker=None, is_smart_depth=None, cumulative_notional=None,
+                                    market_maker=None, is_smart_depth=None, cumulative_notional=None,
                                     cumulative_qty=None, cumulative_avg_px=None):
         if self.check_no_market_depth_already_exists_on_position_and_has_allowed_px(
-                self.ask_market_depths, _id, symbol, exch_time, arrival_time, side, px, qty, premium, position,
+                self.ask_market_depths, _id, symbol, exch_time, arrival_time, side, px, qty, position,
                 market_maker, is_smart_depth, cumulative_notional, cumulative_qty, cumulative_avg_px):
             self.ask_market_depths[position] = (
-                MarketDepth(_id, symbol, exch_time, arrival_time, side, position, px, qty, premium,
+                MarketDepth(_id, symbol, exch_time, arrival_time, side, position, px, qty,
                             market_maker, is_smart_depth, cumulative_notional,
                             cumulative_qty, cumulative_avg_px))
             return True
@@ -760,20 +788,6 @@ cdef class MobileBookContainer:
             if self.check_has_allowed_ask_px(position, px):
                 market_depth.px = px
                 return True
-        return False
-
-    cpdef bint set_bid_market_depth_premium(self, int32_t position, float premium):
-        market_depth = self.bid_market_depths[position]
-        if market_depth is not None:
-            market_depth.premium = premium
-            return True
-        return False
-
-    cpdef bint set_ask_market_depth_premium(self, int32_t position, float premium):
-        market_depth = self.ask_market_depths[position]
-        if market_depth is not None:
-            market_depth.premium = premium
-            return True
         return False
 
     cpdef bint set_bid_market_depth_market_maker(self, int32_t position, str market_maker):
@@ -884,7 +898,8 @@ cdef list container_obj_list_cache = []
 cdef dict symbol_to_container_obj_index_dict = {}
 
 cpdef MobileBookContainer add_container_obj_for_symbol(str symbol):
-    if symbol_to_container_obj_index_dict.get(symbol) is None:
+    mobile_book_container = symbol_to_container_obj_index_dict.get(symbol)
+    if  mobile_book_container is None:
         mobile_book_container = MobileBookContainer(symbol)
         container_obj_list_cache.append(mobile_book_container)
 
@@ -895,8 +910,9 @@ cpdef MobileBookContainer add_container_obj_for_symbol(str symbol):
 
         return mobile_book_container
     else:
-        logging.error(f"Container Object already exists for symbol: {symbol} - Ignoring this create")
-        return None
+        return mobile_book_container
+
+
 
 cpdef MobileBookContainer get_mobile_book_container(str symbol):
     index = symbol_to_container_obj_index_dict.get(symbol)

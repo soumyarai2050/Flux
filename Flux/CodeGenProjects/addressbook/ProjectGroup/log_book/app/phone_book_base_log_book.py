@@ -9,27 +9,28 @@ from typing import Set
 os.environ["DBType"] = "beanie"
 # Project imports
 from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
+from FluxPythonUtils.scripts.utility_functions import get_last_log_line_date_time
 from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_book import AppLogBook
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client, is_ongoing_strat, Side, UpdateType)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import (
     performance_benchmark_service_http_client, RawPerformanceDataBaseModel)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.aggregate import *
 
 LOG_ANALYZER_DATA_DIR = (
-    PurePath(__file__).parent.parent / "data"
+        PurePath(__file__).parent.parent / "data"
 )
 
 debug_mode: bool = False if ((debug_env := os.getenv("PS_LOG_ANALYZER_DEBUG")) is None or
                              len(debug_env) == 0 or debug_env == "0") else True
 
 portfolio_alert_bulk_update_counts_per_call, portfolio_alert_bulk_update_timeout = (
-    get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("portfolio_alert_configs")))
-strat_alert_bulk_update_counts_per_call, strat_alert_bulk_update_timeout = (
-    get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("strat_alert_config")))
+    get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("portfolio_alert_configs"),
+                                                 is_server_config=False))
 
 
 # Updating LogDetail to have strat_id_finder_callable
@@ -47,40 +48,36 @@ class PairStratDbUpdateDataContainer(BaseModel):
 class PhoneBookBaseLogBook(AppLogBook):
     underlying_partial_update_all_portfolio_alert_http: Callable[..., Any] | None = None
     underlying_partial_update_all_strat_alert_http: Callable[..., Any] | None = None
-    underlying_read_portfolio_alert_by_id_http: Callable[..., Any] | None = None
-    underlying_read_strat_alert_by_id_http: Callable[..., Any] | None = None
-
-    asyncio_loop: ClassVar[asyncio.AbstractEventLoop | None] = None
+    underlying_read_portfolio_alert_http: Callable[..., Any] | None = None
+    underlying_read_strat_alert_http: Callable[..., Any] | None = None
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_routes import (
             underlying_partial_update_all_portfolio_alert_http, underlying_partial_update_all_strat_alert_http,
-            underlying_read_portfolio_alert_by_id_http, underlying_read_strat_alert_by_id_http)
+            underlying_read_portfolio_alert_http, underlying_read_strat_alert_http)
         cls.underlying_partial_update_all_portfolio_alert_http = underlying_partial_update_all_portfolio_alert_http
         cls.underlying_partial_update_all_strat_alert_http = underlying_partial_update_all_strat_alert_http
-        cls.underlying_read_portfolio_alert_by_id_http = underlying_read_portfolio_alert_by_id_http
-        cls.underlying_read_strat_alert_by_id_http = underlying_read_strat_alert_by_id_http
+        cls.underlying_read_portfolio_alert_http = underlying_read_portfolio_alert_http
+        cls.underlying_read_strat_alert_http = underlying_read_strat_alert_http
 
-    def __init__(self, regex_file: str, log_details: List[LogDetail] | None = None,
-                 log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
-                 simulation_mode: bool = False, log_detail_type: Type[LogDetail] | None = None):
-        super().__init__(regex_file, config_yaml_dict, performance_benchmark_service_http_client,
-                         RawPerformanceDataBaseModel, log_details=log_details,
-                         log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
-                         debug_mode=debug_mode, log_detail_type=log_detail_type)
+    def __init__(self, regex_file: str, log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
+                 simulation_mode: bool = False):
+        super().__init__(regex_file, config_yaml_dict, log_prefix_regex_pattern_to_callable_name_dict,
+                         debug_mode=debug_mode)
         PhoneBookBaseLogBook.initialize_underlying_http_callables()
         self.simulation_mode = simulation_mode
         self.portfolio_alerts_model_exist: bool = False
-        self.portfolio_alerts_cache: List[AlertOptional] = list()
-        self.strat_id_by_symbol_side_dict: Dict[str, int] = dict()
-        self.strat_alert_cache_by_strat_id_dict: Dict[int, List[Alert]] = dict()
+        self.portfolio_alerts_cache_dict: Dict[str, PortfolioAlertBaseModel] = {}
+        self.strat_id_by_symbol_side_dict: Dict[str, int] = {}
+        self.strat_alert_cache_dict_by_strat_id_dict: Dict[int, Dict[str, StratAlertBaseModel]] = {}
         self.service_up: bool = False
         self.portfolio_alert_queue: Queue = Queue()
         self.strat_alert_queue: Queue = Queue()
         self.pair_strat_api_ops_queue: Queue = Queue()
+        self.raw_performance_data_queue: queue.Queue = queue.Queue()
         self.port_to_executor_web_client: Dict[int, StreetBookServiceHttpClient] = {}
-        self.phone_book_journal_type_update_cache_dict: Dict[str, Queue] = {}
+        self.pydantic_type_name_to_patch_queue_cache_dict: Dict[str, Queue] = {}
         self.phone_book_snapshot_type_update_cache_dict: Dict[str, Queue] = {}
         self.field_sep = get_field_seperator_pattern()
         self.key_val_sep = get_key_val_seperator_pattern()
@@ -88,117 +85,50 @@ class PhoneBookBaseLogBook(AppLogBook):
         self.pattern_to_restart_tail_process: str = get_pattern_to_restart_tail_process()
         self.pattern_to_force_kill_tail_process: str = get_pattern_to_force_kill_tail_process()
         self.pattern_to_remove_file_from_created_cache: str = get_pattern_to_remove_file_from_created_cache()
+        self.max_fetch_from_queue = config_yaml_dict.get("max_fetch_from_patch_queue_for_tail_ex")
+        if self.max_fetch_from_queue is None:
+            self.max_fetch_from_queue = 10  # setting default value
+        self.pattern_for_log_simulator = get_pattern_for_log_simulator()
 
-    def _handle_portfolio_alert_queue_err_handler(self, *args):
-        err_str_ = f"_handle_portfolio_alert_queue_err_handler failed, passed args: {args}"
-        self.portfolio_alert_fail_logger.exception(err_str_)
+    def _handle_put_portfolio_alert_queue_err_handler(self, *args):
+        err_str_ = f"_handle_put_portfolio_alert_queue_err_handler failed, passed args: {args}"
+        log_book_service_http_client.portfolio_alert_fail_logger_query_client(err_str_)
+
+    def _handle_create_portfolio_alert_queue_err_handler(self, *args):
+        err_str_ = f"_handle_create_portfolio_alert_queue_err_handler failed, passed args: {args}"
+        log_book_service_http_client.portfolio_alert_fail_logger_query_client(err_str_)
+
+    def _handle_portfolio_alert_query_call_from_alert_queue_handler(
+            self, portfolio_alerts: List[PortfolioAlertBaseModel]):
+        portfolio_alert_data_list: List[Dict[str, Any]] = []
+        for portfolio_alert in portfolio_alerts:
+            portfolio_alert_data_list.append({
+                "severity": portfolio_alert.severity,
+                "alert_brief": portfolio_alert.alert_brief,
+                "alert_details": portfolio_alert.alert_details
+            })
+        log_book_service_http_client.handle_portfolio_alerts_from_tail_executor_query_client(
+            portfolio_alert_data_list)
+        return portfolio_alerts
 
     def _handle_portfolio_alert_queue(self):
-        PhoneBookBaseLogBook.queue_handler(
-            self.portfolio_alert_queue, portfolio_alert_bulk_update_counts_per_call,
+        alert_queue_handler(
+            self.is_running, self.portfolio_alert_queue, portfolio_alert_bulk_update_counts_per_call,
             portfolio_alert_bulk_update_timeout,
-            self.patch_all_portfolio_alert_client_with_asyncio_loop,
-            self._handle_portfolio_alert_queue_err_handler)
+            self._handle_portfolio_alert_query_call_from_alert_queue_handler,
+            self._handle_create_portfolio_alert_queue_err_handler)
 
-    def patch_all_portfolio_alert_client_with_asyncio_loop(self, pydantic_obj_json_list: Dict):
-        run_coro = PhoneBookBaseLogBook.underlying_partial_update_all_portfolio_alert_http(pydantic_obj_json_list)
-        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-        try:
-            # block for task to finish
-            return future.result()
-        except HTTPException as http_e:
-            err_str_ = f"underlying_partial_update_all_portfolio_alert_http failed with http_exception: {http_e}"
-            logging.error(err_str_)
-            raise Exception(err_str_)
-        except Exception as e:
-            err_str_ = f"underlying_partial_update_all_portfolio_alert_http failed with exception: {e}"
-            logging.error(err_str_)
-            raise Exception(err_str_)
+    def handle_raw_performance_data_queue_err_handler(self, pydantic_obj_list):
+        pass
 
-    def _init_service(self) -> bool:
-        if self.service_up:
-            return True
-        else:
-            self.service_up = is_log_book_service_up(ignore_error=True)
-            if self.service_up:
-                run_coro = PhoneBookBaseLogBook.underlying_read_portfolio_alert_by_id_http(1)
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-                try:
-                    # block for task to finish
-                    portfolio_alert: PortfolioAlert = future.result()
-                except HTTPException as http_e:
-                    err_str_ = f"underlying_read_portfolio_alert_by_id_http failed with http_exception: {http_e}"
-                    logging.error(err_str_)
-                    raise Exception(err_str_)
-                except Exception as e:
-                    err_str_ = f"underlying_read_portfolio_alert_by_id_http failed with exception: {e}"
-                    logging.error(err_str_)
-                    raise Exception(err_str_)
-
-                if portfolio_alert.alerts is not None:
-                    self.portfolio_alerts_cache = portfolio_alert.alerts
-                else:
-                    self.portfolio_alerts_cache = list()
-                return True
-            return False
-
-    def create_or_update_alert(self, alerts: List[AlertOptional] | List[Alert] | None, severity: Severity,
-                               alert_brief: str, alert_details: str | None = None) -> AlertOptional:
-        alert_obj: AlertOptional | None = None
-        if alerts is not None:
-            for alert in alerts:
-                stored_alert_brief: str = alert.alert_brief
-                stored_alert_brief = stored_alert_brief.split(":", 3)[-1].strip()
-                stored_alert_brief = self.clean_alert_str(alert_str=stored_alert_brief)
-
-                stored_alert_details: str | None = alert.alert_details
-                if stored_alert_details is not None:
-                    stored_alert_details = self.clean_alert_str(alert_str=stored_alert_details)
-
-                cleaned_alert_brief: str = alert_brief.split(":", 3)[-1].strip()
-                cleaned_alert_brief = self.clean_alert_str(alert_str=cleaned_alert_brief)
-                cleaned_alert_details: str | None = alert_details
-                if alert_details is not None:
-                    cleaned_alert_details = self.clean_alert_str(alert_str=cleaned_alert_details)
-
-                if cleaned_alert_brief == stored_alert_brief and severity == alert.severity:
-                    # handling truncated mismatch
-                    if cleaned_alert_details is not None and stored_alert_details is not None:
-                        if len(cleaned_alert_details) > len(stored_alert_details):
-                            cleaned_alert_details = cleaned_alert_details[:len(stored_alert_details)]
-                        else:
-                            stored_alert_details = stored_alert_details[:len(cleaned_alert_details)]
-                    if cleaned_alert_details == stored_alert_details:
-                        updated_alert_count: int = alert.alert_count + 1
-                        updated_last_update_date_time: DateTime = DateTime.utcnow()
-                        alert_obj = AlertOptional(_id=alert.id, dismiss=False, alert_count=updated_alert_count,
-                                                  alert_brief=alert_brief, severity=alert.severity,
-                                                  last_update_date_time=updated_last_update_date_time)
-                        # update the alert in cache
-                        alert.dismiss = False
-                        alert.alert_brief = alert_brief
-                        alert.alert_count = updated_alert_count
-                        alert.last_update_date_time = updated_last_update_date_time
-                        break
-                    # else not required: alert details not matched
-                # else not required: alert not matched with existing alerts
-        if alert_obj is None:
-            # create a new alert
-            alert_obj: AlertOptional = create_alert(alert_brief=alert_brief, alert_details=alert_details,
-                                                    severity=severity)
-            alerts.append(alert_obj)
-        return alert_obj
-
-    def get_severity_type_from_severity_str(self, severity_str: str) -> Severity:
-        return Severity[severity_str]
-
-    def clean_alert_str(self, alert_str: str) -> str:
-        # remove object hex memory path
-        cleaned_alert_str: str = re.sub(r"0x[a-f0-9]*", "", alert_str)
-        # remove all numeric digits
-        cleaned_alert_str = re.sub(r"-?[0-9]*", "", cleaned_alert_str)
-        cleaned_alert_str = cleaned_alert_str.split("...check the file:")[0]
-        return cleaned_alert_str
+    def _handle_raw_performance_data_queue(self):
+        raw_performance_data_bulk_create_counts_per_call, raw_perf_data_bulk_create_timeout = (
+            get_transaction_counts_n_timeout_from_config(self.config_yaml_dict.get("raw_perf_data_config")))
+        alert_queue_handler(
+            self.is_running, self.raw_performance_data_queue, raw_performance_data_bulk_create_counts_per_call,
+            raw_perf_data_bulk_create_timeout,
+            performance_benchmark_service_http_client.create_all_raw_performance_data_client,
+            self.handle_raw_performance_data_queue_err_handler)
 
     def _create_alert(self, error_dict: Dict) -> List[str]:
         alert_brief_n_detail_lists: List[str] = (
@@ -216,8 +146,9 @@ class PhoneBookBaseLogBook(AppLogBook):
 
     def _get_pair_strat_obj_from_symbol_side(self, symbol: str, side: Side) -> PairStratBaseModel | None:
         pair_strat_list: List[PairStratBaseModel] = \
-            email_book_service_http_client.get_pair_strat_from_symbol_side_query_client(
-                sec_id=symbol, side=side)
+            (email_book_service_http_client.
+             get_ongoing_or_single_exact_non_ongoing_pair_strat_from_symbol_side_query_client(
+                sec_id=symbol, side=side))
 
         if len(pair_strat_list) == 0:
             return None
@@ -232,26 +163,6 @@ class PhoneBookBaseLogBook(AppLogBook):
                 StreetBookServiceHttpClient.set_or_get_if_instance_exists(host_, port_))
             self.port_to_executor_web_client[port_] = executor_web_client
         return executor_web_client
-
-    def _update_strat_alert_cache(self, strat_id: int) -> None:
-        run_coro = PhoneBookBaseLogBook.underlying_read_strat_alert_by_id_http(strat_id)
-        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-        try:
-            # block for task to finish
-            strat_alert: StratAlert = future.result()
-        except HTTPException as http_e:
-            err_str_ = f"underlying_read_strat_alert_by_id_http failed with http_exception: {http_e}"
-            logging.error(err_str_)
-            raise Exception(err_str_)
-        except Exception as e:
-            err_str_ = f"underlying_read_strat_alert_by_id_http failed with exception: {e}"
-            logging.error(err_str_)
-            raise Exception(err_str_)
-
-        if strat_alert.alerts is not None:
-            self.strat_alert_cache_by_strat_id_dict[strat_id] = strat_alert.alerts
-        else:
-            self.strat_alert_cache_by_strat_id_dict[strat_id] = []
 
     def _pair_strat_api_ops_queue_handler(self):
         while 1:
@@ -268,7 +179,7 @@ class PhoneBookBaseLogBook(AppLogBook):
                             # API operations other than update
                             pydantic_basemodel_class_type: Type = eval(pydantic_basemodel_type)
 
-                            if isinstance(kwargs, list):    # put_all or post_all
+                            if isinstance(kwargs, list):  # put_all or post_all
                                 pydantic_obj_list = []
                                 for kwarg in kwargs:
                                     pydantic_object = pydantic_basemodel_class_type(**kwarg)
@@ -282,7 +193,7 @@ class PhoneBookBaseLogBook(AppLogBook):
                             callback_method(**kwargs)
                         break
                     except Exception as e:
-                        if not self.should_retry_due_to_server_down(e):
+                        if not should_retry_due_to_server_down(e):
                             alert_brief: str = f"{method_name} failed in pair_strat log analyzer"
                             alert_details: str = (f"{pydantic_basemodel_type = }, "
                                                   f"exception: {e}")
@@ -299,161 +210,50 @@ class PhoneBookBaseLogBook(AppLogBook):
                 self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
                                            alert_details=err_str_detail)
 
-    def get_update_obj_list_for_journal_type_update(self, pydantic_basemodel_class_type: Type[BaseModel],
-                                                    patch_queue: Queue) -> List[Dict]:      # blocking function
-        update_dict_list: List[Dict] = []
+    def _snapshot_type_callable_err_handler(self, pydantic_basemodel_class_type: Type[BaseModel], kwargs):
+        err_str_brief = ("Can't find _id key in patch kwargs dict - ignoring this update in "
+                         "get_update_obj_for_snapshot_type_update, "
+                         f"pydantic_basemodel_class_type: {pydantic_basemodel_class_type.__name__}, "
+                         f"{kwargs = }")
+        logging.exception(f"{err_str_brief}")
+        self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief)
 
-        kwargs: Dict = patch_queue.get()
-        pydantic_object = pydantic_basemodel_class_type(**kwargs)
-        update_dict_list.append(jsonable_encoder(pydantic_object, by_alias=True, exclude_none=True))
+    def dynamic_queue_handler_err_handler(self, pydantic_basemodel_type: str, update_type: UpdateType,
+                                          err_str_: Exception):
+        err_str_brief = (f"handle_dynamic_queue_for_patch running for pydantic_basemodel_type: "
+                         f"{pydantic_basemodel_type} and update_type: {update_type} failed")
+        err_str_detail = f"exception: {err_str_}"
+        logging.exception(f"{err_str_brief}{PhoneBookBaseLogBook.log_seperator} "
+                          f"{err_str_detail}")
+        self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
+                                   alert_details=err_str_detail)
 
-        while not patch_queue.empty():
-            kwargs: Dict = patch_queue.get()
-            pydantic_object = pydantic_basemodel_class_type(**kwargs)
-            update_dict_list.append(jsonable_encoder(pydantic_object, by_alias=True, exclude_none=True))
-        return update_dict_list
+    def get_update_obj_list_for_journal_type_update(
+            self, pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str,
+            patch_queue: Queue, max_fetch_from_queue: int, parse_to_pydantic: bool | None = None):
+        # blocking function
+        update_json_list = get_update_obj_list_for_journal_type_update(
+            pydantic_basemodel_class_type, update_type, method_name, patch_queue,
+            max_fetch_from_queue, parse_to_pydantic)
 
-    def get_update_obj_for_snapshot_type_update(self, pydantic_basemodel_class_type: Type[BaseModel],
-                                                patch_queue: Queue) -> List[Dict]:      # blocking function
-        id_to_obj_dict = {}
+        container_json = {"update_json_list": update_json_list, "update_type": update_type,
+                          "pydantic_basemodel_type_name": pydantic_basemodel_class_type.__name__,
+                          "method_name": method_name}
+        return container_json
 
-        kwargs: Dict = patch_queue.get()
-        pydantic_object = pydantic_basemodel_class_type(**kwargs)
-        id_to_obj_dict[pydantic_object.id] = pydantic_object
+    def get_update_obj_for_snapshot_type_update(
+            self, pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str,
+            patch_queue: Queue, max_fetch_from_queue: int, err_handler_callable: Callable,
+            parse_to_pydantic: bool | None = None):
+        # blocking function
+        update_json_list = get_update_obj_for_snapshot_type_update(
+            pydantic_basemodel_class_type, update_type, method_name, patch_queue,
+            max_fetch_from_queue, err_handler_callable, parse_to_pydantic)
 
-        while not patch_queue.empty():
-            kwargs: Dict = patch_queue.get()
-
-            obj_id = kwargs.get("_id")
-
-            if obj_id is not None:
-                pydantic_object = id_to_obj_dict.get(obj_id)
-
-                if pydantic_object is None:
-                    pydantic_object = pydantic_basemodel_class_type(**kwargs)
-                    id_to_obj_dict[pydantic_object.id] = pydantic_object
-                else:
-                    # updating already existing object
-                    for key, val in kwargs.items():
-                        setattr(pydantic_object, key, val)
-            else:
-                err_str_brief = ("Can't find _id key in patch kwargs dict - ignoring this update, "
-                                 f"pydantic_basemodel_class_type: {pydantic_basemodel_class_type.__name__}, "
-                                 f"{kwargs = }")
-                logging.exception(f"{err_str_brief}")
-                self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief)
-
-        obj_json_list: List[Dict] = []
-        for _, obj in id_to_obj_dict.items():
-            obj_json_list.append(jsonable_encoder(obj, by_alias=True, exclude_none=True))
-
-        return obj_json_list
-
-    def should_retry_due_to_server_down(self, exception: Exception) -> bool:
-        if "Failed to establish a new connection: [Errno 111] Connection refused" in str(exception):
-            logging.exception("Connection Error in phone_book server call, "
-                              "likely server is down, retrying call ...")
-            time.sleep(1)
-        elif "service is not initialized yet" in str(exception):
-            # Check is server up
-            logging.exception("phone_book service not up yet, likely server "
-                              "restarted but is not ready yet, retrying call ...")
-            time.sleep(1)
-        elif ("('Connection aborted.', ConnectionResetError(104, 'Connection reset "
-              "by peer'))") in str(exception):
-            logging.exception(
-                "phone_book service connection error, retrying call ...")
-            time.sleep(1)
-        else:
-            return False
-        return True
-
-    def handle_dynamic_queue_for_patch(self, pydantic_basemodel_type: str, method_name: str,
-                                       update_type: UpdateType, patch_queue: Queue):
-        pydantic_basemodel_class_type: Type[BaseModel] = eval(pydantic_basemodel_type)
-        callback_method: Callable = getattr(email_book_service_http_client, method_name)
-
-        while 1:
-            try:
-                if update_type == UpdateType.JOURNAL_TYPE:
-                    # blocking call
-                    update_json_list: List[Dict] = (
-                        self.get_update_obj_list_for_journal_type_update(pydantic_basemodel_class_type, patch_queue))
-
-                else:   # if update_type is UpdateType.SNAPSHOT_TYPE
-                    # blocking call
-                    update_json_list: List[Dict] = (
-                        self.get_update_obj_for_snapshot_type_update(pydantic_basemodel_class_type, patch_queue))
-
-                for update_json in update_json_list:
-                    while 1:
-                        try:
-                            callback_method(update_json)
-                            logging.info(f"pair_strat_db update call: {callback_method.__name__ = }, "
-                                         f"{update_json = }")
-                            break
-                        except Exception as e:
-                            if not self.should_retry_due_to_server_down(e):
-                                alert_brief: str = f"{method_name = } failed in pair_strat log analyzer"
-                                alert_details: str = (f"pydantic_class_type: {pydantic_basemodel_type}, "
-                                                      f"exception: {e}")
-                                logging.exception(f"{alert_brief}{PhoneBookBaseLogBook.log_seperator} "
-                                                  f"{alert_details}")
-                                self.send_portfolio_alerts(severity=self.get_severity("error"),
-                                                           alert_brief=alert_brief,
-                                                           alert_details=alert_details)
-                                break
-            except Exception as e:
-                err_str_brief = (f"handle_dynamic_queue_for_patch running for pydantic_basemodel_type: "
-                                 f"{pydantic_basemodel_type} and update_type: {update_type} failed")
-                err_str_detail = f"exception: {e}"
-                logging.exception(f"{err_str_brief}{PhoneBookBaseLogBook.log_seperator} "
-                                  f"{err_str_detail}")
-                self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
-                                           alert_details=err_str_detail)
-
-    def handle_dynamic_queue_for_patch_all(self, pydantic_basemodel_type: str, method_name: str,
-                                           update_type: UpdateType, patch_all_queue: Queue):
-        pydantic_basemodel_class_type: Type[BaseModel] = eval(pydantic_basemodel_type)
-        patch_all_callback_method: Callable = getattr(email_book_service_http_client, method_name)
-
-        while 1:
-            try:
-                if update_type == UpdateType.JOURNAL_TYPE:
-                    # blocking call
-                    update_json_list: List[Dict] = (
-                        self.get_update_obj_list_for_journal_type_update(pydantic_basemodel_class_type,
-                                                                         patch_all_queue))
-                else:  # if update_type is UpdateType.SNAPSHOT_TYPE
-                    # blocking call
-                    update_json_list: List[Dict] = (
-                        self.get_update_obj_for_snapshot_type_update(pydantic_basemodel_class_type, patch_all_queue))
-
-                while 1:
-                    try:
-                        patch_all_callback_method(update_json_list)
-                        logging.info(f"pair_strat_db update call: {patch_all_callback_method.__name__ = }, "
-                                     f"{update_json_list = }")
-                        break
-                    except Exception as e:
-                        if not self.should_retry_due_to_server_down(e):
-                            alert_brief: str = f"{method_name = } failed in pair_strat log analyzer"
-                            alert_details: str = (f"pydantic_class_type: {pydantic_basemodel_type}, "
-                                                  f"exception: {e}")
-                            logging.exception(f"{alert_brief}{PhoneBookBaseLogBook.log_seperator} "
-                                              f"{alert_details}")
-                            self.send_portfolio_alerts(severity=self.get_severity("error"),
-                                                       alert_brief=alert_brief,
-                                                       alert_details=alert_details)
-                            break
-            except Exception as e:
-                err_str_brief = (f"handle_dynamic_queue_for_patch_all running for "
-                                 f"{pydantic_basemodel_type = } and {update_type = } failed")
-                err_str_detail = f"exception: {e}"
-                logging.exception(f"{err_str_brief}{PhoneBookBaseLogBook.log_seperator} "
-                                  f"{err_str_detail}")
-                self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
-                                           alert_details=err_str_detail)
+        container_json = {"update_json_list": update_json_list, "update_type": update_type,
+                          "pydantic_basemodel_type_name": pydantic_basemodel_class_type.__name__,
+                          "method_name": method_name}
+        return container_json
 
     def process_pair_strat_api_ops(self, message: str):
         try:
@@ -470,58 +270,13 @@ class PhoneBookBaseLogBook(AppLogBook):
                 key, value = arg.split(self.key_val_sep)
                 kwargs[key] = value
 
-            if "patch_all" in method_name:
-                if update_type in UpdateType.__members__:
-                    update_type: UpdateType = UpdateType(update_type)
-
-                    if update_type == UpdateType.JOURNAL_TYPE:
-                        update_cache_dict = self.phone_book_journal_type_update_cache_dict
-                    else:
-                        update_cache_dict = self.phone_book_snapshot_type_update_cache_dict
-
-                    patch_all_queue = update_cache_dict.get(pydantic_basemodel_type_name)
-
-                    if patch_all_queue is None:
-                        patch_all_queue = Queue()
-
-                        Thread(target=self.handle_dynamic_queue_for_patch_all,
-                               args=(pydantic_basemodel_type_name, method_name, update_type,
-                                     patch_all_queue,)).start()
-
-                        update_cache_dict[pydantic_basemodel_type_name] = patch_all_queue
-
-                    patch_all_queue.put(kwargs)
-                else:
-                    raise Exception(f"Unsupported {update_type = } for log msg: {message}")
-            elif "patch" in method_name:
-                if update_type in UpdateType.__members__:
-                    update_type: UpdateType = UpdateType(update_type)
-
-                    if update_type == UpdateType.JOURNAL_TYPE:
-                        update_cache_dict = self.phone_book_journal_type_update_cache_dict
-                    else:
-                        update_cache_dict = self.phone_book_snapshot_type_update_cache_dict
-
-                    patch_all_queue = update_cache_dict.get(pydantic_basemodel_type_name)
-
-                    if patch_all_queue is None:
-                        patch_all_queue = Queue()
-
-                        Thread(target=self.handle_dynamic_queue_for_patch,
-                               args=(pydantic_basemodel_type_name, method_name, update_type,
-                                     patch_all_queue,)).start()
-
-                        update_cache_dict[pydantic_basemodel_type_name] = patch_all_queue
-
-                    patch_all_queue.put(kwargs)
-                else:
-                    raise Exception(f"Unsupported update_type: {update_type} for log msg: {message}")
-            else:
-                pair_strat_db_update_data = PairStratDbUpdateDataContainer(
-                    method_name=method_name,
-                    pydantic_basemodel_type=pydantic_basemodel_type_name,
-                    kwargs=kwargs)
-                self.pair_strat_api_ops_queue.put(pair_strat_db_update_data)
+            handle_patch_db_queue_updater(update_type, self.pydantic_type_name_to_patch_queue_cache_dict,
+                                          pydantic_basemodel_type_name, method_name, kwargs,
+                                          self.get_update_obj_list_for_journal_type_update,
+                                          self.get_update_obj_for_snapshot_type_update,
+                                          log_book_service_http_client.process_pair_strat_api_ops_query_client,
+                                          self.dynamic_queue_handler_err_handler, self.max_fetch_from_queue,
+                                          self._snapshot_type_callable_err_handler)
 
         except Exception as e:
             alert_brief: str = f"_process_pair_strat_db_updates failed in log analyzer"
@@ -535,27 +290,23 @@ class PhoneBookBaseLogBook(AppLogBook):
     def send_portfolio_alerts(self, severity: str, alert_brief: str, alert_details: str | None = None) -> None:
         logging.debug(f"sending alert with {severity = }, {alert_brief = }, "
                       f"{alert_details = }")
-        while True:
-            try:
+        try:
+            if not self.service_up:
+                self.service_up: bool = init_service(self.portfolio_alerts_cache_dict)
                 if not self.service_up:
-                    service_ready: bool = self._init_service()
-                    if not service_ready:
-                        raise Exception("service up check failed. waiting for the service to start...")
-                    # else not required: proceed to creating alert
-                # else not required
+                    raise Exception("service up check failed. waiting for the service to start...")
+                # else not required: proceed to creating alert
+            # else not required
 
-                severity: Severity = self.get_severity_type_from_severity_str(severity_str=severity)
-                alert_obj: AlertOptional = self.create_or_update_alert(self.portfolio_alerts_cache, severity,
-                                                                       alert_brief, alert_details)
-                updated_portfolio_alert: PortfolioAlertBaseModel = \
-                    PortfolioAlertBaseModel(_id=1, alerts=[alert_obj])
-                self.portfolio_alert_queue.put(jsonable_encoder(updated_portfolio_alert,
-                                                                by_alias=True, exclude_none=True))
-                break
-            except Exception as e:
-                logging.exception(f"_send_alerts failed{PhoneBookBaseLogBook.log_seperator} exception: {e}")
-                self.service_up = False
-                time.sleep(30)
+            severity: Severity = get_severity_type_from_severity_str(severity_str=severity)
+            create_or_update_alert(self.portfolio_alerts_cache_dict, self.portfolio_alert_queue,
+                                   StratAlertBaseModel, PortfolioAlertBaseModel,
+                                   severity, alert_brief, alert_details)
+        except Exception as e:
+            log_book_service_http_client.portfolio_alert_fail_logger_query_client(
+                f"send_portfolio_alerts failed{PhoneBookBaseLogBook.log_seperator} exception: {e};;; "
+                f"received: {severity = }, {alert_brief = }, {alert_details = }")
+            self.service_up = False
 
     def _get_error_dict(self, log_prefix: str, log_message: str) -> \
             Dict[str, str] | None:
@@ -572,12 +323,31 @@ class PhoneBookBaseLogBook(AppLogBook):
         return None
 
     def notify_no_activity(self, log_detail: LogDetail):
-        non_activity_secs = (DateTime.utcnow() - log_detail.last_processed_utc_datetime).total_seconds()
-        alert_brief: str = f"No new logs found for {log_detail.service} for last " \
-                           f"{non_activity_secs} seconds"
-        alert_details: str = f"{log_detail.service} log file path: {log_detail.log_file_path}"
-        self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
-                                   alert_details=alert_details)
+        last_line_date_time_str = get_last_log_line_date_time(log_detail.log_file_path)
+
+        if last_line_date_time_str is not None:
+            try:
+                last_line_date_time = pendulum.parse(last_line_date_time_str)
+            except Exception as e:
+                alert_brief: str = ("Failed to parse last_line_date_time_str received from get_last_log_line_date_time"
+                                    "callable in notify_no_activity - can't find no activity delta")
+                alert_details: str = f"{last_line_date_time_str = }, {log_detail = }"
+                self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
+                                           alert_details=alert_details)
+            else:
+                non_activity_secs = (DateTime.utcnow() - last_line_date_time).total_seconds()
+                if non_activity_secs >= log_detail.poll_timeout:
+                    alert_brief: str = f"No new logs found for {log_detail.service} for last " \
+                                       f"{non_activity_secs} seconds"
+                    alert_details: str = f"{log_detail.service} log file path: {log_detail.log_file_path}"
+                    self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
+                                               alert_details=alert_details)
+        else:
+            alert_brief: str = ("Received last_line_date_time_str as None from get_last_log_line_date_time"
+                                "callable in notify_no_activity - can't find no activity delta")
+            alert_details: str = f"{log_detail = }"
+            self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
+                                       alert_details=alert_details)
 
     def notify_tail_error_in_log_service(self, brief_msg_str: str, detail_msg_str: str):
         self.send_portfolio_alerts(severity=self.get_severity("warning"), alert_brief=brief_msg_str,
@@ -590,59 +360,79 @@ class PhoneBookBaseLogBook(AppLogBook):
         msg_detail: str | None = None
         if log_seperator_index != -1:
             msg_brief = error_msg[:log_seperator_index]
-            msg_detail = error_msg[log_seperator_index+len(PhoneBookBaseLogBook.log_seperator):]
+            msg_detail = error_msg[log_seperator_index + len(PhoneBookBaseLogBook.log_seperator):]
         else:
             msg_brief = error_msg
 
         self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=msg_brief,
                                    alert_details=msg_detail)
 
-    def handle_log_book_cmd_log_message(self, log_prefix: str, log_message: str,
-                                            log_detail: StratLogDetail):
+    def _process_barter_simulator_message(self, message: str) -> None:
         try:
-            if log_message.startswith(self.pattern_to_restart_tail_process):
-                log_message = log_message[len(self.pattern_to_restart_tail_process):]  # removing starting chars
-                args: List[str] = log_message.split(self.field_sep)
-                log_file_path = args.pop(0)
-                if len(args):
-                    timestamp = args.pop(0)
-                else:
-                    timestamp = None
+            if not self.simulation_mode:
+                raise Exception("Received barter simulator message but log analyzer not running in simulation mode")
+            # remove pattern_for_log_simulator from beginning of message
+            message: str = message[len(self.pattern_for_log_simulator):]
+            args: List[str] = message.split(self.field_sep)
+            method_name: str = args.pop(0)
+            host: str = args.pop(0)
+            port: int = parse_to_int(args.pop(0))
 
-                log_detail_to_restart = self.log_file_path_to_log_detail_dict.get(log_file_path)
+            kwargs: Dict[str, str] = dict()
+            # get method kwargs separated by key_val_sep if any
+            for arg in args:
+                key, value = arg.split(self.key_val_sep)
+                kwargs[key] = value
 
-                # updating tail_details for this log_file to restart it from logged timestamp
-                log_detail_to_restart.processed_timestamp = timestamp
-                log_detail_to_restart.is_running = False
+            executor_web_client = self._get_executor_http_client_from_pair_strat(port, host)
 
-            elif log_message.startswith(self.pattern_to_force_kill_tail_process):
-                # removing starting chars, remaining is log_file_name
-                log_file_path = log_message[len(self.pattern_to_force_kill_tail_process):]
-
-                log_detail_to_restart = self.log_file_path_to_log_detail_dict.get(log_file_path)
-
-                if log_detail_to_restart is not None:
-                    log_detail_to_restart.is_running = False
-                    log_detail_to_restart.force_kill = True
-                    logging.info(f"Found Force Kill log for log_detail of file: {log_detail_to_restart.log_file_path}")
-                else:
-                    logging.info(f"Ignoring Force Kill - Can't find any log_detail for file: {log_file_path} "
-                                 f"in dict of file path key: {self.log_file_path_to_log_detail_dict.keys()}")
-            elif log_message.startswith(self.pattern_to_remove_file_from_created_cache):
-                # removing starting chars, remaining is log_file_name
-                log_file_path = log_message[len(self.pattern_to_remove_file_from_created_cache):]
-
-                if log_file_path not in self.pattern_matched_added_file_path_to_service_dict:
-                    logging.info(
-                        f"Can't find {log_file_path = } in log analyzer cache dict keys used to avoid repeated file "
-                        f"tail start, phone_book_log_book.pattern_matched_added_file_path_to_service_dict: "
-                        f"{self.pattern_matched_added_file_path_to_service_dict}")
-                else:
-                    self.pattern_matched_added_file_path_to_service_dict.pop(log_file_path)
+            callback_method: Callable = getattr(executor_web_client, method_name)
+            callback_method(**kwargs)
+            logging.info(f"Called {method_name} with kwargs: {kwargs}")
 
         except Exception as e:
-            err_str_brief = f"handle_log_book_cmd_log_message failed"
-            err_str_detail = f"exception: {e}"
-            logging.exception(f"{err_str_brief}{PhoneBookBaseLogBook.log_seperator} {err_str_detail}")
-            self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
-                                       alert_details=err_str_detail)
+            alert_brief: str = f"_process_barter_simulator_message failed in log analyzer"
+            alert_details: str = f"message: {message}, exception: {e}"
+            logging.exception(f"{alert_brief};;; {alert_details}")
+            self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
+                                       alert_details=alert_details)
+
+    def handle_log_simulator_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail):
+        logging.debug(f"Processing log simulator line: {log_message[:200]}...")
+        # put in method
+        if log_message.startswith(self.pattern_for_log_simulator):
+            # handle barter simulator message
+            logging.info(f"Barter simulator message: {log_message = }")
+            self._process_barter_simulator_message(log_message)
+            return
+
+        error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=log_prefix, log_message=log_message)
+        if error_dict is not None:
+            severity, alert_brief, alert_details = self._create_alert(error_dict)
+            self.send_portfolio_alerts(severity=severity, alert_brief=alert_brief, alert_details=alert_details)
+        # else not required: error pattern doesn't match, no alerts to send
+
+    def handle_perf_benchmark_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail):
+        pattern = re.compile(f"{self.timeit_pattern}.*{self.timeit_pattern}")
+        if search_obj := re.search(pattern, log_message):
+            found_pattern = search_obj.group()
+            found_pattern = found_pattern[8:-8]  # removing beginning and ending _timeit_
+            found_pattern_list = found_pattern.split(self.timeit_field_separator)  # splitting pattern values
+            if len(found_pattern_list) == 3:
+                callable_name, start_time, delta = found_pattern_list
+                if callable_name != "underlying_create_raw_performance_data_http":
+                    raw_performance_data_obj = RawPerformanceDataBaseModel()
+                    raw_performance_data_obj.callable_name = callable_name
+                    raw_performance_data_obj.start_time = pendulum.parse(start_time)
+                    raw_performance_data_obj.delta = parse_to_float(delta)
+
+                    self.raw_performance_data_queue.put(raw_performance_data_obj)
+                    logging.debug(f"Created raw_performance_data entry in queue for callable {callable_name} "
+                                  f"with start_datetime {start_time}")
+                # else not required: avoiding callable underlying_create_raw_performance_data to avoid infinite loop
+            else:
+                err_str_: str = f"Found timeit pattern but internally only contains {found_pattern_list}, " \
+                                f"ideally must contain callable_name, start_time & delta " \
+                                f"seperated by '~'"
+                logging.exception(err_str_)
+        # else not required: if no pattern is matched ignoring this log_message

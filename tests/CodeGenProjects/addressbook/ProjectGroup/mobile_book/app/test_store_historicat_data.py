@@ -10,7 +10,7 @@ from ibapi.common import BarData
 # project imports
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
 from FluxPythonUtils.scripts.utility_functions import str_from_file
-from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.store_historical_data_client import StoreHistoricalDataClient
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.store_historical_data_client import StoreHistoricalDataClient
 
 os.environ["DBType"] = "beanie"
 

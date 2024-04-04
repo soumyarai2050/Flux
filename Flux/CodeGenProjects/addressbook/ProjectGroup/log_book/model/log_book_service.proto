@@ -6,65 +6,137 @@ import "projects_core.proto";
 
 package log_book;
 
-message PortfolioAlert{
-    option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_FilterAggregate,
-    ReadOp: AggregateType_FilterAggregate,
-    UpdateOp: AggregateType_FilterAggregate,
-    PatchOp: AggregateType_FilterAggregate,
-    PatchAllOp: AggregateType_FilterAggregate,
-    DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_FilterAggregate
-  };
-  option (FluxMsgWidgetUIDataElement) = {
-    x: 0,
-    y: 32,
-    w: 8,
-    h: 8,
-    widget_ui_data: {
-      view_layout: UI_TABLE
-    },
-    depending_proto_file_name: "email_book_service.proto"
-  };
-  option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_portfolio_alerts_obj", agg_params: ["-100"]};
-  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  repeated Alert alerts = 2;
-  optional int64 alert_update_seq_num = 3 [(FluxFldHide) = "True"];
-  optional Severity strat_alert_aggregated_severity = 4;  // non persisted field - used get aggregated value to update StratView's strat_alert_aggregated_severity
-  optional int32 alert_count = 5;  // non persisted field - used get aggregated value to update StratView's strat_alert_count
-}
-
-
 message StratAlert{
   option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_FilterAggregate,
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED
     ReadOp: AggregateType_FilterAggregate,
-    UpdateOp: AggregateType_FilterAggregate,
-    PatchOp: AggregateType_FilterAggregate,
-    PatchAllOp: AggregateType_FilterAggregate,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_FilterAggregate
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 32,
     w: 8,
     h: 8,
+    is_repeated: True,
     widget_ui_data: {
       view_layout: UI_TABLE
     },
     depending_proto_file_name: "email_book_service.proto",
-    depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_id: true,
+    override_default_crud: {
+      ui_crud_type: GET_ALL,
+      query_name: "filtered_strat_alert_by_strat_id",
+      query_src_model_name: "PairStrat",
+      ui_query_params: {
+        query_param_field: "strat_id",
+        query_param_field_src: "PairStrat.id"
+      },
+    },
+    is_model_alert_type: true
   };
-  option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_strat_alerts_obj", agg_params: ["-100"]};
+  option (FluxMsgJsonQuery) = {
+      QueryName: "create_or_update_strat_alert"
+      QueryParams: "strat_id"
+      QueryParamsDataType: "int"
+      QueryParams: "severity"
+      QueryParamsDataType: "str"
+      QueryParams: "alert_brief"
+      QueryParamsDataType: "str"
+      QueryParams: "alert_details"
+      QueryParamsDataType: "str | None = None"
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_strat_alert_by_strat_id",
+      QueryParams: "strat_id",
+      QueryParamsDataType: "int",
+      QueryParams: "limit_obj_count",
+      QueryParamsDataType: "int | None = None",
+      QueryType: BOTH
+  };
+  option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgMainCRUDOperationsAgg) = {
+    agg_var_name: "sort_alerts_based_on_severity_n_last_update_date_time",
+    override_get_all_limit_handling: true
+  };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  repeated Alert alerts = 2;
-  optional int64 alert_update_seq_num = 3 [(FluxFldHide) = "True"];
-  optional Severity strat_alert_aggregated_severity = 4;  // non persisted field - used get aggregated value to update StratView's strat_alert_aggregated_severity
-  optional int32 alert_count = 5;  // non persisted field - used get aggregated value to update StratView's strat_alert_count
+  required int32 strat_id = 2 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldIndex) = true];
+  optional bool dismiss = 3 [default=false, (FluxFldIndex) = true, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
+    unpressed_caption: "dismiss",
+    pressed_caption: "undo",
+    value_color_map: "true=DEBUG,false=INFO"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true"
+  }];
+  required Severity severity = 4 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
+  optional int32 alert_count = 5;
+  required string alert_brief = 6 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left"];
+  // must prefix strat:<strat-name> for strat alerts
+  optional string alert_details = 7 [(FluxFldAbbreviated) = "JSON"];
+  optional int64 last_update_date_time = 8 [(FluxFldValIsDateTime) = true];
+
+}
+
+message PortfolioAlert{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_FilterAggregate,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 32,
+    w: 8,
+    h: 8,
+    is_repeated: True,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "email_book_service.proto",
+    is_model_alert_type: true
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "create_or_update_portfolio_alert"
+      QueryParams: "severity"
+      QueryParamsDataType: "str"
+      QueryParams: "alert_brief"
+      QueryParamsDataType: "str"
+      QueryParams: "alert_details"
+      QueryParamsDataType: "str | None = None"
+  };
+  option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgMainCRUDOperationsAgg) = {
+    agg_var_name: "sort_alerts_based_on_severity_n_last_update_date_time"
+    override_get_all_limit_handling: true,
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional bool dismiss = 2 [default = false, (FluxFldIndex) = true, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
+    unpressed_caption: "dismiss",
+    pressed_caption: "undo",
+    value_color_map: "true=DEBUG,false=INFO"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true"
+  }];
+  required Severity severity = 3 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
+  optional int32 alert_count = 4;
+  required string alert_brief = 5 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left"];
+  // must prefix strat:<strat-name> for strat alerts
+  optional string alert_details = 6 [(FluxFldAbbreviated) = "JSON"];
+  optional int64 last_update_date_time = 7 [(FluxFldValIsDateTime) = true];
 }
 
 message LogBookRestartTail{
@@ -78,10 +150,10 @@ message LogBookRestartTail{
   optional bool temp = 1;
 }
 
-message LogBookForceKillTail{
+message LogBookForceKillTailExecutor{
   option (FluxMsgJsonQuery) = {
-      QueryName: "log_book_force_kill_tail"
-      QueryParams: "log_file_name"
+      QueryName: "log_book_force_kill_tail_executor"
+      QueryParams: "log_file_path"
       QueryParamsDataType: "str"
   };
   optional bool temp = 1;
@@ -92,6 +164,63 @@ message LogBookRemoveFileFromCreatedCache{
       QueryName: "log_book_remove_file_from_created_cache"
       QueryParams: "log_file_path_list"
       QueryParamsDataType: "List[str]"
+  };
+  optional bool temp = 1;
+}
+
+message ProcessPairStratAPIOps{
+    option (FluxMsgJsonQuery) = {
+      QueryName: "process_pair_strat_api_ops"
+      QueryParams: "kwargs"
+      QueryParamsDataType: "List[Dict]"
+      QueryRouteType: PATCH
+  };
+  optional bool temp = 1;
+}
+
+message HandlePortfolioAlertsFromTailExecutor{
+    option (FluxMsgJsonQuery) = {
+      QueryName: "handle_portfolio_alerts_from_tail_executor"
+      QueryParams: "portfolio_alert_data_list"
+      QueryParamsDataType: "List[Dict]"
+      QueryRouteType: PATCH
+  };
+  optional bool temp = 1;
+}
+
+message HandleStratAlertsFromTailExecutor{
+    option (FluxMsgJsonQuery) = {
+      QueryName: "handle_strat_alerts_from_tail_executor"
+      QueryParams: "strat_alert_data_list"
+      QueryParamsDataType: "List[Dict]"
+      QueryRouteType: PATCH
+  };
+  optional bool temp = 1;
+}
+
+message PortfolioAlertFailLogger{
+    option (FluxMsgJsonQuery) = {
+      QueryName: "portfolio_alert_fail_logger"
+      QueryParams: "log_msg"
+      QueryParamsDataType: "str"
+  };
+  optional bool temp = 1;
+}
+
+message DismissStratAlertByBriefStr{
+      option (FluxMsgJsonQuery) = {
+      QueryName: "dismiss_strat_alert_by_brief_str"
+      QueryParams: "strat_id"
+      QueryParamsDataType: "int"
+      QueryParams: "brief_str"
+      QueryParamsDataType: "str"
+  };
+  optional bool temp = 1;
+}
+
+message ShutDownLogBook{
+      option (FluxMsgJsonQuery) = {
+      QueryName: "shutdown_log_book"
   };
   optional bool temp = 1;
 }

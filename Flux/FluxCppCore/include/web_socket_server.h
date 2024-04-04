@@ -36,7 +36,7 @@ namespace FluxCppCore {
                                  m_acceptor_(m_io_context_, tcp::endpoint{asio::ip::make_address(km_host_),
                                                                           static_cast<port_type>(km_port_)}),
                                  m_timer_(m_io_context_, km_read_timeout_seconds),
-                                 mp_logger(p_logger) {}
+                                 mp_logger(p_logger) { }
 
         void run() {
             std::shared_ptr sp_socket = std::make_shared<tcp::socket>(m_io_context_);
@@ -46,8 +46,6 @@ namespace FluxCppCore {
                     session(std::move(*sp_socket));
                     // Create a new sp_socket object to be used for the next connection (old socked is moved thus sp_socket obj is free for reuse)
                     sp_socket = std::make_shared<tcp::socket>(m_io_context_);
-                } else if (error_code != asio::error::operation_aborted) {
-                    LOG_ERROR(mp_logger, "Error accepting connection: {}", error_code.message());
                 }
                 m_timer_.expires_from_now(km_read_timeout_seconds); // reset the timer
                 run();
@@ -56,14 +54,12 @@ namespace FluxCppCore {
             m_timer_.async_wait([&](const boost::system::error_code &error_code) {
                 if (!error_code) {
                     shutdown();
-                    LOG_INFO(mp_logger, "Timeout reached");
+//                    LOG_INFO(mp_logger, "Timeout reached");
                     if(m_shutdown)
                         m_io_context_.stop();
                     else
                         m_io_context_.run();
 
-                } else if (error_code != asio::error::operation_aborted) {
-                    LOG_ERROR(mp_logger, "Error accepting connection: {}", error_code.message());
                 }
             });
 
@@ -82,12 +78,20 @@ namespace FluxCppCore {
         bool publish(const std::string &kr_send_string, const int32_t k_new_client_ws_id  = -1)
         {
             boost::system::error_code error_code;
+            std::string string_to_send = kr_send_string;
+
+            std::size_t found = string_to_send.find("id");
+            if (found != std::string::npos) {
+                // Replace "id" with "_id"
+                string_to_send.replace(found, 2, "_id");
+            }
+
             if(-1 == k_new_client_ws_id){
                 for(auto &ws_ptr: ws_vector){
-                    ws_ptr->write(asio::buffer(kr_send_string), error_code);
+                    ws_ptr->write(asio::buffer(string_to_send), error_code);
                 }
             } else{
-                ws_vector[k_new_client_ws_id]->write(asio::buffer(kr_send_string), error_code);
+                ws_vector[k_new_client_ws_id]->write(asio::buffer(string_to_send), error_code);
             }
 
             if (!error_code) {
@@ -149,7 +153,7 @@ namespace FluxCppCore {
         const std::string km_host_;
         const int32_t km_port_;
         const boost::posix_time::seconds km_read_timeout_seconds;
-
+        std::string json_str_;
         std::vector<std::shared_ptr<websocket::stream<tcp::socket>>> ws_vector;
         std::vector <std::thread> m_ws_client_threads;
         bool m_shutdown = false;

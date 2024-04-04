@@ -11,7 +11,7 @@ from ibapi.contract import Contract
 from ibapi.common import TickerId
 
 # Local project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
 
 os.environ["DBType"] = "beanie"
@@ -68,9 +68,9 @@ class StoreDepthMobileBookClient(IbApiClient):
             logging.exception(err_str)
             raise ValueError(err_str)
 
-    def nextValidId(self, order_id: TickerId):
+    def nextValidId(self, chore_id: TickerId):
         """
-        Requests the contract's market depth (order book). Note this request must be
+        Requests the contract's market depth (chore book). Note this request must be
         direct-routed to an exchange and not smart-routed. The number of simultaneous
         market depth requests allowed in an account is calculated based on a formula
         that looks at an accounts' equity, commissions, and quote booster packs.
@@ -88,7 +88,7 @@ class StoreDepthMobileBookClient(IbApiClient):
         for idx, contract in enumerate(self.contracts):
             self.reqMktDepth(idx, contract, self.num_rows, self.is_smart_depth, [])
 
-    def error(self, req_id: TickerId, error_code: int, error_string: str, advanced_order_reject_json=""):
+    def error(self, req_id: TickerId, error_code: int, error_string: str, advanced_chore_reject_json=""):
         logging.debug(f"Error: , {req_id}, {error_code}, {error_string}")
 
     def _update_mkt_depth(self, operation: int, market_depth_base_model: MarketDepthBaseModel):

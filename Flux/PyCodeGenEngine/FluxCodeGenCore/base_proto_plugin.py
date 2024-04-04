@@ -90,6 +90,14 @@ class BaseProtoPlugin(ABC):
     widget_ui_option_depending_proto_file_name_field: ClassVar[str] = "depending_proto_file_name"
     widget_ui_option_depending_proto_model_name_field: ClassVar[str] = "depending_proto_model_name"
     widget_ui_option_depends_on_other_model_for_id_field: ClassVar[str] = "depends_on_other_model_for_id"
+    widget_ui_option_depends_on_model_name_for_port_field: ClassVar[str] = "depends_on_model_name_for_port"
+    widget_ui_option_override_default_crud_field: ClassVar[str] = "override_default_crud"
+    widget_ui_option_override_default_crud_ui_crud_type_field: ClassVar[str] = "ui_crud_type"
+    widget_ui_option_override_default_crud_query_name_field: ClassVar[str] = "query_name"
+    widget_ui_option_override_default_crud_query_src_model_name_field: ClassVar[str] = "query_src_model_name"
+    widget_ui_option_override_default_crud_ui_query_params_field: ClassVar[str] = "ui_query_params"
+    widget_ui_option_override_default_crud_ui_query_params_field_fld: ClassVar[str] = "query_param_field"
+    widget_ui_option_override_default_crud_ui_query_params_src_field: ClassVar[str] = "query_param_field_src"
     widget_ui_option_depends_on_other_model_for_dynamic_url_field: ClassVar[str] = \
         "depends_on_other_model_for_dynamic_url"
     flux_msg_widget_ui_data_element_widget_ui_data_field: ClassVar[str] = "widget_ui_data"
@@ -362,9 +370,9 @@ class BaseProtoPlugin(ABC):
                             field_val_list.append(field_val)
 
                     if is_repeated:
-                        output_dict[f"{field.proto.name}"] = field_val_list
+                        output_dict[field.proto.name] = field_val_list
                     else:
-                        output_dict[f"{field.proto.name}"] = field_val
+                        output_dict[field.proto.name] = field_val
 
             else:
                 field_name_search_str = f"{field.proto.name}"+" {"
@@ -388,9 +396,9 @@ class BaseProtoPlugin(ABC):
                             field_val_list.append(field_val)
 
                     if is_repeated:
-                        output_dict[f"{field.proto.name}"] = field_val_list
+                        output_dict[field.proto.name] = field_val_list
                     else:
-                        output_dict[f"{field.proto.name}"] = field_val
+                        output_dict[field.proto.name] = field_val
         return output_dict
 
     @staticmethod

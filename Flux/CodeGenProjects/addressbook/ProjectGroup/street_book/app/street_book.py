@@ -9,25 +9,25 @@ import ctypes
 
 os.environ["DBType"] = "beanie"
 
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.order_check import OrderControl
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_data_manager import TradingDataManager
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.strat_cache import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link import get_trading_link, TradingLinkBase, is_test_run, \
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.chore_check import ChoreControl
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_data_manager import BarteringDataManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.strat_cache import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import get_bartering_link, BarteringLinkBase, is_test_run, \
     config_dict
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_service_helper import \
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import \
     get_consumable_participation_qty_http, get_symbol_side_key, \
     get_strat_brief_log_key, create_stop_md_script, executor_config_yaml_dict, MobileBookMutexManager
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, email_book_service_http_client, guaranteed_call_pair_strat_client)
 from FluxPythonUtils.scripts.utility_functions import clear_semaphore
-from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
     IsPortfolioLimitsBreached)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.app.post_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
     post_book_service_http_client)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.mobile_book_cache import (
-    MobileBookContainer, TopOfBook, MarketDepth, LastTrade, MarketTradeVolume, add_container_obj_for_symbol)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import (
+    MobileBookContainer, TopOfBook, MarketDepth, LastBarter, MarketBarterVolume, add_container_obj_for_symbol)
 
 
 class MobileBookContainerCache(BaseModel):
@@ -41,33 +41,33 @@ class StreetBook:
     underlying_get_aggressive_market_depths_query_http: Callable[..., Any] | None = None
     underlying_handle_strat_activate_query_http: Callable[..., Any] | None = None
 
-    trading_link: ClassVar[TradingLinkBase] = get_trading_link()
+    bartering_link: ClassVar[BarteringLinkBase] = get_bartering_link()
     asyncio_loop: asyncio.AbstractEventLoop
     mobile_book_provider: ctypes.CDLL
 
     @classmethod
     def initialize_underlying_http_routes(cls):
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_get_market_depths_query_http, underlying_handle_strat_activate_query_http)
         cls.underlying_get_aggressive_market_depths_query_http = underlying_get_market_depths_query_http
         cls.underlying_handle_strat_activate_query_http = underlying_handle_strat_activate_query_http
 
     @staticmethod
-    def executor_trigger(trading_data_manager_: TradingDataManager, strat_cache: StratCache,
+    def executor_trigger(bartering_data_manager_: BarteringDataManager, strat_cache: StratCache,
                          mobile_book_container_cache: MobileBookContainerCache):
-        street_book: StreetBook = StreetBook(trading_data_manager_, strat_cache, mobile_book_container_cache)
+        street_book: StreetBook = StreetBook(bartering_data_manager_, strat_cache, mobile_book_container_cache)
         street_book_thread = Thread(target=street_book.run, daemon=True).start()
         return street_book, street_book_thread
 
     """ 1 instance = 1 thread = 1 pair strat"""
 
-    def __init__(self, trading_data_manager_: TradingDataManager, strat_cache: StratCache,
+    def __init__(self, bartering_data_manager_: BarteringDataManager, strat_cache: StratCache,
                  mobile_book_container_cache: MobileBookContainerCache):
         # prevents consuming any market data older than current time
         self.is_dev_env = True
-        self.allow_multiple_open_orders_per_strat: Final[bool] = allow_multiple_open_orders_per_strat \
-            if (allow_multiple_open_orders_per_strat :=
-                executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat")) is not None else False
+        self.allow_multiple_open_chores_per_strat: Final[bool] = allow_multiple_open_chores_per_strat \
+            if (allow_multiple_open_chores_per_strat :=
+                executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat")) is not None else False
         self.leg1_consumed_depth_time: DateTime = DateTime.utcnow()
         self.leg2_consumed_depth_time: DateTime = DateTime.utcnow()
         self.leg1_consumed_depth: MarketDepth | None = None
@@ -77,34 +77,34 @@ class StreetBook:
         self.is_test_run: bool = is_test_run
         self.is_sanity_test_run: bool = config_dict.get("is_sanity_test_run")
 
-        self.trading_data_manager: TradingDataManager = trading_data_manager_
+        self.bartering_data_manager: BarteringDataManager = bartering_data_manager_
         self.strat_cache: StratCache = strat_cache
         self.mobile_book_container_cache: MobileBookContainerCache = mobile_book_container_cache
         self.leg1_fx: float | None = None
 
         self._system_control_update_date_time: DateTime | None = None
         self._strat_brief_update_date_time: DateTime | None = None
-        self._order_snapshots_update_date_time: DateTime | None = None
-        self._order_journals_update_date_time: DateTime | None = None
+        self._chore_snapshots_update_date_time: DateTime | None = None
+        self._chore_journals_update_date_time: DateTime | None = None
         self._fills_journals_update_date_time: DateTime | None = None
-        self._order_limits_update_date_time: DateTime | None = None
-        self._new_orders_update_date_time: DateTime | None = None
-        self._new_orders_processed_slice: int = 0
-        self._cancel_orders_update_date_time: DateTime | None = None
-        self._cancel_orders_processed_slice: int = 0
+        self._chore_limits_update_date_time: DateTime | None = None
+        self._new_chores_update_date_time: DateTime | None = None
+        self._new_chores_processed_slice: int = 0
+        self._cancel_chores_update_date_time: DateTime | None = None
+        self._cancel_chores_processed_slice: int = 0
         self._top_of_books_update_date_time: DateTime | None = None
         self._tob_leg1_update_date_time: DateTime | None = None
         self._tob_leg2_update_date_time: DateTime | None = None
         self._processed_tob_date_time: DateTime | None = None
 
         self.strat_limit: StratLimits | None = None
-        self.last_order_timestamp: DateTime | None = None
+        self.last_chore_timestamp: DateTime | None = None
 
         self.leg1_notional: float = 0
         self.leg2_notional: float = 0
 
-        self.order_pase_seconds = 0
-        # internal rejects to use:  -ive internal_reject_count + current date time as order id
+        self.chore_pase_seconds = 0
+        # internal rejects to use:  -ive internal_reject_count + current date time as chore id
         self.internal_reject_count = 0
         # 1-time prepare param used by update_aggressive_market_depths_in_cache call for this strat [init on first use]
         self.aggressive_symbol_side_tuples_dict: Dict[str, List[Tuple[str, str]]] = {}
@@ -116,16 +116,16 @@ class StreetBook:
         self.leg_2_symbol: str | None = None
         self.leg_2_side: Side | None = None
 
-    def check_order_eligibility(self, side: Side, check_notional: float) -> bool:
+    def check_chore_eligibility(self, side: Side, check_notional: float) -> bool:
         strat_brief, self._strat_brief_update_date_time = \
             self.strat_cache.get_strat_brief(self._strat_brief_update_date_time)
         if side == Side.BUY:
-            if strat_brief.pair_buy_side_trading_brief.consumable_notional - check_notional > 0:
+            if strat_brief.pair_buy_side_bartering_brief.consumable_notional - check_notional > 0:
                 return True
             else:
                 return False
         else:
-            if strat_brief.pair_sell_side_trading_brief.consumable_notional - check_notional > 0:
+            if strat_brief.pair_sell_side_bartering_brief.consumable_notional - check_notional > 0:
                 return True
             else:
                 return False
@@ -158,21 +158,28 @@ class StreetBook:
         leg1_tob: TopOfBookBaseModel | None
         leg2_tob: TopOfBookBaseModel | None
         leg1_tob, leg2_tob = self.extract_legs_from_tobs(pair_strat, top_of_books)
-        if leg1_tob is not None and self.strat_cache.leg1_trading_symbol is None:
+        # Note: Not taking tob mutex since symbol never changes in tob
+        if leg1_tob is not None and self.strat_cache.leg1_bartering_symbol is None:
             logging.debug(f"ignoring ticker: {leg1_tob.symbol = } not found in strat_cache, "
                           f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
             leg1_tob = None
-        if leg2_tob is not None and self.strat_cache.leg2_trading_symbol is None:
+        if leg2_tob is not None and self.strat_cache.leg2_bartering_symbol is None:
             logging.debug(f"ignoring ticker: {leg2_tob.symbol = } not found in strat_cache, "
                           f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
             leg2_tob = None
         return leg1_tob, leg2_tob
 
     @staticmethod
+    def _get_tob_str(tob: TopOfBook) -> str:
+        with MobileBookMutexManager(StreetBook.mobile_book_provider, tob):
+            return str(tob)
+
+    @staticmethod
     def extract_legs_from_tobs(pair_strat, top_of_books) -> Tuple[TopOfBook | None, TopOfBook | None]:
         leg1_tob: TopOfBook | None = None
         leg2_tob: TopOfBook | None = None
         error = False
+        # Note: Not taking tob mutex since symbol never changes in tob
         if pair_strat.pair_strat_params.strat_leg1.sec.sec_id == top_of_books[0].symbol:
             leg1_tob = top_of_books[0]
             if len(top_of_books) == 2:
@@ -181,7 +188,8 @@ class StreetBook:
                 else:
                     logging.error(f"unexpected security found in top_of_books[1]: {top_of_books[1].symbol = }, "
                                   f"expected: {pair_strat.pair_strat_params.strat_leg2.sec.sec_id}, pair_strat_key: "
-                                  f" {get_pair_strat_log_key(pair_strat)};;; {top_of_books[1] = }")
+                                  f" {get_pair_strat_log_key(pair_strat)};;; top_of_book: "
+                                  f"{StreetBook._get_tob_str(top_of_books[1])}")
                     error = True
         elif pair_strat.pair_strat_params.strat_leg2.sec.sec_id == top_of_books[0].symbol:
             leg2_tob = top_of_books[0]
@@ -191,39 +199,41 @@ class StreetBook:
                 else:
                     logging.error(f"unexpected security found in top_of_books[1]: {top_of_books[1].symbol = }, "
                                   f"expected: {pair_strat.pair_strat_params.strat_leg1.sec.sec_id} pair_strat_key: "
-                                  f"{get_pair_strat_log_key(pair_strat)};;; {top_of_books[1] = }")
+                                  f"{get_pair_strat_log_key(pair_strat)};;; top_of_book: "
+                                  f"{StreetBook._get_tob_str(top_of_books[1])}")
                     error = True
         else:
             logging.error(f"unexpected security found in top_of_books[0]: {top_of_books[0].symbol = }, "
                           f"expected either: {pair_strat.pair_strat_params.strat_leg1.sec.sec_id} or "
                           f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id} in pair_strat_key: "
-                          f"{get_pair_strat_log_key(pair_strat)};;; {top_of_books[1] = }")
+                          f"{get_pair_strat_log_key(pair_strat)};;; top_of_book: "
+                          f"{StreetBook._get_tob_str(top_of_books[1])}")
             error = True
         if error:
             return None, None
         else:
             return leg1_tob, leg2_tob
 
-    def trading_link_internal_order_state_update(
-            self, order_event: OrderEventType, order_id: str, side: Side | None = None,
-            trading_sec_id: str | None = None, system_sec_id: str | None = None,
+    def bartering_link_internal_chore_state_update(
+            self, chore_event: ChoreEventType, chore_id: str, side: Side | None = None,
+            bartering_sec_id: str | None = None, system_sec_id: str | None = None,
             underlying_account: str | None = None, msg: str | None = None):
         # coro needs public method
-        run_coro = self.trading_link.internal_order_state_update(order_event, order_id, side, trading_sec_id,
+        run_coro = self.bartering_link.internal_chore_state_update(chore_event, chore_id, side, bartering_sec_id,
                                                                  system_sec_id, underlying_account, msg)
         future = asyncio.run_coroutine_threadsafe(run_coro, StreetBook.asyncio_loop)
         # block for start_executor_server task to finish
         try:
             return future.result()
         except Exception as e:
-            logging.exception(f"_internal_reject_new_order failed with exception: {e}")
+            logging.exception(f"_internal_reject_new_chore failed with exception: {e}")
 
-    def internal_reject_new_order(self, new_order: NewOrderBaseModel, reject_msg: str):
+    def internal_reject_new_chore(self, new_chore: NewChoreBaseModel, reject_msg: str):
         self.internal_reject_count += 1
-        internal_reject_order_id: str = str(self.internal_reject_count * -1) + str(DateTime.utcnow())
-        self.trading_link_internal_order_state_update(
-            OrderEventType.OE_INT_REJ, internal_reject_order_id, new_order.side, None,
-            new_order.security.sec_id, None, reject_msg)
+        internal_reject_chore_id: str = str(self.internal_reject_count * -1) + str(DateTime.utcnow())
+        self.bartering_link_internal_chore_state_update(
+            ChoreEventType.OE_INT_REJ, internal_reject_chore_id, new_chore.side, None,
+            new_chore.security.sec_id, None, reject_msg)
 
     def set_unack(self, system_symbol: str, unack_state: bool):
         if self.strat_cache._pair_strat.pair_strat_params.strat_leg1.sec.sec_id == system_symbol:
@@ -247,223 +257,223 @@ class StreetBook:
                           f"pair_strat_key_key: {get_pair_strat_log_key(pair_strat)}")
         return False
 
-    def place_new_order(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
-                        order_limits: OrderLimits, pair_strat: PairStrat, px: float, usd_px: float, qty: int,
+    def place_new_chore(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
+                        chore_limits: ChoreLimitsBaseModel, pair_strat: PairStrat, px: float, usd_px: float, qty: int,
                         side: Side, system_symbol: str, err_dict: Dict[str, any] | None = None,
-                        is_eqt: bool | None = None, check_mask: int = OrderControl.ORDER_CONTROL_SUCCESS) -> int:
+                        is_eqt: bool | None = None, check_mask: int = ChoreControl.ORDER_CONTROL_SUCCESS) -> int:
         ret_val: int
         if err_dict is None:
             err_dict = dict()
         try:
-            trading_symbol, account, exchange = self.strat_cache.get_metadata(system_symbol)
-            if trading_symbol is None or account is None or exchange is None:
-                logging.error(f"unable to send order, couldn't find metadata for: symbol {system_symbol}, meta-data:"
-                              f" {trading_symbol = }, {account = }, {exchange = } "
+            bartering_symbol, account, exchange = self.strat_cache.get_metadata(system_symbol)
+            if bartering_symbol is None or account is None or exchange is None:
+                logging.error(f"unable to send chore, couldn't find metadata for: symbol {system_symbol}, meta-data:"
+                              f" {bartering_symbol = }, {account = }, {exchange = } "
                               f"symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
-                return OrderControl.ORDER_CONTROL_REQUIRED_DATA_MISSING_FAIL
+                return ChoreControl.ORDER_CONTROL_REQUIRED_DATA_MISSING_FAIL
 
-            # block new order if any prior unack order exist
+            # block new chore if any prior unack chore exist
             if self.check_unack(system_symbol):
-                error_msg: str = f"past order on {system_symbol = } is in unack state, dropping order with " \
+                error_msg: str = f"past chore on {system_symbol = } is in unack state, dropping chore with " \
                                  f"{px = }, {qty = }, {side = }, symbol_side_key: " \
                                  f"{get_symbol_side_key([(system_symbol, side)])}"
                 logging.error(error_msg)
-                return OrderControl.ORDER_CONTROL_CHECK_UNACK_FAIL
+                return ChoreControl.ORDER_CONTROL_CHECK_UNACK_FAIL
 
-            if OrderControl.ORDER_CONTROL_SUCCESS == (ret_val := self.check_new_order(top_of_book, strat_brief,
-                                                                                      order_limits, pair_strat,
+            if ChoreControl.ORDER_CONTROL_SUCCESS == (ret_val := self.check_new_chore(top_of_book, strat_brief,
+                                                                                      chore_limits, pair_strat,
                                                                                       px, usd_px, qty, side,
                                                                                       system_symbol, account,
                                                                                       exchange, err_dict, check_mask)):
-                # check and block order if strat not in activ state [second fail-safe-check]
+                # check and block chore if strat not in activ state [second fail-safe-check]
                 # If pair_strat is not active, don't act, just return [check MD state and take action if required]
                 pair_strat = self._get_latest_pair_strat()
-                if pair_strat.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
-                    logging.error("Secondary Block place order - strat not in activ state or outside market hours")
-                    return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
+                if pair_strat.strat_state != StratState.StratState_ACTIVE or self._is_outside_bartering_hours():
+                    logging.error("Secondary Block place chore - strat not in activ state or outside market hours")
+                    return ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
-                # set unack for subsequent orders - this symbol to be blocked until this order goes through
+                # set unack for subsequent chores - this symbol to be blocked until this chore goes through
                 self.set_unack(system_symbol, True)
-                if not self.trading_link_place_new_order(px, qty, side, trading_symbol, system_symbol, account,
+                if not self.bartering_link_place_new_chore(px, qty, side, bartering_symbol, system_symbol, account,
                                                          exchange):
-                    # reset unack for subsequent orders to go through - this order did fail to go through
+                    # reset unack for subsequent chores to go through - this chore did fail to go through
                     self.set_unack(system_symbol, False)
-                    return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
+                    return ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
                 else:
-                    return OrderControl.ORDER_CONTROL_SUCCESS  # order sent out successfully
+                    return ChoreControl.ORDER_CONTROL_SUCCESS  # chore sent out successfully
             else:
                 return ret_val
         except Exception as e:
-            logging.exception(f"place_new_order failed for: {system_symbol} px-qty-side: {px}-{qty}-{side}, with "
+            logging.exception(f"place_new_chore failed for: {system_symbol} px-qty-side: {px}-{qty}-{side}, with "
                               f"exception: {e}")
-            return OrderControl.ORDER_CONTROL_EXCEPTION_FAIL
+            return ChoreControl.ORDER_CONTROL_EXCEPTION_FAIL
         finally:
             pass
 
-    def trading_link_place_new_order(self, px, qty, side, trading_symbol, system_symbol, account, exchange):
-        run_coro = self.trading_link.place_new_order(px, qty, side, trading_symbol, system_symbol,
+    def bartering_link_place_new_chore(self, px, qty, side, bartering_symbol, system_symbol, account, exchange):
+        run_coro = self.bartering_link.place_new_chore(px, qty, side, bartering_symbol, system_symbol,
                                                      account, exchange)
         future = asyncio.run_coroutine_threadsafe(run_coro, StreetBook.asyncio_loop)
 
         # block for task to finish
         try:
-            order_sent_status = future.result()
-            return order_sent_status
+            chore_sent_status = future.result()
+            return chore_sent_status
         except Exception as e:
-            logging.exception(f"trading_link_place_new_order failed for {system_symbol = } "
+            logging.exception(f"bartering_link_place_new_chore failed for {system_symbol = } "
                               f"px-qty-side: {px}-{qty}-{side} with exception;;;{e}")
             return False
 
     def check_consumable_concentration(self, strat_brief: StratBrief | StratBriefBaseModel,
-                                       trading_brief: PairSideTradingBrief, qty: int,
+                                       bartering_brief: PairSideBarteringBrief, qty: int,
                                        side_str: str) -> bool:
-        if trading_brief.consumable_concentration - qty < 0:
-            if trading_brief.consumable_concentration == 0:
+        if bartering_brief.consumable_concentration - qty < 0:
+            if bartering_brief.consumable_concentration == 0:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated {side_str} order, unexpected: consumable_concentration found 0! "
+                logging.error(f"blocked generated {side_str} chore, unexpected: consumable_concentration found 0! "
                               f"for start_cache: {self.strat_cache.get_key()}, strat_brief_key: "
                               f"{get_strat_brief_log_key(strat_brief)}")
             else:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated {side_str} order, not enough consumable_concentration: "
-                              f"{strat_brief.pair_sell_side_trading_brief.consumable_concentration} needed: {qty = }, "
+                logging.error(f"blocked generated {side_str} chore, not enough consumable_concentration: "
+                              f"{strat_brief.pair_sell_side_bartering_brief.consumable_concentration} needed: {qty = }, "
                               f"for start_cache: {self.strat_cache.get_key()}, strat_brief_key: "
                               f"{get_strat_brief_log_key(strat_brief)}")
             return False
         else:
             return True
 
-    def check_strat_limits(self, strat_brief: StratBriefBaseModel, order_limits: OrderLimits,
+    def check_strat_limits(self, strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel,
                            px: float, usd_px: float, qty: int, side: Side,
-                           order_usd_notional: float, system_symbol: str, err_dict: Dict[str, any]):
-        checks_passed = OrderControl.ORDER_CONTROL_SUCCESS
+                           chore_usd_notional: float, system_symbol: str, err_dict: Dict[str, any]):
+        checks_passed = ChoreControl.ORDER_CONTROL_SUCCESS
         symbol_overview: SymbolOverviewBaseModel | None = None
         symbol_overview_tuple = \
             self.strat_cache.get_symbol_overview_from_symbol(system_symbol)
         if symbol_overview_tuple:
             symbol_overview, _ = symbol_overview_tuple
             if not symbol_overview:
-                logging.error(f"blocked generated {side} order, symbol_overview missing for {system_symbol = }, "
+                logging.error(f"blocked generated {side} chore, symbol_overview missing for {system_symbol = }, "
                               f"for strat_cache: {self.strat_cache.get_key()}, limit up/down check needs "
                               f"symbol_overview, strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
-                return OrderControl.ORDER_CONTROL_REQUIRED_DATA_MISSING_FAIL
+                return ChoreControl.ORDER_CONTROL_REQUIRED_DATA_MISSING_FAIL
             elif not symbol_overview.limit_dn_px or not symbol_overview.limit_up_px:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} order, "
+                logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} chore, "
                               f"limit up/down px not available limit-dn px: {symbol_overview.limit_dn_px}, found "
                               f"{px = }, {symbol_overview.limit_up_px = }")
-                return OrderControl.ORDER_CONTROL_REQUIRED_DATA_MISSING_FAIL
+                return ChoreControl.ORDER_CONTROL_REQUIRED_DATA_MISSING_FAIL
             # else all good to continue limit checks
 
         if side == Side.SELL:
-            # max_open_orders_per_side check
-            if strat_brief.pair_sell_side_trading_brief.consumable_open_orders < 0:
+            # max_open_chores_per_side check
+            if strat_brief.pair_sell_side_bartering_brief.consumable_open_chores < 0:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated SELL order, not enough consumable_open_orders: "
-                              f"{strat_brief.pair_sell_side_trading_brief.consumable_open_orders} for strat_cache: "
+                logging.error(f"blocked generated SELL chore, not enough consumable_open_chores: "
+                              f"{strat_brief.pair_sell_side_bartering_brief.consumable_open_chores} for strat_cache: "
                               f"{self.strat_cache.get_key()}, strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
-                checks_passed |= OrderControl.ORDER_CONTROL_MAX_OPEN_ORDERS_FAIL
+                checks_passed |= ChoreControl.ORDER_CONTROL_MAX_OPEN_ORDERS_FAIL
 
             # max_open_single_leg_notional check
-            if order_usd_notional > strat_brief.pair_sell_side_trading_brief.consumable_open_notional:
+            if chore_usd_notional > strat_brief.pair_sell_side_bartering_brief.consumable_open_notional:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} order, "
+                logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} chore, "
                               f"breaches available consumable open notional, expected less than: "
-                              f"{strat_brief.pair_sell_side_trading_brief.consumable_open_notional}, order needs:"
-                              f" {order_usd_notional}")
-                checks_passed |= OrderControl.ORDER_CONTROL_CONSUMABLE_OPEN_NOTIONAL_FAIL
+                              f"{strat_brief.pair_sell_side_bartering_brief.consumable_open_notional}, chore needs:"
+                              f" {chore_usd_notional}")
+                checks_passed |= ChoreControl.ORDER_CONTROL_CONSUMABLE_OPEN_NOTIONAL_FAIL
 
             # covers: max single_leg notional, max open cb notional & max net filled notional
             # ( TODO Urgent: validate and add this description to log detail section ;;;)
             # Checking max_single_leg_notional
-            if order_usd_notional > strat_brief.pair_sell_side_trading_brief.consumable_notional:
+            if chore_usd_notional > strat_brief.pair_sell_side_bartering_brief.consumable_notional:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated SELL order, breaches available consumable notional, expected less "
-                              f"than: {strat_brief.pair_sell_side_trading_brief.consumable_notional}, order needs: "
-                              f"{order_usd_notional} - the check covers: max cb notional, max open cb notional, "
+                logging.error(f"blocked generated SELL chore, breaches available consumable notional, expected less "
+                              f"than: {strat_brief.pair_sell_side_bartering_brief.consumable_notional}, chore needs: "
+                              f"{chore_usd_notional} - the check covers: max cb notional, max open cb notional, "
                               f"max net filled notional, for start_cache: {self.strat_cache.get_key()}, "
                               f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
-                checks_passed |= OrderControl.ORDER_CONTROL_CONSUMABLE_NOTIONAL_FAIL
+                checks_passed |= ChoreControl.ORDER_CONTROL_CONSUMABLE_NOTIONAL_FAIL
 
             # Checking max_concentration
-            if not self.check_consumable_concentration(strat_brief, strat_brief.pair_sell_side_trading_brief, qty,
+            if not self.check_consumable_concentration(strat_brief, strat_brief.pair_sell_side_bartering_brief, qty,
                                                        "SELL"):
-                checks_passed |= OrderControl.ORDER_CONTROL_MAX_CONCENTRATION_FAIL
+                checks_passed |= ChoreControl.ORDER_CONTROL_MAX_CONCENTRATION_FAIL
 
-            # limit down - TODO : Important : Upgrade this to support trading at Limit Dn within the limit Dn limit
+            # limit down - TODO : Important : Upgrade this to support bartering at Limit Dn within the limit Dn limit
             if px < symbol_overview.limit_dn_px:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated SELL order, limit down trading not allowed on day-1, px "
+                logging.error(f"blocked generated SELL chore, limit down bartering not allowed on day-1, px "
                               f"expected higher than limit-dn px: {symbol_overview.limit_dn_px}, found {px = } for "
                               f"strat_cache: {self.strat_cache.get_key()}, strat_brief_log_key: "
                               f"{get_strat_brief_log_key(strat_brief)}")
-                checks_passed |= OrderControl.ORDER_CONTROL_LIMIT_DOWN_FAIL
+                checks_passed |= ChoreControl.ORDER_CONTROL_LIMIT_DOWN_FAIL
 
         elif side == Side.BUY:
-            # max_open_orders_per_side check
-            if strat_brief.pair_buy_side_trading_brief.consumable_open_orders < 0:
+            # max_open_chores_per_side check
+            if strat_brief.pair_buy_side_bartering_brief.consumable_open_chores < 0:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated BUY order, not enough consumable_open_orders: "
-                              f"{strat_brief.pair_buy_side_trading_brief.consumable_open_orders} for strat_cache: "
+                logging.error(f"blocked generated BUY chore, not enough consumable_open_chores: "
+                              f"{strat_brief.pair_buy_side_bartering_brief.consumable_open_chores} for strat_cache: "
                               f"{self.strat_cache.get_key()}, strat_brief: {get_strat_brief_log_key(strat_brief)}")
-                checks_passed |= OrderControl.ORDER_CONTROL_MAX_OPEN_ORDERS_FAIL
+                checks_passed |= ChoreControl.ORDER_CONTROL_MAX_OPEN_ORDERS_FAIL
 
             # max_open_single_leg_notional check
-            if order_usd_notional > strat_brief.pair_buy_side_trading_brief.consumable_open_notional:
+            if chore_usd_notional > strat_brief.pair_buy_side_bartering_brief.consumable_open_notional:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} order, "
-                              f"breaches available consumable open notional, order needs: "
-                              f"{strat_brief.pair_buy_side_trading_brief.consumable_open_notional}, expected less than:"
-                              f" {order_usd_notional}")
-                checks_passed |= OrderControl.ORDER_CONTROL_CONSUMABLE_OPEN_NOTIONAL_FAIL
+                logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} chore, "
+                              f"breaches available consumable open notional, chore needs: "
+                              f"{strat_brief.pair_buy_side_bartering_brief.consumable_open_notional}, expected less than:"
+                              f" {chore_usd_notional}")
+                checks_passed |= ChoreControl.ORDER_CONTROL_CONSUMABLE_OPEN_NOTIONAL_FAIL
 
-            if order_usd_notional > strat_brief.pair_buy_side_trading_brief.consumable_notional:
+            if chore_usd_notional > strat_brief.pair_buy_side_bartering_brief.consumable_notional:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated BUY order, breaches available consumable notional, expected less "
-                              f"than: {strat_brief.pair_buy_side_trading_brief.consumable_notional}, order needs: "
-                              f"{order_usd_notional} for strat_cache: {self.strat_cache.get_key()}, strat_brief: "
+                logging.error(f"blocked generated BUY chore, breaches available consumable notional, expected less "
+                              f"than: {strat_brief.pair_buy_side_bartering_brief.consumable_notional}, chore needs: "
+                              f"{chore_usd_notional} for strat_cache: {self.strat_cache.get_key()}, strat_brief: "
                               f"{get_strat_brief_log_key(strat_brief)}")
-                checks_passed |= OrderControl.ORDER_CONTROL_CONSUMABLE_NOTIONAL_FAIL
+                checks_passed |= ChoreControl.ORDER_CONTROL_CONSUMABLE_NOTIONAL_FAIL
             # Checking max_concentration
-            if not self.check_consumable_concentration(strat_brief, strat_brief.pair_buy_side_trading_brief, qty,
+            if not self.check_consumable_concentration(strat_brief, strat_brief.pair_buy_side_bartering_brief, qty,
                                                        "BUY"):
-                checks_passed |= OrderControl.ORDER_CONTROL_MAX_CONCENTRATION_FAIL
+                checks_passed |= ChoreControl.ORDER_CONTROL_MAX_CONCENTRATION_FAIL
 
             # Buy - not allowed more than limit up px
-            # limit up - TODO : Important : Upgrade this to support trading at Limit Up within the limit Up limit
+            # limit up - TODO : Important : Upgrade this to support bartering at Limit Up within the limit Up limit
             if px > symbol_overview.limit_up_px:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated BUY order, limit up trading not allowed on day-1, px "
+                logging.error(f"blocked generated BUY chore, limit up bartering not allowed on day-1, px "
                               f"expected lower than limit-up px: {symbol_overview.limit_up_px}, found {px = } for "
                               f"strat_cache: {self.strat_cache.get_key()}, strat_brief: "
                               f"{get_strat_brief_log_key(strat_brief)}")
-                checks_passed |= OrderControl.ORDER_CONTROL_LIMIT_UP_FAIL
+                checks_passed |= ChoreControl.ORDER_CONTROL_LIMIT_UP_FAIL
 
         consumable_participation_qty: int = get_consumable_participation_qty_http(
-            system_symbol, side, self.strat_limit.market_trade_volume_participation.applicable_period_seconds,
-            self.strat_limit.market_trade_volume_participation.max_participation_rate, StreetBook.asyncio_loop)
+            system_symbol, side, self.strat_limit.market_barter_volume_participation.applicable_period_seconds,
+            self.strat_limit.market_barter_volume_participation.max_participation_rate, StreetBook.asyncio_loop)
         if consumable_participation_qty is not None and consumable_participation_qty != 0:
             if consumable_participation_qty - qty < 0:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated order, not enough consumable_participation_qty available, "
-                              f"expected higher than order {qty = }, found {consumable_participation_qty = } for "
+                logging.error(f"blocked generated chore, not enough consumable_participation_qty available, "
+                              f"expected higher than chore {qty = }, found {consumable_participation_qty = } for "
                               f"strat_cache: {self.strat_cache.get_key()}, strat_brief: "
                               f"{get_strat_brief_log_key(strat_brief)}, {system_symbol = }, {side = }, "
                               f"symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
-                checks_passed |= OrderControl.ORDER_CONTROL_CONSUMABLE_PARTICIPATION_QTY_FAIL
-                if (consumable_participation_qty * usd_px) > order_limits.min_order_notional:
+                checks_passed |= ChoreControl.ORDER_CONTROL_CONSUMABLE_PARTICIPATION_QTY_FAIL
+                if (consumable_participation_qty * usd_px) > chore_limits.min_chore_notional:
                     err_dict["consumable_participation_qty"] = f"{consumable_participation_qty}"
             # else check passed - no action
         else:
@@ -473,164 +483,213 @@ class StreetBook:
             logging.error(f"Received unusable {consumable_participation_qty = } from "
                           f"get_consumable_participation_qty_http, {system_symbol = }, {side = }, "
                           f"applicable_period_seconds: "
-                          f"{self.strat_limit.market_trade_volume_participation.applicable_period_seconds}, "
+                          f"{self.strat_limit.market_barter_volume_participation.applicable_period_seconds}, "
                           f"strat_brief_key: {strat_brief_key}, check failed")
-            checks_passed |= OrderControl.ORDER_CONTROL_UNUSABLE_CONSUMABLE_PARTICIPATION_QTY_FAIL
+            checks_passed |= ChoreControl.ORDER_CONTROL_UNUSABLE_CONSUMABLE_PARTICIPATION_QTY_FAIL
         # checking max_net_filled_notional
-        if order_usd_notional > strat_brief.consumable_nett_filled_notional:
+        if chore_usd_notional > strat_brief.consumable_nett_filled_notional:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.error(f"blocked generated order, not enough consumable_nett_filled_notional available, "
+            logging.error(f"blocked generated chore, not enough consumable_nett_filled_notional available, "
                           f"remaining {strat_brief.consumable_nett_filled_notional = }, "
                           f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
-            checks_passed |= OrderControl.ORDER_CONTROL_CONSUMABLE_NETT_FILLED_NOTIONAL_FAIL
+            checks_passed |= ChoreControl.ORDER_CONTROL_CONSUMABLE_NETT_FILLED_NOTIONAL_FAIL
 
         return checks_passed
 
-    def get_breach_threshold_px(self, top_of_book: TopOfBook, order_limits: OrderLimits,
+    def _get_tob_last_barter_px(self, top_of_book: TopOfBook, side: Side) -> float | None:
+        with MobileBookMutexManager(self.mobile_book_provider, top_of_book):
+            if top_of_book.last_barter is None or math.isclose(top_of_book.last_barter.px, 0):
+                # @@@ below error log is used in specific test case for string matching - if changed here
+                # needs to be changed in test also
+                logging.error(f"blocked generated chore, symbol: {top_of_book.symbol}, {side = } as "
+                              f"top_of_book.last_barter.px is none or 0, symbol_side_key: "
+                              f" {get_symbol_side_key([(top_of_book.symbol, side)])}")
+                return None
+            return top_of_book.last_barter.px
+
+    def get_breach_threshold_px(self, top_of_book: TopOfBook, chore_limits: ChoreLimitsBaseModel,
                                 side: Side, system_symbol: str) -> float | None:
         # TODO important - check and change reference px in cases where last px is not available
-        if top_of_book.last_trade is None or math.isclose(top_of_book.last_trade.px, 0):
-            # @@@ below error log is used in specific test case for string matching - if changed here
-            # needs to be changed in test also
-            logging.error(f"blocked generated order, symbol: {top_of_book.symbol}, {side = } as "
-                          f"top_of_book.last_trade.px is none or 0, symbol_side_key: "
-                          f" {get_symbol_side_key([(top_of_book.symbol, side)])}")
-            return None
+        last_barter_px = self._get_tob_last_barter_px(top_of_book, side)
+        if last_barter_px is None:
+            return None     # error logged in _get_tob_last_barter_px
 
         if side != Side.BUY and side != Side.SELL:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.error(f"blocked generated unsupported side order, symbol_side_key: "
+            logging.error(f"blocked generated unsupported side chore, symbol_side_key: "
                           f"{get_symbol_side_key([(system_symbol, side)])}")
-            return None  # None return blocks the order from going further
+            return None  # None return blocks the chore from going further
 
-        aggressive_side = Side.BUY if side == Side.SELL else Side.SELL
-        # market_depths, _ = self.strat_cache.get_market_depth(system_symbol, aggressive_side)
+        return self._get_breach_threshold_px(top_of_book, chore_limits, side, system_symbol,
+                                             last_barter_px)
+
+    def _get_aggressive_tob_ask_quote_px(self, tob: TopOfBook, side: Side) -> int | None:
+        with MobileBookMutexManager(self.mobile_book_provider, tob):
+            if not tob.ask_quote or not tob.ask_quote.px:
+                # @@@ below error log is used in specific test case for string matching - if changed here
+                # needs to be changed in test also
+                logging.error(f"blocked generated BUY chore, {tob.symbol = }, {side = } as aggressive_quote"
+                              f" is not found or has no px, symbol_side_key: "
+                              f"{get_symbol_side_key([(tob.symbol, side)])};;;aggressive_quote: {tob.ask_quote}")
+                return None  # None return blocks the chore from going further
+            else:
+                return tob.ask_quote.px
+
+    def _get_aggressive_tob_bid_quote_px(self, tob: TopOfBook, side: Side) -> int | None:
+        with MobileBookMutexManager(self.mobile_book_provider, tob):
+            if not tob.bid_quote or not tob.bid_quote.px:
+                # @@@ below error log is used in specific test case for string matching - if changed here
+                # needs to be changed in test also
+                logging.error(f"blocked generated SELL chore, {tob.symbol = }, {side = } as aggressive_quote"
+                              f" is not found or has no px, symbol_side_key: "
+                              f"{get_symbol_side_key([(tob.symbol, side)])};;; aggressive_quote: {tob.bid_quote}")
+                return None  # None return blocks the chore from going further
+            else:
+                return tob.bid_quote.px
+
+    def _get_px_by_max_level(self, system_symbol: str, side: Side, chore_limits: ChoreLimitsBaseModel) -> float | None:
+        px_by_max_level: float = 0
 
         if system_symbol == self.leg_1_symbol:
             mobile_book_container = self.mobile_book_container_cache.leg_1_mobile_book_container
         else:
             mobile_book_container = self.mobile_book_container_cache.leg_2_mobile_book_container
 
-        # getting aggressive market depth
-        if aggressive_side == Side.SELL:
-            market_depths = mobile_book_container.get_ask_market_depths()
-        else:
-            market_depths = mobile_book_container.get_bid_market_depths()
-        return self._get_breach_threshold_px(top_of_book, order_limits, side, system_symbol, market_depths)
+        if chore_limits.max_px_levels == 0:
+            if side == Side.SELL:
+                market_depths = mobile_book_container.get_ask_market_depths()
+            else:
+                market_depths = mobile_book_container.get_bid_market_depths()
 
-    def _get_breach_threshold_px(self, top_of_book: TopOfBook, order_limits: OrderLimits,
-                                 side: Side, system_symbol: str, market_depths: List[MarketDepth]) -> float | None:
-        px_by_max_level: float = 0
-        with MobileBookMutexManager(self.mobile_book_provider, *market_depths):
-            for market_depth in market_depths:
+            market_depth = market_depths[0]
+            if market_depth is not None:
+                px_by_max_level = market_depth.px
+
+        else:
+            max_px_level: int = chore_limits.max_px_levels
+            if max_px_level > 0:
+                aggressive_side = Side.BUY if side == Side.SELL else Side.SELL
+            else:
+                # when chore_limits.max_px_levels < 0, aggressive side is same as current side
+                aggressive_side = side
+                max_px_level = abs(max_px_level)
+
+            # getting aggressive market depth
+            if aggressive_side == Side.SELL:
+                market_depths = mobile_book_container.get_ask_market_depths()
+            else:
+                market_depths = mobile_book_container.get_bid_market_depths()
+
+            for lvl in range(max_px_level - 1, -1, -1):
+                # lvl reducing from max_px_level to 0
+                market_depth = market_depths[lvl]
                 if market_depth is not None:
-                    if market_depth.position <= order_limits.max_px_levels:
-                        px_by_max_level = market_depth.px
-                        break
+                    px_by_max_level = market_depth.px
+                    break
+
         if math.isclose(px_by_max_level, 0):
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.error(f"blocked generated order, {system_symbol = }, {side = }, unable to find valid px"
-                          f" based on {order_limits.max_px_levels = } limit from available depths, "
+            logging.error(f"blocked generated chore, {system_symbol = }, {side = }, unable to find valid px"
+                          f" based on {chore_limits.max_px_levels = } limit from available depths, "
                           f"symbol_side_key: {get_symbol_side_key([(system_symbol, side)])};;;"
                           f"depths: {[str(market_depth) for market_depth in market_depths]}")
             return None
-        aggressive_quote: QuoteOptional | None = None
-        if side == Side.BUY:
-            aggressive_quote = top_of_book.ask_quote
-            if not aggressive_quote or not aggressive_quote.px:
-                # @@@ below error log is used in specific test case for string matching - if changed here
-                # needs to be changed in test also
-                logging.error(f"blocked generated BUY order, {system_symbol = }, {side = } as aggressive_quote"
-                              f" is not found or has no px, symbol_side_key: "
-                              f"{get_symbol_side_key([(system_symbol, side)])};;;aggressive_quote: {aggressive_quote}")
-                return None  # None return blocks the order from going further
-            max_px_by_deviation: float = top_of_book.last_trade.px + (
-                    top_of_book.last_trade.px / 100 * order_limits.max_px_deviation)
-            max_px_by_basis_point: float = aggressive_quote.px + (aggressive_quote.px / 100 * (
-                    order_limits.max_basis_points / 100))
-            return min(max_px_by_basis_point, max_px_by_deviation, px_by_max_level)
+        return px_by_max_level
 
+    def _get_breach_threshold_px(self, top_of_book: TopOfBook, chore_limits: ChoreLimitsBaseModel,
+                                 side: Side, system_symbol: str, last_barter_px: float) -> float | None:
+
+        px_by_max_level = self._get_px_by_max_level(system_symbol, side, chore_limits)
+        if px_by_max_level is None:
+            # _get_px_by_max_level logs error internally
+            return None
+
+        if side == Side.BUY:
+            aggressive_quote_px: float | None = self._get_aggressive_tob_ask_quote_px(top_of_book, side)
+            if not aggressive_quote_px:
+                return None     # error logged in _get_aggressive_tob_ask_quote_px
+            max_px_by_deviation: float = last_barter_px + (
+                    last_barter_px / 100 * chore_limits.max_px_deviation)
+            max_px_by_basis_point: float = aggressive_quote_px + (aggressive_quote_px / 100 * (
+                    chore_limits.max_basis_points / 100))
+            return min(max_px_by_basis_point, max_px_by_deviation, px_by_max_level)
         else:
-            aggressive_quote = top_of_book.bid_quote
-            if not aggressive_quote or not aggressive_quote.px:
-                # @@@ below error log is used in specific test case for string matching - if changed here
-                # needs to be changed in test also
-                logging.error(f"blocked generated SELL order, {system_symbol = }, {side = } as aggressive_quote"
-                              f" is not found or has no px, symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
-                return None  # None return blocks the order from going further
-            min_px_by_deviation: float = top_of_book.last_trade.px - (
-                    top_of_book.last_trade.px / 100 * order_limits.max_px_deviation)
-            min_px_by_basis_point: float = aggressive_quote.px - (aggressive_quote.px / 100 * (
-                    order_limits.max_basis_points / 100))
+            aggressive_quote_px: float | None = self._get_aggressive_tob_bid_quote_px(top_of_book, side)
+            if not aggressive_quote_px:
+                return None     # error logged in _get_aggressive_tob_ask_quote_px
+            min_px_by_deviation: float = last_barter_px - (
+                    last_barter_px / 100 * chore_limits.max_px_deviation)
+            min_px_by_basis_point: float = aggressive_quote_px - (aggressive_quote_px / 100 * (
+                    chore_limits.max_basis_points / 100))
             return max(min_px_by_deviation, min_px_by_basis_point, px_by_max_level)
 
-    def check_new_order(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
-                        order_limits: OrderLimits, pair_strat: PairStrat, px: float, usd_px: float,
+    def check_new_chore(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
+                        chore_limits: ChoreLimitsBaseModel, pair_strat: PairStrat, px: float, usd_px: float,
                         qty: int, side: Side, system_symbol: str, account: str, exchange: str,
-                        err_dict: Dict[str, any], check_mask: int = OrderControl.ORDER_CONTROL_SUCCESS) -> int:
-        checks_passed: int = OrderControl.ORDER_CONTROL_SUCCESS
+                        err_dict: Dict[str, any], check_mask: int = ChoreControl.ORDER_CONTROL_SUCCESS) -> int:
+        checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS
 
-        order_usd_notional = usd_px * qty
+        chore_usd_notional = usd_px * qty
 
-        checks_passed_ = OrderControl.check_min_order_notional(pair_strat, order_limits, order_usd_notional,
+        checks_passed_ = ChoreControl.check_min_chore_notional(pair_strat, chore_limits, chore_usd_notional,
                                                                system_symbol, side)
 
-        if checks_passed_ != OrderControl.ORDER_CONTROL_SUCCESS: checks_passed |= checks_passed_
+        if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS: checks_passed |= checks_passed_
 
-        if check_mask == OrderControl.ORDER_CONTROL_CONSUMABLE_PARTICIPATION_QTY_FAIL:
-            return checks_passed  # skip other checks - they were conducted before, this is adjusted order
-        checks_passed_ = OrderControl.check_max_order_notional(order_limits, order_usd_notional, system_symbol, side)
+        if check_mask == ChoreControl.ORDER_CONTROL_CONSUMABLE_PARTICIPATION_QTY_FAIL:
+            return checks_passed  # skip other checks - they were conducted before, this is adjusted chore
+        checks_passed_ = ChoreControl.check_max_chore_notional(chore_limits, chore_usd_notional, system_symbol, side)
 
-        if checks_passed_ != OrderControl.ORDER_CONTROL_SUCCESS: checks_passed |= checks_passed_
+        if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS: checks_passed |= checks_passed_
 
-        checks_passed_ = OrderControl.check_max_order_qty(order_limits, qty, system_symbol, side)
+        checks_passed_ = ChoreControl.check_max_chore_qty(chore_limits, qty, system_symbol, side)
 
-        if checks_passed_ != OrderControl.ORDER_CONTROL_SUCCESS: checks_passed |= checks_passed_
+        if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS: checks_passed |= checks_passed_
 
         if top_of_book:
-            breach_px: float = self.get_breach_threshold_px(top_of_book, order_limits, side, system_symbol)
+            breach_px: float = self.get_breach_threshold_px(top_of_book, chore_limits, side, system_symbol)
             if breach_px is not None:
                 if side == Side.BUY:
                     if px > breach_px:
                         # @@@ below error log is used in specific test case for string matching - if changed here
                         # needs to be changed in test also
-                        logging.error(f"blocked generated BUY order, order {px = } > allowed max_px {breach_px}, "
+                        logging.error(f"blocked generated BUY chore, chore {px = } > allowed max_px {breach_px}, "
                                       f"symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
-                        checks_passed |= OrderControl.ORDER_CONTROL_BUY_ORDER_MAX_PX_FAIL
+                        checks_passed |= ChoreControl.ORDER_CONTROL_BUY_ORDER_MAX_PX_FAIL
                 elif side == Side.SELL:
                     if px < breach_px:
                         # @@@ below error log is used in specific test case for string matching - if changed here
                         # needs to be changed in test also
-                        logging.error(f"blocked generated SELL order, order {px = } < allowed min_px {breach_px}, "
+                        logging.error(f"blocked generated SELL chore, chore {px = } < allowed min_px {breach_px}, "
                                       f"symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
-                        checks_passed |= OrderControl.ORDER_CONTROL_SELL_ORDER_MIN_PX_FAIL
+                        checks_passed |= ChoreControl.ORDER_CONTROL_SELL_ORDER_MIN_PX_FAIL
                 else:
-                    logging.error(f"blocked generated unsupported {side = } order, order {px = }, {qty = }, "
+                    logging.error(f"blocked generated unsupported {side = } chore, chore {px = }, {qty = }, "
                                   f"symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
-                    checks_passed |= OrderControl.ORDER_CONTROL_UNSUPPORTED_SIDE_FAIL
+                    checks_passed |= ChoreControl.ORDER_CONTROL_UNSUPPORTED_SIDE_FAIL
             else:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated order, breach_px returned None from get_breach_threshold_px for "
+                logging.error(f"blocked generated chore, breach_px returned None from get_breach_threshold_px for "
                               f"symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}, "
                               f"{px = }, {usd_px = }")
-                checks_passed |= OrderControl.ORDER_CONTROL_NO_BREACH_PX_FAIL
+                checks_passed |= ChoreControl.ORDER_CONTROL_NO_BREACH_PX_FAIL
         else:
-            logging.error(f"blocked generated order, unable to conduct px checks: top_of_book is sent None for strat: "
+            logging.error(f"blocked generated chore, unable to conduct px checks: top_of_book is sent None for strat: "
                           f"{self.strat_cache}, symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
-            checks_passed |= OrderControl.ORDER_CONTROL_NO_TOB_FAIL
+            checks_passed |= ChoreControl.ORDER_CONTROL_NO_TOB_FAIL
 
-        checks_passed |= self.check_strat_limits(strat_brief, order_limits, px, usd_px, qty, side, order_usd_notional,
+        checks_passed |= self.check_strat_limits(strat_brief, chore_limits, px, usd_px, qty, side, chore_usd_notional,
                                                  system_symbol, err_dict)
 
-        # TODO LAZY Read config "order_pace_seconds" to pace orders (needed for testing - not a limit)
-        if self.order_pase_seconds > 0:
-            # allow orders only after order_pase_seconds
-            if self.last_order_timestamp.add(seconds=self.order_pase_seconds) < DateTime.now():
-                checks_passed |= OrderControl.ORDER_CONTROL_ORDER_PASE_SECONDS_FAIL
+        # TODO LAZY Read config "chore_pace_seconds" to pace chores (needed for testing - not a limit)
+        if self.chore_pase_seconds > 0:
+            # allow chores only after chore_pase_seconds
+            if self.last_chore_timestamp.add(seconds=self.chore_pase_seconds) < DateTime.now():
+                checks_passed |= ChoreControl.ORDER_CONTROL_ORDER_PASE_SECONDS_FAIL
 
         return checks_passed
 
@@ -825,35 +884,35 @@ class StreetBook:
         """
         return px / self.leg1_fx
 
-    def _check_tob_n_place_non_systematic_order(self, new_order: NewOrderBaseModel, pair_strat: PairStrat,
-                                                strat_brief: StratBriefBaseModel, order_limits: OrderLimits,
+    def _check_tob_n_place_non_systematic_chore(self, new_chore: NewChoreBaseModel, pair_strat: PairStrat,
+                                                strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel,
                                                 top_of_books: List[TopOfBookBaseModel]) -> int:
         leg1_tob: TopOfBookBaseModel | None
         leg2_tob: TopOfBookBaseModel | None
-        trade_tob: TopOfBookBaseModel | None = None
+        barter_tob: TopOfBookBaseModel | None = None
         leg1_tob, leg2_tob = self.extract_strat_specific_legs_from_tobs(pair_strat, top_of_books)
 
         if leg1_tob is not None:
-            if self.strat_cache.leg1_trading_symbol == new_order.security.sec_id:
-                trade_tob = leg1_tob
+            if self.strat_cache.leg1_bartering_symbol == new_chore.security.sec_id:
+                barter_tob = leg1_tob
 
-        if trade_tob is None and leg2_tob is not None:
-            if self.strat_cache.leg2_trading_symbol == new_order.security.sec_id:
-                trade_tob = leg2_tob
+        if barter_tob is None and leg2_tob is not None:
+            if self.strat_cache.leg2_bartering_symbol == new_chore.security.sec_id:
+                barter_tob = leg2_tob
 
-        if trade_tob is None:
-            err_str_ = f"unable to send new_order: no matching leg in this strat: {new_order} " \
+        if barter_tob is None:
+            err_str_ = f"unable to send new_chore: no matching leg in this strat: {new_chore} " \
                        f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;;" \
                        f"{self.strat_cache = }, {pair_strat = }"
             logging.error(err_str_)
             return False
         else:
-            usd_px = self.get_usd_px(new_order.px, new_order.security.sec_id)
-            order_placed: int = self.place_new_order(trade_tob, strat_brief, order_limits, pair_strat,
-                                                     new_order.px, usd_px,
-                                                     new_order.qty, new_order.side,
-                                                     system_symbol=new_order.security.sec_id)
-            return order_placed
+            usd_px = self.get_usd_px(new_chore.px, new_chore.security.sec_id)
+            chore_placed: int = self.place_new_chore(barter_tob, strat_brief, chore_limits, pair_strat,
+                                                     new_chore.px, usd_px,
+                                                     new_chore.qty, new_chore.side,
+                                                     system_symbol=new_chore.security.sec_id)
+            return chore_placed
 
     @staticmethod
     def get_leg1_leg2_ratio(leg1_px: float, leg2_px: float):
@@ -861,77 +920,153 @@ class StreetBook:
             return 0
         return leg1_px / leg2_px
 
-    def _place_order(self, pair_strat: PairStratBaseModel, strat_brief: StratBriefBaseModel,
-                     order_limits: OrderLimits, quote: QuoteOptional, tob: TopOfBookBaseModel) -> float:
-        """returns float posted notional of the order sent"""
+    def _get_bid_tob_px_qty(self, tob: TopOfBook) -> Tuple[float | None, int | None]:
+        with MobileBookMutexManager(self.mobile_book_provider, tob):
+            if tob.bid_quote is not None:
+                has_valid_px_qty = True
+                if not tob.bid_quote.qty:
+                    logging.error(f"Invalid {tob.bid_quote.qty = } found in tob of {tob.symbol = };;; {tob = }")
+                    has_valid_px_qty = False
+                elif math.isclose(tob.bid_quote.px, 0):
+                    logging.error(f"Invalid {tob.bid_quote.px = } found in tob of {tob.symbol = };;; {tob = }")
+                    has_valid_px_qty = False
+                if has_valid_px_qty:
+                    return tob.bid_quote.px, tob.bid_quote.qty
+            else:
+                logging.error(f"Can't find bid_quote in top of book, {tob.symbol = };;; {tob = }")
+        return None, None
+
+    def _get_ask_tob_px_qty(self, tob: TopOfBook) -> Tuple[float | None, int | None]:
+        with MobileBookMutexManager(self.mobile_book_provider, tob):
+            if tob.ask_quote is not None:
+                has_valid_px_qty = True
+                if not tob.ask_quote.qty:
+                    logging.error(f"Invalid {tob.ask_quote.qty = } found in tob of {tob.symbol = };;; {tob = }")
+                    has_valid_px_qty = False
+                elif math.isclose(tob.ask_quote.px, 0):
+                    logging.error(f"Invalid {tob.ask_quote.px = } found in tob of {tob.symbol = };;; {tob = }")
+                    has_valid_px_qty = False
+                if has_valid_px_qty:
+                    return tob.ask_quote.px, tob.ask_quote.qty
+            else:
+                logging.error(f"Can't find ask_quote in top of book, {tob.symbol = };;; {tob = }")
+        return None, None
+
+    def _place_chore(self, pair_strat: PairStratBaseModel, strat_brief: StratBriefBaseModel,
+                     chore_limits: ChoreLimitsBaseModel, side: TickType, tob: TopOfBookBaseModel) -> float:
+        """returns float posted notional of the chore sent"""
         # fail-safe
         pair_strat = self.strat_cache.get_pair_strat_obj()
         if pair_strat is not None:
             # If pair_strat not active, don't act, just return [check MD state and take action if required]
-            if pair_strat.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
-                logging.error("Blocked place order - strat not in activ state")
-                return 0  # no order sent = no posted notional
-        if not (quote.qty == 0 or math.isclose(quote.px, 0)):
-            ask_usd_px: float = self.get_usd_px(quote.px, tob.symbol)
-            order_placed = self.place_new_order(tob, strat_brief, order_limits, pair_strat, quote.px,
-                                                ask_usd_px, quote.qty,
-                                                Side.BUY, tob.symbol)
-            if order_placed == OrderControl.ORDER_CONTROL_SUCCESS:
-                posted_notional = quote.px * quote.qty
-                return posted_notional
+            if pair_strat.strat_state != StratState.StratState_ACTIVE or self._is_outside_bartering_hours():
+                logging.error("Blocked place chore - strat not in activ state")
+                return 0  # no chore sent = no posted notional
+        if side == TickType.BID:
+            px, qty = self._get_bid_tob_px_qty(tob)
         else:
-            logging.error(f"0 value found in ask TOB - ignoring {quote.px = }, {quote.qty = }, pair_strat_key: "
-                          f"{get_pair_strat_log_key(pair_strat)}")
-            return 0  # no order sent = no posted notional
+            px, qty = self._get_ask_tob_px_qty(tob)
 
-    def _check_tob_and_place_order(self, pair_strat: PairStratBaseModel | PairStrat, strat_brief: StratBriefBaseModel,
-                                   order_limits: OrderLimits, top_of_books: List[TopOfBookBaseModel]) -> int:
+        if px is None or qty is None:
+            return 0  # no chore sent = no posted notional
+
+        # Note: not taking tob mutex since symbol is not changed
+        ask_usd_px: float = self.get_usd_px(px, tob.symbol)
+        chore_placed = self.place_new_chore(tob, strat_brief, chore_limits, pair_strat, px,
+                                            ask_usd_px, qty,
+                                            Side.BUY, tob.symbol)
+        if chore_placed == ChoreControl.ORDER_CONTROL_SUCCESS:
+            posted_notional = px * qty
+            return posted_notional
+
+    def _check_tob_and_place_chore(self, pair_strat: PairStratBaseModel | PairStrat, strat_brief: StratBriefBaseModel,
+                                   chore_limits: ChoreLimitsBaseModel, top_of_books: List[TopOfBookBaseModel]) -> int:
         posted_leg1_notional: float = 0
         posted_leg2_notional: float = 0
         leg1_tob: TopOfBookBaseModel | None
         leg2_tob: TopOfBookBaseModel | None
-        trade_tob: TopOfBookBaseModel
+        barter_tob: TopOfBookBaseModel
         leg1_tob, leg2_tob = self.extract_strat_specific_legs_from_tobs(pair_strat, top_of_books)
 
-        order_placed: int = OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
-        if leg1_tob is not None and self.strat_cache.leg1_trading_symbol is not None:
+        chore_placed: int = ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
+        if leg1_tob is not None and self.strat_cache.leg1_bartering_symbol is not None:
             if abs(self.leg1_notional) <= abs(self.leg2_notional):
                 # process primary leg
                 if pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:  # execute aggressive buy
-                    posted_leg1_notional = self._place_order(pair_strat, strat_brief, order_limits, leg1_tob.ask_quote,
+                    posted_leg1_notional = self._place_chore(pair_strat, strat_brief, chore_limits, TickType.ASK,
                                                              leg1_tob)
                     if math.isclose(posted_leg1_notional, 0):
-                        return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
+                        return ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
                 else:  # execute aggressive sell
-                    posted_leg1_notional = self._place_order(pair_strat, strat_brief, order_limits, leg1_tob.bid_quote,
+                    posted_leg1_notional = self._place_chore(pair_strat, strat_brief, chore_limits, TickType.BID,
                                                              leg1_tob)
                     if math.isclose(posted_leg1_notional, 0):
-                        return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
+                        return ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
-        if leg2_tob is not None and self.strat_cache.leg2_trading_symbol is not None:
+        if leg2_tob is not None and self.strat_cache.leg2_bartering_symbol is not None:
             if abs(self.leg2_notional) <= abs(self.leg1_notional):
                 # process secondary leg
                 if pair_strat.pair_strat_params.strat_leg2.side == Side.BUY:  # execute aggressive buy
-                    posted_leg2_notional = self._place_order(pair_strat, strat_brief, order_limits, leg2_tob.ask_quote,
+                    posted_leg2_notional = self._place_chore(pair_strat, strat_brief, chore_limits, TickType.ASK,
                                                              leg2_tob)
                     if math.isclose(posted_leg2_notional, 0):
-                        return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
+                        return ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
                 else:  # execute aggressive sell
-                    posted_leg2_notional = self._place_order(pair_strat, strat_brief, order_limits, leg2_tob.bid_quote,
+                    posted_leg2_notional = self._place_chore(pair_strat, strat_brief, chore_limits, TickType.BID,
                                                              leg2_tob)
                     if math.isclose(posted_leg2_notional, 0):
-                        return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
+                        return ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
-        if order_placed == OrderControl.ORDER_CONTROL_SUCCESS:
-            self.last_order_timestamp = DateTime.now()
+        if chore_placed == ChoreControl.ORDER_CONTROL_SUCCESS:
+            self.last_chore_timestamp = DateTime.now()
             self.leg1_notional += posted_leg1_notional
             self.leg2_notional += posted_leg2_notional
             logging.debug(f"strat-matched ToB for pair_strat_key {get_pair_strat_log_key(pair_strat)}: "
                           f"{[str(tob) for tob in top_of_books]}")
-        return order_placed
+        return chore_placed
 
-    def _check_tob_and_place_order_test(self, pair_strat: PairStratBaseModel | PairStrat,
-                                        strat_brief: StratBriefBaseModel, order_limits: OrderLimits,
+    def _get_tob_symbol(self, tob: TopOfBook) -> str:
+        with MobileBookMutexManager(self.mobile_book_provider, tob):
+            return tob.symbol
+
+    def _get_tob_last_update_date_time(self, tob: TopOfBook) -> DateTime:
+        with MobileBookMutexManager(self.mobile_book_provider, tob):
+            return tob.last_update_date_time
+
+    def _get_tob_bid_quote_px(self, tob: TopOfBook) -> float | None:
+        with MobileBookMutexManager(self.mobile_book_provider, tob):
+            if tob.bid_quote is not None:
+                return tob.bid_quote.px
+            else:
+                logging.info(f"Can't find bid_quote in tob of symbol: {tob.symbol};;; tob: {tob}")
+                return None
+
+    def _get_tob_ask_quote_px(self, tob: TopOfBook) -> float | None:
+        with MobileBookMutexManager(self.mobile_book_provider, tob):
+            if tob.ask_quote is not None:
+                return tob.ask_quote.px
+            else:
+                logging.info(f"Can't find ask_quote in tob of symbol: {tob.symbol};;; tob: {tob}")
+                return None
+
+    def _get_tob_bid_quote_last_update_date_time(self, tob: TopOfBook) -> DateTime | None:
+        with MobileBookMutexManager(self.mobile_book_provider, tob):
+            if tob.bid_quote is not None:
+                return tob.bid_quote.last_update_date_time
+            else:
+                logging.info(f"Can't find bid_quote in tob of symbol: {tob.symbol};;; tob: {tob}")
+                return None
+
+    def _get_tob_ask_quote_last_update_date_time(self, tob: TopOfBook) -> DateTime | None:
+        with MobileBookMutexManager(self.mobile_book_provider, tob):
+            if tob.ask_quote is not None:
+                return tob.ask_quote.last_update_date_time
+            else:
+                logging.info(f"Can't find ask_quote in tob of symbol: {tob.symbol};;; tob: {tob}")
+                return None
+
+    def _check_tob_and_place_chore_test(self, pair_strat: PairStratBaseModel | PairStrat,
+                                        strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel,
                                         top_of_books: List[TopOfBookBaseModel]) -> int:
         buy_top_of_book: TopOfBookBaseModel | None = None
         sell_top_of_book: TopOfBookBaseModel | None = None
@@ -943,7 +1078,7 @@ class StreetBook:
             buy_symbol = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
             sell_symbol = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
 
-        order_placed: int = OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
+        chore_placed: int = ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
         leg_1_top_of_book = (
             self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book(
@@ -953,20 +1088,23 @@ class StreetBook:
                 self._top_of_books_update_date_time))
 
         if leg_1_top_of_book and leg_2_top_of_book:
-            if leg_1_top_of_book.last_update_date_time < leg_2_top_of_book.last_update_date_time:
-                self._top_of_books_update_date_time = leg_1_top_of_book.last_update_date_time
-            else:
-                self._top_of_books_update_date_time = leg_2_top_of_book.last_update_date_time
+            # leg_1_last_update_date_time = self._get_tob_last_update_date_time(leg_1_top_of_book)
+            # leg_2_last_update_date_time = self._get_tob_last_update_date_time(leg_2_top_of_book)
+            # if leg_1_last_update_date_time < leg_2_last_update_date_time:
+            #     self._top_of_books_update_date_time = leg_1_last_update_date_time
+            # else:
+            #     self._top_of_books_update_date_time = leg_2_last_update_date_time
 
             top_of_books = [leg_1_top_of_book, leg_2_top_of_book]
 
             latest_update_date_time: DateTime | None = None
             for top_of_book in top_of_books:
                 if latest_update_date_time is None:
-                    if top_of_book.symbol == buy_symbol:
+                    tob_symbol = self._get_tob_symbol(top_of_book)
+                    if tob_symbol == buy_symbol:
                         buy_top_of_book = top_of_book
                         sell_top_of_book = None
-                    elif top_of_book.symbol == sell_symbol:
+                    elif tob_symbol == sell_symbol:
                         sell_top_of_book = top_of_book
                         buy_top_of_book = None
                     else:
@@ -974,13 +1112,15 @@ class StreetBook:
                                    f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}"
                         logging.error(err_str_)
                         raise Exception(err_str_)
-                    latest_update_date_time = top_of_book.last_update_date_time
+                    latest_update_date_time = self._get_tob_last_update_date_time(top_of_book)
                 else:
-                    if top_of_book.last_update_date_time > latest_update_date_time:
-                        if top_of_book.symbol == buy_symbol:
+                    latest_update_date_time_ = self._get_tob_last_update_date_time(top_of_book)
+                    if latest_update_date_time_ > latest_update_date_time:
+                        tob_symbol = self._get_tob_symbol(top_of_book)
+                        if tob_symbol == buy_symbol:
                             buy_top_of_book = top_of_book
                             sell_top_of_book = None
-                        elif top_of_book.symbol == sell_symbol:
+                        elif tob_symbol == sell_symbol:
                             sell_top_of_book = top_of_book
                             buy_top_of_book = None
                         else:
@@ -988,36 +1128,38 @@ class StreetBook:
                                        f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}"
                             logging.error(err_str_)
                             raise Exception(err_str_)
-                        latest_update_date_time = top_of_book.last_update_date_time
+                        latest_update_date_time = latest_update_date_time_
             # tob tuple last_update_date_time is set to least of the 2 tobs update time
-            # setting it to latest_update_date_time to allow order to be placed
+            # setting it to latest_update_date_time to allow chore to be placed
             self._top_of_books_update_date_time = latest_update_date_time
 
             if buy_top_of_book is not None:
-                if buy_top_of_book.bid_quote.last_update_date_time == \
-                        self._top_of_books_update_date_time:
-                    if buy_top_of_book.bid_quote.px == 110:
+                bid_quote_last_update_date_time = self._get_tob_bid_quote_last_update_date_time(buy_top_of_book)
+                if bid_quote_last_update_date_time == self._top_of_books_update_date_time:
+                    buy_tob_bid_px = self._get_tob_bid_quote_px(buy_top_of_book)
+                    if buy_tob_bid_px == 100:
                         px = random.randint(90, 100)
                         qty = random.randint(85, 95)
-                        usd_px: float = self.get_usd_px(px, buy_top_of_book.symbol)
-                        order_placed = self.place_new_order(buy_top_of_book, strat_brief, order_limits,
+                        usd_px: float = self.get_usd_px(px, buy_symbol)
+                        chore_placed = self.place_new_chore(buy_top_of_book, strat_brief, chore_limits,
                                                             pair_strat, px, usd_px, qty,
-                                                            Side.BUY, buy_top_of_book.symbol)
+                                                            Side.BUY, buy_symbol)
             elif sell_top_of_book is not None:
-                if sell_top_of_book.ask_quote.last_update_date_time == \
-                        self._top_of_books_update_date_time:
-                    if sell_top_of_book.ask_quote.px == 120:
+                ask_quote_last_update_date_time = self._get_tob_ask_quote_last_update_date_time(sell_top_of_book)
+                if ask_quote_last_update_date_time == self._top_of_books_update_date_time:
+                    sell_tob_ask_px = self._get_tob_ask_quote_px(sell_top_of_book)
+                    if sell_tob_ask_px == 120:
                         px = random.randint(100, 110)
                         qty = random.randint(65, 75)
-                        usd_px: float = self.get_usd_px(px, sell_top_of_book.symbol)
-                        order_placed = self.place_new_order(sell_top_of_book, strat_brief, order_limits,
+                        usd_px: float = self.get_usd_px(px, sell_symbol)
+                        chore_placed = self.place_new_chore(sell_top_of_book, strat_brief, chore_limits,
                                                             pair_strat, px, usd_px, qty,
-                                                            Side.SELL, sell_top_of_book.symbol)
+                                                            Side.SELL, sell_symbol)
             else:
                 err_str_ = "TOB updates could not find any updated buy or sell tob, " \
                            f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}"
                 logging.debug(err_str_)
-            return order_placed
+            return chore_placed
         return False
 
     def get_leg1_fx(self):
@@ -1037,80 +1179,80 @@ class StreetBook:
                 return None
 
     def process_cxl_request(self):
-        cancel_orders_and_date_tuple = self.strat_cache.get_cancel_order(self._cancel_orders_update_date_time)
-        if cancel_orders_and_date_tuple is not None:
-            cancel_orders, self._cancel_orders_update_date_time = cancel_orders_and_date_tuple
-            if cancel_orders is not None:
-                final_slice = len(cancel_orders)
-                unprocessed_cancel_orders: List[CancelOrderBaseModel] = \
-                    cancel_orders[self._cancel_orders_processed_slice:final_slice]
-                self._cancel_orders_processed_slice = final_slice
-                for cancel_order in unprocessed_cancel_orders:
-                    if not cancel_order.cxl_confirmed:
-                        self.trading_link_place_cxl_order(
-                            cancel_order.order_id, cancel_order.side, None, cancel_order.security.sec_id,
+        cancel_chores_and_date_tuple = self.strat_cache.get_cancel_chore(self._cancel_chores_update_date_time)
+        if cancel_chores_and_date_tuple is not None:
+            cancel_chores, self._cancel_chores_update_date_time = cancel_chores_and_date_tuple
+            if cancel_chores is not None:
+                final_slice = len(cancel_chores)
+                unprocessed_cancel_chores: List[CancelChoreBaseModel] = \
+                    cancel_chores[self._cancel_chores_processed_slice:final_slice]
+                self._cancel_chores_processed_slice = final_slice
+                for cancel_chore in unprocessed_cancel_chores:
+                    if not cancel_chore.cxl_confirmed:
+                        self.bartering_link_place_cxl_chore(
+                            cancel_chore.chore_id, cancel_chore.side, None, cancel_chore.security.sec_id,
                             underlying_account="NA")
 
-                # if some update was on existing cancel_orders then this semaphore release was for that update only,
+                # if some update was on existing cancel_chores then this semaphore release was for that update only,
                 # therefore returning True to continue and wait for next semaphore release
                 return True
-        # all else return false - no cancel_order to process
+        # all else return false - no cancel_chore to process
         return False
 
-    def trading_link_place_cxl_order(self, order_id, side, trading_sec_id, system_sec_id, underlying_account):
+    def bartering_link_place_cxl_chore(self, chore_id, side, bartering_sec_id, system_sec_id, underlying_account):
         # coro needs public method
-        run_coro = self.trading_link.place_cxl_order(order_id, side, trading_sec_id, system_sec_id, underlying_account)
+        run_coro = self.bartering_link.place_cxl_chore(chore_id, side, bartering_sec_id, system_sec_id, underlying_account)
         future = asyncio.run_coroutine_threadsafe(run_coro, StreetBook.asyncio_loop)
 
         # block for start_executor_server task to finish
         try:
-            # ignore return order_journal: don't generate cxl orders in system, just treat cancel acks as unsol cxls
+            # ignore return chore_journal: don't generate cxl chores in system, just treat cancel acks as unsol cxls
             if not (res := future.result()):
-                logging.error(f"trading_link_place_cxl_order failed, {res = } returned")
+                logging.error(f"bartering_link_place_cxl_chore failed, {res = } returned")
         except Exception as e:
-            logging.exception(f"trading_link_place_cxl_order failed with exception: {e}")
+            logging.exception(f"bartering_link_place_cxl_chore failed with exception: {e}")
 
-    def is_pair_strat_done(self, strat_brief: StratBriefBaseModel, ol: OrderLimits) -> int:
+    def is_pair_strat_done(self, strat_brief: StratBriefBaseModel, ol: ChoreLimitsBaseModel) -> int:
         """
         Args:
             strat_brief:
-            ol: current order limits as set by system / user
+            ol: current chore limits as set by system / user
         Returns:
-            0: indicates done; no notional to consume on at-least 1 leg & no-open orders for this strat in market
+            0: indicates done; no notional to consume on at-least 1 leg & no-open chores for this strat in market
             -1: indicates needs-processing; strat has notional left to consume on either of the legs
-            + number: indicates finishing: no notional to consume on at-least 1 leg but open orders for strat in market
+            + number: indicates finishing: no notional to consume on at-least 1 leg but open chores for strat in market
         """
         strat_done: bool = False
-        open_order_count: int = self.strat_cache.get_open_order_count_from_cache()
+        open_chore_count: int = self.strat_cache.get_open_chore_count_from_cache()
 
-        if 0 == open_order_count and (
-                strat_brief.pair_sell_side_trading_brief.consumable_notional < ol.min_order_notional):
+        if 0 == open_chore_count and (
+                strat_brief.pair_sell_side_bartering_brief.consumable_notional < ol.min_chore_notional):
             # sell leg of strat is done - if either leg is done - strat is done
-            logging.info(f"Sell Side Leg is done, no open orders remaining + sell-remainder: "
-                         f"{strat_brief.pair_sell_side_trading_brief.consumable_notional} is less than allowed"
-                         f" {ol.min_order_notional = }, no further orders possible")
+            logging.info(f"Sell Side Leg is done, no open chores remaining + sell-remainder: "
+                         f"{strat_brief.pair_sell_side_bartering_brief.consumable_notional} is less than allowed"
+                         f" {ol.min_chore_notional = }, no further chores possible")
             strat_done = True
         # else not required, more notional to consume on sell leg - strat done is set to 1 (no error, not done)
-        if 0 == open_order_count and (
-                strat_brief.pair_buy_side_trading_brief.consumable_notional < ol.min_order_notional):
+        if 0 == open_chore_count and (
+                strat_brief.pair_buy_side_bartering_brief.consumable_notional < ol.min_chore_notional):
             # buy leg of strat is done - if either leg is done - strat is done
-            logging.info(f"Buy Side Leg is done, no open orders remaining + buy-remainder: "
-                         f"{strat_brief.pair_buy_side_trading_brief.consumable_notional} is less than allowed"
-                         f" {ol.min_order_notional = }, no further orders possible")
+            logging.info(f"Buy Side Leg is done, no open chores remaining + buy-remainder: "
+                         f"{strat_brief.pair_buy_side_bartering_brief.consumable_notional} is less than allowed"
+                         f" {ol.min_chore_notional = }, no further chores possible")
             strat_done = True
         # else not required, more notional to consume on buy leg - strat done is set to 1 (no error, not done)
         if strat_done:
-            if 0 == open_order_count:
+            if 0 == open_chore_count:
                 logging.info(f"Strat is done")
             else:
-                logging.warning(f"Strat is finishing [if / after strat open orders: {open_order_count} are filled]")
-            return open_order_count  # [ returns 0 or + ive number] - Done or Finishing
+                logging.warning(f"Strat is finishing [if / after strat open chores: {open_chore_count} are filled]")
+            return open_chore_count  # [ returns 0 or + ive number] - Done or Finishing
         else:
             return -1  # in progress
 
     def _get_latest_system_control(self) -> SystemControlBaseModel | None:
         system_control: SystemControlBaseModel | None = None
-        system_control_tuple = self.trading_data_manager.trading_cache.get_system_control()
+        system_control_tuple = self.bartering_data_manager.bartering_cache.get_system_control()
         if system_control_tuple is None:
             logging.warning("no kill_switch found yet - strat will not trigger until kill_switch arrives")
             return None
@@ -1119,14 +1261,14 @@ class StreetBook:
         return system_control
 
     def is_strat_ready_for_next_opportunity(self, log_error: bool = False) -> bool:
-        open_order_count: int = self.strat_cache.get_open_order_count_from_cache()
+        open_chore_count: int = self.strat_cache.get_open_chore_count_from_cache()
         if self.strat_cache.has_unack_leg():
             if log_error:
-                logging.debug(f"blocked opportunity search, has unack leg and {open_order_count} open order(s)")
+                logging.debug(f"blocked opportunity search, has unack leg and {open_chore_count} open chore(s)")
             return False
-        elif (not self.allow_multiple_open_orders_per_strat) and 0 != open_order_count:
+        elif (not self.allow_multiple_open_chores_per_strat) and 0 != open_chore_count:
             if log_error:
-                logging.debug(f"blocked opportunity search, has {open_order_count} open order(s)")
+                logging.debug(f"blocked opportunity search, has {open_chore_count} open chore(s)")
             return False
         else:
             return True
@@ -1143,7 +1285,7 @@ class StreetBook:
             logging.error(f"pair_strat_tuple is None for: {self.strat_cache = }")
         return None
 
-    def _is_outside_trading_hours(self):
+    def _is_outside_bartering_hours(self):
         if self.is_sanity_test_run or self.is_test_run or self.is_dev_env: return False
         return False
 
@@ -1173,13 +1315,13 @@ class StreetBook:
                     return -1
 
                 # If pair_strat is not active, don't act, just return [check MD state and take action if required]
-                if pair_strat.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
+                if pair_strat.strat_state != StratState.StratState_ACTIVE or self._is_outside_bartering_hours():
                     continue
                 else:
                     strat_limits_tuple = self.strat_cache.get_strat_limits()
                     self.strat_limit, strat_limits_update_date_time = strat_limits_tuple
 
-                # 3. check if any cxl order is requested and send out
+                # 3. check if any cxl chore is requested and send out
                 if self.process_cxl_request():
                     continue
 
@@ -1200,38 +1342,36 @@ class StreetBook:
                                   f"{self.strat_cache.get_key()};;; [ {self.strat_cache = } ]")
                     continue  # go next run - we don't stop processing for one faulty strat_cache
 
-                order_limits: OrderLimits | None = None
-                order_limits_tuple = self.trading_data_manager.trading_cache.get_order_limits()
-                if order_limits_tuple:
-                    order_limits, _ = order_limits_tuple
-                    if order_limits and self.strat_limit:
-                        strat_done_counter = self.is_pair_strat_done(strat_brief, order_limits)
+                chore_limits: ChoreLimitsBaseModel | None = None
+                chore_limits_tuple = self.bartering_data_manager.bartering_cache.get_chore_limits()
+                if chore_limits_tuple:
+                    chore_limits, _ = chore_limits_tuple
+                    if chore_limits and self.strat_limit:
+                        strat_done_counter = self.is_pair_strat_done(strat_brief, chore_limits)
                         if 0 == strat_done_counter:
                             return 0  # triggers graceful shutdown
                         elif -1 != strat_done_counter:
-                            # strat is finishing: waiting to close pending strat_done_counter number of open orders
+                            # strat is finishing: waiting to close pending strat_done_counter number of open chores
                             continue
                         # else not needed - move forward, more processing needed to complete the strat
                     else:
-                        logging.error(f"Can't proceed: order_limits/strat_limit not found for trading_cache: "
-                                      f"{self.trading_data_manager.trading_cache}; {self.strat_cache = }")
+                        logging.error(f"Can't proceed: chore_limits/strat_limit not found for bartering_cache: "
+                                      f"{self.bartering_data_manager.bartering_cache}; {self.strat_cache = }")
                         continue  # go next run - we don't stop processing for one faulty strat_cache
                 else:
-                    logging.error(f"order_limits_tuple not found for strat: {self.strat_cache}, can't proceed")
+                    logging.error(f"chore_limits_tuple not found for strat: {self.strat_cache}, can't proceed")
                     continue  # go next run - we don't stop processing for one faulty strat_cache
 
                 # 4. get top_of_book (new or old to be checked by respective strat based on strat requirement)
 
                 leg_1_top_of_book = (
-                    self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book(
-                        self._top_of_books_update_date_time))
+                    self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book())
                 leg_2_top_of_book = (
-                    self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book(
-                        self._top_of_books_update_date_time))
+                    self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book())
 
                 if leg_1_top_of_book is None or leg_2_top_of_book is None:
                     logging.warning(f"strats need both sides of TOB to be present, "
-                                    f"found  leg_1 or leg_2 or neither of them"
+                                    f"found  only leg_1 or only leg_2 or neither of them"
                                     f";;;tob found: {leg_1_top_of_book = }, "
                                     f"{leg_2_top_of_book = }")
                     continue
@@ -1249,39 +1389,38 @@ class StreetBook:
                     logging.debug("not-progressing: kill switch enabled")
                     continue
 
-                # 7. continue only if past-pair (iff triggered) has no open/unack orders
+                # 7. continue only if past-pair (iff triggered) has no open/unack chores
                 if not self.is_strat_ready_for_next_opportunity(log_error=True):
                     continue
 
-                with MobileBookMutexManager(self.mobile_book_provider, *top_of_books):
-                    # 8. If any manual new_order requested: apply risk checks
-                    # (maybe no strat param checks?) & send out
-                    new_orders_and_date_tuple = self.strat_cache.get_new_order(self._new_orders_update_date_time)
-                    if new_orders_and_date_tuple is not None:
-                        new_orders, self._new_orders_update_date_time = new_orders_and_date_tuple
-                        if new_orders is not None:
-                            final_slice = len(new_orders)
-                            unprocessed_new_orders: List[NewOrderBaseModel] = (
-                                new_orders[self._new_orders_processed_slice:final_slice])
-                            self._new_orders_processed_slice = final_slice
-                            for new_order in unprocessed_new_orders:
-                                if system_control and not system_control.kill_switch:
-                                    self._check_tob_n_place_non_systematic_order(new_order, pair_strat, strat_brief,
-                                                                                 order_limits, top_of_books)
-                                    continue
-                                else:
-                                    # kill switch in force - drop the order
-                                    logging.error(f"kill switch is enabled, dropping non-systematic "
-                                                  f"new-order request;;; {new_order = } "
-                                                  "non-systematic new order call")
-                                    continue
-                    # else no new_order to process, ignore and move to next step
+                # 8. If any manual new_chore requested: apply risk checks
+                # (maybe no strat param checks?) & send out
+                new_chores_and_date_tuple = self.strat_cache.get_new_chore(self._new_chores_update_date_time)
+                if new_chores_and_date_tuple is not None:
+                    new_chores, self._new_chores_update_date_time = new_chores_and_date_tuple
+                    if new_chores is not None:
+                        final_slice = len(new_chores)
+                        unprocessed_new_chores: List[NewChoreBaseModel] = (
+                            new_chores[self._new_chores_processed_slice:final_slice])
+                        self._new_chores_processed_slice = final_slice
+                        for new_chore in unprocessed_new_chores:
+                            if system_control and not system_control.kill_switch:
+                                self._check_tob_n_place_non_systematic_chore(new_chore, pair_strat, strat_brief,
+                                                                             chore_limits, top_of_books)
+                                continue
+                            else:
+                                # kill switch in force - drop the chore
+                                logging.error(f"kill switch is enabled, dropping non-systematic "
+                                              f"new-chore request;;; {new_chore = } "
+                                              "non-systematic new chore call")
+                                continue
+                # else no new_chore to process, ignore and move to next step
 
-                    if self.is_sanity_test_run:
-                        self._check_tob_and_place_order_test(pair_strat, strat_brief, order_limits, top_of_books)
-                    else:
-                        self._check_tob_and_place_order(pair_strat, strat_brief, order_limits, top_of_books)
-                    continue  # all good - go next run
+                if self.is_sanity_test_run:
+                    self._check_tob_and_place_chore_test(pair_strat, strat_brief, chore_limits, top_of_books)
+                else:
+                    self._check_tob_and_place_chore(pair_strat, strat_brief, chore_limits, top_of_books)
+                continue  # all good - go next run
             except Exception as e:
                 logging.exception(f"Run returned with exception: {e}")
                 return -1

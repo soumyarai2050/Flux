@@ -37,7 +37,7 @@ if [ "$ExistingProjectCamelCaseName" != "$ExistingProjectTitleCaseName" ]; then
 fi
 
 # updating generated gen_scripts to have code specific to this project group
-echo "replacing any text occurrence of: CodeGenEngineEnvManager with: TradingGenEngineEnv and replacing their import statements in $PWD recursively"
-find . -type f ! -name "gen_scripts.sh" -exec gsed -i -E "s#from Flux.code_gen_engine_env import CodeGenEngineEnvManager#from Flux.CodeGenProjects.addressbook.trading_gen_engine_env import TradingGenEngineEnv#g" {} +
-find . -type f ! -name "gen_scripts.sh" -exec gsed -i -E "s#CodeGenEngineEnvManager#TradingGenEngineEnv#g" {} +
+echo "replacing any text occurrence of: CodeGenEngineEnvManager with: BarteringGenEngineEnv and replacing their import statements in $PWD recursively"
+find . -type f ! -name "gen_scripts.sh" -exec gsed -i -E "s#from Flux.code_gen_engine_env import CodeGenEngineEnvManager#from Flux.CodeGenProjects.AddressBook.bartering_gen_engine_env import BarteringGenEngineEnv#g" {} +
+find . -type f ! -name "gen_scripts.sh" -exec gsed -i -E "s#CodeGenEngineEnvManager#BarteringGenEngineEnv#g" {} +
 

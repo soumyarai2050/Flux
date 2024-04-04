@@ -24,6 +24,7 @@ message FluxMsgNestedFldValFilter{
 message FluxMsgMainCrudOperationsAgg{
   required string agg_var_name = 1;
   repeated string agg_params = 2; // string of all params, case conversion is required where it's used
+  optional bool override_get_all_limit_handling = 3;
 }
 
 message ForeignKeyOption

@@ -6,14 +6,14 @@ from threading import Thread, Semaphore
 
 os.environ["DBType"] = "beanie"
 # project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.app.post_book_service_routes_callback_base_native_override import (
-    PostBookServiceRoutesCallbackBaseNativeOverride, ContainerObject, OrderJournalBaseModel,
-    OrderSnapshotBaseModel, StratBriefBaseModel)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_routes_callback_base_native_override import (
+    PostBookServiceRoutesCallbackBaseNativeOverride, ContainerObject, ChoreJournalBaseModel,
+    ChoreSnapshotBaseModel, StratBriefBaseModel)
 
 
 class MockContainerObject(ContainerObject):
-    order_journals: List[OrderJournalBaseModel]
-    order_snapshots: List[OrderSnapshotBaseModel]
+    chore_journals: List[ChoreJournalBaseModel]
+    chore_snapshots: List[ChoreSnapshotBaseModel]
     strat_brief: StratBriefBaseModel | None = None
 
 
@@ -38,18 +38,18 @@ class MockPostBookServiceRoutesCallbackBaseNativeOverride(
         self.wait_semaphore.release()
         super().update_strat_id_list_n_dict_from_payload(strat_id_list, strat_id_to_container_obj_dict, payload_dict)
 
-    def _get_order_journal_from_payload(self, payload_dict: Dict[str, Any]):
-        order_journal: OrderJournalBaseModel | None = None
-        if (order_journal_dict := payload_dict.get("order_journal")) is not None:
-            order_journal = OrderJournalBaseModel(**order_journal_dict)
-        # else not required: Fills update doesn't contain order_journal
-        return order_journal
+    def _get_chore_journal_from_payload(self, payload_dict: Dict[str, Any]):
+        chore_journal: ChoreJournalBaseModel | None = None
+        if (chore_journal_dict := payload_dict.get("chore_journal")) is not None:
+            chore_journal = ChoreJournalBaseModel(**chore_journal_dict)
+        # else not required: Fills update doesn't contain chore_journal
+        return chore_journal
 
-    def _get_order_snapshot_from_payload(self, payload_dict: Dict[str, Any]):
-        order_snapshot: OrderSnapshotBaseModel | None = None
-        if (order_snapshot_dict := payload_dict.get("order_snapshot")) is not None:
-            order_snapshot = OrderSnapshotBaseModel(**order_snapshot_dict)
-        return order_snapshot
+    def _get_chore_snapshot_from_payload(self, payload_dict: Dict[str, Any]):
+        chore_snapshot: ChoreSnapshotBaseModel | None = None
+        if (chore_snapshot_dict := payload_dict.get("chore_snapshot")) is not None:
+            chore_snapshot = ChoreSnapshotBaseModel(**chore_snapshot_dict)
+        return chore_snapshot
 
     def _get_strat_brief_from_payload(self, payload_dict: Dict[str, Any]):
         strat_brief: StratBriefBaseModel | None = None
@@ -73,11 +73,11 @@ def test_queue_handling(single_strat_single_data, single_strat_multi_data,
 
     # Checking single strat single data
     mock_post_book_override.expected_strat_id_list = [1]
-    order_journal = OrderJournalBaseModel(**single_strat_single_data[0].get("order_journal"))
-    order_snapshot = OrderSnapshotBaseModel(**single_strat_single_data[0].get("order_snapshot"))
+    chore_journal = ChoreJournalBaseModel(**single_strat_single_data[0].get("chore_journal"))
+    chore_snapshot = ChoreSnapshotBaseModel(**single_strat_single_data[0].get("chore_snapshot"))
     strat_brief = StratBriefBaseModel(**single_strat_single_data[0].get("strat_brief"))
-    container_obj = MockContainerObject(order_journals=[order_journal],
-                                        order_snapshots=[order_snapshot],
+    container_obj = MockContainerObject(chore_journals=[chore_journal],
+                                        chore_snapshots=[chore_snapshot],
                                         strat_brief=strat_brief)
     mock_post_book_override.expected_strat_id_to_container_obj_dict = {1: container_obj}
     # updating queue
@@ -99,16 +99,16 @@ def test_queue_handling(single_strat_single_data, single_strat_multi_data,
     mock_post_book_override.is_strat_id_list = False
     mock_post_book_override.is_expected_strat_id_to_container_obj_dict = False
     mock_post_book_override.expected_strat_id_list = [1]
-    order_journal_list = []
-    order_snapshot_list = []
+    chore_journal_list = []
+    chore_snapshot_list = []
     strat_brief: StratBriefBaseModel | None = None
 
     for payload in single_strat_multi_data:
-        order_journal_list.append(OrderJournalBaseModel(**payload.get("order_journal")))
-        order_snapshot_list.append(OrderSnapshotBaseModel(**payload.get("order_snapshot")))
+        chore_journal_list.append(ChoreJournalBaseModel(**payload.get("chore_journal")))
+        chore_snapshot_list.append(ChoreSnapshotBaseModel(**payload.get("chore_snapshot")))
         strat_brief = StratBriefBaseModel(**payload.get("strat_brief"))
-    container_obj = MockContainerObject(order_journals=order_journal_list,
-                                        order_snapshots=order_snapshot_list,
+    container_obj = MockContainerObject(chore_journals=chore_journal_list,
+                                        chore_snapshots=chore_snapshot_list,
                                         strat_brief=strat_brief)
     mock_post_book_override.expected_strat_id_to_container_obj_dict = {1: container_obj}
     # updating queue
@@ -133,11 +133,11 @@ def test_queue_handling(single_strat_single_data, single_strat_multi_data,
     mock_post_book_override.expected_strat_id_list = [1, 2, 3, 4, 5]
     for payload in multi_strat_single_data:
         strat_id = payload.get("strat_id")
-        order_journal = OrderJournalBaseModel(**payload.get("order_journal"))
-        order_snapshot = OrderSnapshotBaseModel(**payload.get("order_snapshot"))
+        chore_journal = ChoreJournalBaseModel(**payload.get("chore_journal"))
+        chore_snapshot = ChoreSnapshotBaseModel(**payload.get("chore_snapshot"))
         strat_brief = StratBriefBaseModel(**payload.get("strat_brief"))
-        container_obj = MockContainerObject(order_journals=[order_journal],
-                                            order_snapshots=[order_snapshot],
+        container_obj = MockContainerObject(chore_journals=[chore_journal],
+                                            chore_snapshots=[chore_snapshot],
                                             strat_brief=strat_brief)
         mock_post_book_override.expected_strat_id_to_container_obj_dict[strat_id] = container_obj
     # updating queue
@@ -163,18 +163,18 @@ def test_queue_handling(single_strat_single_data, single_strat_multi_data,
 
     for payload in multi_strat_multi_data:
         strat_id = payload.get("strat_id")
-        order_journal = OrderJournalBaseModel(**payload.get("order_journal"))
-        order_snapshot = OrderSnapshotBaseModel(**payload.get("order_snapshot"))
+        chore_journal = ChoreJournalBaseModel(**payload.get("chore_journal"))
+        chore_snapshot = ChoreSnapshotBaseModel(**payload.get("chore_snapshot"))
         strat_brief = StratBriefBaseModel(**payload.get("strat_brief"))
 
         container_obj = mock_post_book_override.expected_strat_id_to_container_obj_dict.get(strat_id)
         if container_obj is None:
-            container_obj = MockContainerObject(order_journals=[order_journal],
-                                                order_snapshots=[order_snapshot],
+            container_obj = MockContainerObject(chore_journals=[chore_journal],
+                                                chore_snapshots=[chore_snapshot],
                                                 strat_brief=strat_brief)
         else:
-            container_obj.order_journals.append(order_journal)
-            container_obj.order_snapshots.append(order_snapshot)
+            container_obj.chore_journals.append(chore_journal)
+            container_obj.chore_snapshots.append(chore_snapshot)
             container_obj.strat_brief = strat_brief
         mock_post_book_override.expected_strat_id_to_container_obj_dict[strat_id] = container_obj
 

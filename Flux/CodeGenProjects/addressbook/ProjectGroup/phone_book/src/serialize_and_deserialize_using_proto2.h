@@ -18,11 +18,11 @@
 class SerializeAndDeserializeProto2 {
 
 public:
-    std::string serialize_order_journal(const phone_book::OrderJournal& order_journal);
+    std::string serialize_chore_journal(const phone_book::ChoreJournal& chore_journal);
 
-    phone_book::OrderJournal deserialize_order_journal(const std::string& json_string);
+    phone_book::ChoreJournal deserialize_chore_journal(const std::string& json_string);
 
-    phone_book::OrderJournal create_order_journal();
+    phone_book::ChoreJournal create_chore_journal();
 
 };
 

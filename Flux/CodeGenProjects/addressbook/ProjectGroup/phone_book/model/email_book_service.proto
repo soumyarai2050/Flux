@@ -3,7 +3,7 @@ syntax = "proto2";
 import "ui_option_utils.proto";
 import "flux_options.proto";
 import "projects_core.proto";
-import "trade_core.proto";
+import "barter_core.proto";
 import "email_book_core.proto";
 import "dept_book_n_phone_book_core.proto";
 import "phone_book_n_street_book_core.proto";
@@ -46,7 +46,7 @@ message PairStratParams{
 
 
 //Widget - 7
-message OrderLimits{
+message ChoreLimits{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
@@ -76,14 +76,14 @@ message OrderLimits{
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int32 max_basis_points = 2 [(FluxFldValMax) = "1000", (FluxFldHelp) = "basis-points a single order can consume, if set to 1, it`s (1/100 of 1% of px @ BBO) or (0.01% of px @ BBO) + + px @ BBO"];
-  optional float max_px_deviation = 3 [default = 2, (FluxFldValMax) = "2", (FluxFldNameColor) = "ERROR", (FluxFldHelp) = "max % deviation allowed from Last Traded px (if no last trading px, use closing px)"];
-  optional int32 max_px_levels = 4 [(FluxFldValMax) = "20", (FluxFldHelp) = "max orderbook levels allowed to be consumed by single order"];
-  optional int32 max_order_qty = 5[(FluxFldValMax) = "1000000", (FluxFldHelp) = "max qty for securities that trade in shares"];
-  optional int32 max_contract_qty = 6 [(FluxFldValMax) = "10000", (FluxFldHelp) = "max qty for securities that trade in contracts"];
-  optional float min_order_notional = 7 [(FluxFldDisplayType) = "int", (FluxFldValMin) = "1000", (FluxFldHelp) = "order qty times limit px must be greater than this limit"];
-  optional float max_order_notional = 8 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "500000", (FluxFldHelp) = "order qty times limit px must be less than this limit"];
-  optional int32 min_order_notional_allowance = 9 [(FluxFldValMax) = "50000", (FluxFldHelp) = "used by StratModeRelaxed to compute random next order opportunity min-notional from the min-notional , min-notional + this-allowance range"];
+  optional int32 max_basis_points = 2 [(FluxFldValMax) = "1000", (FluxFldHelp) = "basis-points a single chore can consume, if set to 1, it`s (1/100 of 1% of px @ BBO) or (0.01% of px @ BBO) + + px @ BBO"];
+  optional float max_px_deviation = 3 [default = 2, (FluxFldValMax) = "2", (FluxFldNameColor) = "ERROR", (FluxFldHelp) = "max % deviation allowed from Last Barterd px (if no last bartering px, use closing px)"];
+  optional int32 max_px_levels = 4 [(FluxFldValMax) = "20", (FluxFldHelp) = "max chorebook levels allowed to be consumed by single chore"];
+  optional int32 max_chore_qty = 5[(FluxFldValMax) = "1000000", (FluxFldHelp) = "max qty for securities that barter in shares"];
+  optional int32 max_contract_qty = 6 [(FluxFldValMax) = "10000", (FluxFldHelp) = "max qty for securities that barter in contracts"];
+  optional float min_chore_notional = 7 [(FluxFldDisplayType) = "int", (FluxFldValMin) = "1000", (FluxFldHelp) = "chore qty times limit px must be greater than this limit"];
+  optional float max_chore_notional = 8 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "500000", (FluxFldHelp) = "chore qty times limit px must be less than this limit"];
+  optional int32 min_chore_notional_allowance = 9 [(FluxFldValMax) = "50000", (FluxFldHelp) = "used by StratModeRelaxed to compute random next chore opportunity min-notional from the min-notional , min-notional + this-allowance range"];
 }
 
 message SystemControl{
@@ -141,14 +141,12 @@ message PortfolioStatus{
     y: 25,
     w: 7,
     h: 8,
-    alert_bubble_source: "PortfolioStatus.portfolio_alerts",
-    alert_bubble_color: "PortfolioStatus.portfolio_alerts.severity",
     widget_ui_data: {
       view_layout: UI_TABLE
     }
   };
   option (FluxMsgJsonQuery) = {
-    QueryName: "update_portfolio_status_by_order_or_fill_data",
+    QueryName: "update_portfolio_status_by_chore_or_fill_data",
     QueryParams: "overall_buy_notional",
     QueryParamsDataType: "float | None = None",
     QueryParams: "overall_sell_notional",
@@ -160,7 +158,7 @@ message PortfolioStatus{
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional float overall_buy_notional = 3 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "Open + Executed [New Order : overall_buy_notional + (Px X Qty)]; [Cxled : overall_buy_notional - (Px X Cxl-Qty)]; [Fill : overall_buy_notional - (order-Px X fill-Qty) + (fill-px X fill-qty)]"];
+  optional float overall_buy_notional = 3 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "Open + Executed [New Chore : overall_buy_notional + (Px X Qty)]; [Cxled : overall_buy_notional - (Px X Cxl-Qty)]; [Fill : overall_buy_notional - (chore-Px X fill-Qty) + (fill-px X fill-qty)]"];
   optional float overall_sell_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "Open + Executed [refer overall_buy_notional formula]"];
   // Executed
   optional float overall_buy_fill_notional = 5 [(FluxFldDisplayType) = "int"];
@@ -185,7 +183,7 @@ message PairStrat{
       QueryParamsDataType: "str"
   };
     option (FluxMsgJsonQuery) = {
-    QueryName: "get_pair_strat_from_symbol_side",
+    QueryName: "get_ongoing_or_single_exact_non_ongoing_pair_strat_from_symbol_side",
     QueryParams: "sec_id",
     QueryParamsDataType: "str",
     QueryParams: "side",
@@ -235,10 +233,13 @@ message PairStrat{
     optional int64 pair_strat_params_update_seq_num = 7 [(FluxFldHide) = "True"];
     optional string host = 8 [(FluxFldHide) = "True"];
     optional int64 port = 9 [(FluxFldHide) = "True"];
-    optional bool is_executor_running = 10 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
-    optional bool is_partially_running = 11 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
+    optional int64 top_of_book_port = 10 [(FluxFldHide) = "True"];
+    optional int64 market_depth_port = 11 [(FluxFldHide) = "True"];
+    optional int64 last_barter_port = 12 [(FluxFldHide) = "True"];
+    optional bool is_executor_running = 13 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
+    optional bool is_partially_running = 14 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
     // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
-    required StratState strat_state = 12 [default = StratState_SNOOZED, (FluxFldButton) = {
+    required StratState strat_state = 15 [default = StratState_SNOOZED, (FluxFldButton) = {
       unpressed_caption: "Activate",
       pressed_caption: "Pause",
       disabled_captions: "StratState_DONE=Done",
@@ -266,7 +267,7 @@ message StratView{
   optional float average_premium = 4 [(FluxFldNumberFormat) = "%"];
   optional float market_premium = 5 [(FluxFldNumberFormat) = "%"];
   optional float balance_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="StratView.max_single_leg_notional", (FluxFldProgressBar) = {
-    value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // order of condition matching -> left to right (select first match)
+    value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // chore of condition matching -> left to right (select first match)
     hover_text_type: HoverTextType_VALUE,
     is_reverse: true
   }];
@@ -385,8 +386,8 @@ message SampleTSModel1{
 
 
 //Not used , maybe deleted in future
-message TradeBrief{
-  required string trade_id = 1;
+message BarterBrief{
+  required string barter_id = 1;
   required Security security = 2;
   required Side side = 3;
   required float px = 4;
@@ -403,8 +404,8 @@ message CommandRequest{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required string command = 2 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
-  optional string params = 3 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
+  required string command = 2 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific chore state"];
+  optional string params = 3 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific chore state"];
   optional Security security = 4;
   required Side side = 5;
 }
@@ -417,8 +418,8 @@ message CommandResponse{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required string command = 2 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
-  repeated string response = 3 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
+  required string command = 2 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific chore state"];
+  repeated string response = 3 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific chore state"];
   optional Security security = 4;
   required Side side = 5;
 }

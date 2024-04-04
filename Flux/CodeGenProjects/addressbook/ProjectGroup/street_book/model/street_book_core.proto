@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-import "trade_core.proto";
+import "barter_core.proto";
 import "flux_options.proto";
 
 package street_book;
@@ -10,8 +10,8 @@ message Residual{
   required float residual_notional = 2 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "absolute of ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px) only if the value remains non 0 post residual_mark_seconds interval else 0 (in non 0 case mark the remaining non zero as residual and pull that qty form the market)"];
 }
 
-message MarketTradeVolumeParticipation{
-    required float max_participation_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "30", (FluxFldHelp) = "max % participation size allowed of rolling trade volume within applicable_period_seconds"];
+message MarketBarterVolumeParticipation{
+    required float max_participation_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "30", (FluxFldHelp) = "max % participation size allowed of rolling barter volume within applicable_period_seconds"];
     optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, unset value implies seconds from SOD till time of checking"];
 }
 
@@ -23,7 +23,7 @@ message OpenInterestParticipation{
 message CancelRate{
   required int32 max_cancel_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "35", (FluxFldHelp) = "% of total size sent to market [BUY+SELL] - ignoring what happened to the qty on exchange (e.g. reject / cancelled are also counted)"];
   optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
-  optional int32 waived_min_orders = 3 [(FluxFldHelp) = "enforce check only after waived_min_orders have been sent to market irrespective of the participant order outcome -ack, reject, cancelled, lapsed"];
+  optional int32 waived_min_chores = 3 [(FluxFldHelp) = "enforce check only after waived_min_chores have been sent to market irrespective of the participant chore outcome -ack, reject, cancelled, lapsed"];
 }
 
 message ResidualRestriction{

@@ -1,6 +1,6 @@
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import PairStrat, \
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import PairStrat, \
     PairStratBaseModel, PairStratOptional
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_key_handler import \
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_key_handler import \
     EmailBookServiceKeyHandler
 from FluxPythonUtils.scripts.utility_functions import get_symbol_side_key
 

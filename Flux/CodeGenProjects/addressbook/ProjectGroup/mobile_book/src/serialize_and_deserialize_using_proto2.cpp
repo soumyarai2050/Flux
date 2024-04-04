@@ -35,13 +35,13 @@ std::vector<mobile_book::TopOfBook> SerializeAndDeserializeProto2::create_top_of
     top_of_book1.mutable_bid_quote()->set_qty(100);
     top_of_book1.mutable_ask_quote()->set_px(90.0);
     top_of_book1.mutable_ask_quote()->set_qty(100);
-    top_of_book1.mutable_last_trade()->set_px(1000.0);
-    top_of_book1.mutable_last_trade()->set_qty(10);
-    top_of_book1.set_total_trading_security_size(10);
-    mobile_book::MarketTradeVolume* market_trade_volume1 = top_of_book1.mutable_market_trade_volume()->Add();
-    market_trade_volume1->set_id("1");
-    market_trade_volume1->set_participation_period_last_trade_qty_sum(1000);
-    market_trade_volume1->set_applicable_period_seconds(10);
+    top_of_book1.mutable_last_barter()->set_px(1000.0);
+    top_of_book1.mutable_last_barter()->set_qty(10);
+    top_of_book1.set_total_bartering_security_size(10);
+    mobile_book::MarketBarterVolume* market_barter_volume1 = top_of_book1.mutable_market_barter_volume()->Add();
+    market_barter_volume1->set_id("1");
+    market_barter_volume1->set_participation_period_last_barter_qty_sum(1000);
+    market_barter_volume1->set_applicable_period_seconds(10);
     top_of_book_data.push_back(top_of_book1);
 
     // Top of Book 2
@@ -51,13 +51,13 @@ std::vector<mobile_book::TopOfBook> SerializeAndDeserializeProto2::create_top_of
     top_of_book2.mutable_bid_quote()->set_qty(50);
     top_of_book2.mutable_ask_quote()->set_px(510.0);
     top_of_book2.mutable_ask_quote()->set_qty(50);
-    top_of_book2.mutable_last_trade()->set_px(505.0);
-    top_of_book2.mutable_last_trade()->set_qty(5);
-    top_of_book2.set_total_trading_security_size(5);
-    mobile_book::MarketTradeVolume* market_trade_volume2 = top_of_book2.mutable_market_trade_volume()->Add();
-    market_trade_volume2->set_id("2");
-    market_trade_volume2->set_participation_period_last_trade_qty_sum(500);
-    market_trade_volume2->set_applicable_period_seconds(5);
+    top_of_book2.mutable_last_barter()->set_px(505.0);
+    top_of_book2.mutable_last_barter()->set_qty(5);
+    top_of_book2.set_total_bartering_security_size(5);
+    mobile_book::MarketBarterVolume* market_barter_volume2 = top_of_book2.mutable_market_barter_volume()->Add();
+    market_barter_volume2->set_id("2");
+    market_barter_volume2->set_participation_period_last_barter_qty_sum(500);
+    market_barter_volume2->set_applicable_period_seconds(5);
     top_of_book_data.push_back(top_of_book2);
 
     // Top of Book 3
@@ -67,13 +67,13 @@ std::vector<mobile_book::TopOfBook> SerializeAndDeserializeProto2::create_top_of
     top_of_book3.mutable_bid_quote()->set_qty(20);
     top_of_book3.mutable_ask_quote()->set_px(205.0);
     top_of_book3.mutable_ask_quote()->set_qty(20);
-    top_of_book3.mutable_last_trade()->set_px(202.0);
-    top_of_book3.mutable_last_trade()->set_qty(2);
-    top_of_book3.set_total_trading_security_size(2);
-    mobile_book::MarketTradeVolume* market_trade_volume3 = top_of_book3.mutable_market_trade_volume()->Add();
-    market_trade_volume3->set_id("3");
-    market_trade_volume3->set_participation_period_last_trade_qty_sum(200);
-    market_trade_volume3->set_applicable_period_seconds(2);
+    top_of_book3.mutable_last_barter()->set_px(202.0);
+    top_of_book3.mutable_last_barter()->set_qty(2);
+    top_of_book3.set_total_bartering_security_size(2);
+    mobile_book::MarketBarterVolume* market_barter_volume3 = top_of_book3.mutable_market_barter_volume()->Add();
+    market_barter_volume3->set_id("3");
+    market_barter_volume3->set_participation_period_last_barter_qty_sum(200);
+    market_barter_volume3->set_applicable_period_seconds(2);
     top_of_book_data.push_back(top_of_book3);
 
     return top_of_book_data;

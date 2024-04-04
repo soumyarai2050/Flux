@@ -4,7 +4,7 @@ FastAPI
 2. Path , EndPoint and Route are use interchangeably in the documentation
 3. add path params or vars with py f"str{var}" syntax 
 4. Refer generated documentation from /docs and /redoc suffix urls
-5. route definition order matters, first matching route is opted, eg: 
+5. route definition chore matters, first matching route is opted, eg: 
    - if first route declared is: `/users/{user_id}`
    - second declared route is: `/users/me` 
      - the specific route declared (second: `/users/me`) will never be called as first route is always a match

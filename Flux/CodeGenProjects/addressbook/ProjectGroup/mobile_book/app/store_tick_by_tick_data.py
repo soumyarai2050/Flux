@@ -8,7 +8,7 @@ from typing import Dict
 from ibapi.common import TickerId, TickAttribBidAsk, TickAttribLast
 from ibapi.utils import floatMaxString, decimalMaxString
 from ibapi.ticktype import TickTypeEnum
-from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
 
 os.environ["DBType"] = "beanie"
@@ -56,7 +56,7 @@ class StoreTickByTickData(IbApiClient):
                 self.reqTickByTickData(ticker_id, contract, tick_type["tick_type"],
                                        tick_type["number_of_ticks"], tick_type["ignore_size"])
 
-    def error(self, req_id: TickerId, error_code: int, error_string: str, advanced_order_reject_json=""):
+    def error(self, req_id: TickerId, error_code: int, error_string: str, advanced_chore_reject_json=""):
         logging.debug(f"Error: {req_id}, {error_code}, {error_string}")
 
     def tickByTickBidAsk(self, ticker_id: int, time: int, bid_price: float, ask_price: float,

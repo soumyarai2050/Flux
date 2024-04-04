@@ -293,9 +293,9 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         return output_str
 
     def _handle_callback_ws_query_method_output(self, query_name: str, is_projection_query: bool | None = None) -> str:
-        output_str = f"    async def {query_name}_query_ws_pre(self):\n"
+        output_str = f"    async def {query_name}_query_ws_pre(self, *args):\n"
         if not is_projection_query:
-            output_str += f"        return {query_name}_filter_callable\n\n"
+            output_str += f"        return {query_name}_filter_callable, None\n\n"
         else:
             output_str += f"        return {query_name}_filter_callable, []\n\n"
         output_str += f"    async def {query_name}_query_ws_post(self):\n"
@@ -310,7 +310,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
             output_str += f"    logging.error('WS Query option found for message {msg_name} but filter callable " \
                           f"is not overridden/defined for query pre to be returned, currently using code generated " \
                           f"implementation')\n"
-            output_str += f"    return True\n\n\n"
+            output_str += f"    return {msg_name_snake_cased}_obj_json_str\n\n\n"
         return output_str
 
     def handle_callback_query_methods_output(self, msg_name_n_ws_query_name_tuple_list: List[Tuple[str, str]]) -> str:

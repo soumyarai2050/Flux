@@ -38,16 +38,16 @@ std::vector<mobile_book::TopOfBook> SerializeAndDeserializeProto3::create_top_of
     topOfBook.mutable_ask_quote()->set_px(90.0);
     topOfBook.mutable_ask_quote()->set_qty(100);
 
-    topOfBook.mutable_last_trade()->set_px(1000.0);
-    topOfBook.mutable_last_trade()->set_qty(10);
+    topOfBook.mutable_last_barter()->set_px(1000.0);
+    topOfBook.mutable_last_barter()->set_qty(10);
 
-    topOfBook.set_total_trading_security_size(10);
+    topOfBook.set_total_bartering_security_size(10);
 
-    mobile_book::MarketTradeVolume* marketTradeVolume = topOfBook.mutable_market_trade_volume()->Add();
+    mobile_book::MarketBarterVolume* marketBarterVolume = topOfBook.mutable_market_barter_volume()->Add();
 
-    marketTradeVolume->set_id(1);
-    marketTradeVolume->set_participation_period_last_trade_qty_sum(1000);
-    marketTradeVolume->set_applicable_period_seconds(10);
+    marketBarterVolume->set_id(1);
+    marketBarterVolume->set_participation_period_last_barter_qty_sum(1000);
+    marketBarterVolume->set_applicable_period_seconds(10);
 
     top_of_book_data.push_back(topOfBook);
 

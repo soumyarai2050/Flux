@@ -1,16 +1,17 @@
 import _, { cloneDeep, isObject } from 'lodash';
 import {
     ColorPriority, ColorTypes, DataTypes, HoverTextType, Modes, ShapeType, SizeType,
-    DB_ID, NEW_ITEM_ID, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL
+    DB_ID, NEW_ITEM_ID, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL, SeverityType
 } from './constants';
 import Node from './components/Node';
 import HeaderField from './components/HeaderField';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import * as workerUtils from './workerUtils';
+import { AlertCache } from './utility/alertCache';
 export const { applyFilter, applyGetAllWebsocketUpdate, floatToInt, getAbbreviatedRows,
     getActiveRows, getFilterDict, getIdFromAbbreviatedKey, getLocalizedValueAndSuffix,
-    roundNumber, stableSort
+    roundNumber, stableSort, sortAlertArray
 } = workerUtils;
 dayjs.extend(utc);
 
@@ -135,10 +136,10 @@ function addFieldAttributes(object, attributes) {
 }
 
 function addMessageAttributes(object, attributes, message) {
-    
+
     fluxOptions.forEach(({ propertyName, usageName }) => {
         if (attributes.hasOwnProperty(propertyName)) {
-            
+
         }
     })
 }
@@ -577,6 +578,8 @@ export function getDataxpath(data, xpath) {
                     found = true;
                 }
             })
+        } else if (xpath.startsWith('[')) {  // repeated root widget. xpath starts with []
+            found = true;
         }
         if (found) {
             updatedxpath = updatedxpath + currentxpath + '[' + index + ']';
@@ -811,39 +814,39 @@ export function generateTreeStructure(schema, currentSchemaName, callerProps, to
         currentSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, currentSchemaName]);
     }
     let childNode;
-    if (currentSchema.widget_ui_data_element && currentSchema.widget_ui_data_element.is_repeated) {
-        childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.ARRAY, callerProps, currentSchemaName, currentSchemaName);
-        for (let i = 0; i < callerProps.data.length; i++) {
-            let dataxpath = "[" + i + "]";
-            let node = addHeaderNode(childNode, currentSchema, currentSchemaName, DataTypes.OBJECT, callerProps, dataxpath, dataxpath);
-            Object.keys(currentSchema.properties).map((propname) => {
-                if (callerProps.xpath && callerProps.xpath !== propname) return;
-                let metadataProp = currentSchema.properties[propname];
-                if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
-                    addSimpleNode(node, schema, currentSchema, propname, callerProps, dataxpath, null, dataxpath);
-                }
-                else {
-                    dataxpath += dataxpath + "." + propname;
-                    addNode(node, schema, metadataProp, propname, callerProps, dataxpath, null, dataxpath);
-                }
-            });
+    // if (currentSchema.widget_ui_data_element && currentSchema.widget_ui_data_element.is_repeated) {
+    //     childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.ARRAY, callerProps, currentSchemaName, currentSchemaName);
+    //     for (let i = 0; i < callerProps.data.length; i++) {
+    //         let dataxpath = "[" + i + "]";
+    //         let node = addHeaderNode(childNode, currentSchema, currentSchemaName, DataTypes.OBJECT, callerProps, dataxpath, dataxpath);
+    //         Object.keys(currentSchema.properties).map((propname) => {
+    //             if (callerProps.xpath && callerProps.xpath !== propname) return;
+    //             let metadataProp = currentSchema.properties[propname];
+    //             if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
+    //                 addSimpleNode(node, schema, currentSchema, propname, callerProps, dataxpath, null, dataxpath);
+    //             }
+    //             else {
+    //                 dataxpath += dataxpath + "." + propname;
+    //                 addNode(node, schema, metadataProp, propname, callerProps, dataxpath, null, dataxpath);
+    //             }
+    //         });
+    //     }
+    // } else {
+    childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.OBJECT, callerProps, currentSchemaName, currentSchemaName);
+    Object.keys(currentSchema.properties).map((propname) => {
+        if (callerProps.xpath && callerProps.xpath !== propname) return;
+        let metadataProp = currentSchema.properties[propname];
+        if (!currentSchema.required.includes(propname)) {
+            metadataProp.required = [];
         }
-    } else {
-        childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.OBJECT, callerProps, currentSchemaName, currentSchemaName);
-        Object.keys(currentSchema.properties).map((propname) => {
-            if (callerProps.xpath && callerProps.xpath !== propname) return;
-            let metadataProp = currentSchema.properties[propname];
-            if (!currentSchema.required.includes(propname)) {
-                metadataProp.required = [];
-            }
-            if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
-                addSimpleNode(childNode, schema, currentSchema, propname, callerProps);
-            }
-            else {
-                addNode(childNode, schema, metadataProp, propname, callerProps, propname, null, propname);
-            }
-        });
-    }
+        if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
+            addSimpleNode(childNode, schema, currentSchema, propname, callerProps);
+        }
+        else {
+            addNode(childNode, schema, metadataProp, propname, callerProps, propname, null, propname);
+        }
+    });
+    // }
     return tree;
 }
 
@@ -1551,7 +1554,7 @@ export function hasxpath(data, xpath) {
     return false;
 }
 
-export function getTableColumns(collections, mode, enableOverride = [], disableOverride = [], collectionView = false) {
+export function getTableColumns(collections, mode, enableOverride = [], disableOverride = [], collectionView = false, repeatedView = false) {
     let columns = collections
         .map(collection => Object.assign({}, collection))
         .map(collection => {
@@ -1564,6 +1567,9 @@ export function getTableColumns(collections, mode, enableOverride = [], disableO
             }
             if (disableOverride.includes(fieldName)) {
                 collection.hide = false;
+            }
+            if (repeatedView) {
+                collection.rootLevel = false;
             }
             return collection;
         })
@@ -1584,11 +1590,17 @@ export function getTableColumns(collections, mode, enableOverride = [], disableO
     return columns;
 }
 
-export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false) {
+export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false, repeatedView = false) {
     if (rows.length > 1) {
         tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => !column.noCommonKey);
     }
     let commonKeyCollections = [];
+    if (rows.length === 1 && (collectionView || repeatedView)) {
+        const hasButtonType = tableColumns.find(obj => obj.type === 'button');
+        if (hasButtonType) {
+            return [];
+        }
+    }
     if (rows.length > 0) {
         tableColumns.map((column) => {
             if (hide && column.hide) return;
@@ -1637,10 +1649,14 @@ export function getTableRowsFromData(collections, data, xpath) {
     return rows;
 }
 
-export function getTableRows(collections, mode, originalData, data, xpath) {
+export function getTableRows(collections, mode, originalData, data, xpath, repeatedView = false) {
     let tableRows = [];
     if (mode === Modes.READ_MODE) {
-        tableRows = getTableRowsFromData(collections, addxpath(cloneDeep(originalData)), xpath);
+        if (repeatedView) {
+            tableRows = getTableRowsFromData(collections, data, xpath);
+        } else {
+            tableRows = getTableRowsFromData(collections, addxpath(cloneDeep(originalData)), xpath);
+        }
     } else {
         let originalDataTableRows = getTableRowsFromData(collections, addxpath(cloneDeep(originalData)), xpath);
         tableRows = getTableRowsFromData(collections, data, xpath);
@@ -1840,35 +1856,97 @@ export function createObjectFromXpathDict(obj, xpath, value) {
     return o;
 }
 
-export function applyWebSocketUpdate(arr, obj, uiLimit) {
-    let updatedArr = arr.filter(o => o[DB_ID] !== obj[DB_ID]);
-    // if obj is not deleted object
-    if (Object.keys(obj) !== 1) {
-        let index = arr.findIndex(o => o[DB_ID] === obj[DB_ID]);
-        // if index is not equal to -1, it is updated obj. If updated, replace the obj at the index
-        if (index !== -1) {
-            updatedArr.splice(index, 0, obj);
+export function applyWebSocketUpdate(storedArray, updatedObj, uiLimit, isAlertModel = false) {
+    const updatedArray = storedArray.filter(obj => obj[DB_ID] !== updatedObj[DB_ID]);
+    // create or update case
+    if (Object.keys(updatedObj).length !== 1) {
+        const idx = storedArray.findIndex(obj => obj[DB_ID] === updatedObj[DB_ID]);
+        // obj with DB_ID already exists. update obj case. update the existing obj at the index
+        if (idx !== -1) {
+            // ws update received for alert model. if alert is dismissed, return the filtered array
+            if (isAlertModel && updatedObj.dismiss) {
+                return updatedArray;
+            } else {  // either not alert model or alert not dismissed or received ws update on existing obj. 
+                updatedArray.splice(idx, 0, updatedObj);
+            }
         } else {
             if (uiLimit) {
                 // if uiLimit is positive, remove the top object and add the latest obj at the end
                 // otherwise remove the last object and add the latest obj at the top
                 if (uiLimit >= 0) {
-                    if (updatedArr.length >= Math.abs(uiLimit)) {
-                        updatedArr.shift();
+                    if (updatedArray.length >= Math.abs(uiLimit)) {
+                        updatedArray.shift();
                     }
-                    updatedArr.push(obj);
-                } else {
-                    if (updatedArr.length >= Math.abs(uiLimit)) {
-                        updatedArr.pop();
+                    updatedArray.push(updatedObj);
+                } else {  // negative uiLimit
+                    if (updatedArray.length >= Math.abs(uiLimit)) {
+                        updatedArray.pop();
                     }
-                    updatedArr.splice(0, 0, obj);
+                    updatedArray.splice(0, 0, updatedObj);
                 }
             } else {
-                updatedArr.push(obj);
+                updatedArray.push(updatedObj);
             }
         }
+    }  // else not required - obj is deleted. already filtered above
+    return updatedArray;
+}
+
+export function applyWebSocketUpdateForAlertModel(storedArray, updatedObj, uiLimit, modelName, id = null) {
+    const idx = storedArray.findIndex(obj => obj[DB_ID] === updatedObj[DB_ID]);
+    const updatedArray = cloneDeep(storedArray);
+
+    // obj is created or updated
+    if (Object.keys(updatedObj).length !== 1) {
+        // obj already exists. received update on obj
+        if (idx !== -1) {
+            const storedObj = storedArray[idx];
+            // removing stored
+            updatedArray.splice(idx, 1);
+            AlertCache.updateSeverityCache(modelName, id, storedObj.severity, -1);
+            // existing alert is dismissed/cleared
+            if (updatedObj.dismiss) {
+                return updatedArray;
+            } else {  // alert is updated (except dismiss)
+                const newIdx = AlertCache.getSeverityIndex(modelName, id, updatedObj.severity);
+                updatedArray.splice(newIdx, 0, updatedObj);
+                AlertCache.updateSeverityCache(modelName, id, updatedObj.severity, 1);
+                return updatedArray;
+            }
+        } else {  // new obj is created
+            // uiLimit (array max size) limit is set
+            if (uiLimit) {
+                // positive array size limit
+                if (uiLimit >= 0) {
+                    if (updatedArray.length >= uiLimit) {
+                        const storedObj =  updatedArray[0];
+                        updatedArray.shift();
+                        AlertCache.updateSeverityCache(modelName, id, storedObj.severity, -1);
+                    }
+                } else {  // negative array size limit
+                    if (updatedArray.length >= Math.abs(uiLimit)) {
+                        const storedObj =  updatedArray[updatedArray.length - 1];
+                        updatedArray.pop();
+                        AlertCache.updateSeverityCache(modelName, id, storedObj.severity, -1);
+                    }
+                }
+            }
+            const newIdx = AlertCache.getSeverityIndex(modelName, id, updatedObj.severity);
+            updatedArray.splice(newIdx, 0, updatedObj);
+            AlertCache.updateSeverityCache(modelName, id, updatedObj.severity, 1);
+            return updatedArray;
+        }
+    } else {  // obj is deleted
+        if (idx !== -1) {
+            const storedObj = storedArray[idx];
+            // removing stored
+            updatedArray.splice(idx, 1);
+            AlertCache.updateSeverityCache(modelName, id, storedObj.severity, -1);
+        } else {
+            console.error('applyWebSocketUpdateForAlertModel failed. received delete update for id: ' + updatedObj[DB_ID] + ', but id not found in storedArray');
+        }
     }
-    return updatedArr;
+    return updatedArray;
 }
 
 // export function applyGetAllWebsocketUpdate(arr, obj, uiLimit) {
@@ -3045,17 +3123,26 @@ export function updatePartitionFldSchema(schema, chartObj) {
     return updatedSchema;
 }
 
-export function getServerUrl(widgetSchema, linkedObj, runningField) {
+export function getServerUrl(widgetSchema, linkedObj, runningField, schemaName, requestType) {
     if (widgetSchema.connection_details) {
         const connectionDetails = widgetSchema.connection_details;
         const { host, port, project_name } = connectionDetails;
         // set url only if linkedObj running field is set to true for dynamic as well as static
         if (widgetSchema.widget_ui_data_element.depending_proto_model_name) {
-            if (linkedObj && Object.keys(linkedObj).length > 0 && _.get(linkedObj, runningField)) {
+            if (linkedObj && Object.keys(linkedObj).length && _.get(linkedObj, runningField)) {
                 if (connectionDetails.dynamic_url) {
                     const hostxpath = host.substring(host.indexOf('.') + 1);
-                    const portxpath = port.substring(port.indexOf('.') + 1);
-                    return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
+                    let portxpath = port.substring(port.indexOf('.') + 1);
+                    if (widgetSchema.widget_ui_data_element.depends_on_model_name_for_port && schemaName) {
+                        if (requestType === 'http') {
+                            return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
+                        } else if (requestType === 'ws') {
+                            portxpath = schemaName + '_port';
+                            return `http:${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}`;
+                        }
+                    } else {
+                        return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
+                    }
                 } else {
                     return `http://${host}:${port}/${project_name}`;
                 }
@@ -3210,4 +3297,15 @@ export function getReducerArrrayFromCollections(collections) {
         });
     return reducerArray;
 
+}
+
+export function getRepeatedWidgetModifiedArray(storedArray, selectedId, updatedObj) {
+    let updatedArray = addxpath(cloneDeep(storedArray));
+    if (selectedId && updatedObj[DB_ID] === selectedId) {
+        const idx = updatedArray.findIndex(obj => obj[DB_ID] === selectedId);
+        if (idx !== -1) {
+            updatedArray[idx] = updatedObj;
+        }
+    }
+    return updatedArray;
 }

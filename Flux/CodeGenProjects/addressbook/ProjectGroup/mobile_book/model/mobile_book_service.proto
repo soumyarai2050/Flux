@@ -3,7 +3,7 @@ syntax = "proto2";
 import "flux_options.proto";
 import "ui_option_utils.proto";
 import "projects_core.proto";
-import "trade_core.proto";
+import "barter_core.proto";
 import "mobile_book_n_street_book_core.proto";
 import "dept_book_n_mobile_book_n_street_book_core.proto";
 
@@ -20,18 +20,18 @@ option (FluxFileImportDependencyModel) = {
   ImportFileName: "mobile_book_n_street_book_core.proto",
   ImportModelName: "TopOfBook",
   ImportModelName: "MarketDepth",
-  ImportModelName: "LastTrade",
+  ImportModelName: "LastBarter",
   ImportModelName: "TopOfBookList",
   ImportModelName: "MarketDepthList",
-  ImportModelName: "LastTradeList"
+  ImportModelName: "LastBarterList"
 };
 
 option (FluxFileCRUDPortOffset) = 40;
 
 message SideSpecificMobileBookBrief{
   optional float allowed_px_by_max_basis_points = 1 [(FluxFldHelp) = "(bbo_aggressive / 100) * (max_basis_points/100) + bbo_aggressive"];
-  optional float allowed_px_by_max_deviation = 2 [(FluxFldHelp) = "vwap (+/-) (vwap/100 * max_px_deviation) : Sell Order use - , buy + "];
-  optional float allowed_px_by_max_level = 3 [(FluxFldHelp) = "Price at max level in order book (capped at depth level availability - 10) "];
+  optional float allowed_px_by_max_deviation = 2 [(FluxFldHelp) = "vwap (+/-) (vwap/100 * max_px_deviation) : Sell Chore use - , buy + "];
+  optional float allowed_px_by_max_level = 3 [(FluxFldHelp) = "Price at max level in chore book (capped at depth level availability - 10) "];
   optional float allowed_max_px = 4 [(FluxFldHelp) = "Min/Max of allowed_px_by_basis_point_limit, allowed_px_by_deviation_limit, allowed_px_by_level_limit depending on buy or sell"];
 }
 
@@ -72,9 +72,9 @@ message TickByTickBBO {
   optional int64 qty = 7;
 }
 
-message MarketTradeVolume{
+message MarketBarterVolume{
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int64 participation_period_last_trade_qty_sum = 2;
+  optional int64 participation_period_last_barter_qty_sum = 2;
   optional int32 applicable_period_seconds = 3 [(FluxFldHelp) = "sliding window interval of above volume, unset value implies seconds from SOD till time current time"];
 }
 

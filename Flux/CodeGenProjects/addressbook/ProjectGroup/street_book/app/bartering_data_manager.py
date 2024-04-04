@@ -1,19 +1,19 @@
 from threading import Thread
 
 from FluxPythonUtils.scripts.ws_reader import WSReader
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_cache import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.strat_cache import StratCache
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_service_helper import (
-    get_fills_journal_log_key, get_order_journal_log_key)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import is_ongoing_strat
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link import is_test_run
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_ws_data_manager import \
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_cache import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.strat_cache import StratCache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
+    get_fills_journal_log_key, get_chore_journal_log_key)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import is_ongoing_strat
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import is_test_run
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_ws_data_manager import \
     EmailBookServiceDataManager
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.StreetBook.street_book_service_ws_data_manager import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_ws_data_manager import (
     StreetBookServiceDataManager)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.phone_book_n_street_book_client import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import PairStrat, PairStratBaseModel, FxSymbolOverviewBaseModel
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.phone_book_n_street_book_client import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import PairStrat, PairStratBaseModel, FxSymbolOverviewBaseModel
 
 port = os.environ.get("PORT")
 if port is None or len(port) == 0:
@@ -24,14 +24,14 @@ else:
     port = parse_to_int(port)
 
 
-class TradingDataManager(EmailBookServiceDataManager, StreetBookServiceDataManager):
+class BarteringDataManager(EmailBookServiceDataManager, StreetBookServiceDataManager):
 
     def __init__(self, executor_trigger_method: Callable,
                  strat_cache: StratCache, mobile_book_container_cache):
         EmailBookServiceDataManager.__init__(self, ps_host, ps_port, strat_cache)
         StreetBookServiceDataManager.__init__(self, host, port, strat_cache)
         cpp_ws_url: str = f"ws://{host}:8083/"
-        self.trading_cache: TradingCache = TradingCache()
+        self.bartering_cache: BarteringCache = BarteringCache()
         self.strat_cache: StratCache = strat_cache
         self.mobile_book_container_cache = mobile_book_container_cache
         self.street_book = None
@@ -48,7 +48,7 @@ class TradingDataManager(EmailBookServiceDataManager, StreetBookServiceDataManag
         if raise_exception:
             err_str_ = (
                 "Couldn't find any pair_strat in strat_cache, strat_cache must be loaded with pair_strat before"
-                "provided to object initialization - ignoring TradingDataManager init")
+                "provided to object initialization - ignoring BarteringDataManager init")
             logging.error(err_str_)
             raise Exception(err_str)
 
@@ -67,7 +67,7 @@ class TradingDataManager(EmailBookServiceDataManager, StreetBookServiceDataManag
         #                                       self.handle_market_depth_ws, False)
 
         # selecting which ws connections are required
-        self.order_limits_ws_get_all_cont.register_to_run()
+        self.chore_limits_ws_get_all_cont.register_to_run()
         self.system_control_ws_get_all_cont.register_to_run()
         # overriding pair strat ws_get_all_const to filter by id
         pair_strat_obj = self.strat_cache.get_pair_strat()[0]
@@ -94,7 +94,7 @@ class TradingDataManager(EmailBookServiceDataManager, StreetBookServiceDataManag
     #         # handle kill switch here (in portfolio status handler directly)
     #         if portfolio_status_.kill_switch:
     #             logging.critical("Triggering portfolio_status Kill_SWITCH")
-    #             trading_link.trigger_kill_switch()
+    #             bartering_link.trigger_kill_switch()
     #     else:
     #         err_str_ = "Received portfolio_status object from caller as None"
     #         logging.exception(err_str_)
@@ -130,21 +130,21 @@ class TradingDataManager(EmailBookServiceDataManager, StreetBookServiceDataManag
             # else not required: fine if strat cache is non-ongoing and is not running(stopped is True)
 
     def handle_strat_brief_get_all_ws(self, strat_brief_: StratBriefBaseModel | StratBrief, **kwargs):
-        if strat_brief_.pair_buy_side_trading_brief and strat_brief_.pair_sell_side_trading_brief:
+        if strat_brief_.pair_buy_side_bartering_brief and strat_brief_.pair_sell_side_bartering_brief:
             super().handle_strat_brief_get_all_ws(strat_brief_, **kwargs)
         else:
             # don't log strat_brief_key here, it needs both legs (missing here): {get_strat_brief_log_key(strat_brief_)}
-            logging.error(f"ignoring strat brief update - missing required pair_buy_side_trading_brief or pair_sell_"
-                          f"side_trading_brief;;; {strat_brief_ = }")
+            logging.error(f"ignoring strat brief update - missing required pair_buy_side_bartering_brief or pair_sell_"
+                          f"side_bartering_brief;;; {strat_brief_ = }")
 
     def underlying_handle_fills_journal_ws(self, **kwargs):
         fills_journal_ = kwargs.get("fills_journal_")
         key, symbol = StratCache.get_key_n_symbol_from_fills_journal(fills_journal_)
         cached_pair_strat, _ = self.strat_cache.get_pair_strat()
 
-        symbol_side_tuple = StratCache.order_id_to_symbol_side_tuple_dict.get(fills_journal_.order_id)
+        symbol_side_tuple = StratCache.chore_id_to_symbol_side_tuple_dict.get(fills_journal_.chore_id)
         if not symbol_side_tuple:
-            logging.error(f"Unknown order id: {fills_journal_.order_id} found for fill "
+            logging.error(f"Unknown chore id: {fills_journal_.chore_id} found for fill "
                           f"{get_fills_journal_log_key(fills_journal_)}, avoiding set_has_unack_leg update;;;"
                           f" {fills_journal_ = }")
             return
@@ -159,24 +159,24 @@ class TradingDataManager(EmailBookServiceDataManager, StreetBookServiceDataManag
                           f"with {key = }, fill journal {symbol = }, fill_journal_key: "
                           f"{get_fills_journal_log_key(fills_journal_)}")
 
-    def underlying_handle_order_journal_ws(self, **kwargs):
-        order_journal_ = kwargs.get("order_journal_")
+    def underlying_handle_chore_journal_ws(self, **kwargs):
+        chore_journal_ = kwargs.get("chore_journal_")
         with self.strat_cache.re_ent_lock:
             is_unack = False
-            if order_journal_.order_event in [OrderEventType.OE_NEW, OrderEventType.OE_CXL]:
+            if chore_journal_.chore_event in [ChoreEventType.OE_NEW, ChoreEventType.OE_CXL]:
                 is_unack = True
-                if order_journal_.order_event == OrderEventType.OE_NEW:
-                    StratCache.order_id_to_symbol_side_tuple_dict[order_journal_.order.order_id] = \
-                        (order_journal_.order.security.sec_id, order_journal_.order.side)
+                if chore_journal_.chore_event == ChoreEventType.OE_NEW:
+                    StratCache.chore_id_to_symbol_side_tuple_dict[chore_journal_.chore.chore_id] = \
+                        (chore_journal_.chore.security.sec_id, chore_journal_.chore.side)
 
         cached_pair_strat, _ = self.strat_cache.get_pair_strat()
-        if order_journal_.order.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+        if chore_journal_.chore.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
             self.strat_cache.set_has_unack_leg1(is_unack)
-        elif order_journal_.order.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+        elif chore_journal_.chore.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
             self.strat_cache.set_has_unack_leg2(is_unack)
         else:
-            logging.error(f"unexpected: order general with non-matching symbol found in pre-matched strat-cache, "
-                          f"order_journal_key: {get_order_journal_log_key(order_journal_)}")
+            logging.error(f"unexpected: chore general with non-matching symbol found in pre-matched strat-cache, "
+                          f"chore_journal_key: {get_chore_journal_log_key(chore_journal_)}")
 
     def handle_fx_symbol_overview_get_all_ws(self, fx_symbol_overview_: FxSymbolOverviewBaseModel, **kwargs):
         if fx_symbol_overview_.symbol in StratCache.fx_symbol_overview_dict:
@@ -191,23 +191,23 @@ class TradingDataManager(EmailBookServiceDataManager, StreetBookServiceDataManag
             return  # No use-case for fx TOB at this time
         super().handle_top_of_book_get_all_ws(top_of_book_)
 
-    def handle_recovery_order_journal(self, order_journal_: OrderJournal | OrderJournalBaseModel):
-        # interface to update order_journal in crash recovery, Must be used only if required
+    def handle_recovery_chore_journal(self, chore_journal_: ChoreJournal | ChoreJournalBaseModel):
+        # interface to update chore_journal in crash recovery, Must be used only if required
         with self.strat_cache.re_ent_lock:
-            self.strat_cache.set_order_journal(order_journal_)
-        logging.debug(f"Updated order_journal cache in recovery;;; {order_journal_ = }")
+            self.strat_cache.set_chore_journal(chore_journal_)
+        logging.debug(f"Updated chore_journal cache in recovery;;; {chore_journal_ = }")
 
-    def handle_recovery_cancel_order(self, cancel_order_: CancelOrder | CancelOrderBaseModel):
-        # interface to update cancel_order in crash recovery, Must be used only if required
+    def handle_recovery_cancel_chore(self, cancel_chore_: CancelChore | CancelChoreBaseModel):
+        # interface to update cancel_chore in crash recovery, Must be used only if required
         with self.strat_cache.re_ent_lock:
-            self.strat_cache.set_cancel_order(cancel_order_)
-        logging.debug(f"Updated cancel_order cache in recovery;;; {cancel_order_ = }")
+            self.strat_cache.set_cancel_chore(cancel_chore_)
+        logging.debug(f"Updated cancel_chore cache in recovery;;; {cancel_chore_ = }")
 
-    def handle_recovery_new_order(self, new_order_: NewOrder | NewOrderBaseModel):
-        # interface to update new_order in crash recovery, Must be used only if required
+    def handle_recovery_new_chore(self, new_chore_: NewChore | NewChoreBaseModel):
+        # interface to update new_chore in crash recovery, Must be used only if required
         with self.strat_cache.re_ent_lock:
-            self.strat_cache.set_new_order(new_order_)
-        logging.debug(f"Updated new_order cache in recovery;;; {new_order_ = }")
+            self.strat_cache.set_new_chore(new_chore_)
+        logging.debug(f"Updated new_chore cache in recovery;;; {new_chore_ = }")
 
     def handle_market_depth_get_all_ws(self, market_depth_: MarketDepthBaseModel | MarketDepth, **kwargs):
         if market_depth_.symbol in StratCache.fx_symbol_overview_dict:

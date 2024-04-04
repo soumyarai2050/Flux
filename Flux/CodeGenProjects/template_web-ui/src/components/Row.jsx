@@ -3,7 +3,7 @@ import { TableRow } from '@mui/material';
 import PropTypes from 'prop-types';
 import _ from 'lodash';
 import { getDataxpath } from '../utils';
-import { Modes } from '../constants';
+import { DB_ID, Modes } from '../constants';
 import Cell from './Cell';
 import classes from './Row.module.css';
 
@@ -64,9 +64,26 @@ const Row = (props) => {
                 let dataAdd = row['data-add'] ? row['data-add'] : false;
                 let dataRemove = row['data-remove'] ? row['data-remove'] : false;
                 let value = row[cell.tableTitle];
-                let previousValue = _.get(originalData, xpath);
+                let previousValue;
+                if (props.widgetType === 'repeatedRoot') {
+                    if (rowindex && selected) {
+                        const storedObj = originalData.find(obj => obj[DB_ID] === rowindex);
+                        if (storedObj) {
+                            previousValue = _.get(storedObj, xpath);
+                        }
+                    } else {
+                        previousValue = _.get(originalData, xpath);
+                    }
+                } else {
+                    previousValue = _.get(originalData, xpath);
+                }
+                // let previousValue = _.get(originalData, xpath);
 
                 if (cell.hide) return;
+                let buttonDisable = false;
+                if (props.widgetType === 'repeatedRoot' && !selected) {
+                    buttonDisable = true;
+                }
 
                 return (
                     <Cell
@@ -83,7 +100,7 @@ const Row = (props) => {
                         dataAdd={dataAdd}
                         dataRemove={dataRemove}
                         disabled={disabled}
-                        buttonDisable={false}
+                        buttonDisable={buttonDisable}
                         onUpdate={onUpdate}
                         onDoubleClick={onRowClick}
                         onButtonClick={onButtonClick}
@@ -96,6 +113,8 @@ const Row = (props) => {
                         index={props.index}
                         forceUpdate={props.forceUpdate}
                         truncateDateTime={props.truncateDateTime}
+                        widgetType={props.widgetType}
+                        selected={selected}
                     />
                 )
             })}

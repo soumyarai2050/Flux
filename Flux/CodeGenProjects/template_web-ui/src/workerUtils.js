@@ -1,5 +1,5 @@
 import _, { cloneDeep } from 'lodash';
-import { DB_ID, DataTypes } from './constants';
+import { DB_ID, DataTypes, SeverityType } from './constants';
 import { SortComparator } from './utility/sortComparator';
 
 const FLOAT_POINT_PRECISION = 2;
@@ -188,20 +188,85 @@ export function getIdFromAbbreviatedKey(abbreviated, abbreviatedKey) {
     }
 }
 
-export function applyGetAllWebsocketUpdate(arr, obj, uiLimit) {
-    const index = arr.findIndex(o => o[DB_ID] === obj[DB_ID]);
-    // if index is not equal to -1, object already exists
-    if (index !== -1) {
-        if (Object.keys(obj).length === 1) {
-            // deleted object update. remove the object at the index
-            arr.splice(index, 1);
+// export function applyGetAllWebsocketUpdate(arr, obj, uiLimit) {
+//     const index = arr.findIndex(o => o[DB_ID] === obj[DB_ID]);
+//     // if index is not equal to -1, object already exists
+//     if (index !== -1) {
+//         if (Object.keys(obj).length === 1) {
+//             // deleted object update. remove the object at the index
+//             arr.splice(index, 1);
+//         } else {
+//             // replace the object with updated object at the index
+//             arr.splice(index, 1, obj);
+//         }
+//     } else {
+//         // add the new object to the array
+//         arr.push(obj);
+//     }
+//     return arr;
+// }
+
+export function applyGetAllWebsocketUpdate(storedArray, updatedObj, uiLimit, isAlertModel = false) {
+    const updatedArray = storedArray.filter(obj => obj[DB_ID] !== updatedObj[DB_ID]);
+    // create or update case
+    if (Object.keys(updatedObj).length !== 1) {
+        const idx = storedArray.findIndex(obj => obj[DB_ID] === updatedObj[DB_ID]);
+        // obj with DB_ID already exists. update obj case. update the existing obj at the index
+        if (idx !== -1) {
+            // ws update received for alert model. if alert is dismissed, return the filtered array
+            if (isAlertModel && updatedObj.dismiss) {
+                return updatedArray;
+            } else {  // either not alert model or alert not dismissed or received ws update on existing obj. 
+                updatedArray.splice(idx, 0, updatedObj);
+            }
         } else {
-            // replace the object with updated object at the index
-            arr.splice(index, 1, obj);
+            if (uiLimit) {
+                // if uiLimit is positive, remove the top object and add the latest obj at the end
+                // otherwise remove the last object and add the latest obj at the top
+                if (uiLimit >= 0) {
+                    if (updatedArray.length >= Math.abs(uiLimit)) {
+                        updatedArray.shift();
+                    }
+                    updatedArray.push(updatedObj);
+                } else {  // negative uiLimit
+                    if (updatedArray.length >= Math.abs(uiLimit)) {
+                        if (isAlertModel) {
+                            if (SeverityType[updatedObj.severity] > SeverityType[updatedArray[updatedArray.length - 1].severity]) {
+                                updatedArray.pop();
+                                updatedArray.push(updatedObj);
+                            }
+                            sortAlertArray(updatedArray);
+                            return updatedArray;
+                        } else {
+                            updatedArray.pop();
+                        }
+                    } 
+                    updatedArray.splice(0, 0, updatedObj);
+                    return updatedArray;
+                }
+            } else {
+                updatedArray.push(updatedObj);
+            }
         }
-    } else {
-        // add the new object to the array
-        arr.push(obj);
-    }
-    return arr;
+    }  // else not required - obj is deleted. already filtered above
+    return updatedArray;
+}
+
+export function sortAlertArray(alertArray) {
+    alertArray.sort((a, b) => {
+        const severityA = SeverityType[a.severity];
+        const severityB = SeverityType[b.severity];
+        if (severityA > severityB) {
+            return -1;
+        } else if (severityB > severityA) {
+            return 1;
+        } else {  // same severity
+            if (a.last_update_date_time >= b.last_update_date_time) {
+                return -1;
+            } else {
+                return 1;
+            }
+        }
+    })
+    return alertArray;
 }

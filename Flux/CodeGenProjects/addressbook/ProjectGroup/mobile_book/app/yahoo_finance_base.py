@@ -11,8 +11,8 @@ import os
 
 # project imports
 os.environ["DBType"] = "beanie"
-from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.generated.FastApi.mobile_book_service_http_client import MobileBookServiceHttpClient
-from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.generated.Pydentic.mobile_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.FastApi.mobile_book_service_http_client import MobileBookServiceHttpClient
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.Pydentic.mobile_book_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
 host: str = "127.0.0.1" if ((env_var := os.getenv("HOST")) is None or len(env_var) == 0) else env_var

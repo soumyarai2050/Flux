@@ -21,7 +21,7 @@ enum PositionType{
   POS_TYPE_UNSPECIFIED = 0;
   PTH = 1; // Pay to hold driven
   LOCATE = 2; // Borrow driven
-  SOD = 3; // past trades driven
+  SOD = 3; // past barters driven
   INDICATIVE = 4; // potential availability, needs additional steps to become tradable (converts to Locate or PTH)
 }
 
@@ -140,11 +140,11 @@ enum TickType {
 
 message SortCriteria {
   optional string level1 = 1;
-  optional SortType level1_order = 2 [default = ASCENDING];
+  optional SortType level1_chore = 2 [default = ASCENDING];
   optional string level2 = 3;
-  optional SortType level2_order = 4 [default = ASCENDING];
+  optional SortType level2_chore = 4 [default = ASCENDING];
   optional string level3 = 5;
-  optional SortType level3_order = 6 [default = ASCENDING];
+  optional SortType level3_chore = 6 [default = ASCENDING];
 }
 
 // stores all position types from all sources for optimal selection, usage and clearance
@@ -163,7 +163,7 @@ message Position{
   required PositionType type = 3;
   // available position size for consumption
   required int64 available_size = 4;
-  // position committed but not consumed (portfolio to strat; day-2: maybe strat to open order)
+  // position committed but not consumed (portfolio to strat; day-2: maybe strat to open chore)
   required int64 allocated_size = 5;
   // external position consumption
   required int64 consumed_size = 6;
@@ -175,7 +175,7 @@ message Position{
   optional float incurred_cost = 9;
   // T+1 and onwards recurring daily cost
   optional float carry_cost = 10;
-  optional int32 priority = 11 [default = 10, (FluxFldHelp) = "default priority: 10, orders to respect specified priority (lower value is higher priority), duplicates allowed"];
+  optional int32 priority = 11 [default = 10, (FluxFldHelp) = "default priority: 10, chores to respect specified priority (lower value is higher priority), duplicates allowed"];
   optional float premium_percentage = 12 [default = 2, (FluxFldNumberFormat) = "%"];
 }
 
@@ -201,7 +201,7 @@ message Broker{
   repeated SecPosition sec_positions = 3;
   // broker identifier
   required string broker = 4;
-  optional int32 bkr_priority = 5 [default = 10, (FluxFldHelp) = "default priority 10, embedded position priorities are relative within broker priority level group; orders respect specified priority (lower value is higher priority), duplicates allowed"];
+  optional int32 bkr_priority = 5 [default = 10, (FluxFldHelp) = "default priority 10, embedded position priorities are relative within broker priority level group; chores respect specified priority (lower value is higher priority), duplicates allowed"];
 }
 
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
@@ -217,21 +217,21 @@ message Quote{
   optional string last_update_date_time = 4[(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
 }
 
-message OrderBrief{
-  required string order_id = 1;
+message ChoreBrief{
+  required string chore_id = 1;
   required Security security = 2;
   required Side side = 3;
   optional float px = 4;
   optional int64 qty = 5;
-  optional float order_notional = 6 [(FluxFldDisplayType) = "int"];
+  optional float chore_notional = 6 [(FluxFldDisplayType) = "int"];
   required string underlying_account = 7;
   optional string exchange = 8;
-  repeated string text = 9 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
+  repeated string text = 9 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific chore state"];
 }
 
-message MarketTradeVolume{
+message MarketBarterVolume{
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int64 participation_period_last_trade_qty_sum = 2;
+  optional int64 participation_period_last_barter_qty_sum = 2;
   optional int32 applicable_period_seconds = 3 [(FluxFldHelp) = "sliding window interval of above volume, unset value implies seconds from SOD till time current time"];
 }
 

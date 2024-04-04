@@ -4,3 +4,4 @@ mongo_server_uri: "mongodb://localhost:27017"
 ps_db_name: "phone_book_8020"
 md_db_name: "mobile_book"
 web_project_url: "http://localhost:3020"
+run_gdb_terminal: False

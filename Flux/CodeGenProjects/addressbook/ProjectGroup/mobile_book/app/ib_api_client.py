@@ -14,7 +14,7 @@ class IbApiClient(EClient, EWrapper):
     # if we do not have any market data subscriptions, we are able to use this request to receive delayed data
     delayed_data: ClassVar[int] = 3
     #  will work as a combination of the two so that you can request market data outside of regular
-    #  trading hours even without a subscription
+    #  bartering hours even without a subscription
     frozen_delayed_data: ClassVar[int] = 4
 
     # LOG Levels

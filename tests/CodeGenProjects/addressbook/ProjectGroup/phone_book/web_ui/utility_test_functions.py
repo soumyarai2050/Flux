@@ -11,9 +11,9 @@ from selenium.common import NoSuchElementException, ElementNotInteractableExcept
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-from CodeGenProjects.addressbook.ProjectGroup.phone_book.web_ui.web_ui_models import *
-from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import *
-from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import test_config_file_path, \
+from CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import test_config_file_path, \
     email_book_service_native_web_client, create_tob
 
 
@@ -244,10 +244,10 @@ def update_max_value_field_strats_limits(widget: WebElement, xpath: str, name: s
 def create_strat_limits_using_tree_view(driver: WebDriver, strat_limits: Dict, layout: Layout) -> None:
     strat_limits_widget = driver.find_element(By.ID, "strat_limits")
 
-    # strat_limits.max_open_orders_per_side
-    xpath = "max_open_orders_per_side"
-    value = strat_limits["max_open_orders_per_side"]
-    name = "max_open_orders_per_side"
+    # strat_limits.max_open_chores_per_side
+    xpath = "max_open_chores_per_side"
+    value = strat_limits["max_open_chores_per_side"]
+    name = "max_open_chores_per_side"
     set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     xpath = "max_single_leg_notional"
@@ -300,21 +300,21 @@ def create_strat_limits_using_tree_view(driver: WebDriver, strat_limits: Dict, l
 
 
     scroll_into_view(driver=driver, element=input_residual_mark_second_element)
-    # strat_limits.cancel_rate.waived_min_orders
-    xpath = "cancel_rate.waived_min_orders"
-    value = strat_limits["cancel_rate"]["waived_min_orders"]
-    name = "waived_min_orders"
+    # strat_limits.cancel_rate.waived_min_chores
+    xpath = "cancel_rate.waived_min_chores"
+    value = strat_limits["cancel_rate"]["waived_min_chores"]
+    name = "waived_min_chores"
     set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
-    # strat_limits.market_trade_volume_participation.max_participation_rate
-    xpath = "market_trade_volume_participation.max_participation_rate"
-    value = strat_limits["market_trade_volume_participation"]["max_participation_rate"]
+    # strat_limits.market_barter_volume_participation.max_participation_rate
+    xpath = "market_barter_volume_participation.max_participation_rate"
+    value = strat_limits["market_barter_volume_participation"]["max_participation_rate"]
     name = "max_participation_rate"
     set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # mrket_trde_applicable_periods_seconds
-    xpath = "market_trade_volume_participation.applicable_period_seconds"
-    value = strat_limits["market_trade_volume_participation"]["applicable_period_seconds"]
+    xpath = "market_barter_volume_participation.applicable_period_seconds"
+    value = strat_limits["market_barter_volume_participation"]["applicable_period_seconds"]
     name = "applicable_period_seconds"
     set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
@@ -360,10 +360,10 @@ def get_value_from_input_field(widget: WebElement, xpath: str, layout: Layout)->
 
 
 def validate_strat_limits(widget: WebElement, strat_limits: Dict,  layout: Layout) -> None:
-    # max_open_orders_per_side
-    xpath = "max_open_orders_per_side"
+    # max_open_chores_per_side
+    xpath = "max_open_chores_per_side"
     value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["max_open_orders_per_side"])
+    assert value == str(strat_limits["max_open_chores_per_side"])
 
     # max_single_leg_notional
     xpath = "max_single_leg_notional"
@@ -403,20 +403,20 @@ def validate_strat_limits(widget: WebElement, strat_limits: Dict,  layout: Layou
     value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     assert value == str(strat_limits["cancel_rate"]["applicable_period_seconds"])
 
-    # waived_min_orders
-    xpath = "cancel_rate.waived_min_orders"
+    # waived_min_chores
+    xpath = "cancel_rate.waived_min_chores"
     value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["cancel_rate"]["waived_min_orders"])
+    assert value == str(strat_limits["cancel_rate"]["waived_min_chores"])
 
     # max_participation_rate
-    xpath = "market_trade_volume_participation.max_participation_rate"
+    xpath = "market_barter_volume_participation.max_participation_rate"
     value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["market_trade_volume_participation"]["max_participation_rate"])
+    assert value == str(strat_limits["market_barter_volume_participation"]["max_participation_rate"])
 
     # applicable_period_seconds
-    xpath = "market_trade_volume_participation.applicable_period_seconds"
+    xpath = "market_barter_volume_participation.applicable_period_seconds"
     value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["market_trade_volume_participation"]["applicable_period_seconds"])
+    assert value == str(strat_limits["market_barter_volume_participation"]["applicable_period_seconds"])
 
     # participation_rate
     xpath = "market_depth.participation_rate"
@@ -565,12 +565,12 @@ def get_xpath_from_field_name(schema_dict: Dict[str, any], widget_type: WidgetTy
     return None
 
 
-def override_default_limits(order_limits: OrderLimitsBaseModel, portfolio_limits: PortfolioLimitsBaseModel) -> None:
-    updated_order_limits: OrderLimitsBaseModel = OrderLimitsBaseModel(_id=order_limits.id, max_basis_points=150,
-                                                                      max_px_deviation=2, min_order_notional=1_000,
-                                                                      max_order_notional=400000)
-    email_book_service_native_web_client.patch_order_limits_client(jsonable_encoder(
-        updated_order_limits, by_alias=True, exclude_none=True))
+def override_default_limits(chore_limits: ChoreLimitsBaseModel, portfolio_limits: PortfolioLimitsBaseModel) -> None:
+    updated_chore_limits: ChoreLimitsBaseModel = ChoreLimitsBaseModel(_id=chore_limits.id, max_basis_points=150,
+                                                                      max_px_deviation=2, min_chore_notional=1_000,
+                                                                      max_chore_notional=400000)
+    email_book_service_native_web_client.patch_chore_limits_client(jsonable_encoder(
+        updated_chore_limits, by_alias=True, exclude_none=True))
 
     updated_portfolio_limits: PortfolioLimitsBaseModel = \
         PortfolioLimitsBaseModel(_id=portfolio_limits.id, max_open_baskets=200)
@@ -583,11 +583,11 @@ def override_strat_limit(street_book_service_http_client: StreetBookServiceHttpC
 
     for strat_limit in strat_limit_list:
         cancel_rate: CancelRateOptional = CancelRateOptional(max_cancel_rate=20)
-        market_trade_volume_participation: MarketTradeVolumeParticipationOptional = \
-            MarketTradeVolumeParticipationOptional(max_participation_rate=20)
+        market_barter_volume_participation: MarketBarterVolumeParticipationOptional = \
+            MarketBarterVolumeParticipationOptional(max_participation_rate=20)
         updated_strat_limit: StratLimitsBaseModel = \
             StratLimitsBaseModel(_id=strat_limit.id, cancel_rate=cancel_rate,
-                                 market_trade_volume_participation=market_trade_volume_participation)
+                                 market_barter_volume_participation=market_barter_volume_participation)
         street_book_service_http_client.patch_strat_limits_client(jsonable_encoder(
             updated_strat_limit, by_alias=True, exclude_none=True))
 
@@ -922,14 +922,14 @@ def get_replaced_str(default_field_value: str) -> int:
 
 
 def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_list,
-                              market_depth_list: List[MarketDepthBaseModel], last_trade_list: List[LastTradeBaseModel],
+                              market_depth_list: List[MarketDepthBaseModel], last_barter_list: List[LastBarterBaseModel],
                               fills_journal_list: List[FillsJournalBaseModel],
-                              order_snapshot_list: List[OrderSnapshotBaseModel],
-                              order_journal_list: List[OrderJournalBaseModel]) -> None:
+                              chore_snapshot_list: List[ChoreSnapshotBaseModel],
+                              chore_journal_list: List[ChoreJournalBaseModel]) -> None:
     """
 
-    Function for creating top_of_book, market_depth, last_trade,
-    fills_journal, order_snapshot, order_journal, using the web client.
+    Function for creating top_of_book, market_depth, last_barter,
+    fills_journal, chore_snapshot, chore_journal, using the web client.
 
     The function sets up and executes a series of tests to ensure the proper
     creation and functionality of various components related to data
@@ -971,14 +971,14 @@ def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_list,
         assert market_depth.market_maker == expected_market_depth.market_maker
         assert market_depth.is_smart_depth == expected_market_depth.is_smart_depth
 
-    expected_last_trade_list: List[LastTradeBaseModel] = (
-        executor_web_client.create_all_last_trade_client(last_trade_list))
-    assert last_trade_list == expected_last_trade_list
+    expected_last_barter_list: List[LastBarterBaseModel] = (
+        executor_web_client.create_all_last_barter_client(last_barter_list))
+    assert last_barter_list == expected_last_barter_list
 
     for fills_journal in fills_journal_list:
         expected_fills_journal: FillsJournalBaseModel = executor_web_client.create_fills_journal_client(fills_journal)
         assert fills_journal.id == expected_fills_journal.id
-        assert fills_journal.order_id == expected_fills_journal.order_id
+        assert fills_journal.chore_id == expected_fills_journal.chore_id
         assert fills_journal.fill_px == expected_fills_journal.fill_px
         assert fills_journal.fill_qty == expected_fills_journal.fill_qty
         assert fills_journal.fill_symbol == expected_fills_journal.fill_symbol
@@ -989,24 +989,24 @@ def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_list,
         assert (fills_journal.underlying_account_cumulative_fill_qty ==
                 expected_fills_journal.underlying_account_cumulative_fill_qty)
 
-    for order_snapshot in order_snapshot_list:
-        expected_order_snapshot: OrderSnapshotBaseModel = (
-            executor_web_client.create_order_snapshot_client(order_snapshot))
-        assert order_snapshot == expected_order_snapshot
+    for chore_snapshot in chore_snapshot_list:
+        expected_chore_snapshot: ChoreSnapshotBaseModel = (
+            executor_web_client.create_chore_snapshot_client(chore_snapshot))
+        assert chore_snapshot == expected_chore_snapshot
 
-    for order_journal in order_journal_list:
-        expected_order_journal: OrderJournalBaseModel = executor_web_client.create_order_journal_client(order_journal)
-        assert order_journal.id == expected_order_journal.id
-        assert order_journal.order_event == expected_order_journal.order_event
-        assert order_journal.current_period_order_count == expected_order_journal.current_period_order_count
-        # assert order_journal == expected_order_journal
+    for chore_journal in chore_journal_list:
+        expected_chore_journal: ChoreJournalBaseModel = executor_web_client.create_chore_journal_client(chore_journal)
+        assert chore_journal.id == expected_chore_journal.id
+        assert chore_journal.chore_event == expected_chore_journal.chore_event
+        assert chore_journal.current_period_chore_count == expected_chore_journal.current_period_chore_count
+        # assert chore_journal == expected_chore_journal
 
 
 def delete_tob_md_ld_fj_os_oj() -> None:
     """
 
-        Function for deleting top_of_book, market_depth, last_trade,
-        fills_journal, order_snapshot, order_journal, using the web client.
+        Function for deleting top_of_book, market_depth, last_barter,
+        fills_journal, chore_snapshot, chore_journal, using the web client.
 
         The function sets up and executes a series of tests to ensure the proper
         creation and functionality of various components related to data
@@ -1018,8 +1018,8 @@ def delete_tob_md_ld_fj_os_oj() -> None:
 
     for pair_strat in pair_strat_list:
         if not pair_strat.is_executor_running:
-            err_str_ = ("strat exists but is not running, can't delete top_of_book, market_depth, last_trade, "
-                        "fills_journal, order_snapshot, order_journal when not running, delete it manually")
+            err_str_ = ("strat exists but is not running, can't delete top_of_book, market_depth, last_barter, "
+                        "fills_journal, chore_snapshot, chore_journal when not running, delete it manually")
             logging.error(err_str_)
             raise Exception(err_str_)
         assert pair_strat.is_executor_running
@@ -1032,16 +1032,16 @@ def delete_tob_md_ld_fj_os_oj() -> None:
         for _ in range(1, 21):
             assert executor_web_client.delete_market_depth_client(market_depth_id=_, return_obj_copy=False)
 
-        assert executor_web_client.delete_all_last_trade_client(return_obj_copy=False)
+        assert executor_web_client.delete_all_last_barter_client(return_obj_copy=False)
 
         for _ in range(1, 11):
             assert executor_web_client.delete_fills_journal_client(fills_journal_id=_, return_obj_copy=False)
 
         for _ in range(1, 11):
-            assert executor_web_client.delete_order_snapshot_client(order_snapshot_id=_, return_obj_copy=False)
+            assert executor_web_client.delete_chore_snapshot_client(chore_snapshot_id=_, return_obj_copy=False)
 
         for _ in range(1, 11):
-            assert executor_web_client.delete_order_journal_client(order_journal_id=_, return_obj_copy=False)
+            assert executor_web_client.delete_chore_journal_client(chore_journal_id=_, return_obj_copy=False)
 
 
 def scroll_into_view(driver: WebDriver, element: WebElement):
@@ -1203,7 +1203,7 @@ def flux_fld_title_in_widgets(result: List[WidgetQuery], widget_type: WidgetType
             if widget_type == WidgetType.INDEPENDENT:
                 field_title: str = field_query.properties["title"].replace(" ", "_")
                 if (field_title != "max_contract_qty" and field_title != "security" and field_title != "positions" and
-                        field_title != "eligible_brokers_update_count" and field_title != "min_order_notional_allowance"
+                        field_title != "eligible_brokers_update_count" and field_title != "min_chore_notional_allowance"
                         and field_title != "alerts"):
                     assert field_title in common_key_list
             elif widget_type == WidgetType.DEPENDENT:
@@ -1361,7 +1361,7 @@ def convert_schema_dict_to_widget_query(schema_dict: Dict[str, Any]) -> List[Wid
 def update_schema_json(schema_dict: Dict[str, any], update_widget_name: str, update_field_name: str,
                        extend_field_name: str, value: any, project_name: str) -> None:
 
-    project_path: PurePath = code_gen_projects_dir_path / "addressbook"/ "ProjectGroup" / project_name
+    project_path: PurePath = code_gen_projects_dir_path / "AddressBook"/ "ProjectGroup" / project_name
 
     schema_path: PurePath = project_path / "web-ui" / "public" / "schema.json"
 
@@ -1468,7 +1468,7 @@ def set_val_max_input_fld(driver: WebDriver, layout: Layout, input_type: str, sc
         click_button_with_name(widget=widget, button_name="Edit")
         switch_layout(widget=widget, layout=layout)
 
-        if widget_name == "order_limits" and layout == Layout.TABLE:
+        if widget_name == "chore_limits" and layout == Layout.TABLE:
             switch_layout(widget=widget, layout=Layout.TABLE)
 
         for field_query in widget_query.fields:
@@ -1514,7 +1514,7 @@ def set_val_min_input_fld(driver: WebDriver, layout: Layout, input_type: str, sc
             switch_layout(widget=widget, layout=Layout.TABLE)
         else:
             switch_layout(widget=widget, layout=Layout.TREE)
-        if widget_name == "order_limits" and layout == Layout.TABLE:
+        if widget_name == "chore_limits" and layout == Layout.TABLE:
             switch_layout(widget=widget, layout=Layout.TABLE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
@@ -1625,9 +1625,9 @@ def set_input_value_for_comma_seperated(driver: WebDriver, schema_dict, layout: 
         widget = driver.find_element(By.ID, widget_name)
         scroll_into_view(driver=driver, element=widget)
         click_button_with_name(widget=widget, button_name="Edit")
-        if widget_name == "order_limits" and layout == Layout.TABLE:
+        if widget_name == "chore_limits" and layout == Layout.TABLE:
             switch_layout(widget=widget, layout=Layout.TABLE)
-        elif layout == Layout.TREE and widget_name == "order_limits":
+        elif layout == Layout.TREE and widget_name == "chore_limits":
             pass
         elif layout == Layout.TREE:
             switch_layout(widget=widget, layout=Layout.TREE)

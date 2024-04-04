@@ -5,13 +5,13 @@ import sys
 import threading
 
 # project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import (
     StreetBookServiceKeyHandler)
 from FluxPythonUtils.scripts.utility_functions import get_symbol_side_key
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.phone_book_n_street_book_client import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.phone_book_n_street_book_client import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 
 update_strat_status_lock: threading.Lock = threading.Lock()
 
@@ -42,9 +42,9 @@ def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_er
 # def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, alert_brief: str,
 #                                              alert_details: str | None = None,
 #                                              severity: Severity = Severity.Severity_ERROR,
-#                                              impacted_orders: List[OrderBrief] | None = None):
-#     impacted_orders = [] if impacted_orders is None else impacted_orders
-#     alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
+#                                              impacted_chores: List[ChoreBrief] | None = None):
+#     impacted_chores = [] if impacted_chores is None else impacted_chores
+#     alert: Alert = create_alert(alert_brief, alert_details, impacted_chores, severity)
 #     with update_strat_status_lock:
 #         pair_strat: PairStratBaseModel = \
 #             email_book_service_http_client.get_ongoing_strat_from_symbol_side_query_client(sec_id, side)
@@ -58,9 +58,9 @@ def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_er
 
 #
 # def update_strat_alert_async(strat_id: int, alert_brief: str, alert_details: str | None = None,
-#                              impacted_orders: List[OrderBrief] | None = None,
+#                              impacted_chores: List[ChoreBrief] | None = None,
 #                              severity: Severity = Severity.Severity_ERROR):
-#     alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
+#     alert: Alert = create_alert(alert_brief, alert_details, impacted_chores, severity)
 #     with update_strat_status_lock:
 #         pair_strat: PairStrat = email_book_service_http_client.get_pair_strat_client(strat_id)
 #         strat_status: StratStatus = StratStatus(strat_state=pair_strat.strat_status.strat_state,
@@ -71,12 +71,12 @@ def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_er
 #                                                               return_obj_copy=False)
 
 
-def get_order_journal_log_key(order_journal: OrderJournal | OrderJournalBaseModel | OrderJournalOptional):
-    sec_id = order_journal.order.security.sec_id
-    side = order_journal.order.side
+def get_chore_journal_log_key(chore_journal: ChoreJournal | ChoreJournalBaseModel | ChoreJournalOptional):
+    sec_id = chore_journal.chore.security.sec_id
+    side = chore_journal.chore.side
     symbol_side_key = get_symbol_side_key([(sec_id, side)])
-    base_order_journal_key = StreetBookServiceKeyHandler.get_log_key_from_order_journal(order_journal)
-    return f"{symbol_side_key}-{base_order_journal_key}"
+    base_chore_journal_key = StreetBookServiceKeyHandler.get_log_key_from_chore_journal(chore_journal)
+    return f"{symbol_side_key}-{base_chore_journal_key}"
 
 
 def get_fills_journal_log_key(fills_journal: FillsJournal | FillsJournalBaseModel | FillsJournalOptional):
@@ -87,12 +87,12 @@ def get_fills_journal_log_key(fills_journal: FillsJournal | FillsJournalBaseMode
     return f"{symbol_side_key}-{base_fill_journal_key}"
 
 
-def get_order_snapshot_log_key(order_snapshot: OrderSnapshot | OrderSnapshotBaseModel | OrderSnapshotOptional):
-    sec_id = order_snapshot.order_brief.security.sec_id
-    side = order_snapshot.order_brief.side
+def get_chore_snapshot_log_key(chore_snapshot: ChoreSnapshot | ChoreSnapshotBaseModel | ChoreSnapshotOptional):
+    sec_id = chore_snapshot.chore_brief.security.sec_id
+    side = chore_snapshot.chore_brief.side
     symbol_side_key = get_symbol_side_key([(sec_id, side)])
-    base_order_snapshot_key = StreetBookServiceKeyHandler.get_log_key_from_order_snapshot(order_snapshot)
-    return f"{symbol_side_key}-{base_order_snapshot_key}"
+    base_chore_snapshot_key = StreetBookServiceKeyHandler.get_log_key_from_chore_snapshot(chore_snapshot)
+    return f"{symbol_side_key}-{base_chore_snapshot_key}"
 
 
 def get_symbol_side_snapshot_log_key(
@@ -106,10 +106,10 @@ def get_symbol_side_snapshot_log_key(
 
 
 def get_strat_brief_log_key(strat_brief: StratBrief | StratBriefBaseModel | StratBriefOptional):
-    buy_sec_id = strat_brief.pair_buy_side_trading_brief.security.sec_id
-    buy_side = strat_brief.pair_buy_side_trading_brief.side
-    sell_sec_id = strat_brief.pair_sell_side_trading_brief.security.sec_id
-    sell_side = strat_brief.pair_sell_side_trading_brief.side
+    buy_sec_id = strat_brief.pair_buy_side_bartering_brief.security.sec_id
+    buy_side = strat_brief.pair_buy_side_bartering_brief.side
+    sell_sec_id = strat_brief.pair_sell_side_bartering_brief.security.sec_id
+    sell_side = strat_brief.pair_sell_side_bartering_brief.side
     symbol_side_key = get_symbol_side_key([(buy_sec_id, buy_side), (sell_sec_id, sell_side)])
     base_strat_brief_key = StreetBookServiceKeyHandler.get_log_key_from_strat_brief(strat_brief)
     return f"{symbol_side_key}-{base_strat_brief_key}"
@@ -120,11 +120,11 @@ def get_consumable_participation_qty(
         max_participation_rate: float) -> int | None:
     if len(executor_check_snapshot_obj_list) == 1:
         executor_check_snapshot_obj = executor_check_snapshot_obj_list[0]
-        participation_period_order_qty_sum = executor_check_snapshot_obj.last_n_sec_order_qty
-        participation_period_last_trade_qty_sum = executor_check_snapshot_obj.last_n_sec_trade_qty
+        participation_period_chore_qty_sum = executor_check_snapshot_obj.last_n_sec_chore_qty
+        participation_period_last_barter_qty_sum = executor_check_snapshot_obj.last_n_sec_barter_qty
 
-        return int(((participation_period_last_trade_qty_sum / 100) *
-                    max_participation_rate) - participation_period_order_qty_sum)
+        return int(((participation_period_last_barter_qty_sum / 100) *
+                    max_participation_rate) - participation_period_chore_qty_sum)
     else:
         logging.error(f"Received executor_check_snapshot_obj_list with length {len(executor_check_snapshot_obj_list)}"
                       f" expected 1")
@@ -147,7 +147,7 @@ def get_consumable_participation_qty_http(symbol: str, side: Side, applicable_pe
 
 async def get_consumable_participation_qty_underlying_http(symbol: str, side: Side, applicable_period_seconds: int,
                                                            max_participation_rate: float) -> int | None:
-    from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
         underlying_get_executor_check_snapshot_query_http)
 
     executor_check_snapshot_list: List[ExecutorCheckSnapshot] = \
@@ -165,13 +165,13 @@ async def get_consumable_participation_qty_underlying_http(symbol: str, side: Si
 
 
 def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratLimits:
-    cancel_rate: CancelRate = CancelRate(max_cancel_rate=60, applicable_period_seconds=0, waived_min_orders=5)
-    market_trade_volume_participation: MarketTradeVolumeParticipation = \
-        MarketTradeVolumeParticipation(max_participation_rate=40,
+    cancel_rate: CancelRate = CancelRate(max_cancel_rate=60, applicable_period_seconds=0, waived_min_chores=5)
+    market_barter_volume_participation: MarketBarterVolumeParticipation = \
+        MarketBarterVolumeParticipation(max_participation_rate=40,
                                        applicable_period_seconds=180)
     market_depth: OpenInterestParticipation = OpenInterestParticipation(participation_rate=10, depth_levels=3)
     residual_restriction: ResidualRestriction = ResidualRestriction(max_residual=30_000, residual_mark_seconds=4)
-    strat_limits: StratLimits = StratLimits(max_open_orders_per_side=5,
+    strat_limits: StratLimits = StratLimits(max_open_chores_per_side=5,
                                             max_single_leg_notional=get_default_max_notional(),
                                             max_open_single_leg_notional=30_000,
                                             max_net_filled_notional=160_000,
@@ -179,7 +179,7 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
                                             limit_up_down_volume_participation_rate=1,
                                             eligible_brokers=eligible_brokers,
                                             cancel_rate=cancel_rate,
-                                            market_trade_volume_participation=market_trade_volume_participation,
+                                            market_barter_volume_participation=market_barter_volume_participation,
                                             market_depth=market_depth,
                                             residual_restriction=residual_restriction
                                             )
@@ -187,8 +187,8 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
 
 
 def get_new_strat_status(strat_limits_obj: StratLimits) -> StratStatus:
-    strat_status = StratStatus(fills_brief=[], open_orders_brief=[], total_buy_qty=0,
-                               total_sell_qty=0, total_order_qty=0, total_open_buy_qty=0,
+    strat_status = StratStatus(fills_brief=[], open_chores_brief=[], total_buy_qty=0,
+                               total_sell_qty=0, total_chore_qty=0, total_open_buy_qty=0,
                                total_open_sell_qty=0, avg_open_buy_px=0.0, avg_open_sell_px=0.0,
                                total_open_buy_notional=0.0, total_open_sell_notional=0.0,
                                total_open_exposure=0.0, total_fill_buy_qty=0,

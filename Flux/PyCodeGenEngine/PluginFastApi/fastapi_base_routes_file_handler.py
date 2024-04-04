@@ -79,7 +79,14 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str = f"from {model_file_path} import *\n"
         return output_str
 
-    def _get_filter_configs_var_name(self, message: protogen.Message) -> str:
+    def _get_filter_agg_projection_model(self, message: protogen.Message) -> str | None:
+        additional_agg_option_val_dict = \
+            self.get_complex_option_value_from_proto(message,
+                                                     BaseFastapiPlugin.flux_msg_main_crud_operations_agg)
+        return additional_agg_option_val_dict.get("projection_model_name")
+
+    def _get_filter_configs_var_name(self, message: protogen.Message, param_name: str | None = None,
+                                     put_param: bool | None = True, put_limit: bool | None = None) -> str:
         filter_option_val_list_of_dict = \
             self.get_complex_option_value_from_proto(message,
                                                      BaseFastapiPlugin.flux_msg_nested_fld_val_filter_param,
@@ -91,16 +98,47 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
                 field_name_list.append(field_name)
         if field_name_list:
             return_str = "_n_".join(field_name_list)
+            override_default_get_all_limit = False
             if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_main_crud_operations_agg):
                 additional_agg_option_val_dict = \
                     self.get_complex_option_value_from_proto(message,
                                                              BaseFastapiPlugin.flux_msg_main_crud_operations_agg)
                 additional_agg_name = additional_agg_option_val_dict["agg_var_name"]
+                override_default_get_all_limit = additional_agg_option_val_dict.get("override_get_all_limit_handling")
                 return_str += f"_n_{additional_agg_name}"
             return_str += "_filter_config"
+            if put_param:
+                if param_name is not None:
+                    if override_default_get_all_limit and put_limit:
+                        return_str += f"({param_name}, limit_obj_count)"
+                    else:
+                        return_str += f"({param_name})"
+                else:
+                    if override_default_get_all_limit and put_limit:
+                        return_str += f"(None, limit_obj_count)"
+                    else:
+                        return_str += f"(None)"
+
             return return_str
         elif self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_main_crud_operations_agg):
-            return f"{message.proto.name}_limit_filter_config"
+            additional_agg_option_val_dict = \
+                self.get_complex_option_value_from_proto(message,
+                                                         BaseFastapiPlugin.flux_msg_main_crud_operations_agg)
+
+            override_default_get_all_limit = additional_agg_option_val_dict.get("override_get_all_limit_handling")
+            return_str = f"{message.proto.name}_limit_filter_config"
+            if put_param:
+                if param_name is not None:
+                    if override_default_get_all_limit and put_limit:
+                        return_str += f"({param_name}, limit_obj_count)"
+                    else:
+                        return_str += f"({param_name})"
+                else:
+                    if override_default_get_all_limit and put_limit:
+                        return_str += f"(None, limit_obj_count)"
+                    else:
+                        return_str += f"(None)"
+            return return_str
         else:
             return ""
 
@@ -140,31 +178,44 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
                 raise Exception(err_str)
 
         additional_agg_str = ""
+        override_default_get_all_limit: bool = False
         if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_main_crud_operations_agg):
             additional_agg_option_val_dict = \
                 self.get_complex_option_value_from_proto(message,
                                                          BaseFastapiPlugin.flux_msg_main_crud_operations_agg)
 
-            agg_params = additional_agg_option_val_dict["agg_params"]
-            if isinstance(agg_params, list):
-                type_casted_agg_params = [str(parse_string_to_original_types(param)) for param in agg_params]
-                agg_params = ", ".join(type_casted_agg_params)
-            else:
-                agg_params = parse_string_to_original_types(agg_params)
+            override_default_get_all_limit = additional_agg_option_val_dict.get("override_get_all_limit_handling")
+            agg_params = additional_agg_option_val_dict.get("agg_params")
+            additional_agg_str = f"{additional_agg_option_val_dict['agg_var_name']}(pydantic_obj"
 
-            additional_agg_str = f"{additional_agg_option_val_dict['agg_var_name']}({agg_params})"
+            if override_default_get_all_limit:
+                additional_agg_str += ", limit"
+
+            if agg_params is not None:
+                if isinstance(agg_params, list):
+                    type_casted_agg_params = [str(parse_string_to_original_types(param)) for param in agg_params]
+                    agg_params = ", ".join(type_casted_agg_params)
+                else:
+                    agg_params = parse_string_to_original_types(agg_params)
+
+                additional_agg_str += f", {agg_params}"
+            additional_agg_str += ")"
+
         # else not required: by-passing if option not used
 
         if filter_list:
-            var_name = self._get_filter_configs_var_name(message)
-            return_str = f"{var_name}: Final[Dict[str, Any]] = " + "{'redact': " + f"{filter_list}"
+            var_name = self._get_filter_configs_var_name(message, put_param=False)
+            return_str = f"{var_name} = lambda pydantic_obj : " + "{'redact': " + f"{filter_list}"
             if additional_agg_str:
                 return_str += f", 'agg': {additional_agg_str}"
             return_str += "}\n"
             return return_str
         elif additional_agg_str:
-            var_name = self._get_filter_configs_var_name(message)
-            return_str = f"{var_name}: Final[Dict[str, Any]] = " + "{'agg': " + f"{additional_agg_str}" + "}\n"
+            var_name = self._get_filter_configs_var_name(message, put_param=False)
+            if override_default_get_all_limit:
+                return_str = f"{var_name} = lambda pydantic_obj, limit = None: " + "{'agg': " + f"{additional_agg_str}" + "}\n"
+            else:
+                return_str = f"{var_name} = lambda pydantic_obj : " + "{'agg': " + f"{additional_agg_str}" + "}\n"
             return return_str
         else:
             return ""

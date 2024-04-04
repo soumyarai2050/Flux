@@ -1,6 +1,6 @@
 # project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.generated.FastApi.mobile_book_service_routes_callback import MobileBookServiceRoutesCallback
-from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.mobile_book_service_helper import md_port
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.FastApi.mobile_book_service_routes_callback import MobileBookServiceRoutesCallback
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_service_helper import md_port
 from FluxPythonUtils.scripts.utility_functions import except_n_log_alert
 
 

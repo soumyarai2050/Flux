@@ -42,7 +42,7 @@ if __name__ == "__main__":
     if not os.path.exists(templates_dir_path):
         os.mkdir(templates_dir_path)
 
-    from Flux.CodeGenProjects.addressbook.ProjectGroup.template_project_name.generated.FastApi.template_model_service_launch_server import \
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.template_project_name.generated.FastApi.template_model_service_launch_server import \
         template_model_service_launch_server
 
     template_model_service_launch_server()

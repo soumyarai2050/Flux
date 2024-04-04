@@ -144,14 +144,14 @@ class PathWSConnectionManager(WSConnectionManager):
                 filter_callable = ws_data.filter_callable
                 kwargs_tuple = ws_data.filter_callable_kwargs
                 # somehow this was found as a string
-                if filter_callable is None:
-                    create_task = True
-                else:
-                    create_task = filter_callable(json_str, **kwargs_tuple)
-                    # else not required: ignore task creation if callable not allows
-                if create_task:
+                if filter_callable is not None:
+                    json_str = filter_callable(json_str, **kwargs_tuple)
+                # else not required: if no filter_callable exists then pass json_str as is
+
+                if json_str:
                     task = asyncio.create_task(ws.send_text(json_str), name=f"{len(task_list)}")
                     task_list.append(task)
+                # else not required: avoid task submit if filter callable returns None - filter criteria mismatched
         except WebSocketDisconnect as e:
             remove_websocket = ws_data.ws_object
             logging.exception(
@@ -246,14 +246,15 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
                 filter_callable = ws_data.filter_callable
                 filter_callable_kwargs = ws_data.filter_callable_kwargs
                 # somehow this was found as a string
-                if filter_callable is None:
-                    create_task = True
-                else:
-                    create_task = filter_callable(json_str, **filter_callable_kwargs)
+                if filter_callable is not None:
+                    json_str = filter_callable(json_str, **filter_callable_kwargs)
+                # else not required: if no filter_callable exists then pass json_str as is
 
-                if create_task:
+                if json_str:
                     task = asyncio.create_task(ws_data.ws_object.send_text(json_str), name=f"{len(task_list)}")
                     task_list.append(task)
+                # else not required: avoid task submit if filter callable returns None - filter criteria mismatched
+
             except WebSocketDisconnect as e:
                 remove_websocket = ws_data.ws_object
                 logging.exception(

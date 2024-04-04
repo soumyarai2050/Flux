@@ -12,11 +12,11 @@ from typing import Set
 import ctypes
 
 # project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_routes_callback import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_routes_callback import (
     StreetBookServiceRoutesCallback)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_service_helper import (
-    get_order_journal_log_key, get_symbol_side_key, get_order_snapshot_log_key,
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
+    get_chore_journal_log_key, get_symbol_side_key, get_chore_snapshot_log_key,
     get_symbol_side_snapshot_log_key, all_service_up_check, host, EXECUTOR_PROJECT_DATA_DIR,
     email_book_service_http_client, get_consumable_participation_qty,
     get_strat_brief_log_key, get_fills_journal_log_key, get_new_strat_limits, get_new_strat_status,
@@ -24,32 +24,40 @@ from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_s
     EXECUTOR_PROJECT_SCRIPTS_DIR, post_book_service_http_client, MobileBookMutexManager)
 from FluxPythonUtils.scripts.utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.service_state import ServiceState
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, PairStratBaseModel, StratState, is_ongoing_strat,
     guaranteed_call_pair_strat_client, pair_strat_client_call_log_str, UpdateType)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trade_simulator import TradeSimulator, TradingLinkBase
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link import is_test_run
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import StratAlertBaseModel
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.strat_cache import StratCache
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_key_handler import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.barter_simulator import BarterSimulator, BarteringLinkBase
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import is_test_run
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import StratAlertBaseModel
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.strat_cache import StratCache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_key_handler import (
     EmailBookServiceKeyHandler)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.aggregate import (
-    get_order_total_sum_of_last_n_sec, get_symbol_side_snapshot_from_symbol_side, get_strat_brief_from_symbol,
-    get_open_order_snapshots_for_symbol, get_symbol_side_underlying_account_cumulative_fill_qty,
-    get_symbol_overview_from_symbol, get_last_n_sec_total_trade_qty, get_market_depths,
-    get_last_n_order_journals_from_order_id)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate import (
+    get_chore_total_sum_of_last_n_sec, get_symbol_side_snapshot_from_symbol_side, get_strat_brief_from_symbol,
+    get_open_chore_snapshots_for_symbol, get_symbol_side_underlying_account_cumulative_fill_qty,
+    get_symbol_overview_from_symbol, get_last_n_sec_total_barter_qty, get_market_depths,
+    get_last_n_chore_journals_from_chore_id, get_last_n_sec_first_n_last_barter)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
     PortfolioStatusUpdatesContainer)
 from FluxPythonUtils.scripts.ws_reader import WSReader
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
     StratLeg, FxSymbolOverviewBaseModel, StratViewBaseModel)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book import (
-    StreetBook, TradingDataManager, TopOfBook, MarketDepth, MobileBookContainerCache,
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book import (
+    StreetBook, BarteringDataManager, TopOfBook, MarketDepth, MobileBookContainerCache,
     add_container_obj_for_symbol)
+
+
+class FirstLastBarterCont(BaseModel):
+    id: int | None = Field(None, alias="_id")
+    first: LastBarterOptional | None = None
+    last: LastBarterOptional | None = None
+    model_config = ConfigDict(populate_by_name=True, extra='forbid')
+
 
 def get_pair_strat_id_from_cmd_argv():
     if len(sys.argv) > 2:
@@ -95,56 +103,56 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     underlying_read_symbol_overview_http: Callable[..., Any] | None = None
     underlying_read_top_of_book_http: Callable[..., Any] | None = None
     underlying_get_top_of_book_from_symbol_query_http: Callable[..., Any] | None = None
-    underlying_read_order_snapshot_http: Callable[..., Any] | None = None
-    underlying_read_order_journal_http: Callable[..., Any] | None = None
-    underlying_get_last_n_sec_total_trade_qty_query_http: Callable[..., Any] | None = None
+    underlying_read_chore_snapshot_http: Callable[..., Any] | None = None
+    underlying_read_chore_journal_http: Callable[..., Any] | None = None
+    underlying_get_last_n_sec_total_barter_qty_query_http: Callable[..., Any] | None = None
     get_underlying_account_cumulative_fill_qty_query_http: Callable[..., Any] | None = None
-    underlying_create_order_snapshot_http: Callable[..., Any] | None = None
-    underlying_partial_update_order_snapshot_http: Callable[..., Any] | None = None
+    underlying_create_chore_snapshot_http: Callable[..., Any] | None = None
+    underlying_partial_update_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_partial_update_symbol_side_snapshot_http: Callable[..., Any] | None = None
-    underlying_partial_update_cancel_order_http: Callable[..., Any] | None = None
+    underlying_partial_update_cancel_chore_http: Callable[..., Any] | None = None
     underlying_partial_update_strat_status_http: Callable[..., Any] | None = None
-    underlying_get_open_order_count_query_http: Callable[..., Any] | None = None
+    underlying_get_open_chore_count_query_http: Callable[..., Any] | None = None
     underlying_partial_update_strat_brief_http: Callable[..., Any] | None = None
     underlying_delete_symbol_side_snapshot_http: Callable[..., Any] | None = None
     get_symbol_side_underlying_account_cumulative_fill_qty_query_http: Callable[..., Any] | None = None
     underlying_read_fills_journal_http: Callable[..., Any] | None = None
-    underlying_read_last_trade_http: Callable[..., Any] | None = None
+    underlying_read_last_barter_http: Callable[..., Any] | None = None
     underlying_is_strat_ongoing_query_http: Callable[..., Any] | None = None
     underlying_delete_strat_brief_http: Callable[..., Any] | None = None
-    underlying_create_cancel_order_http: Callable[..., Any] | None = None
+    underlying_create_cancel_chore_http: Callable[..., Any] | None = None
     underlying_read_market_depth_http: Callable[..., Any] | None = None
     underlying_read_strat_status_http: Callable[..., Any] | None = None
     underlying_read_strat_status_by_id_http: Callable[..., Any] | None = None
-    underlying_read_cancel_order_http: Callable[..., Any] | None = None
+    underlying_read_cancel_chore_http: Callable[..., Any] | None = None
     underlying_read_strat_limits_http: Callable[..., Any] | None = None
     underlying_delete_strat_status_http: Callable[..., Any] | None = None
-    underlying_trade_simulator_place_cxl_order_query_http: Callable[..., Any] | None = None
+    underlying_barter_simulator_place_cxl_chore_query_http: Callable[..., Any] | None = None
     underlying_read_strat_view_http: Callable[..., Any] | None = None
 
     @classmethod
     def initialize_underlying_http_routes(cls):
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_read_strat_brief_http, residual_compute_shared_lock, journal_shared_lock,
             underlying_create_strat_limits_http, underlying_delete_strat_limits_http,
             underlying_create_strat_status_http, underlying_update_strat_status_http,
             underlying_get_executor_check_snapshot_query_http, underlying_create_strat_brief_http,
             underlying_read_symbol_side_snapshot_http, underlying_create_symbol_side_snapshot_http,
             underlying_partial_update_symbol_overview_http, underlying_read_strat_limits_by_id_http,
-            underlying_read_symbol_overview_http, underlying_create_cancel_order_http,
+            underlying_read_symbol_overview_http, underlying_create_cancel_chore_http,
             underlying_read_top_of_book_http, underlying_get_top_of_book_from_symbol_query_http,
-            underlying_read_order_snapshot_http, underlying_read_order_journal_http,
-            underlying_get_last_n_sec_total_trade_qty_query_http, underlying_partial_update_cancel_order_http,
-            get_underlying_account_cumulative_fill_qty_query_http, underlying_create_order_snapshot_http,
-            underlying_partial_update_order_snapshot_http, underlying_partial_update_symbol_side_snapshot_http,
-            underlying_partial_update_strat_status_http, underlying_get_open_order_count_query_http,
+            underlying_read_chore_snapshot_http, underlying_read_chore_journal_http,
+            underlying_get_last_n_sec_total_barter_qty_query_http, underlying_partial_update_cancel_chore_http,
+            get_underlying_account_cumulative_fill_qty_query_http, underlying_create_chore_snapshot_http,
+            underlying_partial_update_chore_snapshot_http, underlying_partial_update_symbol_side_snapshot_http,
+            underlying_partial_update_strat_status_http, underlying_get_open_chore_count_query_http,
             underlying_partial_update_strat_brief_http, underlying_delete_symbol_side_snapshot_http,
             get_symbol_side_underlying_account_cumulative_fill_qty_query_http, underlying_read_fills_journal_http,
-            underlying_read_last_trade_http,
+            underlying_read_last_barter_http,
             underlying_delete_strat_brief_http, underlying_read_market_depth_http, underlying_read_strat_status_http,
-            underlying_read_strat_status_by_id_http, underlying_read_cancel_order_http,
+            underlying_read_strat_status_by_id_http, underlying_read_cancel_chore_http,
             underlying_read_strat_limits_http, underlying_delete_strat_status_http,
-            underlying_trade_simulator_place_cxl_order_query_http)
+            underlying_barter_simulator_place_cxl_chore_query_http)
 
         cls.residual_compute_shared_lock = residual_compute_shared_lock
         cls.journal_shared_lock = journal_shared_lock
@@ -162,34 +170,34 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         cls.underlying_read_symbol_overview_http = underlying_read_symbol_overview_http
         cls.underlying_read_top_of_book_http = underlying_read_top_of_book_http
         cls.underlying_get_top_of_book_from_symbol_query_http = underlying_get_top_of_book_from_symbol_query_http
-        cls.underlying_read_order_snapshot_http = underlying_read_order_snapshot_http
-        cls.underlying_read_order_journal_http = underlying_read_order_journal_http
-        cls.underlying_get_last_n_sec_total_trade_qty_query_http = underlying_get_last_n_sec_total_trade_qty_query_http
+        cls.underlying_read_chore_snapshot_http = underlying_read_chore_snapshot_http
+        cls.underlying_read_chore_journal_http = underlying_read_chore_journal_http
+        cls.underlying_get_last_n_sec_total_barter_qty_query_http = underlying_get_last_n_sec_total_barter_qty_query_http
         cls.get_underlying_account_cumulative_fill_qty_query_http = (
             get_underlying_account_cumulative_fill_qty_query_http)
-        cls.underlying_create_order_snapshot_http = underlying_create_order_snapshot_http
-        cls.underlying_partial_update_order_snapshot_http = underlying_partial_update_order_snapshot_http
+        cls.underlying_create_chore_snapshot_http = underlying_create_chore_snapshot_http
+        cls.underlying_partial_update_chore_snapshot_http = underlying_partial_update_chore_snapshot_http
         cls.underlying_partial_update_symbol_side_snapshot_http = underlying_partial_update_symbol_side_snapshot_http
-        cls.underlying_partial_update_cancel_order_http = underlying_partial_update_cancel_order_http
+        cls.underlying_partial_update_cancel_chore_http = underlying_partial_update_cancel_chore_http
         cls.underlying_partial_update_strat_status_http = underlying_partial_update_strat_status_http
-        cls.underlying_get_open_order_count_query_http = underlying_get_open_order_count_query_http
+        cls.underlying_get_open_chore_count_query_http = underlying_get_open_chore_count_query_http
         cls.underlying_partial_update_strat_brief_http = underlying_partial_update_strat_brief_http
         cls.underlying_delete_symbol_side_snapshot_http = underlying_delete_symbol_side_snapshot_http
         cls.get_symbol_side_underlying_account_cumulative_fill_qty_query_http = (
             get_symbol_side_underlying_account_cumulative_fill_qty_query_http)
         cls.underlying_read_fills_journal_http = underlying_read_fills_journal_http
-        cls.underlying_read_last_trade_http = underlying_read_last_trade_http
+        cls.underlying_read_last_barter_http = underlying_read_last_barter_http
         cls.underlying_read_strat_brief_http = underlying_read_strat_brief_http
         cls.underlying_delete_strat_brief_http = underlying_delete_strat_brief_http
-        cls.underlying_create_cancel_order_http = underlying_create_cancel_order_http
+        cls.underlying_create_cancel_chore_http = underlying_create_cancel_chore_http
         cls.underlying_read_market_depth_http = underlying_read_market_depth_http
         cls.underlying_read_strat_status_http = underlying_read_strat_status_http
         cls.underlying_read_strat_status_by_id_http = underlying_read_strat_status_by_id_http
-        cls.underlying_read_cancel_order_http = underlying_read_cancel_order_http
+        cls.underlying_read_cancel_chore_http = underlying_read_cancel_chore_http
         cls.underlying_read_strat_limits_http = underlying_read_strat_limits_http
         cls.underlying_delete_strat_status_http = underlying_delete_strat_status_http
-        cls.underlying_trade_simulator_place_cxl_order_query_http = (
-            underlying_trade_simulator_place_cxl_order_query_http)
+        cls.underlying_barter_simulator_place_cxl_chore_query_http = (
+            underlying_barter_simulator_place_cxl_chore_query_http)
 
     def __init__(self):
         super().__init__()
@@ -218,7 +226,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         self.min_refresh_interval: int = parse_to_int(executor_config_yaml_dict.get("min_refresh_interval"))
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
-        self.trading_data_manager: TradingDataManager | None = None
+        self.bartering_data_manager: BarteringDataManager | None = None
         self.simulate_config_yaml_file_path = (
                 EXECUTOR_PROJECT_DATA_DIR / f"executor_{self.pair_strat_id}_simulate_config.yaml")
         self.log_simulator_file_name = f"log_simulator_{self.pair_strat_id}_logs_{self.datetime_str}.log"
@@ -233,7 +241,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # Load the shared library
         so_module_dir = PurePath(__file__).parent
-        so_module_file_name = TradingLinkBase.pair_strat_config_dict.get("cpp_app_so_module_file_name")
+        so_module_file_name = BarteringLinkBase.pair_strat_config_dict.get("cpp_app_so_module_file_name")
 
         os.environ["LD_LIBRARY_PATH"] = f"{so_module_dir}:$LD_LIBRARY_PATH"
         self.mobile_book_provider = ctypes.CDLL(so_module_dir / so_module_file_name)
@@ -243,7 +251,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         self.mobile_book_provider.unlock_mutex.restype = None
         self.mobile_book_provider.initialize_database.argtypes = [
             ctypes.c_char_p,
-            ctypes.c_char_p
+            ctypes.c_char_p,
+            ctypes.py_object
         ]
         self.mobile_book_provider.create_or_update_md_n_tob.argtypes = [
             ctypes.c_int32,
@@ -254,14 +263,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             ctypes.c_int32,
             ctypes.c_float,
             ctypes.c_int64,
-            ctypes.c_float,
             ctypes.c_char_p,
             ctypes.c_bool,
             ctypes.c_float,
             ctypes.c_int64,
             ctypes.c_float
         ]
-        self.mobile_book_provider.create_or_update_last_trade_n_tob.argtypes = [
+        self.mobile_book_provider.create_or_update_last_barter_n_tob.argtypes = [
             ctypes.c_int32,
             ctypes.c_char_p,
             ctypes.c_char_p,
@@ -276,7 +284,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         ]
         self.mobile_book_provider.initialize_database.restype = None
         self.mobile_book_provider.create_or_update_md_n_tob.restype = None
-        self.mobile_book_provider.create_or_update_last_trade_n_tob.restype = None
+        self.mobile_book_provider.create_or_update_last_barter_n_tob.restype = None
 
     def get_generic_read_route(self):
         return None
@@ -284,7 +292,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     def get_usd_px(self, px: float, system_symbol: str):
         """
         assumes single currency strat for now - may extend to accept symbol and send revised px according to
-        underlying trading currency
+        underlying bartering currency
         """
         return px / self.usd_fx
 
@@ -326,7 +334,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 # validate essential services are up, if so, set service ready state to true
                 # static data and md service are considered essential
                 if (self.all_services_up and static_data_service_state.ready and self.usd_fx is not None and
-                        symbol_overview_for_symbol_exists and self.trading_data_manager is not None):
+                        symbol_overview_for_symbol_exists and self.bartering_data_manager is not None):
                     if not self.service_ready:
                         self.service_ready = True
                         # creating required models for this strat
@@ -338,11 +346,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     logging.warning(f"service is not up yet;;; {self.all_services_up = }, "
                                     f"{static_data_service_state.ready = }, {self.usd_fx = }, "
                                     f"{symbol_overview_for_symbol_exists = }, "
-                                    f"{self.trading_data_manager = }")
+                                    f"{self.bartering_data_manager = }")
                 if not self.all_services_up:
                     try:
                         if all_service_up_check(self.web_client):
-                            # starting trading_data_manager and street_book
+                            # starting bartering_data_manager and street_book
                             try:
                                 pair_strat = email_book_service_http_client.get_pair_strat_client(self.pair_strat_id)
                             except Exception as e:
@@ -360,14 +368,24 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             shutil.copy(temp_config_file_path, dest_config_file_path)
 
                             # setting simulate_config_file_name
-                            TradingLinkBase.simulate_config_yaml_path = self.simulate_config_yaml_file_path
-                            TradingLinkBase.executor_port = self.port
-                            TradingLinkBase.reload_executor_configs()
+                            BarteringLinkBase.simulate_config_yaml_path = self.simulate_config_yaml_file_path
+                            BarteringLinkBase.executor_port = self.port
+                            BarteringLinkBase.reload_executor_configs()
 
                             # setting partial_run to True and assigning port to pair_strat
                             if not pair_strat.is_partially_running:
                                 pair_strat.is_partially_running = True
                                 pair_strat.port = self.port
+
+                                # Setting MobileBookCache instances for this symbol pair
+                                md_port_dict: Dict = {}
+                                mongo_server = executor_config_yaml_dict.get("mongo_server")
+                                self.mobile_book_provider.initialize_database(
+                                    ctypes.c_char_p(mongo_server.encode('utf-8')),
+                                    ctypes.c_char_p(self.db_name.encode('utf-8')), md_port_dict)
+                                pair_strat.top_of_book_port = md_port_dict.get("top_of_book_port")
+                                pair_strat.market_depth_port = md_port_dict.get("market_depth_port")
+                                pair_strat.last_barter_port = md_port_dict.get("last_barter_port")
 
                                 try:
                                     updated_pair_strat = email_book_service_http_client.patch_pair_strat_client(
@@ -376,11 +394,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                     logging.exception(f"patch_pair_strat_client failed with exception: {e}")
                                     continue
                                 else:
-                                    # Setting MobileBookCache instances for this symbol pair
-                                    mongo_server = executor_config_yaml_dict.get("mongo_server")
-                                    self.mobile_book_provider.initialize_database(
-                                        ctypes.c_char_p(mongo_server.encode('utf-8')),
-                                        ctypes.c_char_p(self.db_name.encode('utf-8')))
 
                                     leg_1_mobile_book_container = (
                                         add_container_obj_for_symbol(self.strat_leg_1.sec.sec_id))
@@ -400,12 +413,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                     # Setting asyncio_loop for StreetBook
                                     StreetBook.asyncio_loop = self.asyncio_loop
                                     StreetBook.mobile_book_provider = self.mobile_book_provider
-                                    # StreetBook.trading_link.asyncio_loop = self.asyncio_loop
-                                    TradingDataManager.asyncio_loop = self.asyncio_loop
-                                    self.trading_data_manager = TradingDataManager(StreetBook.executor_trigger,
+                                    # StreetBook.bartering_link.asyncio_loop = self.asyncio_loop
+                                    BarteringDataManager.asyncio_loop = self.asyncio_loop
+                                    self.bartering_data_manager = BarteringDataManager(StreetBook.executor_trigger,
                                                                                    self.strat_cache,
                                                                                    self.mobile_book_container_cache)
-                                    logging.debug(f"Created trading_data_manager for {pair_strat = }")
+                                    logging.debug(f"Created bartering_data_manager for {pair_strat = }")
                             # else not required: not updating if already is_executor_running
                             logging.debug("Marked pair_strat.is_partially_running True")
 
@@ -449,7 +462,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                   f"failed with exception: {e}")
                             else:
                                 for symbol_overview in symbol_overview_list:
-                                    self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview)
+                                    self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview)
 
                             symbol_overview_list = self.strat_cache.get_symbol_overviews
                             if None not in symbol_overview_list:
@@ -492,18 +505,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
                     if self.service_ready:
                         try:
-                            # Gets all open orders, updates residuals and raises pause to strat if req
-                            run_coro = self.cxl_expired_open_orders()
+                            # Gets all open chores, updates residuals and raises pause to strat if req
+                            run_coro = self.cxl_expired_open_chores()
                             future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
                             # block for task to finish
                             try:
                                 future.result()
                             except Exception as e:
-                                logging.exception(f"cxl_expired_open_orders failed with exception: {e}")
+                                logging.exception(f"cxl_expired_open_chores failed with exception: {e}")
 
                         except Exception as e:
-                            logging.error("periodic open order check failed, periodic order state checks will "
+                            logging.error("periodic open chore check failed, periodic chore state checks will "
                                           "not be honored and retried in next periodic cycle"
                                           f";;;exception: {e}", exc_info=True)
             else:
@@ -651,7 +664,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                      f"strat_limits_list: {strat_limits_list}")
                     logging.error(err_str_)
                 else:
-                    self.trading_data_manager.handle_strat_limits_get_all_ws(strat_limits_list[0])
+                    self.bartering_data_manager.handle_strat_limits_get_all_ws(strat_limits_list[0])
                 return strat_limits_list[0]
 
     async def _check_n_remove_strat_limits(self):
@@ -704,7 +717,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         f"strat_status_list: {strat_status_list}")
                     logging.error(err_str_)
                 else:
-                    self.trading_data_manager.handle_strat_status_get_all_ws(strat_status_list[0])
+                    self.bartering_data_manager.handle_strat_status_get_all_ws(strat_status_list[0])
                 return strat_status_list[0]
 
     async def _check_n_remove_strat_status(self):
@@ -738,7 +751,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             return
         else:
             # If no strat_brief exists for this symbol
-            consumable_open_orders = strat_limits.max_open_orders_per_side
+            consumable_open_chores = strat_limits.max_open_chores_per_side
             consumable_notional = strat_limits.max_single_leg_notional
             consumable_open_notional = strat_limits.max_open_single_leg_notional
 
@@ -747,16 +760,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         open_notional = 0
         open_qty = 0
 
-        buy_side_trading_brief: PairSideTradingBrief | None = None
-        sell_side_trading_brief: PairSideTradingBrief | None = None
+        buy_side_bartering_brief: PairSideBarteringBrief | None = None
+        sell_side_bartering_brief: PairSideBarteringBrief | None = None
 
         for sec, side in [(self.strat_leg_1.sec, self.strat_leg_1.side), (self.strat_leg_2.sec, self.strat_leg_2.side)]:
             symbol = sec.sec_id
             consumable_concentration = self.get_consumable_concentration_from_source(symbol, strat_limits)
 
-            participation_period_order_qty_sum = 0
+            participation_period_chore_qty_sum = 0
             consumable_cxl_qty = 0
-            applicable_period_second = strat_limits.market_trade_volume_participation.applicable_period_seconds
+            applicable_period_second = strat_limits.market_barter_volume_participation.applicable_period_seconds
             executor_check_snapshot_list = \
                 await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                        underlying_get_executor_check_snapshot_query_http(symbol, side,
@@ -765,7 +778,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 indicative_consumable_participation_qty = \
                     get_consumable_participation_qty(
                         executor_check_snapshot_list,
-                        strat_limits.market_trade_volume_participation.max_participation_rate)
+                        strat_limits.market_barter_volume_participation.max_participation_rate)
             else:
                 logging.error("Received unexpected length of executor_check_snapshot_list from query "
                               f"{len(executor_check_snapshot_list)}, expected 1, symbol_side_key: "
@@ -773,15 +786,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                               f"get_executor_check_snapshot_query pre implementation")
                 indicative_consumable_participation_qty = 0
             indicative_consumable_residual = strat_limits.residual_restriction.max_residual
-            sec_pair_side_trading_brief_obj = \
-                PairSideTradingBrief(security=sec,
+            sec_pair_side_bartering_brief_obj = \
+                PairSideBarteringBrief(security=sec,
                                      side=side,
                                      last_update_date_time=DateTime.utcnow(),
-                                     consumable_open_orders=consumable_open_orders,
+                                     consumable_open_chores=consumable_open_chores,
                                      consumable_notional=consumable_notional,
                                      consumable_open_notional=consumable_open_notional,
                                      consumable_concentration=consumable_concentration,
-                                     participation_period_order_qty_sum=participation_period_order_qty_sum,
+                                     participation_period_chore_qty_sum=participation_period_chore_qty_sum,
                                      consumable_cxl_qty=consumable_cxl_qty,
                                      indicative_consumable_participation_qty=indicative_consumable_participation_qty,
                                      residual_qty=residual_qty,
@@ -789,19 +802,19 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                      all_bkr_cxlled_qty=all_bkr_cxlled_qty,
                                      open_notional=open_notional, open_qty=open_qty)
             if Side.BUY == side:
-                if buy_side_trading_brief is None:
-                    buy_side_trading_brief = sec_pair_side_trading_brief_obj
+                if buy_side_bartering_brief is None:
+                    buy_side_bartering_brief = sec_pair_side_bartering_brief_obj
                 else:
-                    logging.error(f"expected buy_side_trading_brief to be None, found: {buy_side_trading_brief}")
+                    logging.error(f"expected buy_side_bartering_brief to be None, found: {buy_side_bartering_brief}")
             elif Side.SELL == side:
-                if sell_side_trading_brief is None:
-                    sell_side_trading_brief = sec_pair_side_trading_brief_obj
+                if sell_side_bartering_brief is None:
+                    sell_side_bartering_brief = sec_pair_side_bartering_brief_obj
                 else:
-                    logging.error(f"expected sell_side_trading_brief to be None, found: {sell_side_trading_brief}")
+                    logging.error(f"expected sell_side_bartering_brief to be None, found: {sell_side_bartering_brief}")
 
         strat_brief_obj: StratBrief = StratBrief(_id=strat_limits.id,
-                                                 pair_buy_side_trading_brief=buy_side_trading_brief,
-                                                 pair_sell_side_trading_brief=sell_side_trading_brief,
+                                                 pair_buy_side_bartering_brief=buy_side_bartering_brief,
+                                                 pair_sell_side_bartering_brief=sell_side_bartering_brief,
                                                  consumable_nett_filled_notional=strat_limits.max_net_filled_notional)
         created_strat_brief = \
             await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_brief_http(
@@ -832,7 +845,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                                   avg_cxled_px=0,
                                                                   total_cxled_notional=0,
                                                                   last_update_date_time=DateTime.utcnow(),
-                                                                  order_count=0)
+                                                                  chore_count=0)
                     created_symbol_side_snapshot: SymbolSideSnapshot = \
                         await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                                underlying_create_symbol_side_snapshot_http(symbol_side_snapshot_obj))
@@ -886,8 +899,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         strat_limits = self._check_n_create_default_strat_limits()
         if strat_limits is not None:
             strat_status = self._check_n_create_or_update_strat_status(strat_limits)
-            if not self._check_n_create_strat_alert(self.pair_strat_id):
-                return False
 
             if strat_status is not None:
                 pair_strat_tuple = self.strat_cache.get_pair_strat()
@@ -922,33 +933,33 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         strat_brief_list: List[StratBrief] = \
             await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http()
         for strat_brief in strat_brief_list:
-            self.trading_data_manager.handle_strat_brief_get_all_ws(strat_brief)
+            self.bartering_data_manager.handle_strat_brief_get_all_ws(strat_brief)
 
         if self.is_crash_recovery:
 
-            # updating order_journals
-            order_journals: List[OrderJournal] = \
-                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_order_journal_http()
-            for order_journal in order_journals:
-                self.trading_data_manager.handle_recovery_order_journal(order_journal)
+            # updating chore_journals
+            chore_journals: List[ChoreJournal] = \
+                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_journal_http()
+            for chore_journal in chore_journals:
+                self.bartering_data_manager.handle_recovery_chore_journal(chore_journal)
 
-            # updating order_snapshots
-            order_snapshots: List[OrderSnapshot] = \
-                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http()
-            for order_snapshot in order_snapshots:
-                self.trading_data_manager.handle_order_snapshot_get_all_ws(order_snapshot)
+            # updating chore_snapshots
+            chore_snapshots: List[ChoreSnapshot] = \
+                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_snapshot_http()
+            for chore_snapshot in chore_snapshots:
+                self.bartering_data_manager.handle_chore_snapshot_get_all_ws(chore_snapshot)
 
             # updating symbol_side_snapshot
             symbol_side_snapshots: List[SymbolSideSnapshot] = \
                 await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_symbol_side_snapshot_http()
             for symbol_side_snapshot in symbol_side_snapshots:
-                self.trading_data_manager.handle_symbol_side_snapshot_get_all_ws(symbol_side_snapshot)
+                self.bartering_data_manager.handle_symbol_side_snapshot_get_all_ws(symbol_side_snapshot)
 
-            # updating cancel_orders
-            cancel_orders: List[CancelOrder] = \
-                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_cancel_order_http()
-            for cancel_order in cancel_orders:
-                self.trading_data_manager.handle_recovery_cancel_order(cancel_order)
+            # updating cancel_chores
+            cancel_chores: List[CancelChore] = \
+                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_cancel_chore_http()
+            for cancel_chore in cancel_chores:
+                self.bartering_data_manager.handle_recovery_cancel_chore(cancel_chore)
 
     async def _create_related_models_for_active_strat(self) -> None:
         # updating strat_cache
@@ -1009,12 +1020,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 pause_strat = True
             # else not required: if residual is in control then nothing to do
 
-        if symbol_side_snapshot_.order_count > strat_limits.cancel_rate.waived_min_orders:
+        if symbol_side_snapshot_.chore_count > strat_limits.cancel_rate.waived_min_chores:
             if symbol_side_snapshot_.side == Side.BUY:
-                if strat_brief_.pair_buy_side_trading_brief.all_bkr_cxlled_qty > 0:
-                    if (consumable_cxl_qty := strat_brief_.pair_buy_side_trading_brief.consumable_cxl_qty) < 0:
+                if strat_brief_.pair_buy_side_bartering_brief.all_bkr_cxlled_qty > 0:
+                    if (consumable_cxl_qty := strat_brief_.pair_buy_side_bartering_brief.consumable_cxl_qty) < 0:
                         err_str_: str = f"Consumable cxl qty can't be < 0, current {consumable_cxl_qty = } " \
-                                        f"for symbol {strat_brief_.pair_buy_side_trading_brief.security.sec_id} and " \
+                                        f"for symbol {strat_brief_.pair_buy_side_bartering_brief.security.sec_id} and " \
                                         f"side {Side.BUY} - pausing this strat"
                         alert_brief: str = err_str_
                         alert_details: str = (f"{updated_strat_status = }, {strat_limits = }, "
@@ -1023,13 +1034,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                          f"{get_symbol_side_snapshot_log_key(symbol_side_snapshot_)};;; {alert_details}")
                         pause_strat = True
                     # else not required: if consumable_cxl-qty is allowed then ignore
-                # else not required: if there is not even a single buy order then consumable_cxl-qty will
+                # else not required: if there is not even a single buy chore then consumable_cxl-qty will
                 # become 0 in that case too, so ignoring this case if buy side all_bkr_cxlled_qty is 0
             else:
-                if strat_brief_.pair_sell_side_trading_brief.all_bkr_cxlled_qty > 0:
-                    if (consumable_cxl_qty := strat_brief_.pair_sell_side_trading_brief.consumable_cxl_qty) < 0:
+                if strat_brief_.pair_sell_side_bartering_brief.all_bkr_cxlled_qty > 0:
+                    if (consumable_cxl_qty := strat_brief_.pair_sell_side_bartering_brief.consumable_cxl_qty) < 0:
                         err_str_: str = f"Consumable cxl qty can't be < 0, current {consumable_cxl_qty = } " \
-                                        f"for symbol {strat_brief_.pair_sell_side_trading_brief.security.sec_id} and " \
+                                        f"for symbol {strat_brief_.pair_sell_side_bartering_brief.security.sec_id} and " \
                                         f"side {Side.SELL} - pausing this strat"
                         alert_brief: str = err_str_
                         alert_details: str = (f"{updated_strat_status = }, {strat_limits = }, "
@@ -1039,9 +1050,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                          f"{get_symbol_side_snapshot_log_key(symbol_side_snapshot_)};;; "
                                          f"{alert_details}")
                     # else not required: if consumable_cxl-qty is allowed then ignore
-                # else not required: if there is not even a single sell order then consumable_cxl-qty will
+                # else not required: if there is not even a single sell chore then consumable_cxl-qty will
                 # become 0 in that case too, so ignoring this case if sell side all_bkr_cxlled_qty is 0
-            # else not required: if order count is less than waived_min_orders
+            # else not required: if chore count is less than waived_min_chores
         if pause_strat:
             self.set_strat_state_to_pause()
 
@@ -1055,28 +1066,28 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         elif symbol == self.strat_leg_2.sec.sec_id:
             return self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book()
 
-    def _get_last_trade_px_n_symbol_tuples_from_tob(self, current_leg_tob_obj: TopOfBook,
+    def _get_last_barter_px_n_symbol_tuples_from_tob(self, current_leg_tob_obj: TopOfBook,
                                                     other_leg_tob_obj: TopOfBook) -> Tuple[Tuple[float, str],
                                                                                     Tuple[float, str]]:
         with (MobileBookMutexManager(self.mobile_book_provider, current_leg_tob_obj, other_leg_tob_obj)):
-            return ((current_leg_tob_obj.last_trade.px, current_leg_tob_obj.symbol),
-                    (other_leg_tob_obj.last_trade.px, other_leg_tob_obj.symbol))
+            return ((current_leg_tob_obj.last_barter.px, current_leg_tob_obj.symbol),
+                    (other_leg_tob_obj.last_barter.px, other_leg_tob_obj.symbol))
 
     def __get_residual_obj(self, side: Side, strat_brief: StratBrief) -> Residual | None:
         if side == Side.BUY:
-            residual_qty = strat_brief.pair_buy_side_trading_brief.residual_qty
-            other_leg_residual_qty = strat_brief.pair_sell_side_trading_brief.residual_qty
+            residual_qty = strat_brief.pair_buy_side_bartering_brief.residual_qty
+            other_leg_residual_qty = strat_brief.pair_sell_side_bartering_brief.residual_qty
             top_of_book_obj = \
-                self._get_top_of_book_from_symbol(strat_brief.pair_buy_side_trading_brief.security.sec_id)
+                self._get_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
             other_leg_top_of_book = \
-                self._get_top_of_book_from_symbol(strat_brief.pair_sell_side_trading_brief.security.sec_id)
+                self._get_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
         else:
-            residual_qty = strat_brief.pair_sell_side_trading_brief.residual_qty
-            other_leg_residual_qty = strat_brief.pair_buy_side_trading_brief.residual_qty
+            residual_qty = strat_brief.pair_sell_side_bartering_brief.residual_qty
+            other_leg_residual_qty = strat_brief.pair_buy_side_bartering_brief.residual_qty
             top_of_book_obj = \
-                self._get_top_of_book_from_symbol(strat_brief.pair_sell_side_trading_brief.security.sec_id)
+                self._get_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
             other_leg_top_of_book = \
-                self._get_top_of_book_from_symbol(strat_brief.pair_buy_side_trading_brief.security.sec_id)
+                self._get_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
 
         if top_of_book_obj is None or other_leg_top_of_book is None:
             logging.error(f"Received both leg's TOBs as {top_of_book_obj} and {other_leg_top_of_book}, "
@@ -1085,27 +1096,27 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # since unit value is used make function
         current_leg_tob_data, other_leg_tob_data = (
-            self._get_last_trade_px_n_symbol_tuples_from_tob(top_of_book_obj, other_leg_top_of_book))
-        current_leg_last_trade_px, current_leg_tob_symbol = current_leg_tob_data
-        other_leg_last_trade_px, other_leg_tob_symbol = other_leg_tob_data
-        residual_notional = abs((residual_qty * self.get_usd_px(current_leg_last_trade_px,
+            self._get_last_barter_px_n_symbol_tuples_from_tob(top_of_book_obj, other_leg_top_of_book))
+        current_leg_last_barter_px, current_leg_tob_symbol = current_leg_tob_data
+        other_leg_last_barter_px, other_leg_tob_symbol = other_leg_tob_data
+        residual_notional = abs((residual_qty * self.get_usd_px(current_leg_last_barter_px,
                                                                 current_leg_tob_symbol)) -
-                                (other_leg_residual_qty * self.get_usd_px(other_leg_last_trade_px,
+                                (other_leg_residual_qty * self.get_usd_px(other_leg_last_barter_px,
                                                                           other_leg_tob_symbol)))
         if side == Side.BUY:
-            if (residual_qty * self.get_usd_px(top_of_book_obj.last_trade.px,
+            if (residual_qty * self.get_usd_px(top_of_book_obj.last_barter.px,
                                                top_of_book_obj.symbol)) > \
-                    (other_leg_residual_qty * self.get_usd_px(other_leg_top_of_book.last_trade.px,
+                    (other_leg_residual_qty * self.get_usd_px(other_leg_top_of_book.last_barter.px,
                                                               other_leg_top_of_book.symbol)):
-                residual_security = strat_brief.pair_buy_side_trading_brief.security
+                residual_security = strat_brief.pair_buy_side_bartering_brief.security
             else:
-                residual_security = strat_brief.pair_sell_side_trading_brief.security
+                residual_security = strat_brief.pair_sell_side_bartering_brief.security
         else:
-            if (residual_qty * top_of_book_obj.last_trade.px) > \
-                    (other_leg_residual_qty * other_leg_top_of_book.last_trade.px):
-                residual_security = strat_brief.pair_sell_side_trading_brief.security
+            if (residual_qty * top_of_book_obj.last_barter.px) > \
+                    (other_leg_residual_qty * other_leg_top_of_book.last_barter.px):
+                residual_security = strat_brief.pair_sell_side_bartering_brief.security
             else:
-                residual_security = strat_brief.pair_buy_side_trading_brief.security
+                residual_security = strat_brief.pair_buy_side_bartering_brief.security
 
         if residual_notional > 0:
             updated_residual = Residual(security=residual_security, residual_notional=residual_notional)
@@ -1114,57 +1125,60 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             updated_residual = Residual(security=residual_security, residual_notional=0)
             return updated_residual
 
-    async def get_last_n_sec_order_qty(self, symbol: str, side: Side, last_n_sec: int) -> int | None:
-        last_n_sec_order_qty: int | None = None
+    async def get_last_n_sec_chore_qty(self, symbol: str, side: Side, last_n_sec: int) -> int | None:
+        last_n_sec_chore_qty: int | None = None
         if last_n_sec == 0:
             symbol_side_snapshots_tuple = self.strat_cache.get_symbol_side_snapshot_from_symbol(symbol)
             if symbol_side_snapshots_tuple is not None:
                 symbol_side_snapshot, _ = symbol_side_snapshots_tuple
-                last_n_sec_order_qty = symbol_side_snapshot.total_qty
+                last_n_sec_chore_qty = symbol_side_snapshot.total_qty
             else:
                 err_str_ = f"Received symbol_side_snapshots_tuple as None from strat_cache, symbol_side_key: " \
                            f"{get_symbol_side_key([(symbol, side)])}"
                 logging.exception(err_str_)
         else:
             agg_objs = \
-                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http(
-                    get_order_total_sum_of_last_n_sec(symbol, last_n_sec), self.get_generic_read_route())
+                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_snapshot_http(
+                    get_chore_total_sum_of_last_n_sec(symbol, last_n_sec), self.get_generic_read_route())
 
             if len(agg_objs) > 0:
-                last_n_sec_order_qty = agg_objs[-1].last_n_sec_total_qty
+                last_n_sec_chore_qty = agg_objs[-1].last_n_sec_total_qty
             else:
-                last_n_sec_order_qty = 0
-                err_str_ = "received empty list of aggregated objects from aggregation on OrderSnapshot to " \
-                           f"get {last_n_sec = } total order sum, symbol_side_key: " \
+                last_n_sec_chore_qty = 0
+                err_str_ = "received empty list of aggregated objects from aggregation on ChoreSnapshot to " \
+                           f"get {last_n_sec = } total chore sum, symbol_side_key: " \
                            f"{get_symbol_side_key([(symbol, side)])}"
                 logging.debug(err_str_)
-        return last_n_sec_order_qty
+        logging.debug(f"Received {last_n_sec_chore_qty = }, {last_n_sec = }, {symbol = }, {Side = }")
+        return last_n_sec_chore_qty
 
-    async def get_last_n_sec_trade_qty(self, symbol: str, side: Side) -> int | None:
+    async def get_last_n_sec_barter_qty(self, symbol: str, side: Side) -> int | None:
         strat_limits_tuple = self.strat_cache.get_strat_limits()
 
-        last_n_sec_trade_qty: int | None = None
+        last_n_sec_barter_qty: int | None = None
         if strat_limits_tuple is not None:
             strat_limits, _ = strat_limits_tuple
 
             if strat_limits is not None:
-                applicable_period_seconds = strat_limits.market_trade_volume_participation.applicable_period_seconds
-                last_n_sec_market_trade_vol_obj_list = \
+                applicable_period_seconds = strat_limits.market_barter_volume_participation.applicable_period_seconds
+                last_n_sec_market_barter_vol_obj_list = \
                     await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                           underlying_get_last_n_sec_total_trade_qty_query_http(symbol, applicable_period_seconds))
-                if last_n_sec_market_trade_vol_obj_list:
-                    last_n_sec_trade_qty = last_n_sec_market_trade_vol_obj_list[0].last_n_sec_trade_vol
+                           underlying_get_last_n_sec_total_barter_qty_query_http(symbol, applicable_period_seconds))
+                if last_n_sec_market_barter_vol_obj_list:
+                    last_n_sec_barter_qty = last_n_sec_market_barter_vol_obj_list[0].last_n_sec_barter_vol
+                    logging.debug(
+                        f"Received {last_n_sec_barter_qty = }, {applicable_period_seconds = }, {symbol = }, {Side = }")
                 else:
-                    logging.error(f"could not receive any last_n_sec_market_trade_vol_obj to get last_n_sec_trade_qty "
+                    logging.error(f"could not receive any last_n_sec_market_barter_vol_obj to get last_n_sec_barter_qty "
                                   f"for symbol_side_key: {get_symbol_side_key([(symbol, side)])}, likely bug in "
-                                  f"get_last_n_sec_total_trade_qty_query pre impl")
+                                  f"get_last_n_sec_total_barter_qty_query pre impl")
         else:
             err_str_ = (
-                "Can't find any strat_limits in cache to get last_n_sec trade qty, "
+                "Can't find any strat_limits in cache to get last_n_sec barter qty, "
                 "ignoring model creations, symbol_side_key: "
                 f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
             logging.error(err_str_)
-        return last_n_sec_trade_qty
+        return last_n_sec_barter_qty
 
     async def get_list_of_underlying_account_n_cumulative_fill_qty(self, symbol: str, side: Side):
         underlying_account_cum_fill_qty_obj_list = \
@@ -1179,7 +1193,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     async def create_admin_control_pre(self, admin_control_obj: AdminControl):
         match admin_control_obj.command_type:
             case CommandType.RESET_STATE:
-                from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_beanie_database \
+                from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_beanie_database \
                     import document_models
                 for document_model in document_models:
                     document_model._cache_obj_id_to_obj_dict = {}
@@ -1269,60 +1283,60 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         return updated_strat_status_obj_json
 
     ##############################
-    # Order Journal Update Methods
+    # Chore Journal Update Methods
     ##############################
 
-    async def create_order_journal_pre(self, order_journal_obj: OrderJournal) -> None:
+    async def create_chore_journal_pre(self, chore_journal_obj: ChoreJournal) -> None:
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = f"create_order_journal_pre not ready - service is not initialized yet, " \
-                       f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
+            err_str_ = f"create_chore_journal_pre not ready - service is not initialized yet, " \
+                       f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
-        # updating order notional in order journal obj
+        # updating chore notional in chore journal obj
 
-        if order_journal_obj.order_event == OrderEventType.OE_NEW and order_journal_obj.order.px == 0:
-            top_of_book_obj = self._get_top_of_book_from_symbol(order_journal_obj.order.security.sec_id)
+        if chore_journal_obj.chore_event == ChoreEventType.OE_NEW and chore_journal_obj.chore.px == 0:
+            top_of_book_obj = self._get_top_of_book_from_symbol(chore_journal_obj.chore.security.sec_id)
             if top_of_book_obj is not None:
                 with MobileBookMutexManager(self.mobile_book_provider, top_of_book_obj):
-                    order_journal_obj.order.px = top_of_book_obj.last_trade.px
+                    chore_journal_obj.chore.px = top_of_book_obj.last_barter.px
             else:
-                err_str_ = f"received order journal px 0 and to update px, received {top_of_book_obj = }, " \
-                           f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
+                err_str_ = f"received chore journal px 0 and to update px, received {top_of_book_obj = }, " \
+                           f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
                 logging.error(err_str_)
                 raise HTTPException(status_code=500, detail=err_str_)
-        # If order_journal is not new then we don't care about px, we care about event_type and if order is new
+        # If chore_journal is not new then we don't care about px, we care about event_type and if chore is new
         # and px is not 0 then using provided px
 
-        if order_journal_obj.order.px is not None and order_journal_obj.order.qty is not None:
-            order_journal_obj.order.order_notional = \
-                self.get_usd_px(order_journal_obj.order.px,
-                                order_journal_obj.order.security.sec_id) * order_journal_obj.order.qty
+        if chore_journal_obj.chore.px is not None and chore_journal_obj.chore.qty is not None:
+            chore_journal_obj.chore.chore_notional = \
+                self.get_usd_px(chore_journal_obj.chore.px,
+                                chore_journal_obj.chore.security.sec_id) * chore_journal_obj.chore.qty
         else:
-            order_journal_obj.order.order_notional = 0
+            chore_journal_obj.chore.chore_notional = 0
 
-    async def create_order_journal_post(self, order_journal_obj: OrderJournal):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_order_journal_get_all_ws(order_journal_obj)
+    async def create_chore_journal_post(self, chore_journal_obj: ChoreJournal):
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_chore_journal_get_all_ws(chore_journal_obj)
 
         async with StreetBookServiceRoutesCallbackBaseNativeOverride.residual_compute_shared_lock:
-            res = await self._update_order_snapshot_from_order_journal(order_journal_obj)
+            res = await self._update_chore_snapshot_from_chore_journal(chore_journal_obj)
 
             if res is not None:
-                strat_id, order_snapshot, strat_brief, portfolio_status_updates = res
+                strat_id, chore_snapshot, strat_brief, portfolio_status_updates = res
 
                 # Updating and checking portfolio_limits in portfolio_manager
                 post_book_service_http_client.check_portfolio_limits_query_client(
-                    strat_id, order_journal_obj, order_snapshot, strat_brief, portfolio_status_updates)
+                    strat_id, chore_journal_obj, chore_snapshot, strat_brief, portfolio_status_updates)
 
-            # else not required: if result returned from _update_order_snapshot_from_order_journal is None, that
+            # else not required: if result returned from _update_chore_snapshot_from_chore_journal is None, that
             # signifies some unexpected exception occurred so complete update was not done,
             # therefore avoiding portfolio_limit checks too
 
-    async def create_order_snapshot_pre(self, order_snapshot_obj: OrderSnapshot):
+    async def create_chore_snapshot_pre(self, chore_snapshot_obj: ChoreSnapshot):
         # updating security's sec_type to default value if sec_type is None
-        if order_snapshot_obj.order_brief.security.sec_type is None:
-            order_snapshot_obj.order_brief.security.sec_type = SecurityType.TICKER
+        if chore_snapshot_obj.chore_brief.security.sec_type is None:
+            chore_snapshot_obj.chore_brief.security.sec_type = SecurityType.TICKER
 
     async def create_symbol_side_snapshot_pre(self, symbol_side_snapshot_obj: SymbolSideSnapshot):
         # updating security's sec_type to default value if sec_type is None
@@ -1330,13 +1344,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             symbol_side_snapshot_obj.security.sec_type = SecurityType.TICKER
 
     @staticmethod
-    def is_cxled_event(event: OrderEventType) -> bool:
-        if event in [OrderEventType.OE_CXL_ACK, OrderEventType.OE_UNSOL_CXL]:
+    def is_cxled_event(event: ChoreEventType) -> bool:
+        if event in [ChoreEventType.OE_CXL_ACK, ChoreEventType.OE_UNSOL_CXL]:
             return True
         return False
 
-    async def _update_order_snapshot_from_order_journal(
-            self, order_journal_obj: OrderJournal) -> Tuple[int, OrderSnapshot, StratBrief | None,
+    async def _update_chore_snapshot_from_chore_journal(
+            self, chore_journal_obj: ChoreJournal) -> Tuple[int, ChoreSnapshot, StratBrief | None,
                                                             PortfolioStatusUpdatesContainer | None] | None:
         pair_strat = self.strat_cache.get_pair_strat_obj()
 
@@ -1344,14 +1358,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             # avoiding any update if strat is non-ongoing
             return None
 
-        match order_journal_obj.order_event:
-            case OrderEventType.OE_NEW:
+        match chore_journal_obj.chore_event:
+            case ChoreEventType.OE_NEW:
                 # importing routes here otherwise at the time of launch callback's set instance is called by
                 # routes call before set_instance file call and set_instance file throws error that
                 # 'set instance called more than once in one session'
 
-                order_snapshot = OrderSnapshot(_id=OrderSnapshot.next_id(),
-                                               order_brief=order_journal_obj.order,
+                chore_snapshot = ChoreSnapshot(_id=ChoreSnapshot.next_id(),
+                                               chore_brief=chore_journal_obj.chore,
                                                filled_qty=0, avg_fill_px=0,
                                                fill_notional=0,
                                                cxled_qty=0,
@@ -1359,329 +1373,329 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                cxled_notional=0,
                                                last_update_fill_qty=0,
                                                last_update_fill_px=0,
-                                               create_date_time=order_journal_obj.order_event_date_time,
-                                               last_update_date_time=order_journal_obj.order_event_date_time,
-                                               order_status=OrderStatusType.OE_UNACK)
-                order_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                        underlying_create_order_snapshot_http(order_snapshot))
+                                               create_date_time=chore_journal_obj.chore_event_date_time,
+                                               last_update_date_time=chore_journal_obj.chore_event_date_time,
+                                               chore_status=ChoreStatusType.OE_UNACK)
+                chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
+                                        underlying_create_chore_snapshot_http(chore_snapshot))
                 symbol_side_snapshot = \
-                    await self._create_update_symbol_side_snapshot_from_order_journal(order_journal_obj,
-                                                                                      order_snapshot)
+                    await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+                                                                                      chore_snapshot)
                 if symbol_side_snapshot is not None:
-                    updated_strat_brief = await self._update_strat_brief_from_order_or_fill(order_journal_obj,
-                                                                                            order_snapshot,
+                    updated_strat_brief = await self._update_strat_brief_from_chore_or_fill(chore_journal_obj,
+                                                                                            chore_snapshot,
                                                                                             symbol_side_snapshot)
                     if updated_strat_brief is not None:
-                        await self._update_strat_status_from_order_journal(order_journal_obj, order_snapshot,
+                        await self._update_strat_status_from_chore_journal(chore_journal_obj, chore_snapshot,
                                                                            symbol_side_snapshot, updated_strat_brief)
                     # else not required: if updated_strat_brief is None then it means some error occurred in
-                    # _update_strat_brief_from_order which would have got added to alert already
+                    # _update_strat_brief_from_chore which would have got added to alert already
                     portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
-                        await self._update_portfolio_status_from_order_journal(
-                            order_journal_obj, order_snapshot))
+                        await self._update_portfolio_status_from_chore_journal(
+                            chore_journal_obj, chore_snapshot))
 
-                    return pair_strat.id, order_snapshot, updated_strat_brief, portfolio_status_updates
-                # else not require_create_update_symbol_side_snapshot_from_order_journald: if symbol_side_snapshot
-                # is None then it means some error occurred in _create_update_symbol_side_snapshot_from_order_journal
+                    return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
+                # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
+                # is None then it means some error occurred in _create_update_symbol_side_snapshot_from_chore_journal
                 # which would have got added to alert already
 
-            case OrderEventType.OE_ACK:
-                async with OrderSnapshot.reentrant_lock:
-                    order_snapshot = \
-                        await self._check_state_and_get_order_snapshot_obj(order_journal_obj,
-                                                                           [OrderStatusType.OE_UNACK])
-                    if order_snapshot is not None:
-                        updated_order_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                            underlying_partial_update_order_snapshot_http(
-                                json.loads(OrderSnapshotOptional(
-                                    _id=order_snapshot.id,
-                                    last_update_date_time=order_journal_obj.order_event_date_time,
-                                    order_status=OrderStatusType.OE_ACKED).model_dump_json(by_alias=True,
+            case ChoreEventType.OE_ACK:
+                async with ChoreSnapshot.reentrant_lock:
+                    chore_snapshot = \
+                        await self._check_state_and_get_chore_snapshot_obj(chore_journal_obj,
+                                                                           [ChoreStatusType.OE_UNACK])
+                    if chore_snapshot is not None:
+                        updated_chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
+                            underlying_partial_update_chore_snapshot_http(
+                                json.loads(ChoreSnapshotOptional(
+                                    _id=chore_snapshot.id,
+                                    last_update_date_time=chore_journal_obj.chore_event_date_time,
+                                    chore_status=ChoreStatusType.OE_ACKED).model_dump_json(by_alias=True,
                                                                                            exclude_none=True))))
 
-                        return pair_strat.id, updated_order_snapshot, None, None
+                        return pair_strat.id, updated_chore_snapshot, None, None
 
                     # else not required: none returned object signifies there was something wrong in
-                    # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
-            case OrderEventType.OE_CXL:
-                async with OrderSnapshot.reentrant_lock:
-                    order_snapshot = await self._check_state_and_get_order_snapshot_obj(
-                        order_journal_obj, [OrderStatusType.OE_UNACK, OrderStatusType.OE_ACKED])
-                    if order_snapshot is not None:
-                        updated_order_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                        underlying_partial_update_order_snapshot_http(
-                            json.loads(OrderSnapshotOptional(
-                                _id=order_snapshot.id, last_update_date_time=order_journal_obj.order_event_date_time,
-                                order_status=OrderStatusType.OE_CXL_UNACK).model_dump_json(by_alias=True,
+                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
+            case ChoreEventType.OE_CXL:
+                async with ChoreSnapshot.reentrant_lock:
+                    chore_snapshot = await self._check_state_and_get_chore_snapshot_obj(
+                        chore_journal_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED])
+                    if chore_snapshot is not None:
+                        updated_chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
+                        underlying_partial_update_chore_snapshot_http(
+                            json.loads(ChoreSnapshotOptional(
+                                _id=chore_snapshot.id, last_update_date_time=chore_journal_obj.chore_event_date_time,
+                                chore_status=ChoreStatusType.OE_CXL_UNACK).model_dump_json(by_alias=True,
                                                                                            exclude_none=True))))
 
-                        return pair_strat.id, updated_order_snapshot, None, None
+                        return pair_strat.id, updated_chore_snapshot, None, None
 
                     # else not required: none returned object signifies there was something wrong in
-                    # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
-            case OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL:
-                async with OrderSnapshot.reentrant_lock:
-                    order_snapshot = \
-                        await self._check_state_and_get_order_snapshot_obj(
-                            order_journal_obj, [OrderStatusType.OE_CXL_UNACK, OrderStatusType.OE_ACKED,
-                                                OrderStatusType.OE_UNACK, OrderStatusType.OE_FILLED])
-                    if order_snapshot is not None:
-                        # When CXL_ACK arrived after order got fully filled, since nothing is left to cxl - ignoring
-                        # this order_journal's order_snapshot update
-                        if order_snapshot.order_status == OrderStatusType.OE_FILLED:
-                            logging.info("Received order_journal with event CXL_ACK after OrderSnapshot is fully "
-                                         f"filled - ignoring this CXL_ACK, order_journal_key: "
-                                         f"{get_order_journal_log_key(order_journal_obj)};;; "
-                                         f"{order_journal_obj = }, {order_snapshot = }")
+                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
+            case ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL:
+                async with ChoreSnapshot.reentrant_lock:
+                    chore_snapshot = \
+                        await self._check_state_and_get_chore_snapshot_obj(
+                            chore_journal_obj, [ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_ACKED,
+                                                ChoreStatusType.OE_UNACK, ChoreStatusType.OE_FILLED])
+                    if chore_snapshot is not None:
+                        # When CXL_ACK arrived after chore got fully filled, since nothing is left to cxl - ignoring
+                        # this chore_journal's chore_snapshot update
+                        if chore_snapshot.chore_status == ChoreStatusType.OE_FILLED:
+                            logging.info("Received chore_journal with event CXL_ACK after ChoreSnapshot is fully "
+                                         f"filled - ignoring this CXL_ACK, chore_journal_key: "
+                                         f"{get_chore_journal_log_key(chore_journal_obj)};;; "
+                                         f"{chore_journal_obj = }, {chore_snapshot = }")
                         else:
-                            # If order_event is OE_UNSOL_CXL, that is treated as unsolicited cxl
+                            # If chore_event is OE_UNSOL_CXL, that is treated as unsolicited cxl
                             # If CXL_ACK comes after OE_CXL_UNACK, that means cxl_ack came after cxl request
-                            # order_brief = OrderBriefOptional(**order_snapshot.order_brief.model_dump())
-                            order_brief = order_snapshot.order_brief
-                            if order_journal_obj.order.text:
-                                if order_brief.text:
-                                    order_brief.text.extend(order_journal_obj.order.text)
+                            # chore_brief = ChoreBriefOptional(**chore_snapshot.chore_brief.model_dump())
+                            chore_brief = chore_snapshot.chore_brief
+                            if chore_journal_obj.chore.text:
+                                if chore_brief.text:
+                                    chore_brief.text.extend(chore_journal_obj.chore.text)
                                 else:
-                                    order_brief.text = order_journal_obj.order.text
-                            # else not required: If no text is present in order_journal then updating
-                            # order snapshot with same obj
+                                    chore_brief.text = chore_journal_obj.chore.text
+                            # else not required: If no text is present in chore_journal then updating
+                            # chore snapshot with same obj
 
-                            cxled_qty = int(order_snapshot.order_brief.qty - order_snapshot.filled_qty)
-                            cxled_notional = cxled_qty * self.get_usd_px(order_snapshot.order_brief.px,
-                                                                         order_snapshot.order_brief.security.sec_id)
+                            cxled_qty = int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
+                            cxled_notional = cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                         chore_snapshot.chore_brief.security.sec_id)
                             avg_cxled_px = \
-                                (self.get_local_px_or_notional(cxled_notional, order_snapshot.order_brief.security.sec_id) /
+                                (self.get_local_px_or_notional(cxled_notional, chore_snapshot.chore_brief.security.sec_id) /
                                  cxled_qty) if cxled_qty != 0 else 0
-                            order_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                underlying_partial_update_order_snapshot_http(
-                                    json.loads(OrderSnapshotOptional(_id=order_snapshot.id,
-                                                                     order_brief=order_brief,
+                            chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
+                                underlying_partial_update_chore_snapshot_http(
+                                    json.loads(ChoreSnapshotOptional(_id=chore_snapshot.id,
+                                                                     chore_brief=chore_brief,
                                                                      cxled_qty=cxled_qty,
                                                                      cxled_notional=cxled_notional,
                                                                      avg_cxled_px=avg_cxled_px,
                                                                      last_update_date_time=
-                                                                     order_journal_obj.order_event_date_time,
-                                                                     order_status=
-                                                                     OrderStatusType.OE_DOD).model_dump_json(
+                                                                     chore_journal_obj.chore_event_date_time,
+                                                                     chore_status=
+                                                                     ChoreStatusType.OE_DOD).model_dump_json(
                                         by_alias=True, exclude_none=True))))
 
-                        if order_snapshot.order_status != OrderStatusType.OE_FILLED:
-                            symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_order_journal(
-                                order_journal_obj, order_snapshot)
+                        if chore_snapshot.chore_status != ChoreStatusType.OE_FILLED:
+                            symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_chore_journal(
+                                chore_journal_obj, chore_snapshot)
                             if symbol_side_snapshot is not None:
                                 updated_strat_brief = (
-                                    await self._update_strat_brief_from_order_or_fill(order_journal_obj, order_snapshot,
+                                    await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
                                                                                       symbol_side_snapshot))
                                 if updated_strat_brief is not None:
-                                    await self._update_strat_status_from_order_journal(
-                                        order_journal_obj, order_snapshot, symbol_side_snapshot, updated_strat_brief)
+                                    await self._update_strat_status_from_chore_journal(
+                                        chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
                                 # else not required: if updated_strat_brief is None then it means some error occurred in
-                                # _update_strat_brief_from_order which would have got added to alert already
+                                # _update_strat_brief_from_chore which would have got added to alert already
                                 portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
-                                    await self._update_portfolio_status_from_order_journal(
-                                        order_journal_obj, order_snapshot))
+                                    await self._update_portfolio_status_from_chore_journal(
+                                        chore_journal_obj, chore_snapshot))
 
-                                return pair_strat.id, order_snapshot, updated_strat_brief, portfolio_status_updates
+                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
 
                             # else not required: if symbol_side_snapshot is None then it means some error occurred in
-                            # _create_update_symbol_side_snapshot_from_order_journal which would have got added to
+                            # _create_update_symbol_side_snapshot_from_chore_journal which would have got added to
                             # alert already
 
-                        # else not required: If CXL_ACK arrived after order is fully filled then since we ignore
-                        # any update for this order journal object, returns None to not update post trade engine too
+                        # else not required: If CXL_ACK arrived after chore is fully filled then since we ignore
+                        # any update for this chore journal object, returns None to not update post barter engine too
 
                     # else not required: none returned object signifies there was something wrong in
-                    # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
+                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
 
-            case OrderEventType.OE_CXL_INT_REJ | OrderEventType.OE_CXL_BRK_REJ | OrderEventType.OE_CXL_EXH_REJ:
-                # reverting the state of order_snapshot after receiving cxl reject
+            case ChoreEventType.OE_CXL_INT_REJ | ChoreEventType.OE_CXL_BRK_REJ | ChoreEventType.OE_CXL_EXH_REJ:
+                # reverting the state of chore_snapshot after receiving cxl reject
 
-                async with OrderSnapshot.reentrant_lock:
-                    order_snapshot = await self._check_state_and_get_order_snapshot_obj(
-                        order_journal_obj, [OrderStatusType.OE_CXL_UNACK, OrderStatusType.OE_FILLED])
-                    if order_snapshot is not None:
-                        if order_snapshot.order_brief.qty > order_snapshot.filled_qty:
-                            last_3_order_journals_from_order_id = \
+                async with ChoreSnapshot.reentrant_lock:
+                    chore_snapshot = await self._check_state_and_get_chore_snapshot_obj(
+                        chore_journal_obj, [ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_FILLED])
+                    if chore_snapshot is not None:
+                        if chore_snapshot.chore_brief.qty > chore_snapshot.filled_qty:
+                            last_3_chore_journals_from_chore_id = \
                                 await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                       underlying_read_order_journal_http(
-                                        get_last_n_order_journals_from_order_id(
-                                            order_journal_obj.order.order_id, 3),
+                                       underlying_read_chore_journal_http(
+                                        get_last_n_chore_journals_from_chore_id(
+                                            chore_journal_obj.chore.chore_id, 3),
                                         self.get_generic_read_route()))
-                            if last_3_order_journals_from_order_id:
-                                if (last_3_order_journals_from_order_id[0].order_event in
-                                        [OrderEventType.OE_CXL_INT_REJ,
-                                         OrderEventType.OE_CXL_BRK_REJ,
-                                         OrderEventType.OE_CXL_EXH_REJ]):
-                                    if last_3_order_journals_from_order_id[-1].order_event == OrderEventType.OE_NEW:
-                                        order_status = OrderStatusType.OE_UNACK
-                                    elif last_3_order_journals_from_order_id[-1].order_event == OrderEventType.OE_ACK:
-                                        order_status = OrderStatusType.OE_ACKED
+                            if last_3_chore_journals_from_chore_id:
+                                if (last_3_chore_journals_from_chore_id[0].chore_event in
+                                        [ChoreEventType.OE_CXL_INT_REJ,
+                                         ChoreEventType.OE_CXL_BRK_REJ,
+                                         ChoreEventType.OE_CXL_EXH_REJ]):
+                                    if last_3_chore_journals_from_chore_id[-1].chore_event == ChoreEventType.OE_NEW:
+                                        chore_status = ChoreStatusType.OE_UNACK
+                                    elif last_3_chore_journals_from_chore_id[-1].chore_event == ChoreEventType.OE_ACK:
+                                        chore_status = ChoreStatusType.OE_ACKED
                                     else:
-                                        err_str_ = ("3rd order journal from order_journal of status OE_CXL_INT_REJ "
+                                        err_str_ = ("3rd chore journal from chore_journal of status OE_CXL_INT_REJ "
                                                     "or OE_CXL_BRK_REJ or OE_CXL_EXH_REJ, must be"
                                                     "of status OE_ACK or OE_UNACK, received "
-                                                    f"{last_3_order_journals_from_order_id = }, "
-                                                    f"order_journal_key: "
-                                                    f"{get_order_journal_log_key(order_journal_obj)}")
+                                                    f"{last_3_chore_journals_from_chore_id = }, "
+                                                    f"chore_journal_key: "
+                                                    f"{get_chore_journal_log_key(chore_journal_obj)}")
                                         logging.error(err_str_)
                                         return None
                                 else:
-                                    err_str_ = ("Recent order journal must be of status OE_CXL_INT_REJ "
+                                    err_str_ = ("Recent chore journal must be of status OE_CXL_INT_REJ "
                                                 "or OE_CXL_BRK_REJ or OE_CXL_EXH_REJ, received last 3 "
-                                                "order_journals {last_3_order_journals_from_order_id}, "
-                                                f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}")
+                                                "chore_journals {last_3_chore_journals_from_chore_id}, "
+                                                f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}")
                                     logging.error(err_str_)
                                     return None
                             else:
-                                err_str_ = f"Received empty list while fetching last 3 order_journals for " \
-                                           f"{order_journal_obj.order.order_id = }, " \
-                                           f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
+                                err_str_ = f"Received empty list while fetching last 3 chore_journals for " \
+                                           f"{chore_journal_obj.chore.chore_id = }, " \
+                                           f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
                                 logging.error(err_str_)
                                 return None
-                        elif order_snapshot.order_brief.qty < order_snapshot.filled_qty:
-                            order_status = OrderStatusType.OE_OVER_FILLED
+                        elif chore_snapshot.chore_brief.qty < chore_snapshot.filled_qty:
+                            chore_status = ChoreStatusType.OE_OVER_FILLED
                         else:
-                            order_status = OrderStatusType.OE_FILLED
-                        updated_order_snapshot = \
+                            chore_status = ChoreStatusType.OE_FILLED
+                        updated_chore_snapshot = \
                             await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                   underlying_partial_update_order_snapshot_http(
-                                    json.loads(OrderSnapshotOptional(
-                                        _id=order_snapshot.id, last_update_date_time=
-                                        order_journal_obj.order_event_date_time,
-                                        order_status=order_status).model_dump_json(by_alias=True, exclude_none=True))))
+                                   underlying_partial_update_chore_snapshot_http(
+                                    json.loads(ChoreSnapshotOptional(
+                                        _id=chore_snapshot.id, last_update_date_time=
+                                        chore_journal_obj.chore_event_date_time,
+                                        chore_status=chore_status).model_dump_json(by_alias=True, exclude_none=True))))
 
-                        return pair_strat.id, updated_order_snapshot, None, None
+                        return pair_strat.id, updated_chore_snapshot, None, None
                     # else not required: none returned object signifies there was something wrong in
-                    # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
+                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
 
-            case OrderEventType.OE_INT_REJ | OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ:
-                async with OrderSnapshot.reentrant_lock:
-                    order_snapshot = \
-                        await self._check_state_and_get_order_snapshot_obj(
-                            order_journal_obj, [OrderStatusType.OE_UNACK, OrderStatusType.OE_ACKED])
-                    if order_snapshot is not None:
-                        order_brief = order_snapshot.order_brief
-                        if order_brief.text:
-                            order_brief.text.extend(order_journal_obj.order.text)
+            case ChoreEventType.OE_INT_REJ | ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ:
+                async with ChoreSnapshot.reentrant_lock:
+                    chore_snapshot = \
+                        await self._check_state_and_get_chore_snapshot_obj(
+                            chore_journal_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED])
+                    if chore_snapshot is not None:
+                        chore_brief = chore_snapshot.chore_brief
+                        if chore_brief.text:
+                            chore_brief.text.extend(chore_journal_obj.chore.text)
                         else:
-                            order_brief.text = order_journal_obj.order.text
-                        cxled_qty = int(order_snapshot.order_brief.qty - order_snapshot.filled_qty)
+                            chore_brief.text = chore_journal_obj.chore.text
+                        cxled_qty = int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
                         cxled_notional = \
-                            order_snapshot.cxled_qty * self.get_usd_px(order_snapshot.order_brief.px,
-                                                                       order_snapshot.order_brief.security.sec_id)
+                            chore_snapshot.cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                       chore_snapshot.chore_brief.security.sec_id)
                         avg_cxled_px = \
-                            (self.get_local_px_or_notional(cxled_notional, order_snapshot.order_brief.security.sec_id) /
+                            (self.get_local_px_or_notional(cxled_notional, chore_snapshot.chore_brief.security.sec_id) /
                              cxled_qty) if cxled_qty != 0 else 0
-                        order_snapshot = \
+                        chore_snapshot = \
                             await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                   underlying_partial_update_order_snapshot_http(
-                                    json.loads(OrderSnapshotOptional(
-                                        _id=order_snapshot.id,
-                                        # order_brief=OrderBriefOptional(**order_brief.model_dump()),
-                                        order_brief=order_brief,
+                                   underlying_partial_update_chore_snapshot_http(
+                                    json.loads(ChoreSnapshotOptional(
+                                        _id=chore_snapshot.id,
+                                        # chore_brief=ChoreBriefOptional(**chore_brief.model_dump()),
+                                        chore_brief=chore_brief,
                                         cxled_qty=cxled_qty,
                                         cxled_notional=cxled_notional,
                                         avg_cxled_px=avg_cxled_px,
-                                        last_update_date_time=order_journal_obj.order_event_date_time,
-                                        order_status=OrderStatusType.OE_DOD).model_dump_json(by_alias=True,
+                                        last_update_date_time=chore_journal_obj.chore_event_date_time,
+                                        chore_status=ChoreStatusType.OE_DOD).model_dump_json(by_alias=True,
                                                                                              exclude_none=True))))
                         symbol_side_snapshot = \
-                            await self._create_update_symbol_side_snapshot_from_order_journal(order_journal_obj,
-                                                                                              order_snapshot)
+                            await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+                                                                                              chore_snapshot)
                         if symbol_side_snapshot is not None:
                             updated_strat_brief = (
-                                await self._update_strat_brief_from_order_or_fill(order_journal_obj, order_snapshot,
+                                await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
                                                                                   symbol_side_snapshot))
                             if updated_strat_brief is not None:
-                                await self._update_strat_status_from_order_journal(
-                                    order_journal_obj, order_snapshot, symbol_side_snapshot, updated_strat_brief)
+                                await self._update_strat_status_from_chore_journal(
+                                    chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
                             # else not required: if updated_strat_brief is None then it means some error occurred in
-                            # _update_strat_brief_from_order which would have got added to alert already
+                            # _update_strat_brief_from_chore which would have got added to alert already
                             portfolio_status_updates: PortfolioStatusUpdatesContainer = (
-                                await self._update_portfolio_status_from_order_journal(
-                                    order_journal_obj, order_snapshot))
+                                await self._update_portfolio_status_from_chore_journal(
+                                    chore_journal_obj, chore_snapshot))
 
-                            return pair_strat.id, order_snapshot, updated_strat_brief, portfolio_status_updates
-                        # else not require_create_update_symbol_side_snapshot_from_order_journald:
+                            return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
+                        # else not require_create_update_symbol_side_snapshot_from_chore_journald:
                         # if symbol_side_snapshot is None then it means some error occurred in
-                        # _create_update_symbol_side_snapshot_from_order_journal which would have
+                        # _create_update_symbol_side_snapshot_from_chore_journal which would have
                         # got added to alert already
                 # else not required: none returned object signifies there was something wrong in
-                # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
+                # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
 
             case other_:
-                err_str_ = f"Unsupported Order event - {other_} in order_journal_key: " \
-                           f"{get_order_journal_log_key(order_journal_obj)}, {order_journal_obj = }"
+                err_str_ = f"Unsupported Chore event - {other_} in chore_journal_key: " \
+                           f"{get_chore_journal_log_key(chore_journal_obj)}, {chore_journal_obj = }"
                 logging.error(err_str_)
 
-    async def _create_symbol_side_snapshot_for_new_order(self,
-                                                         new_order_journal_obj: OrderJournal) -> SymbolSideSnapshot:
-        security = new_order_journal_obj.order.security
-        side = new_order_journal_obj.order.side
+    async def _create_symbol_side_snapshot_for_new_chore(self,
+                                                         new_chore_journal_obj: ChoreJournal) -> SymbolSideSnapshot:
+        security = new_chore_journal_obj.chore.security
+        side = new_chore_journal_obj.chore.side
         symbol_side_snapshot_obj = SymbolSideSnapshot(_id=SymbolSideSnapshot.next_id(), security=security,
                                                       side=side,
-                                                      avg_px=new_order_journal_obj.order.px,
-                                                      total_qty=int(new_order_journal_obj.order.qty),
+                                                      avg_px=new_chore_journal_obj.chore.px,
+                                                      total_qty=int(new_chore_journal_obj.chore.qty),
                                                       total_filled_qty=0, avg_fill_px=0,
                                                       total_fill_notional=0, last_update_fill_qty=0,
                                                       last_update_fill_px=0, total_cxled_qty=0,
                                                       avg_cxled_px=0, total_cxled_notional=0,
-                                                      last_update_date_time=new_order_journal_obj.order_event_date_time,
-                                                      order_count=1)
+                                                      last_update_date_time=new_chore_journal_obj.chore_event_date_time,
+                                                      chore_count=1)
         symbol_side_snapshot_obj = \
             await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_symbol_side_snapshot_http(
                 symbol_side_snapshot_obj)
         return symbol_side_snapshot_obj
 
-    async def _create_update_symbol_side_snapshot_from_order_journal(self, order_journal: OrderJournal,
-                                                                     order_snapshot_obj: OrderSnapshot
+    async def _create_update_symbol_side_snapshot_from_chore_journal(self, chore_journal: ChoreJournal,
+                                                                     chore_snapshot_obj: ChoreSnapshot
                                                                      ) -> SymbolSideSnapshot | None:
         async with SymbolSideSnapshot.reentrant_lock:
             symbol_side_snapshot_objs = (
-                self.strat_cache.get_symbol_side_snapshot_from_symbol(order_journal.order.security.sec_id))
+                self.strat_cache.get_symbol_side_snapshot_from_symbol(chore_journal.chore.security.sec_id))
 
-            # If no symbol_side_snapshot for symbol-side of received order_journal
+            # If no symbol_side_snapshot for symbol-side of received chore_journal
             if symbol_side_snapshot_objs is None:
-                if order_journal.order_event == OrderEventType.OE_NEW:
-                    created_symbol_side_snapshot = await self._create_symbol_side_snapshot_for_new_order(order_journal)
+                if chore_journal.chore_event == ChoreEventType.OE_NEW:
+                    created_symbol_side_snapshot = await self._create_symbol_side_snapshot_for_new_chore(chore_journal)
                     return created_symbol_side_snapshot
                 else:
-                    err_str_: str = (f"No OE_NEW detected for order_journal_key: "
-                                     f"{get_order_journal_log_key(order_journal)} "
+                    err_str_: str = (f"No OE_NEW detected for chore_journal_key: "
+                                     f"{get_chore_journal_log_key(chore_journal)} "
                                      f"failed to create symbol_side_snapshot "
-                                     f";;; {order_journal = }")
+                                     f";;; {chore_journal = }")
                     logging.error(err_str_)
                     return
-            # If symbol_side_snapshot exists for order_id from order_journal
+            # If symbol_side_snapshot exists for chore_id from chore_journal
             else:
                 symbol_side_snapshot_obj, _ = symbol_side_snapshot_objs
                 updated_symbol_side_snapshot_obj = SymbolSideSnapshotOptional(_id=symbol_side_snapshot_obj.id)
-                match order_journal.order_event:
-                    case OrderEventType.OE_NEW:
-                        updated_symbol_side_snapshot_obj.order_count = symbol_side_snapshot_obj.order_count + 1
+                match chore_journal.chore_event:
+                    case ChoreEventType.OE_NEW:
+                        updated_symbol_side_snapshot_obj.chore_count = symbol_side_snapshot_obj.chore_count + 1
                         updated_symbol_side_snapshot_obj.avg_px = \
                             avg_of_new_val_sum_to_avg(symbol_side_snapshot_obj.avg_px,
-                                                      order_journal.order.px,
-                                                      updated_symbol_side_snapshot_obj.order_count
+                                                      chore_journal.chore.px,
+                                                      updated_symbol_side_snapshot_obj.chore_count
                                                       )
                         updated_symbol_side_snapshot_obj.total_qty = int(
-                                symbol_side_snapshot_obj.total_qty + order_journal.order.qty)
-                        updated_symbol_side_snapshot_obj.last_update_date_time = order_journal.order_event_date_time
-                    case (OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL | OrderEventType.OE_INT_REJ |
-                          OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ):
+                                symbol_side_snapshot_obj.total_qty + chore_journal.chore.qty)
+                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
+                    case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
+                          ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                         updated_symbol_side_snapshot_obj.total_cxled_qty = int(
-                                symbol_side_snapshot_obj.total_cxled_qty + order_snapshot_obj.cxled_qty)
+                                symbol_side_snapshot_obj.total_cxled_qty + chore_snapshot_obj.cxled_qty)
                         updated_symbol_side_snapshot_obj.total_cxled_notional = (
-                                symbol_side_snapshot_obj.total_cxled_notional + order_snapshot_obj.cxled_notional)
+                                symbol_side_snapshot_obj.total_cxled_notional + chore_snapshot_obj.cxled_notional)
                         updated_symbol_side_snapshot_obj.avg_cxled_px = (
                                 self.get_local_px_or_notional(updated_symbol_side_snapshot_obj.total_cxled_notional,
                                                               symbol_side_snapshot_obj.security.sec_id) /
                                 updated_symbol_side_snapshot_obj.total_cxled_qty) \
                             if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0
-                        updated_symbol_side_snapshot_obj.last_update_date_time = order_journal.order_event_date_time
+                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
                     case other_:
                         err_str_ = f"Unsupported StratEventType for symbol_side_snapshot update {other_} " \
-                                   f"{get_order_journal_log_key(order_journal)}"
+                                   f"{get_chore_journal_log_key(chore_journal)}"
                         logging.error(err_str_)
                         return
                 updated_symbol_side_snapshot_obj = \
@@ -1692,34 +1706,33 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                            ))
                 return updated_symbol_side_snapshot_obj
 
-    async def _check_state_and_get_order_snapshot_obj(self, order_journal_obj: OrderJournal,
-                                                      expected_status_list: List[str]) -> OrderSnapshot | None:
+    async def _check_state_and_get_chore_snapshot_obj(self, chore_journal_obj: ChoreJournal,
+                                                      expected_status_list: List[str]) -> ChoreSnapshot | None:
         """
-        Checks if order_snapshot holding order_id of passed order_journal has expected status
-        from provided statuses list and then returns that order_snapshot
+        Checks if chore_snapshot holding chore_id of passed chore_journal has expected status
+        from provided statuses list and then returns that chore_snapshot
         """
-        order_snapshot_obj = self.strat_cache.get_order_snapshot_from_order_id(order_journal_obj.order.order_id)
+        chore_snapshot_obj = self.strat_cache.get_chore_snapshot_from_chore_id(chore_journal_obj.chore.chore_id)
 
-        if order_snapshot_obj is not None:
-            if order_snapshot_obj.order_status in expected_status_list:
-                return order_snapshot_obj
+        if chore_snapshot_obj is not None:
+            if chore_snapshot_obj.chore_status in expected_status_list:
+                return chore_snapshot_obj
             else:
-                ord_journal_key: str = get_order_journal_log_key(order_journal_obj)
-                ord_snapshot_key: str = get_order_snapshot_log_key(order_snapshot_obj)
-                err_str_: str = f"_check_state_and_get_order_snapshot_obj: {ord_journal_key = } " \
-                                f"received with {order_journal_obj.order_event = }, to update status of " \
-                                f"order_snapshot: {ord_snapshot_key}, with " \
-                                f"{order_snapshot_obj.order_status = }, but order_snapshot doesn't contain any of " \
-                                f"{expected_status_list = }" \
-                                f";;; {order_journal_obj = }, {order_snapshot_obj = }"
+                ord_journal_key: str = get_chore_journal_log_key(chore_journal_obj)
+                ord_snapshot_key: str = get_chore_snapshot_log_key(chore_snapshot_obj)
+                err_str_: str = (f"Unexpected: Received chore_journal of event: {chore_journal_obj.chore_event} on "
+                                 f"chore of chore_snapshot status: {chore_snapshot_obj.chore_status}, expected "
+                                 f"chore_statuses for chore_journal event {chore_journal_obj.chore_event} is "
+                                 f"{expected_status_list = }, {ord_journal_key = }, {ord_snapshot_key = };;; "
+                                 f"{chore_journal_obj = }, {chore_snapshot_obj = }")
                 logging.error(err_str_)
-        # else not required: error occurred in _get_order_snapshot_from_order_journal_order_id,
+        # else not required: error occurred in _get_chore_snapshot_from_chore_journal_chore_id,
         # alert must have updated
 
-    async def _update_strat_status_from_order_journal(self, order_journal_obj: OrderJournal,
-                                                      order_snapshot: OrderSnapshot,
+    async def _update_strat_status_from_chore_journal(self, chore_journal_obj: ChoreJournal,
+                                                      chore_snapshot: ChoreSnapshot,
                                                       symbol_side_snapshot: SymbolSideSnapshot,
-                                                      strat_brief: StratBrief, ):
+                                                      strat_brief: StratBrief):
         strat_limits_tuple = self.strat_cache.get_strat_limits()
 
         async with StratStatus.reentrant_lock:
@@ -1728,37 +1741,37 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             if strat_limits_tuple is not None and strat_status_tuple is not None:
                 strat_limits, _ = strat_limits_tuple
                 update_strat_status_obj, _ = strat_status_tuple
-                match order_journal_obj.order.side:
+                match chore_journal_obj.chore.side:
                     case Side.BUY:
-                        match order_journal_obj.order_event:
-                            case OrderEventType.OE_NEW:
-                                update_strat_status_obj.total_buy_qty += int(order_journal_obj.order.qty)
-                                update_strat_status_obj.total_open_buy_qty += int(order_journal_obj.order.qty)
+                        match chore_journal_obj.chore_event:
+                            case ChoreEventType.OE_NEW:
+                                update_strat_status_obj.total_buy_qty += int(chore_journal_obj.chore.qty)
+                                update_strat_status_obj.total_open_buy_qty += int(chore_journal_obj.chore.qty)
                                 update_strat_status_obj.total_open_buy_notional += \
-                                    order_journal_obj.order.qty * self.get_usd_px(order_snapshot.order_brief.px,
-                                                                                  order_snapshot.order_brief.security.sec_id)
-                            case (OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL | OrderEventType.OE_INT_REJ |
-                                  OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ):
+                                    chore_journal_obj.chore.qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                                  chore_snapshot.chore_brief.security.sec_id)
+                            case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
+                                  ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                                 total_buy_unfilled_qty = \
-                                    int(order_snapshot.order_brief.qty - order_snapshot.filled_qty)
+                                    int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
                                 update_strat_status_obj.total_open_buy_qty -= total_buy_unfilled_qty
                                 update_strat_status_obj.total_open_buy_notional -= \
-                                    (total_buy_unfilled_qty * self.get_usd_px(order_snapshot.order_brief.px,
-                                                                              order_snapshot.order_brief.security.sec_id))
-                                update_strat_status_obj.total_cxl_buy_qty += int(order_snapshot.cxled_qty)
+                                    (total_buy_unfilled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                              chore_snapshot.chore_brief.security.sec_id))
+                                update_strat_status_obj.total_cxl_buy_qty += int(chore_snapshot.cxled_qty)
                                 update_strat_status_obj.total_cxl_buy_notional += \
-                                    order_snapshot.cxled_qty * self.get_usd_px(order_snapshot.order_brief.px,
-                                                                               order_snapshot.order_brief.security.sec_id)
+                                    chore_snapshot.cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                               chore_snapshot.chore_brief.security.sec_id)
                                 update_strat_status_obj.avg_cxl_buy_px = (
                                     (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_buy_notional,
-                                                                   order_journal_obj.order.security.sec_id) / update_strat_status_obj.total_cxl_buy_qty)
+                                                                   chore_journal_obj.chore.security.sec_id) / update_strat_status_obj.total_cxl_buy_qty)
                                     if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
                                 update_strat_status_obj.total_cxl_exposure = \
                                     update_strat_status_obj.total_cxl_buy_notional - \
                                     update_strat_status_obj.total_cxl_sell_notional
                             case other_:
-                                err_str_ = f"Unsupported Order Event type {other_}, " \
-                                           f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
+                                err_str_ = f"Unsupported Chore Event type {other_}, " \
+                                           f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
                                 logging.error(err_str_)
                                 return
                         if update_strat_status_obj.total_open_buy_qty == 0:
@@ -1766,38 +1779,38 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         else:
                             update_strat_status_obj.avg_open_buy_px = \
                                 (self.get_local_px_or_notional(update_strat_status_obj.total_open_buy_notional,
-                                                               order_journal_obj.order.security.sec_id) /
+                                                               chore_journal_obj.chore.security.sec_id) /
                                  update_strat_status_obj.total_open_buy_qty)
                     case Side.SELL:
-                        match order_journal_obj.order_event:
-                            case OrderEventType.OE_NEW:
-                                update_strat_status_obj.total_sell_qty += int(order_journal_obj.order.qty)
-                                update_strat_status_obj.total_open_sell_qty += int(order_journal_obj.order.qty)
+                        match chore_journal_obj.chore_event:
+                            case ChoreEventType.OE_NEW:
+                                update_strat_status_obj.total_sell_qty += int(chore_journal_obj.chore.qty)
+                                update_strat_status_obj.total_open_sell_qty += int(chore_journal_obj.chore.qty)
                                 update_strat_status_obj.total_open_sell_notional += \
-                                    order_journal_obj.order.qty * self.get_usd_px(order_journal_obj.order.px,
-                                                                                  order_journal_obj.order.security.sec_id)
-                            case (OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL | OrderEventType.OE_INT_REJ |
-                                  OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ):
+                                    chore_journal_obj.chore.qty * self.get_usd_px(chore_journal_obj.chore.px,
+                                                                                  chore_journal_obj.chore.security.sec_id)
+                            case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
+                                  ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                                 total_sell_unfilled_qty = \
-                                    int(order_snapshot.order_brief.qty - order_snapshot.filled_qty)
+                                    int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
                                 update_strat_status_obj.total_open_sell_qty -= total_sell_unfilled_qty
                                 update_strat_status_obj.total_open_sell_notional -= \
-                                    (total_sell_unfilled_qty * self.get_usd_px(order_snapshot.order_brief.px,
-                                                                               order_snapshot.order_brief.security.sec_id))
-                                update_strat_status_obj.total_cxl_sell_qty += int(order_snapshot.cxled_qty)
+                                    (total_sell_unfilled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                               chore_snapshot.chore_brief.security.sec_id))
+                                update_strat_status_obj.total_cxl_sell_qty += int(chore_snapshot.cxled_qty)
                                 update_strat_status_obj.total_cxl_sell_notional += \
-                                    order_snapshot.cxled_qty * self.get_usd_px(order_snapshot.order_brief.px,
-                                                                               order_snapshot.order_brief.security.sec_id)
+                                    chore_snapshot.cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                               chore_snapshot.chore_brief.security.sec_id)
                                 update_strat_status_obj.avg_cxl_sell_px = (
                                     (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_sell_notional,
-                                                                   order_journal_obj.order.security.sec_id) / update_strat_status_obj.total_cxl_sell_qty)
+                                                                   chore_journal_obj.chore.security.sec_id) / update_strat_status_obj.total_cxl_sell_qty)
                                     if (update_strat_status_obj.total_cxl_sell_qty != 0) else 0)
                                 update_strat_status_obj.total_cxl_exposure = \
                                     update_strat_status_obj.total_cxl_buy_notional - \
                                     update_strat_status_obj.total_cxl_sell_notional
                             case other_:
-                                err_str_ = f"Unsupported Order Event type {other_} " \
-                                           f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
+                                err_str_ = f"Unsupported Chore Event type {other_} " \
+                                           f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
                                 logging.error(err_str_)
                                 return
                         if update_strat_status_obj.total_open_sell_qty == 0:
@@ -1805,15 +1818,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         else:
                             update_strat_status_obj.avg_open_sell_px = \
                                 self.get_local_px_or_notional(update_strat_status_obj.total_open_sell_notional,
-                                                              order_journal_obj.order.security.sec_id) / \
+                                                              chore_journal_obj.chore.security.sec_id) / \
                                 update_strat_status_obj.total_open_sell_qty
                     case other_:
-                        err_str_ = f"Unsupported Side Type {other_} received in order_journal_key: " \
-                                   f"{get_order_journal_log_key(order_journal_obj)} while updating strat_status;;; " \
-                                   f"{order_journal_obj = }"
+                        err_str_ = f"Unsupported Side Type {other_} received in chore_journal_key: " \
+                                   f"{get_chore_journal_log_key(chore_journal_obj)} while updating strat_status;;; " \
+                                   f"{chore_journal_obj = }"
                         logging.error(err_str_)
                         return
-                update_strat_status_obj.total_order_qty = \
+                update_strat_status_obj.total_chore_qty = \
                     int(update_strat_status_obj.total_buy_qty + update_strat_status_obj.total_sell_qty)
                 update_strat_status_obj.total_open_exposure = (update_strat_status_obj.total_open_buy_notional -
                                                                update_strat_status_obj.total_open_sell_notional)
@@ -1824,7 +1837,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     update_strat_status_obj.balance_notional = \
                         strat_limits.max_single_leg_notional - update_strat_status_obj.total_fill_sell_notional
 
-                updated_residual = self.__get_residual_obj(order_snapshot.order_brief.side, strat_brief)
+                updated_residual = self.__get_residual_obj(chore_snapshot.chore_brief.side, strat_brief)
                 if updated_residual is not None:
                     update_strat_status_obj.residual = updated_residual
 
@@ -1839,8 +1852,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                               f"{strat_status_tuple = }, {strat_limits_tuple = }")
                 return
 
-    async def _update_strat_brief_from_order_or_fill(self, order_journal_or_fills_journal: OrderJournal | FillsJournal,
-                                                     order_snapshot: OrderSnapshot,
+    async def _update_strat_brief_from_chore_or_fill(self, chore_journal_or_fills_journal: ChoreJournal | FillsJournal,
+                                                     chore_snapshot: ChoreSnapshot,
                                                      symbol_side_snapshot: SymbolSideSnapshot,
                                                      received_fill_after_dod: bool | None = None) -> StratBrief | None:
 
@@ -1859,77 +1872,77 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     strat_limits, _ = strat_limits_tuple
 
                     if side == Side.BUY:
-                        fetched_open_qty = strat_brief_obj.pair_buy_side_trading_brief.open_qty
-                        fetched_open_notional = strat_brief_obj.pair_buy_side_trading_brief.open_notional
+                        fetched_open_qty = strat_brief_obj.pair_buy_side_bartering_brief.open_qty
+                        fetched_open_notional = strat_brief_obj.pair_buy_side_bartering_brief.open_notional
                     else:
-                        fetched_open_qty = strat_brief_obj.pair_sell_side_trading_brief.open_qty
-                        fetched_open_notional = strat_brief_obj.pair_sell_side_trading_brief.open_notional
+                        fetched_open_qty = strat_brief_obj.pair_sell_side_bartering_brief.open_qty
+                        fetched_open_notional = strat_brief_obj.pair_sell_side_bartering_brief.open_notional
 
-                    if isinstance(order_journal_or_fills_journal, OrderJournal):
-                        order_journal: OrderJournal = order_journal_or_fills_journal
-                        if order_journal.order_event == OrderEventType.OE_NEW:
-                            # When order_event is OE_NEW then just adding current order's total qty to existing
-                            # open_qty + total notional (total order Qty * order px) to exist open_notional
+                    if isinstance(chore_journal_or_fills_journal, ChoreJournal):
+                        chore_journal: ChoreJournal = chore_journal_or_fills_journal
+                        if chore_journal.chore_event == ChoreEventType.OE_NEW:
+                            # When chore_event is OE_NEW then just adding current chore's total qty to existing
+                            # open_qty + total notional (total chore Qty * chore px) to exist open_notional
                             if fetched_open_qty is None:
                                 fetched_open_qty = 0
                             if fetched_open_notional is None:
                                 fetched_open_notional = 0
-                            open_qty = fetched_open_qty + order_snapshot.order_brief.qty
+                            open_qty = fetched_open_qty + chore_snapshot.chore_brief.qty
                             open_notional = (
                                     fetched_open_notional + (
-                                        order_snapshot.order_brief.qty *
-                                        self.get_usd_px(order_snapshot.order_brief.px,
-                                                        order_snapshot.order_brief.security.sec_id)))
-                        elif order_journal.order_event in [OrderEventType.OE_INT_REJ, OrderEventType.OE_BRK_REJ,
-                                                           OrderEventType.OE_EXH_REJ]:
-                            # When order_event is OE_INT_REJ or OE_BRK_REJ or OE_EXH_REJ then just removing
-                            # current order's total qty from existing open_qty + total notional
-                            # (total order Qty * order px) from existing open_notional
-                            open_qty = fetched_open_qty - order_snapshot.order_brief.qty
+                                        chore_snapshot.chore_brief.qty *
+                                        self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                        chore_snapshot.chore_brief.security.sec_id)))
+                        elif chore_journal.chore_event in [ChoreEventType.OE_INT_REJ, ChoreEventType.OE_BRK_REJ,
+                                                           ChoreEventType.OE_EXH_REJ]:
+                            # When chore_event is OE_INT_REJ or OE_BRK_REJ or OE_EXH_REJ then just removing
+                            # current chore's total qty from existing open_qty + total notional
+                            # (total chore Qty * chore px) from existing open_notional
+                            open_qty = fetched_open_qty - chore_snapshot.chore_brief.qty
                             open_notional = (
                                     fetched_open_notional - (
-                                        order_snapshot.order_brief.qty *
-                                        self.get_usd_px(order_snapshot.order_brief.px,
-                                                        order_snapshot.order_brief.security.sec_id)))
-                        elif order_journal.order_event in [OrderEventType.OE_CXL_ACK, OrderEventType.OE_UNSOL_CXL]:
-                            # When order_event is OE_CXL_ACK or OE_UNSOL_CXL then removing current order's
+                                        chore_snapshot.chore_brief.qty *
+                                        self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                        chore_snapshot.chore_brief.security.sec_id)))
+                        elif chore_journal.chore_event in [ChoreEventType.OE_CXL_ACK, ChoreEventType.OE_UNSOL_CXL]:
+                            # When chore_event is OE_CXL_ACK or OE_UNSOL_CXL then removing current chore's
                             # unfilled qty from existing open_qty + unfilled notional
-                            # (unfilled order Qty * order px) from existing open_notional
-                            unfilled_qty = int(order_snapshot.order_brief.qty - order_snapshot.filled_qty)
+                            # (unfilled chore Qty * chore px) from existing open_notional
+                            unfilled_qty = int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
                             open_qty = int(fetched_open_qty - unfilled_qty)
                             open_notional = (
                                     fetched_open_notional - (
-                                        unfilled_qty * self.get_usd_px(order_snapshot.order_brief.px,
-                                                                       order_snapshot.order_brief.security.sec_id)))
+                                        unfilled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                       chore_snapshot.chore_brief.security.sec_id)))
                         else:
-                            err_str_: str = (f"Unsupported OrderEventType: Must be either of "
-                                             f"[{OrderEventType.OE_NEW}, {OrderEventType.OE_INT_REJ}, "
-                                             f"{OrderEventType.OE_BRK_REJ}, {OrderEventType.OE_EXH_REJ}"
-                                             f"{OrderEventType.OE_CXL_ACK}, {OrderEventType.OE_UNSOL_CXL}], "
-                                             f"Found: {order_journal_or_fills_journal.order_event} - ignoring "
+                            err_str_: str = (f"Unsupported ChoreEventType: Must be either of "
+                                             f"[{ChoreEventType.OE_NEW}, {ChoreEventType.OE_INT_REJ}, "
+                                             f"{ChoreEventType.OE_BRK_REJ}, {ChoreEventType.OE_EXH_REJ}"
+                                             f"{ChoreEventType.OE_CXL_ACK}, {ChoreEventType.OE_UNSOL_CXL}], "
+                                             f"Found: {chore_journal_or_fills_journal.chore_event} - ignoring "
                                              f"strat_brief update")
                             logging.error(err_str_)
                             return
-                    elif isinstance(order_journal_or_fills_journal, FillsJournal):
+                    elif isinstance(chore_journal_or_fills_journal, FillsJournal):
                         # For fills, removing current fill's qty from existing
-                        # open_qty + current fill's notional (fill_qty * order_px) from existing open_notional
+                        # open_qty + current fill's notional (fill_qty * chore_px) from existing open_notional
                         if not received_fill_after_dod:
-                            fills_journal: FillsJournal = order_journal_or_fills_journal
+                            fills_journal: FillsJournal = chore_journal_or_fills_journal
                             open_qty = fetched_open_qty - fills_journal.fill_qty
                             open_notional = (
                                     fetched_open_notional - (
                                         fills_journal.fill_qty *
-                                        self.get_usd_px(order_snapshot.order_brief.px,
-                                                        order_snapshot.order_brief.security.sec_id)))
+                                        self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                        chore_snapshot.chore_brief.security.sec_id)))
                         else:
-                            # if fills come after DOD, this order's open calculation must
+                            # if fills come after DOD, this chore's open calculation must
                             # have already removed from overall open qty and notional - no need to remove fill qty from
                             # existing open
                             open_qty = fetched_open_qty
                             open_notional = fetched_open_notional
                     else:
-                        err_str_: str = ("Unsupported Journal type: Must be either OrderJournal or FillsJournal, "
-                                         f"Found type: {type(order_journal_or_fills_journal)} - ignoring "
+                        err_str_: str = ("Unsupported Journal type: Must be either ChoreJournal or FillsJournal, "
+                                         f"Found type: {type(chore_journal_or_fills_journal)} - ignoring "
                                          f"strat_brief update")
                         logging.error(err_str_)
                         return
@@ -1943,43 +1956,43 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 (open_qty + symbol_side_snapshot.total_filled_qty))
                     else:
                         consumable_concentration = 0
-                    open_orders_count = (await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                         underlying_get_open_order_count_query_http(symbol))
-                    consumable_open_orders = strat_limits.max_open_orders_per_side - open_orders_count[
-                        0].open_order_count
+                    open_chores_count = (await StreetBookServiceRoutesCallbackBaseNativeOverride.
+                                         underlying_get_open_chore_count_query_http(symbol))
+                    consumable_open_chores = strat_limits.max_open_chores_per_side - open_chores_count[
+                        0].open_chore_count
                     consumable_cxl_qty = ((((symbol_side_snapshot.total_filled_qty + open_qty +
                                              symbol_side_snapshot.total_cxled_qty) / 100) *
                                            strat_limits.cancel_rate.max_cancel_rate) -
                                           symbol_side_snapshot.total_cxled_qty)
-                    applicable_period_second = strat_limits.market_trade_volume_participation.applicable_period_seconds
+                    applicable_period_second = strat_limits.market_barter_volume_participation.applicable_period_seconds
                     executor_check_snapshot_list = \
                         (await StreetBookServiceRoutesCallbackBaseNativeOverride.
                          underlying_get_executor_check_snapshot_query_http(
                             symbol, side, applicable_period_second))
                     if len(executor_check_snapshot_list) == 1:
-                        participation_period_order_qty_sum = \
-                            executor_check_snapshot_list[0].last_n_sec_order_qty
+                        participation_period_chore_qty_sum = \
+                            executor_check_snapshot_list[0].last_n_sec_chore_qty
                         indicative_consumable_participation_qty = \
                             get_consumable_participation_qty(
                                 executor_check_snapshot_list,
-                                strat_limits.market_trade_volume_participation.max_participation_rate)
+                                strat_limits.market_barter_volume_participation.max_participation_rate)
                     else:
                         logging.error("Received unexpected length of executor_check_snapshot_list from query "
                                       f"{len(executor_check_snapshot_list)}, expected 1, symbol_side_key: "
                                       f"{get_symbol_side_key([(symbol, side)])}, likely bug in "
                                       f"get_executor_check_snapshot_query pre implementation")
                         indicative_consumable_participation_qty = 0
-                        participation_period_order_qty_sum = 0
+                        participation_period_chore_qty_sum = 0
 
                     updated_pair_side_brief_obj = \
-                        PairSideTradingBriefOptional(
+                        PairSideBarteringBriefOptional(
                             security=security, side=side,
-                            last_update_date_time=order_snapshot.last_update_date_time,
-                            consumable_open_orders=consumable_open_orders,
+                            last_update_date_time=chore_snapshot.last_update_date_time,
+                            consumable_open_chores=consumable_open_chores,
                             consumable_notional=consumable_notional,
                             consumable_open_notional=consumable_open_notional,
                             consumable_concentration=consumable_concentration,
-                            participation_period_order_qty_sum=participation_period_order_qty_sum,
+                            participation_period_chore_qty_sum=participation_period_chore_qty_sum,
                             consumable_cxl_qty=consumable_cxl_qty,
                             indicative_consumable_participation_qty=
                             indicative_consumable_participation_qty,
@@ -1988,40 +2001,40 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             open_qty=open_qty)
 
                     if side == Side.BUY:
-                        other_leg_residual_qty = strat_brief_obj.pair_sell_side_trading_brief.residual_qty
-                        stored_pair_strat_trading_brief = strat_brief_obj.pair_buy_side_trading_brief
-                        other_leg_symbol = strat_brief_obj.pair_sell_side_trading_brief.security.sec_id
+                        other_leg_residual_qty = strat_brief_obj.pair_sell_side_bartering_brief.residual_qty
+                        stored_pair_strat_bartering_brief = strat_brief_obj.pair_buy_side_bartering_brief
+                        other_leg_symbol = strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id
                     else:
-                        other_leg_residual_qty = strat_brief_obj.pair_buy_side_trading_brief.residual_qty
-                        stored_pair_strat_trading_brief = strat_brief_obj.pair_sell_side_trading_brief
-                        other_leg_symbol = strat_brief_obj.pair_buy_side_trading_brief.security.sec_id
+                        other_leg_residual_qty = strat_brief_obj.pair_buy_side_bartering_brief.residual_qty
+                        stored_pair_strat_bartering_brief = strat_brief_obj.pair_sell_side_bartering_brief
+                        other_leg_symbol = strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id
                     top_of_book_obj = self._get_top_of_book_from_symbol(symbol)
                     other_leg_top_of_book = self._get_top_of_book_from_symbol(other_leg_symbol)
                     if top_of_book_obj is not None and other_leg_top_of_book is not None:
-                        if order_snapshot.order_status == OrderStatusType.OE_DOD:
+                        if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
                             if received_fill_after_dod:
-                                residual_qty = int((stored_pair_strat_trading_brief.residual_qty -
-                                                    order_snapshot.last_update_fill_qty))
+                                residual_qty = int((stored_pair_strat_bartering_brief.residual_qty -
+                                                    chore_snapshot.last_update_fill_qty))
                             else:
-                                residual_qty = int(stored_pair_strat_trading_brief.residual_qty +
-                                                   (order_snapshot.order_brief.qty - order_snapshot.filled_qty))
+                                residual_qty = int(stored_pair_strat_bartering_brief.residual_qty +
+                                                   (chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty))
                             # Updating residual_qty
                             updated_pair_side_brief_obj.residual_qty = residual_qty
                         else:
-                            residual_qty = stored_pair_strat_trading_brief.residual_qty
+                            residual_qty = stored_pair_strat_bartering_brief.residual_qty
                             updated_pair_side_brief_obj.residual_qty = residual_qty
 
                         current_leg_tob_data, other_leg_tob_data = (
-                            self._get_last_trade_px_n_symbol_tuples_from_tob(top_of_book_obj, other_leg_top_of_book))
-                        current_leg_last_trade_px, current_leg_tob_symbol = current_leg_tob_data
-                        other_leg_last_trade_px, other_leg_tob_symbol = other_leg_tob_data
+                            self._get_last_barter_px_n_symbol_tuples_from_tob(top_of_book_obj, other_leg_top_of_book))
+                        current_leg_last_barter_px, current_leg_tob_symbol = current_leg_tob_data
+                        other_leg_last_barter_px, other_leg_tob_symbol = other_leg_tob_data
                         updated_pair_side_brief_obj.indicative_consumable_residual = \
                             strat_limits.residual_restriction.max_residual - \
-                            ((residual_qty * self.get_usd_px(current_leg_last_trade_px, current_leg_tob_symbol)) -
-                             (other_leg_residual_qty * self.get_usd_px(other_leg_last_trade_px, other_leg_tob_symbol)))
+                            ((residual_qty * self.get_usd_px(current_leg_last_barter_px, current_leg_tob_symbol)) -
+                             (other_leg_residual_qty * self.get_usd_px(other_leg_last_barter_px, other_leg_tob_symbol)))
                     else:
                         logging.error(f"received buy {top_of_book_obj = } and sell {other_leg_top_of_book = }, "
-                                      f"order_snapshot_key: {get_order_snapshot_log_key(order_snapshot)}")
+                                      f"chore_snapshot_key: {get_chore_snapshot_log_key(chore_snapshot)}")
                         return
 
                     # Updating consumable_nett_filled_notional
@@ -2049,16 +2062,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                     f"symbol_side_key: {get_symbol_side_key([(other_sec_id, other_side)])}")
                         logging.error(err_str_)
 
-                    if symbol == strat_brief_obj.pair_buy_side_trading_brief.security.sec_id:
+                    if symbol == strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id:
                         updated_strat_brief = StratBriefOptional(
-                            _id=strat_brief_obj.id, pair_buy_side_trading_brief=updated_pair_side_brief_obj,
+                            _id=strat_brief_obj.id, pair_buy_side_bartering_brief=updated_pair_side_brief_obj,
                             consumable_nett_filled_notional=consumable_nett_filled_notional)
-                    elif symbol == strat_brief_obj.pair_sell_side_trading_brief.security.sec_id:
+                    elif symbol == strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id:
                         updated_strat_brief = StratBriefOptional(
-                            _id=strat_brief_obj.id, pair_sell_side_trading_brief=updated_pair_side_brief_obj,
+                            _id=strat_brief_obj.id, pair_sell_side_bartering_brief=updated_pair_side_brief_obj,
                             consumable_nett_filled_notional=consumable_nett_filled_notional)
                     else:
-                        err_str_ = f"error: None of the 2 pair_side_trading_brief(s) contain {symbol = } in " \
+                        err_str_ = f"error: None of the 2 pair_side_bartering_brief(s) contain {symbol = } in " \
                                    f"strat_brief of key: {get_strat_brief_log_key(strat_brief_obj)};;; " \
                                    f"{strat_brief_obj = }"
                         logging.exception(err_str_)
@@ -2068,7 +2081,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         (await StreetBookServiceRoutesCallbackBaseNativeOverride.
                          underlying_partial_update_strat_brief_http(
                             json.loads(updated_strat_brief.model_dump_json(by_alias=True, exclude_none=True))))
-                    logging.debug(f"Updated strat_brief: {order_snapshot.order_brief.order_id = }, "
+                    logging.debug(f"Updated strat_brief: {chore_snapshot.chore_brief.chore_id = }, "
                                   f"{updated_strat_brief = }")
                     return updated_strat_brief
                 else:
@@ -2081,42 +2094,42 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 logging.exception(err_str_)
                 return
 
-    async def _update_portfolio_status_from_order_journal(
-            self, order_journal_obj: OrderJournal,
-            order_snapshot_obj: OrderSnapshot) -> PortfolioStatusUpdatesContainer | None:
-        match order_journal_obj.order.side:
+    async def _update_portfolio_status_from_chore_journal(
+            self, chore_journal_obj: ChoreJournal,
+            chore_snapshot_obj: ChoreSnapshot) -> PortfolioStatusUpdatesContainer | None:
+        match chore_journal_obj.chore.side:
             case Side.BUY:
                 update_overall_buy_notional = 0
-                match order_journal_obj.order_event:
-                    case OrderEventType.OE_NEW:
+                match chore_journal_obj.chore_event:
+                    case ChoreEventType.OE_NEW:
                         update_overall_buy_notional = \
-                            self.get_usd_px(order_journal_obj.order.px, order_journal_obj.order.security.sec_id) * \
-                            order_journal_obj.order.qty
-                    case (OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL | OrderEventType.OE_INT_REJ |
-                          OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ):
-                        total_buy_unfilled_qty = int(order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty)
+                            self.get_usd_px(chore_journal_obj.chore.px, chore_journal_obj.chore.security.sec_id) * \
+                            chore_journal_obj.chore.qty
+                    case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
+                          ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
+                        total_buy_unfilled_qty = int(chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty)
                         update_overall_buy_notional = \
-                            -(self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                              order_snapshot_obj.order_brief.security.sec_id) * total_buy_unfilled_qty)
+                            -(self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                              chore_snapshot_obj.chore_brief.security.sec_id) * total_buy_unfilled_qty)
                 return PortfolioStatusUpdatesContainer(buy_notional_update=update_overall_buy_notional)
             case Side.SELL:
                 update_overall_sell_notional = 0
-                match order_journal_obj.order_event:
-                    case OrderEventType.OE_NEW:
+                match chore_journal_obj.chore_event:
+                    case ChoreEventType.OE_NEW:
                         update_overall_sell_notional = \
-                            self.get_usd_px(order_journal_obj.order.px, order_journal_obj.order.security.sec_id) * \
-                            order_journal_obj.order.qty
-                    case (OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL | OrderEventType.OE_INT_REJ |
-                          OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ):
-                        total_sell_unfilled_qty = int(order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty)
+                            self.get_usd_px(chore_journal_obj.chore.px, chore_journal_obj.chore.security.sec_id) * \
+                            chore_journal_obj.chore.qty
+                    case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
+                          ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
+                        total_sell_unfilled_qty = int(chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty)
                         update_overall_sell_notional = \
-                            -(self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                              order_snapshot_obj.order_brief.security.sec_id) * total_sell_unfilled_qty)
+                            -(self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                              chore_snapshot_obj.chore_brief.security.sec_id) * total_sell_unfilled_qty)
                 return PortfolioStatusUpdatesContainer(sell_notional_update=update_overall_sell_notional)
             case other_:
-                err_str_ = f"Unsupported Side Type {other_} received in order_journal of key: " \
-                           f"{get_order_journal_log_key(order_journal_obj)} while updating strat_status;;; " \
-                           f"{order_journal_obj = } "
+                err_str_ = f"Unsupported Side Type {other_} received in chore_journal of key: " \
+                           f"{get_chore_journal_log_key(chore_journal_obj)} while updating strat_status;;; " \
+                           f"{chore_journal_obj = } "
                 logging.error(err_str_)
                 return None
 
@@ -2136,105 +2149,105 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             self.get_usd_px(fills_journal_obj.fill_px, fills_journal_obj.fill_symbol) * fills_journal_obj.fill_qty
 
     async def create_fills_journal_post(self, fills_journal_obj: FillsJournal):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_fills_journal_get_all_ws(fills_journal_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_fills_journal_get_all_ws(fills_journal_obj)
 
         async with StreetBookServiceRoutesCallbackBaseNativeOverride.residual_compute_shared_lock:
-            res = await self._apply_fill_update_in_order_snapshot(fills_journal_obj)
+            res = await self._apply_fill_update_in_chore_snapshot(fills_journal_obj)
 
             if res is not None:
-                strat_id, order_snapshot, strat_brief, portfolio_status_updates = res
+                strat_id, chore_snapshot, strat_brief, portfolio_status_updates = res
 
                 # Updating and checking portfolio_limits in portfolio_manager
                 post_book_service_http_client.check_portfolio_limits_query_client(
-                    strat_id, None, order_snapshot, strat_brief, portfolio_status_updates)
+                    strat_id, None, chore_snapshot, strat_brief, portfolio_status_updates)
 
-            # else not required: if result returned from _apply_fill_update_in_order_snapshot is None, that
+            # else not required: if result returned from _apply_fill_update_in_chore_snapshot is None, that
             # signifies some unexpected exception occurred so complete update was not done,
             # therefore avoiding portfolio_limit checks too
 
     async def _update_portfolio_status_from_fill_journal(
-            self, order_snapshot_obj: OrderSnapshot, received_fill_after_dod: bool
+            self, chore_snapshot_obj: ChoreSnapshot, received_fill_after_dod: bool
             ) -> PortfolioStatusUpdatesContainer | None:
 
-        match order_snapshot_obj.order_brief.side:
+        match chore_snapshot_obj.chore_brief.side:
             case Side.BUY:
                 if received_fill_after_dod:
                     update_overall_buy_notional = \
-                        (order_snapshot_obj.last_update_fill_qty *
-                         self.get_usd_px(order_snapshot_obj.last_update_fill_px,
-                                         order_snapshot_obj.order_brief.security.sec_id))
+                        (chore_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                         chore_snapshot_obj.chore_brief.security.sec_id))
                 else:
                     update_overall_buy_notional = \
-                        (order_snapshot_obj.last_update_fill_qty *
-                         self.get_usd_px(order_snapshot_obj.last_update_fill_px,
-                                         order_snapshot_obj.order_brief.security.sec_id)) - \
-                        (order_snapshot_obj.last_update_fill_qty *
-                         self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                         order_snapshot_obj.order_brief.security.sec_id))
+                        (chore_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                         chore_snapshot_obj.chore_brief.security.sec_id)) - \
+                        (chore_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                         chore_snapshot_obj.chore_brief.security.sec_id))
                 update_overall_buy_fill_notional = \
-                    (self.get_usd_px(order_snapshot_obj.last_update_fill_px,
-                                     order_snapshot_obj.order_brief.security.sec_id) *
-                     order_snapshot_obj.last_update_fill_qty)
+                    (self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                     chore_snapshot_obj.chore_brief.security.sec_id) *
+                     chore_snapshot_obj.last_update_fill_qty)
                 return PortfolioStatusUpdatesContainer(buy_notional_update=update_overall_buy_notional,
                                                        buy_fill_notional_update=update_overall_buy_fill_notional)
             case Side.SELL:
                 if received_fill_after_dod:
                     update_overall_sell_notional = \
-                        (order_snapshot_obj.last_update_fill_qty *
-                         self.get_usd_px(order_snapshot_obj.last_update_fill_px,
-                                         order_snapshot_obj.order_brief.security.sec_id))
+                        (chore_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                         chore_snapshot_obj.chore_brief.security.sec_id))
                 else:
                     update_overall_sell_notional = \
-                        (order_snapshot_obj.last_update_fill_qty *
-                         self.get_usd_px(order_snapshot_obj.last_update_fill_px,
-                                         order_snapshot_obj.order_brief.security.sec_id)) - \
-                        (order_snapshot_obj.last_update_fill_qty *
-                         self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                         order_snapshot_obj.order_brief.security.sec_id))
+                        (chore_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                         chore_snapshot_obj.chore_brief.security.sec_id)) - \
+                        (chore_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                         chore_snapshot_obj.chore_brief.security.sec_id))
                 update_overall_sell_fill_notional = \
-                    self.get_usd_px(order_snapshot_obj.last_update_fill_px,
-                                    order_snapshot_obj.order_brief.security.sec_id) * \
-                    order_snapshot_obj.last_update_fill_qty
+                    self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                    chore_snapshot_obj.chore_brief.security.sec_id) * \
+                    chore_snapshot_obj.last_update_fill_qty
                 return PortfolioStatusUpdatesContainer(sell_notional_update=update_overall_sell_notional,
                                                        sell_fill_notional_update=update_overall_sell_fill_notional)
             case other_:
-                err_str_ = f"Unsupported Side Type {other_} received in order snapshot of key " \
-                           f"{get_order_snapshot_log_key(order_snapshot_obj)} while updating strat_status;;; " \
-                           f"{order_snapshot_obj = }"
+                err_str_ = f"Unsupported Side Type {other_} received in chore snapshot of key " \
+                           f"{get_chore_snapshot_log_key(chore_snapshot_obj)} while updating strat_status;;; " \
+                           f"{chore_snapshot_obj = }"
                 logging.error(err_str_)
                 return None
 
-    async def _update_symbol_side_snapshot_from_fill_applied_order_snapshot(
-            self, order_snapshot_obj: OrderSnapshot, received_fill_after_dod: bool) -> SymbolSideSnapshot:
+    async def _update_symbol_side_snapshot_from_fill_applied_chore_snapshot(
+            self, chore_snapshot_obj: ChoreSnapshot, received_fill_after_dod: bool) -> SymbolSideSnapshot:
         async with SymbolSideSnapshot.reentrant_lock:
             symbol_side_snapshot_tuple = self.strat_cache.get_symbol_side_snapshot_from_symbol(
-                order_snapshot_obj.order_brief.security.sec_id)
+                chore_snapshot_obj.chore_brief.security.sec_id)
 
             if symbol_side_snapshot_tuple is not None:
                 symbol_side_snapshot_obj, _ = symbol_side_snapshot_tuple
                 updated_symbol_side_snapshot_obj = SymbolSideSnapshotOptional(_id=symbol_side_snapshot_obj.id)
                 updated_symbol_side_snapshot_obj.total_filled_qty = int(
-                    symbol_side_snapshot_obj.total_filled_qty + order_snapshot_obj.last_update_fill_qty)
+                    symbol_side_snapshot_obj.total_filled_qty + chore_snapshot_obj.last_update_fill_qty)
                 updated_symbol_side_snapshot_obj.total_fill_notional = \
                     symbol_side_snapshot_obj.total_fill_notional + \
-                    (self.get_usd_px(order_snapshot_obj.last_update_fill_px,
-                                     order_snapshot_obj.order_brief.security.sec_id) *
-                     order_snapshot_obj.last_update_fill_qty)
+                    (self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                     chore_snapshot_obj.chore_brief.security.sec_id) *
+                     chore_snapshot_obj.last_update_fill_qty)
                 updated_symbol_side_snapshot_obj.avg_fill_px = \
                     self.get_local_px_or_notional(updated_symbol_side_snapshot_obj.total_fill_notional,
                                                   symbol_side_snapshot_obj.security.sec_id) / \
                     updated_symbol_side_snapshot_obj.total_filled_qty
-                updated_symbol_side_snapshot_obj.last_update_fill_px = order_snapshot_obj.last_update_fill_px
-                updated_symbol_side_snapshot_obj.last_update_fill_qty = int(order_snapshot_obj.last_update_fill_qty)
-                updated_symbol_side_snapshot_obj.last_update_date_time = order_snapshot_obj.last_update_date_time
+                updated_symbol_side_snapshot_obj.last_update_fill_px = chore_snapshot_obj.last_update_fill_px
+                updated_symbol_side_snapshot_obj.last_update_fill_qty = int(chore_snapshot_obj.last_update_fill_qty)
+                updated_symbol_side_snapshot_obj.last_update_date_time = chore_snapshot_obj.last_update_date_time
                 if received_fill_after_dod:
                     updated_symbol_side_snapshot_obj.total_cxled_qty = int(
-                        symbol_side_snapshot_obj.total_cxled_qty - order_snapshot_obj.last_update_fill_qty)
+                        symbol_side_snapshot_obj.total_cxled_qty - chore_snapshot_obj.last_update_fill_qty)
                     updated_symbol_side_snapshot_obj.total_cxled_notional = (
                         symbol_side_snapshot_obj.total_cxled_notional -
-                        (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                                                     order_snapshot_obj.order_brief.security.sec_id)))
+                        (chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                     chore_snapshot_obj.chore_brief.security.sec_id)))
 
                 updated_symbol_side_snapshot_obj = \
                     await (StreetBookServiceRoutesCallbackBaseNativeOverride.
@@ -2244,8 +2257,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 return updated_symbol_side_snapshot_obj
             else:
                 err_str_ = ("Received symbol_side_snapshot_tuple as None from strat_cache for symbol: "
-                            f"{order_snapshot_obj.order_brief.security.sec_id}, "
-                            f"order_snapshot_key: {get_order_snapshot_log_key(order_snapshot_obj)} - "
+                            f"{chore_snapshot_obj.chore_brief.security.sec_id}, "
+                            f"chore_snapshot_key: {get_chore_snapshot_log_key(chore_snapshot_obj)} - "
                             f"ignoring this symbol_side_snapshot update from fills")
                 logging.error(err_str_)
 
@@ -2258,8 +2271,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             PairStratBaseModel, email_book_service_http_client.patch_pair_strat_client,
             _id=self.pair_strat_id, strat_state=StratState.StratState_PAUSED)
 
-    async def _apply_fill_update_in_order_snapshot(
-            self, fills_journal_obj: FillsJournal) -> Tuple[int, OrderSnapshot, StratBrief,
+    async def _apply_fill_update_in_chore_snapshot(
+            self, fills_journal_obj: FillsJournal) -> Tuple[int, ChoreSnapshot, StratBrief,
                                                             PortfolioStatusUpdatesContainer| None] | None:
         pair_strat = self.strat_cache.get_pair_strat_obj()
 
@@ -2267,18 +2280,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             # avoiding any update if strat is non-ongoing
             return
 
-        async with (OrderSnapshot.reentrant_lock):    # for read-write atomicity
-            order_snapshot_obj = self.strat_cache.get_order_snapshot_from_order_id(fills_journal_obj.order_id)
+        async with (ChoreSnapshot.reentrant_lock):    # for read-write atomicity
+            chore_snapshot_obj = self.strat_cache.get_chore_snapshot_from_chore_id(fills_journal_obj.chore_id)
 
-            if order_snapshot_obj is not None:
-                if order_snapshot_obj.order_status in [OrderStatusType.OE_ACKED, OrderStatusType.OE_DOD,
-                                                       OrderStatusType.OE_CXL_UNACK]:
+            if chore_snapshot_obj is not None:
+                if chore_snapshot_obj.chore_status in [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
+                                                       ChoreStatusType.OE_DOD, ChoreStatusType.OE_CXL_UNACK]:
                     received_fill_after_dod = False
-                    if order_snapshot_obj.order_status == OrderStatusType.OE_DOD:
+                    if chore_snapshot_obj.chore_status == ChoreStatusType.OE_DOD:
                         received_fill_after_dod = True
 
                     updated_total_filled_qty: int
-                    if (total_filled_qty := order_snapshot_obj.filled_qty) is not None:
+                    if (total_filled_qty := chore_snapshot_obj.filled_qty) is not None:
                         updated_total_filled_qty = int(total_filled_qty + fills_journal_obj.fill_qty)
                     else:
                         updated_total_filled_qty = int(fills_journal_obj.fill_qty)
@@ -2287,63 +2300,75 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     last_update_fill_px = fills_journal_obj.fill_px
                     updated_cxl_qty: int | None = None
                     updated_cxl_notional = None
-                    order_status = None
+                    chore_status = None
+                    fills_before_ack = False
+                    if chore_snapshot_obj.chore_status == ChoreStatusType.OE_UNACK:
+                        chore_status = ChoreStatusType.OE_ACKED
+                        fills_before_ack = True
 
                     pause_strat: bool = False
 
-                    if order_snapshot_obj.order_brief.qty == updated_total_filled_qty:
-                        pause_fulfill_post_order_dod: bool = (
-                            executor_config_yaml_dict.get("pause_fulfill_post_order_dod"))
-                        if received_fill_after_dod and pause_fulfill_post_order_dod:
+                    if chore_snapshot_obj.chore_brief.qty == updated_total_filled_qty:
+                        pause_fulfill_post_chore_dod: bool = (
+                            executor_config_yaml_dict.get("pause_fulfill_post_chore_dod"))
+                        if received_fill_after_dod and pause_fulfill_post_chore_dod:
                             # @@@ below error log is used in specific test case for string matching - if changed here
                             # needs to be changed in test also
-                            logging.critical("Unexpected: Received fill that makes order_snapshot OE_FILLED which is "
+                            logging.critical("Unexpected: Received fill that makes chore_snapshot OE_FILLED which is "
                                              "already of state OE_DOD, ignoring this fill and putting this strat to "
-                                             f"PAUSE, symbol_side_key: {get_order_snapshot_log_key(order_snapshot_obj)}"
-                                             f";;; {fills_journal_obj = }, {order_snapshot_obj = }")
+                                             f"PAUSE, symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
+                                             f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
                             pause_strat = True
                         else:
-                            order_status = OrderStatusType.OE_FILLED
-                            updated_cxl_qty = int(order_snapshot_obj.cxled_qty - fills_journal_obj.fill_qty)
+                            if received_fill_after_dod:
+                                # @@@ below error log is used in specific test case for string matching - if changed
+                                # here needs to be changed in test also
+                                logging.warning(
+                                    "Received fill that makes chore_snapshot OE_FILLED which is "
+                                    "already of state OE_DOD, symbol_side_key: "
+                                    f"{get_chore_snapshot_log_key(chore_snapshot_obj)}"
+                                    f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
+                            chore_status = ChoreStatusType.OE_FILLED
+                            updated_cxl_qty = int(chore_snapshot_obj.cxled_qty - fills_journal_obj.fill_qty)
                             updated_cxl_notional = (
-                                    updated_cxl_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                                                      order_snapshot_obj.order_brief.security.sec_id))
-                    elif order_snapshot_obj.order_brief.qty < updated_total_filled_qty:
-                        vacant_fill_qty = int(order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty)
+                                    updated_cxl_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                      chore_snapshot_obj.chore_brief.security.sec_id))
+                    elif chore_snapshot_obj.chore_brief.qty < updated_total_filled_qty:     # OVER_FILLED
+                        vacant_fill_qty = int(chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty)
                         non_required_received_fill_qty = fills_journal_obj.fill_qty - vacant_fill_qty
 
                         if received_fill_after_dod:
                             logging.critical(
-                                f"Unexpected: Received fill that will make order_snapshot OVER_FILLED which "
+                                f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED which "
                                 f"is already OE_DOD, {vacant_fill_qty = }, received "
                                 f"{fills_journal_obj.fill_qty = }, {non_required_received_fill_qty = } "
                                 f"from fills_journal_key {get_fills_journal_log_key(fills_journal_obj)} - "
-                                f"ignoring order_snapshot updates for this fill and putting strat to PAUSE"
-                                f"symbol_side_key: {get_order_snapshot_log_key(order_snapshot_obj)}"
-                                f";;; {fills_journal_obj = }, {order_snapshot_obj = }")
+                                f"ignoring chore_snapshot updates for this fill and putting strat to PAUSE"
+                                f"symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
+                                f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
                         else:
                             logging.critical(
-                                f"Unexpected: Received fill that will make order_snapshot OVER_FILLED, "
+                                f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED, "
                                 f"{vacant_fill_qty = }, received {fills_journal_obj.fill_qty = }, "
                                 f"{non_required_received_fill_qty = } "
                                 f"from fills_journal_key {get_fills_journal_log_key(fills_journal_obj)} - "
-                                f"ignoring order_snapshot updates for this fill and putting strat to PAUSE"
-                                f"symbol_side_key: {get_order_snapshot_log_key(order_snapshot_obj)}"
-                                f";;; {fills_journal_obj = }, {order_snapshot_obj = }")
+                                f"ignoring chore_snapshot updates for this fill and putting strat to PAUSE"
+                                f"symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
+                                f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
                         pause_strat = True
                     else:
                         if received_fill_after_dod:
-                            updated_cxl_qty = int(order_snapshot_obj.cxled_qty - fills_journal_obj.fill_qty)
+                            updated_cxl_qty = int(chore_snapshot_obj.cxled_qty - fills_journal_obj.fill_qty)
                             updated_cxl_notional = (
-                                updated_cxl_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                                                  order_snapshot_obj.order_brief.security.sec_id))
+                                updated_cxl_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                  chore_snapshot_obj.chore_brief.security.sec_id))
 
                     if pause_strat:
                         self.set_strat_state_to_pause()
                         return None
-                    # else not required: If pause is not triggered, updating order_snapshot and other models
+                    # else not required: If pause is not triggered, updating chore_snapshot and other models
 
-                    if (last_filled_notional := order_snapshot_obj.fill_notional) is not None:
+                    if (last_filled_notional := chore_snapshot_obj.fill_notional) is not None:
                         updated_fill_notional = last_filled_notional + received_fill_notional
                     else:
                         updated_fill_notional = received_fill_notional
@@ -2351,56 +2376,65 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         self.get_local_px_or_notional(updated_fill_notional,
                                                       fills_journal_obj.fill_symbol) / updated_total_filled_qty
 
-                    order_snapshot_obj = \
+                    if fills_before_ack:
+                        if chore_status == ChoreStatusType.OE_FILLED:
+                            logging.warning(f"Received fill for chore that has status: {ChoreStatusType.OE_UNACK} "
+                                            f"that makes chore fulfilled, "
+                                            f"putting chore to {chore_status} status and applying fill")
+                        else:
+                            logging.warning(f"Received fill for chore that has status: {ChoreStatusType.OE_UNACK}, "
+                                            f"putting chore to {chore_status} status and applying fill")
+
+                    chore_snapshot_obj = \
                         await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                               underlying_partial_update_order_snapshot_http(json.loads(OrderSnapshotOptional(
-                                _id=order_snapshot_obj.id, filled_qty=updated_total_filled_qty,
+                               underlying_partial_update_chore_snapshot_http(json.loads(ChoreSnapshotOptional(
+                                _id=chore_snapshot_obj.id, filled_qty=updated_total_filled_qty,
                                 avg_fill_px=updated_avg_fill_px, fill_notional=updated_fill_notional,
                                 last_update_fill_qty=last_update_fill_qty, last_update_fill_px=last_update_fill_px,
                                 cxled_qty=updated_cxl_qty, cxled_notional=updated_cxl_notional,
                                 last_update_date_time=fills_journal_obj.fill_date_time,
-                                order_status=order_status).model_dump_json(by_alias=True, exclude_none=True))))
+                                chore_status=chore_status).model_dump_json(by_alias=True, exclude_none=True))))
                     symbol_side_snapshot = \
-                        await self._update_symbol_side_snapshot_from_fill_applied_order_snapshot(
-                            order_snapshot_obj, received_fill_after_dod=received_fill_after_dod)
+                        await self._update_symbol_side_snapshot_from_fill_applied_chore_snapshot(
+                            chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod)
                     if symbol_side_snapshot is not None:
-                        updated_strat_brief = await self._update_strat_brief_from_order_or_fill(
-                            fills_journal_obj, order_snapshot_obj, symbol_side_snapshot,
+                        updated_strat_brief = await self._update_strat_brief_from_chore_or_fill(
+                            fills_journal_obj, chore_snapshot_obj, symbol_side_snapshot,
                             received_fill_after_dod=received_fill_after_dod)
                         if updated_strat_brief is not None:
                             await self._update_strat_status_from_fill_journal(
-                                order_snapshot_obj, symbol_side_snapshot, updated_strat_brief,
+                                chore_snapshot_obj, symbol_side_snapshot, updated_strat_brief,
                                 received_fill_after_dod=received_fill_after_dod)
                         # else not required: if updated_strat_brief is None then it means some error occurred in
-                        # _update_strat_brief_from_order which would have got added to alert already
+                        # _update_strat_brief_from_chore which would have got added to alert already
                         portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
                             await self._update_portfolio_status_from_fill_journal(
-                                order_snapshot_obj, received_fill_after_dod=received_fill_after_dod))
+                                chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod))
 
-                        return pair_strat.id, order_snapshot_obj, updated_strat_brief, portfolio_status_updates
+                        return pair_strat.id, chore_snapshot_obj, updated_strat_brief, portfolio_status_updates
 
-                    # else not require_create_update_symbol_side_snapshot_from_order_journald: if symbol_side_snapshot
-                    # is None then it means error occurred in _create_update_symbol_side_snapshot_from_order_journal
+                    # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
+                    # is None then it means error occurred in _create_update_symbol_side_snapshot_from_chore_journal
                     # which would have got added to alert already
-                elif order_snapshot_obj.order_status == OrderStatusType.OE_FILLED:
-                    err_str_ = (f"Unsupported - Fill received for completely filled order_snapshot, "
-                                f"order_snapshot_key: {get_order_snapshot_log_key(order_snapshot_obj)}, "
+                elif chore_snapshot_obj.chore_status == ChoreStatusType.OE_FILLED:
+                    err_str_ = (f"Unsupported - Fill received for completely filled chore_snapshot, "
+                                f"chore_snapshot_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}, "
                                 f"ignoring this fill journal - putting strat to PAUSE;;; "
-                                f"{fills_journal_obj = }, {order_snapshot_obj = }")
+                                f"{fills_journal_obj = }, {chore_snapshot_obj = }")
                     logging.critical(err_str_)
                     self.set_strat_state_to_pause()
                 else:
-                    err_str_ = f"Unsupported - Fill received for order_snapshot having status " \
-                               f"{order_snapshot_obj.order_status}, order_snapshot_key: " \
-                               f"{get_order_snapshot_log_key(order_snapshot_obj)};;; " \
-                               f"{fills_journal_obj = }, {order_snapshot_obj = }"
+                    err_str_ = f"Unsupported - Fill received for chore_snapshot having status " \
+                               f"{chore_snapshot_obj.chore_status}, chore_snapshot_key: " \
+                               f"{get_chore_snapshot_log_key(chore_snapshot_obj)};;; " \
+                               f"{fills_journal_obj = }, {chore_snapshot_obj = }"
                     logging.error(err_str_)
             else:
-                err_str_ = (f"Could not find any order snapshot with {fills_journal_obj.order_id = } in "
+                err_str_ = (f"Could not find any chore snapshot with {fills_journal_obj.chore_id = } in "
                             f"strat_cache, fill_journal_key: {get_fills_journal_log_key(fills_journal_obj)}")
                 logging.error(err_str_)
 
-    async def _update_strat_status_from_fill_journal(self, order_snapshot_obj: OrderSnapshot,
+    async def _update_strat_status_from_fill_journal(self, chore_snapshot_obj: ChoreSnapshot,
                                                      symbol_side_snapshot: SymbolSideSnapshot,
                                                      strat_brief_obj: StratBrief,
                                                      received_fill_after_dod: bool):
@@ -2414,16 +2448,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 fetched_strat_status_obj, _ = strat_status_tuple
 
                 update_strat_status_obj = StratStatusOptional(_id=fetched_strat_status_obj.id)
-                match order_snapshot_obj.order_brief.side:
+                match chore_snapshot_obj.chore_brief.side:
                     case Side.BUY:
                         if not received_fill_after_dod:
                             update_strat_status_obj.total_open_buy_qty = int(fetched_strat_status_obj.total_open_buy_qty -
-                                                                             order_snapshot_obj.last_update_fill_qty)
+                                                                             chore_snapshot_obj.last_update_fill_qty)
                             update_strat_status_obj.total_open_buy_notional = (
                                     fetched_strat_status_obj.total_open_buy_notional -
-                                    (order_snapshot_obj.last_update_fill_qty *
-                                     self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                                     order_snapshot_obj.order_brief.security.sec_id)))
+                                    (chore_snapshot_obj.last_update_fill_qty *
+                                     self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                     chore_snapshot_obj.chore_brief.security.sec_id)))
                             update_strat_status_obj.total_open_sell_notional = (
                                 fetched_strat_status_obj.total_open_sell_notional)
                             if fetched_strat_status_obj.total_open_buy_qty == 0:
@@ -2431,30 +2465,30 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             else:
                                 update_strat_status_obj.avg_open_buy_px = \
                                     self.get_local_px_or_notional(fetched_strat_status_obj.total_open_buy_notional,
-                                                                  order_snapshot_obj.order_brief.security.sec_id) / \
+                                                                  chore_snapshot_obj.chore_brief.security.sec_id) / \
                                     fetched_strat_status_obj.total_open_buy_qty
                         update_strat_status_obj.total_fill_buy_qty = int(
-                                fetched_strat_status_obj.total_fill_buy_qty + order_snapshot_obj.last_update_fill_qty)
+                                fetched_strat_status_obj.total_fill_buy_qty + chore_snapshot_obj.last_update_fill_qty)
                         update_strat_status_obj.total_fill_buy_notional = (
                                 fetched_strat_status_obj.total_fill_buy_notional +
-                                order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
-                                    order_snapshot_obj.last_update_fill_px,
-                                    order_snapshot_obj.order_brief.security.sec_id))
+                                chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(
+                                    chore_snapshot_obj.last_update_fill_px,
+                                    chore_snapshot_obj.chore_brief.security.sec_id))
                         update_strat_status_obj.avg_fill_buy_px = \
                             self.get_local_px_or_notional(update_strat_status_obj.total_fill_buy_notional,
-                                                          order_snapshot_obj.order_brief.security.sec_id) / \
+                                                          chore_snapshot_obj.chore_brief.security.sec_id) / \
                             update_strat_status_obj.total_fill_buy_qty
                         update_strat_status_obj.total_fill_sell_notional = (
                             fetched_strat_status_obj.total_fill_sell_notional)
                         if received_fill_after_dod:
                             update_strat_status_obj.total_cxl_buy_qty = int(
                                     fetched_strat_status_obj.total_cxl_buy_qty -
-                                    order_snapshot_obj.last_update_fill_qty)
+                                    chore_snapshot_obj.last_update_fill_qty)
                             update_strat_status_obj.total_cxl_buy_notional = (
                                 fetched_strat_status_obj.total_cxl_buy_notional -
-                                (self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                                 order_snapshot_obj.order_brief.security.sec_id) *
-                                 order_snapshot_obj.last_update_fill_qty))
+                                (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                 chore_snapshot_obj.chore_brief.security.sec_id) *
+                                 chore_snapshot_obj.last_update_fill_qty))
                             update_strat_status_obj.total_cxl_sell_notional = (
                                 fetched_strat_status_obj.total_cxl_sell_notional)
 
@@ -2462,12 +2496,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         if not received_fill_after_dod:
                             update_strat_status_obj.total_open_sell_qty = int(
                                     fetched_strat_status_obj.total_open_sell_qty -
-                                    order_snapshot_obj.last_update_fill_qty)
+                                    chore_snapshot_obj.last_update_fill_qty)
                             update_strat_status_obj.total_open_sell_notional = (
                                     fetched_strat_status_obj.total_open_sell_notional -
-                                    (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
-                                        order_snapshot_obj.order_brief.px,
-                                        order_snapshot_obj.order_brief.security.sec_id)))
+                                    (chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(
+                                        chore_snapshot_obj.chore_brief.px,
+                                        chore_snapshot_obj.chore_brief.security.sec_id)))
                             update_strat_status_obj.total_open_buy_notional = (
                                 fetched_strat_status_obj.total_open_buy_notional)
                             if update_strat_status_obj.total_open_sell_qty == 0:
@@ -2475,18 +2509,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             else:
                                 update_strat_status_obj.avg_open_sell_px = \
                                     self.get_local_px_or_notional(fetched_strat_status_obj.total_open_sell_notional,
-                                                                  order_snapshot_obj.order_brief.security.sec_id) / \
+                                                                  chore_snapshot_obj.chore_brief.security.sec_id) / \
                                     fetched_strat_status_obj.total_open_sell_qty
                         update_strat_status_obj.total_fill_sell_qty = int(
-                                fetched_strat_status_obj.total_fill_sell_qty + order_snapshot_obj.last_update_fill_qty)
+                                fetched_strat_status_obj.total_fill_sell_qty + chore_snapshot_obj.last_update_fill_qty)
                         update_strat_status_obj.total_fill_sell_notional = (
                                 fetched_strat_status_obj.total_fill_sell_notional +
-                                order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
-                                    order_snapshot_obj.last_update_fill_px,
-                                    order_snapshot_obj.order_brief.security.sec_id))
+                                chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(
+                                    chore_snapshot_obj.last_update_fill_px,
+                                    chore_snapshot_obj.chore_brief.security.sec_id))
                         update_strat_status_obj.avg_fill_sell_px = \
                             self.get_local_px_or_notional(update_strat_status_obj.total_fill_sell_notional,
-                                                          order_snapshot_obj.order_brief.security.sec_id) / \
+                                                          chore_snapshot_obj.chore_brief.security.sec_id) / \
                             update_strat_status_obj.total_fill_sell_qty
                         update_strat_status_obj.total_fill_buy_notional = (
                             fetched_strat_status_obj.total_fill_buy_notional)
@@ -2494,18 +2528,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         if received_fill_after_dod:
                             update_strat_status_obj.total_cxl_sell_qty = int(
                                     fetched_strat_status_obj.total_cxl_sell_qty -
-                                    order_snapshot_obj.last_update_fill_qty)
+                                    chore_snapshot_obj.last_update_fill_qty)
                             update_strat_status_obj.total_cxl_sell_notional = (
                                 fetched_strat_status_obj.total_cxl_sell_notional -
-                                (self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                                 order_snapshot_obj.order_brief.security.sec_id) *
-                                 order_snapshot_obj.last_update_fill_qty))
+                                (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                 chore_snapshot_obj.chore_brief.security.sec_id) *
+                                 chore_snapshot_obj.last_update_fill_qty))
                             update_strat_status_obj.total_cxl_buy_notional = (
                                 fetched_strat_status_obj.total_cxl_buy_notional)
                     case other_:
-                        err_str_ = f"Unsupported Side Type {other_} received for order_snapshot_key: " \
-                                   f"{get_order_snapshot_log_key(order_snapshot_obj)} while updating strat_status;;; " \
-                                   f"{order_snapshot_obj = }"
+                        err_str_ = f"Unsupported Side Type {other_} received for chore_snapshot_key: " \
+                                   f"{get_chore_snapshot_log_key(chore_snapshot_obj)} while updating strat_status;;; " \
+                                   f"{chore_snapshot_obj = }"
                         logging.error(err_str_)
                         return
                 if not received_fill_after_dod:
@@ -2523,7 +2557,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     update_strat_status_obj.balance_notional = \
                         strat_limits.max_single_leg_notional - update_strat_status_obj.total_fill_sell_notional
 
-                updated_residual = self.__get_residual_obj(order_snapshot_obj.order_brief.side, strat_brief_obj)
+                updated_residual = self.__get_residual_obj(chore_snapshot_obj.chore_brief.side, strat_brief_obj)
                 if updated_residual is not None:
                     update_strat_status_obj.residual = updated_residual
 
@@ -2581,46 +2615,46 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         return True
 
     ############################
-    # TradingDataManager updates
+    # BarteringDataManager updates
     ############################
 
-    async def partial_update_order_journal_post(self, stored_order_journal_obj: OrderJournal,
-                                                updated_order_journal_obj: OrderJournalOptional):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_order_journal_get_all_ws(updated_order_journal_obj)
+    async def partial_update_chore_journal_post(self, stored_chore_journal_obj: ChoreJournal,
+                                                updated_chore_journal_obj: ChoreJournalOptional):
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_chore_journal_get_all_ws(updated_chore_journal_obj)
 
-    async def create_order_snapshot_post(self, order_snapshot_obj: OrderSnapshot):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_order_snapshot_get_all_ws(order_snapshot_obj)
+    async def create_chore_snapshot_post(self, chore_snapshot_obj: ChoreSnapshot):
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_chore_snapshot_get_all_ws(chore_snapshot_obj)
 
-    async def update_order_snapshot_post(self, stored_order_snapshot_obj: OrderSnapshot,
-                                         updated_order_snapshot_obj: OrderSnapshot):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_order_snapshot_get_all_ws(updated_order_snapshot_obj)
+    async def update_chore_snapshot_post(self, stored_chore_snapshot_obj: ChoreSnapshot,
+                                         updated_chore_snapshot_obj: ChoreSnapshot):
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_chore_snapshot_get_all_ws(updated_chore_snapshot_obj)
 
-    async def partial_update_order_snapshot_post(self, stored_order_snapshot_obj: OrderSnapshot,
-                                                 updated_order_snapshot_obj: OrderSnapshotOptional):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_order_snapshot_get_all_ws(updated_order_snapshot_obj)
+    async def partial_update_chore_snapshot_post(self, stored_chore_snapshot_obj: ChoreSnapshot,
+                                                 updated_chore_snapshot_obj: ChoreSnapshotOptional):
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_chore_snapshot_get_all_ws(updated_chore_snapshot_obj)
 
     async def create_symbol_side_snapshot_post(self, symbol_side_snapshot_obj: SymbolSideSnapshot):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_symbol_side_snapshot_get_all_ws(symbol_side_snapshot_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_symbol_side_snapshot_get_all_ws(symbol_side_snapshot_obj)
 
     async def update_symbol_side_snapshot_post(self, stored_symbol_side_snapshot_obj: SymbolSideSnapshot,
                                                updated_symbol_side_snapshot_obj: SymbolSideSnapshot):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_symbol_side_snapshot_get_all_ws(updated_symbol_side_snapshot_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_symbol_side_snapshot_get_all_ws(updated_symbol_side_snapshot_obj)
 
     async def partial_update_symbol_side_snapshot_post(self, stored_symbol_side_snapshot_obj: SymbolSideSnapshot,
                                                        updated_symbol_side_snapshot_obj: SymbolSideSnapshotOptional):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_symbol_side_snapshot_get_all_ws(updated_symbol_side_snapshot_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_symbol_side_snapshot_get_all_ws(updated_symbol_side_snapshot_obj)
 
     async def update_strat_status_post(self, stored_strat_status_obj: StratStatus,
                                        updated_strat_status_obj: StratStatus):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_strat_status_get_all_ws(updated_strat_status_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_strat_status_get_all_ws(updated_strat_status_obj)
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
@@ -2628,12 +2662,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_status_obj.id,
                                                  balance_notional=
                                                  updated_strat_status_obj.balance_notional)
-        logging.info(log_str)
+        logging.db(log_str)
 
     async def partial_update_strat_status_post(self, stored_strat_status_obj: StratStatus,
                                                updated_strat_status_obj: StratStatus):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_strat_status_get_all_ws(updated_strat_status_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_strat_status_get_all_ws(updated_strat_status_obj)
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
@@ -2641,7 +2675,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_status_obj.id,
                                                  balance_notional=
                                                  updated_strat_status_obj.balance_notional)
-        logging.info(log_str)
+        logging.db(log_str)
 
     def _call_cpp_mobile_book_updater_from_market_depth(self, market_depth: MarketDepth):
         # Convert string to bytes (for char* arguments)
@@ -2651,7 +2685,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         exch_time_bytes = str(market_depth.exch_time).encode('utf-8')
         arrival_date_time = str(market_depth.arrival_time).encode('utf-8')
         side = 1 if market_depth.side == TickType.BID else 2
-        premium = ctypes.c_float(market_depth.premium) if market_depth.premium else 0
         is_smart_depth = ctypes.c_bool(market_depth.is_smart_depth) if market_depth.is_smart_depth is not None else False
         cumulative_notional = ctypes.c_float(market_depth.cumulative_notional) if market_depth.cumulative_notional else 0
         cumulative_qty = market_depth.cumulative_qty if market_depth.cumulative_qty else 0
@@ -2661,7 +2694,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         self.mobile_book_provider.create_or_update_md_n_tob(
             market_depth.id, symbol, exch_time_bytes, arrival_date_time, ctypes.c_int(side),
             market_depth.position,
-            ctypes.c_float(market_depth.px), market_depth.qty, premium,
+            ctypes.c_float(market_depth.px), market_depth.qty,
             market_maker, is_smart_depth,
             cumulative_notional, cumulative_qty,
             cumulative_avg_px)
@@ -2671,11 +2704,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         symbol = market_depth_json.get("symbol").encode('utf-8')
         market_maker = market_depth_json.get("market_maker").encode('utf-8')
         # Convert to bytes (for char* arguments)
-        exch_time_bytes = str(market_depth_json.get("exch_time").encode('utf-8'))
-        arrival_date_time = str(market_depth_json.get("arrival_time").encode('utf-8'))
+        exch_time_bytes = market_depth_json.get("exch_time").encode('utf-8')
+        arrival_date_time = market_depth_json.get("arrival_time").encode('utf-8')
         side = 1 if market_depth_json.get("side") == "BID" else 2
-        premium = market_depth_json.get("premium")
-        premium = ctypes.c_float(premium) if premium else 0
         is_smart_depth = market_depth_json.get("is_smart_depth")
         is_smart_depth = ctypes.c_bool(is_smart_depth) if is_smart_depth is not None else False
         cumulative_notional = market_depth_json.get("cumulative_notional")
@@ -2690,26 +2721,27 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             market_depth_json.get("_id"), symbol, exch_time_bytes, arrival_date_time,
             ctypes.c_int(side),  market_depth_json.get("position"),
             ctypes.c_float(market_depth_json.get("px")), market_depth_json.get("qty"),
-            premium, market_maker, is_smart_depth,
+            market_maker, is_smart_depth,
             cumulative_notional, cumulative_qty, cumulative_avg_px)
 
-    def _call_cpp_mobile_book_updater_from_last_trade(self, last_trade: LastTrade):
+    def _call_cpp_mobile_book_updater_from_last_barter(self, last_barter: LastBarter):
         # Convert string to bytes (for char* arguments)
-        symbol = last_trade.symbol_n_exch_id.symbol.encode('utf-8')
-        exch_id = last_trade.symbol_n_exch_id.exch_id.encode('utf-8')
+        symbol = last_barter.symbol_n_exch_id.symbol.encode('utf-8')
+        exch_id = last_barter.symbol_n_exch_id.exch_id.encode('utf-8')
         # Convert to bytes (for char* arguments)
-        exch_time_bytes = str(last_trade.exch_time).encode('utf-8')
-        arrival_date_time = str(last_trade.arrival_time).encode('utf-8')
-        premium = ctypes.c_float(last_trade.premium) if last_trade.premium else 0
-        market_trade_vol_id = last_trade.market_trade_volume.id.encode('utf-8') if last_trade.market_trade_volume.id else ""
-        participation_period_last_trade_qty_sum = last_trade.market_trade_volume.participation_period_last_trade_qty_sum if last_trade.market_trade_volume.participation_period_last_trade_qty_sum else 0
-        applicable_period_seconds = last_trade.market_trade_volume.applicable_period_seconds if last_trade.market_trade_volume.applicable_period_seconds else 0
+        exch_time_bytes = str(last_barter.exch_time).encode('utf-8')
+        arrival_date_time = str(last_barter.arrival_time).encode('utf-8')
+        premium = ctypes.c_float(last_barter.premium) if last_barter.premium else 0
+        market_barter_vol_id = last_barter.market_barter_volume.id.encode(
+            'utf-8') if last_barter.market_barter_volume.id else ""
+        participation_period_last_barter_qty_sum = last_barter.market_barter_volume.participation_period_last_barter_qty_sum if last_barter.market_barter_volume.participation_period_last_barter_qty_sum else 0
+        applicable_period_seconds = last_barter.market_barter_volume.applicable_period_seconds if last_barter.market_barter_volume.applicable_period_seconds else 0
 
         # Call the C++ function
-        self.mobile_book_provider.create_or_update_last_trade_n_tob(
-            last_trade.id, symbol, exch_id, exch_time_bytes, arrival_date_time,
-            ctypes.c_float(last_trade.px), last_trade.qty, premium,
-            market_trade_vol_id, participation_period_last_trade_qty_sum,
+        self.mobile_book_provider.create_or_update_last_barter_n_tob(
+            last_barter.id, symbol, exch_id, exch_time_bytes, arrival_date_time,
+            ctypes.c_float(last_barter.px), last_barter.qty, premium,
+            market_barter_vol_id, participation_period_last_barter_qty_sum,
             applicable_period_seconds)
 
     async def create_market_depth_pre(self, market_depth_obj: MarketDepth):
@@ -2722,49 +2754,53 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     async def update_market_depth_pre(self, stored_market_depth_obj: MarketDepth,
                                       updated_market_depth_obj: MarketDepth):
         self._call_cpp_mobile_book_updater_from_market_depth(updated_market_depth_obj)
+        return updated_market_depth_obj
 
     async def update_all_market_depth_pre(self, stored_market_depth_obj_list: List[MarketDepth],
                                           updated_market_depth_obj_list: List[MarketDepth]):
         for updated_market_depth_obj in updated_market_depth_obj_list:
             self._call_cpp_mobile_book_updater_from_market_depth(updated_market_depth_obj)
+        return updated_market_depth_obj_list
 
     async def partial_update_market_depth_pre(self, stored_market_depth_obj: MarketDepth,
                                               updated_market_depth_obj_json: Dict):
         self._call_cpp_mobile_book_updater_from_market_depth_json(updated_market_depth_obj_json)
+        return updated_market_depth_obj_json
 
     async def partial_update_all_market_depth_pre(self, stored_market_depth_obj_list: List[MarketDepth],
                                                   updated_market_depth_obj_json_list: List[Dict]):
         for updated_market_depth_obj_json in updated_market_depth_obj_json_list:
             self._call_cpp_mobile_book_updater_from_market_depth_json(updated_market_depth_obj_json)
+        return updated_market_depth_obj_json_list
 
-    async def create_last_trade_pre(self, last_trade_obj: LastTrade):
-        self._call_cpp_mobile_book_updater_from_last_trade(last_trade_obj)
+    async def create_last_barter_pre(self, last_barter_obj: LastBarter):
+        self._call_cpp_mobile_book_updater_from_last_barter(last_barter_obj)
 
-    async def create_all_last_trade_pre(self, last_trade_obj_list: List[LastTrade]):
-        for last_trade_obj in last_trade_obj_list:
-            self._call_cpp_mobile_book_updater_from_last_trade(last_trade_obj)
+    async def create_all_last_barter_pre(self, last_barter_obj_list: List[LastBarter]):
+        for last_barter_obj in last_barter_obj_list:
+            self._call_cpp_mobile_book_updater_from_last_barter(last_barter_obj)
 
     async def partial_update_fills_journal_post(self, stored_fills_journal_obj: FillsJournal,
                                                 updated_fills_journal_obj: FillsJournalOptional):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_fills_journal_get_all_ws(updated_fills_journal_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_fills_journal_get_all_ws(updated_fills_journal_obj)
 
     async def create_strat_brief_post(self, strat_brief_obj: StratBrief):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_strat_brief_get_all_ws(strat_brief_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_strat_brief_get_all_ws(strat_brief_obj)
 
     async def update_strat_brief_post(self, stored_strat_brief_obj: StratBrief, updated_strat_brief_obj: StratBrief):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_strat_brief_get_all_ws(updated_strat_brief_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_strat_brief_get_all_ws(updated_strat_brief_obj)
 
     async def partial_update_strat_brief_post(self, stored_strat_brief_obj: StratBrief,
                                               updated_strat_brief_obj: StratBriefOptional):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_strat_brief_get_all_ws(updated_strat_brief_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_strat_brief_get_all_ws(updated_strat_brief_obj)
 
     async def create_strat_status_post(self, strat_status_obj: StratStatus):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_strat_status_get_all_ws(strat_status_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_strat_status_get_all_ws(strat_status_obj)
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
@@ -2772,110 +2808,107 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                  UpdateType.SNAPSHOT_TYPE, _id=strat_status_obj.id,
                                                  balance_notional=
                                                  strat_status_obj.balance_notional)
-        logging.info(log_str)
+        logging.db(log_str)
 
     async def create_strat_limits_post(self, strat_limits_obj: StratLimits):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_strat_limits_get_all_ws(strat_limits_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_strat_limits_get_all_ws(strat_limits_obj)
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
                                                  email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=strat_limits_obj.id,
-                                                 max_single_leg_notional=
-                                                 strat_limits_obj.max_single_leg_notional)
-        logging.info(log_str)
+                                                 max_single_leg_notional=strat_limits_obj.max_single_leg_notional)
+        logging.db(log_str)
 
     async def update_strat_limits_post(self, stored_strat_limits_obj: StratLimits,
                                        updated_strat_limits_obj: StratLimits):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_strat_limits_get_all_ws(updated_strat_limits_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_strat_limits_get_all_ws(updated_strat_limits_obj)
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
                                                  email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_limits_obj.id,
-                                                 max_single_leg_notional=
-                                                 updated_strat_limits_obj.max_single_leg_notional)
-        logging.info(log_str)
+                                                 max_single_leg_notional=updated_strat_limits_obj.max_single_leg_notional)
+        logging.db(log_str)
 
     async def partial_update_strat_limits_post(self, stored_strat_limits_obj: StratLimits,
                                                updated_strat_limits_obj: StratLimitsOptional):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_strat_limits_get_all_ws(updated_strat_limits_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_strat_limits_get_all_ws(updated_strat_limits_obj)
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
                                                  email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_limits_obj.id,
-                                                 max_single_leg_notional=
-                                                 updated_strat_limits_obj.max_single_leg_notional)
-        logging.info(log_str)
+                                                 max_single_leg_notional=updated_strat_limits_obj.max_single_leg_notional)
+        logging.db(log_str)
 
-    async def create_new_order_post(self, new_order_obj: NewOrder):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_new_order_get_all_ws(new_order_obj)
+    async def create_new_chore_post(self, new_chore_obj: NewChore):
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_new_chore_get_all_ws(new_chore_obj)
         self.mobile_book_provider.release_notify_semaphore()
 
-    async def create_cancel_order_post(self, cancel_order_obj: CancelOrder):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_cancel_order_get_all_ws(cancel_order_obj)
+    async def create_cancel_chore_post(self, cancel_chore_obj: CancelChore):
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_cancel_chore_get_all_ws(cancel_chore_obj)
         self.mobile_book_provider.release_notify_semaphore()
 
-    async def partial_update_cancel_order_post(self, stored_cancel_order_obj: CancelOrder,
-                                               updated_cancel_order_obj: CancelOrderOptional):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_cancel_order_get_all_ws(updated_cancel_order_obj)
+    async def partial_update_cancel_chore_post(self, stored_cancel_chore_obj: CancelChore,
+                                               updated_cancel_chore_obj: CancelChoreOptional):
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_cancel_chore_get_all_ws(updated_cancel_chore_obj)
         self.mobile_book_provider.release_notify_semaphore()
 
     async def create_symbol_overview_post(self, symbol_overview_obj: SymbolOverview):
         symbol_overview_obj.force_publish = False  # setting it false if at create is it True
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
         self.mobile_book_provider.release_notify_semaphore()
 
     async def update_symbol_overview_post(self, stored_symbol_overview_obj: SymbolOverview,
                                           updated_symbol_overview_obj: SymbolOverview):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
         self.mobile_book_provider.release_notify_semaphore()
 
     async def partial_update_symbol_overview_post(self, stored_symbol_overview_obj: SymbolOverview,
                                                   updated_symbol_overview_obj: SymbolOverviewOptional):
-        # updating trading_data_manager's strat_cache
-        self.trading_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
+        # updating bartering_data_manager's strat_cache
+        self.bartering_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
         self.mobile_book_provider.release_notify_semaphore()
 
     async def create_all_symbol_overview_post(self, symbol_overview_obj_list: List[SymbolOverview]):
-        # updating trading_data_manager's strat_cache
+        # updating bartering_data_manager's strat_cache
         for symbol_overview_obj in symbol_overview_obj_list:
             symbol_overview_obj.force_publish = False  # setting it false if at create it is True
-            if self.trading_data_manager:
-                self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
+            if self.bartering_data_manager:
+                self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
                 self.mobile_book_provider.release_notify_semaphore()
             # else not required: since symbol overview is required to make executor service ready,
             #                    will add this to strat_cache explicitly using underlying http call
 
     async def update_all_symbol_overview_post(self, stored_symbol_overview_obj_list: List[SymbolOverview],
                                               updated_symbol_overview_obj_list: List[SymbolOverview]):
-        # updating trading_data_manager's strat_cache
+        # updating bartering_data_manager's strat_cache
         for symbol_overview_obj in updated_symbol_overview_obj_list:
-            self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
+            self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
             self.mobile_book_provider.release_notify_semaphore()
 
     async def partial_update_all_symbol_overview_post(self, stored_symbol_overview_obj_list: List[SymbolOverview],
                                                       updated_symbol_overview_obj_list: List[SymbolOverviewOptional]):
-        # updating trading_data_manager's strat_cache
+        # updating bartering_data_manager's strat_cache
         for symbol_overview_obj in updated_symbol_overview_obj_list:
-            self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
+            self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
             self.mobile_book_provider.release_notify_semaphore()
 
     #####################
     # Query Pre/Post handling
     #####################
 
-    async def get_symbol_side_snapshot_from_symbol_side_query_pre(self, symbol_side_snapshot_class_type: Type[
-        SymbolSideSnapshot], security_id: str, side: str):
+    async def get_symbol_side_snapshot_from_symbol_side_query_pre(
+            self, symbol_side_snapshot_class_type: Type[SymbolSideSnapshot], security_id: str, side: str):
         symbol_side_snapshot_objs = \
             await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_symbol_side_snapshot_http(
                 get_symbol_side_snapshot_from_symbol_side(security_id, side), self.get_generic_read_route())
@@ -2895,18 +2928,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             if strat_brief_tuple is not None:
                 strat_brief_obj, _ = strat_brief_tuple
                 if side == Side.BUY:
-                    update_trading_side_brief = \
-                        PairSideTradingBriefOptional(
-                            residual_qty=int(strat_brief_obj.pair_buy_side_trading_brief.residual_qty + residual_qty))
+                    update_bartering_side_brief = \
+                        PairSideBarteringBriefOptional(
+                            residual_qty=int(strat_brief_obj.pair_buy_side_bartering_brief.residual_qty + residual_qty))
                     update_strat_brief = StratBriefOptional(_id=strat_brief_obj.id,
-                                                            pair_buy_side_trading_brief=update_trading_side_brief)
+                                                            pair_buy_side_bartering_brief=update_bartering_side_brief)
 
                 else:
-                    update_trading_side_brief = \
-                        PairSideTradingBriefOptional(
-                            residual_qty=int(strat_brief_obj.pair_sell_side_trading_brief.residual_qty + residual_qty))
+                    update_bartering_side_brief = \
+                        PairSideBarteringBriefOptional(
+                            residual_qty=int(strat_brief_obj.pair_sell_side_bartering_brief.residual_qty + residual_qty))
                     update_strat_brief = StratBriefOptional(_id=strat_brief_obj.id,
-                                                            pair_sell_side_trading_brief=update_trading_side_brief)
+                                                            pair_sell_side_bartering_brief=update_bartering_side_brief)
 
                 updated_strat_brief = (
                     await StreetBookServiceRoutesCallbackBaseNativeOverride.
@@ -2946,13 +2979,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             # nothing to send since this query updates residuals only
             return []
 
-    async def get_open_order_count_query_pre(self, open_order_count_class_type: Type[OpenOrderCount], symbol: str):
-        open_orders = \
-            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http(
-                get_open_order_snapshots_for_symbol(symbol), self.get_generic_read_route())
+    async def get_open_chore_count_query_pre(self, open_chore_count_class_type: Type[OpenChoreCount], symbol: str):
+        open_chores = \
+            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_snapshot_http(
+                get_open_chore_snapshots_for_symbol(symbol), self.get_generic_read_route())
 
-        open_order_count = OpenOrderCount(open_order_count=len(open_orders))
-        return [open_order_count]
+        open_chore_count = OpenChoreCount(open_chore_count=len(open_chores))
+        return [open_chore_count]
 
     async def get_underlying_account_cumulative_fill_qty_query_pre(
             self, underlying_account_cum_fill_qty_class_type: Type[UnderlyingAccountCumFillQty],
@@ -2979,39 +3012,39 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         return await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_fills_journal_http(
             get_symbol_side_underlying_account_cumulative_fill_qty(symbol, side), self.get_generic_read_route())
 
-    async def cxl_expired_open_orders(self):
-        open_order_snapshots_list: List[OrderSnapshot] = self.strat_cache.get_open_order_snapshots()
+    async def cxl_expired_open_chores(self):
+        open_chore_snapshots_list: List[ChoreSnapshot] = self.strat_cache.get_open_chore_snapshots()
 
-        for open_order_snapshot in open_order_snapshots_list:
-            if (open_order_snapshot.order_status != OrderStatusType.OE_CXL_UNACK and
-                    open_order_snapshot.order_status not in [OrderStatusType.OE_DOD, OrderStatusType.OE_FILLED]):
+        for open_chore_snapshot in open_chore_snapshots_list:
+            if (open_chore_snapshot.chore_status != ChoreStatusType.OE_CXL_UNACK and
+                    open_chore_snapshot.chore_status not in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED]):
                 strat_limits_tuple = self.strat_cache.get_strat_limits()
-                time_delta = DateTime.utcnow() - open_order_snapshot.create_date_time
+                time_delta = DateTime.utcnow() - open_chore_snapshot.create_date_time
 
                 if strat_limits_tuple is not None:
                     strat_limits, _ = strat_limits_tuple
                     if time_delta.total_seconds() > strat_limits.residual_restriction.residual_mark_seconds:
-                        logging.info(f"Triggering cxl_expired_open_orders, order_id: "
-                                     f"{open_order_snapshot.order_brief.order_id}")
-                        await StreetBook.trading_link.place_cxl_order(
-                            open_order_snapshot.order_brief.order_id, open_order_snapshot.order_brief.side,
-                            open_order_snapshot.order_brief.security.sec_id,
-                            open_order_snapshot.order_brief.security.sec_id,
-                            open_order_snapshot.order_brief.underlying_account)
+                        logging.info(f"Triggering cxl_expired_open_chores, chore_id: "
+                                     f"{open_chore_snapshot.chore_brief.chore_id}")
+                        await StreetBook.bartering_link.place_cxl_chore(
+                            open_chore_snapshot.chore_brief.chore_id, open_chore_snapshot.chore_brief.side,
+                            open_chore_snapshot.chore_brief.security.sec_id,
+                            open_chore_snapshot.chore_brief.security.sec_id,
+                            open_chore_snapshot.chore_brief.underlying_account)
                     # else not required: If time-delta is still less than residual_mark_seconds then avoiding
-                    # cancellation of order
+                    # cancellation of chore
                 else:
-                    logging.error("Received strat_limits_tuple as None from strat_cache, ignoring cxl expiring order "
+                    logging.error("Received strat_limits_tuple as None from strat_cache, ignoring cxl expiring chore "
                                   f"for this call, will retry again in {self.min_refresh_interval} secs")
-            elif open_order_snapshot.order_status == OrderStatusType.OE_DOD:
-                logging.error("Unexpected: Received open_order_snapshot with order_status OE_DOD, likely bug in "
-                              "get_open_order_snapshots - list provided must not have any order_snapshot "
+            elif open_chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
+                logging.error("Unexpected: Received open_chore_snapshot with chore_status OE_DOD, likely bug in "
+                              "get_open_chore_snapshots - list provided must not have any chore_snapshot "
                               "that is non-open")
-            elif open_order_snapshot.order_status == OrderStatusType.OE_FILLED:
-                logging.error("Unexpected: Received open_order_snapshot with order_status OE_FILLED, likely bug in "
-                              "get_open_order_snapshots - list provided must not have any order_snapshot "
+            elif open_chore_snapshot.chore_status == ChoreStatusType.OE_FILLED:
+                logging.error("Unexpected: Received open_chore_snapshot with chore_status OE_FILLED, likely bug in "
+                              "get_open_chore_snapshots - list provided must not have any chore_snapshot "
                               "that is non-open")
-            # else not required: avoiding cxl request if order_snapshot already got cxl request
+            # else not required: avoiding cxl request if chore_snapshot already got cxl request
 
     async def get_strat_brief_from_symbol_query_pre(self, strat_brief_class_type: Type[StratBrief], security_id: str):
         return await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http(
@@ -3021,24 +3054,21 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             self, executor_check_snapshot_class_type: Type[ExecutorCheckSnapshot], symbol: str,
             side: Side, last_n_sec: int):
 
-        last_n_sec_order_qty = await self.get_last_n_sec_order_qty(symbol, side, last_n_sec)
-        logging.debug(f"Received {last_n_sec_order_qty = }, {symbol = }, {Side = }")
+        last_n_sec_chore_qty = await self.get_last_n_sec_chore_qty(symbol, side, last_n_sec)
+        last_n_sec_barter_qty = await self.get_last_n_sec_barter_qty(symbol, side)
 
-        last_n_sec_trade_qty = await self.get_last_n_sec_trade_qty(symbol, side)
-        logging.debug(f"Received {last_n_sec_trade_qty = }, {symbol = }, {Side = }")
-
-        if last_n_sec_order_qty is not None and \
-                last_n_sec_trade_qty is not None:
+        if last_n_sec_chore_qty is not None and \
+                last_n_sec_barter_qty is not None:
             # if no data is found by respective queries then all fields are set to 0 and every call returns
             # executor_check_snapshot object (except when exception occurs)
             executor_check_snapshot = \
-                ExecutorCheckSnapshot(last_n_sec_trade_qty=last_n_sec_trade_qty,
-                                      last_n_sec_order_qty=last_n_sec_order_qty)
+                ExecutorCheckSnapshot(last_n_sec_barter_qty=last_n_sec_barter_qty,
+                                      last_n_sec_chore_qty=last_n_sec_chore_qty)
             return [executor_check_snapshot]
         else:
             # will only return [] if some error occurred
             logging.error(f"no executor_check_snapshot for symbol_side_key: {get_symbol_side_key([(symbol, side)])}, as"
-                          f"Received {last_n_sec_order_qty = }, {last_n_sec_trade_qty = } "
+                          f"Received {last_n_sec_chore_qty = }, {last_n_sec_barter_qty = } "
                           f"& {last_n_sec = }; returning empty list []")
             return []
 
@@ -3048,22 +3078,54 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             get_symbol_overview_from_symbol(symbol))
 
     async def get_top_of_book_from_symbol_query_pre(self, top_of_book_class_type: Type[TopOfBook], symbol: str):
-        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.aggregate import get_objs_from_symbol
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate import get_objs_from_symbol
         return await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_top_of_book_http(
             get_objs_from_symbol(symbol))
 
-    async def get_last_n_sec_total_trade_qty_query_pre(
-            self, last_sec_market_trade_vol_class_type: Type[LastNSecMarketTradeVol],
-            symbol: str, last_n_sec: int) -> List[LastNSecMarketTradeVol]:
-        last_trade_obj_list = \
-            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_last_trade_http(
-                get_last_n_sec_total_trade_qty(symbol, last_n_sec))
-        last_n_sec_trade_vol = 0
-        if last_trade_obj_list:
-            last_n_sec_trade_vol = \
-                last_trade_obj_list[-1].market_trade_volume.participation_period_last_trade_qty_sum
+    async def get_last_n_sec_total_barter_qty_by_aggressive_window_first_n_last_barters(
+            self, last_sec_market_barter_vol_class_type: Type[LastNSecMarketBarterVol],
+            symbol: str, last_n_sec: int) -> List[LastNSecMarketBarterVol]:
+        symbol_side_key = get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])
+        first_last_barter_cont: FirstLastBarterCont = \
+            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_last_barter_http(
+                get_last_n_sec_first_n_last_barter(symbol, last_n_sec), projection_read_http, FirstLastBarterCont)
+        if ((not first_last_barter_cont) or (not first_last_barter_cont.first) or (not first_last_barter_cont.last) or
+                (not first_last_barter_cont.first.market_barter_volume) or
+                (not first_last_barter_cont.last.market_barter_volume) or
+                (not first_last_barter_cont.first.market_barter_volume.participation_period_last_barter_qty_sum) or
+                (not first_last_barter_cont.last.market_barter_volume.participation_period_last_barter_qty_sum)):
+            logging.error(f"not enough data to construct last_n_sec_barter_vol for: {symbol=}, returning 0;;;"
+                          f"{first_last_barter_cont=}, {symbol_side_key=}")
+            return [LastNSecMarketBarterVol(last_n_sec_barter_vol=0)]
+        last_n_sec_trd_vol = (first_last_barter_cont.first.market_barter_volume.participation_period_last_barter_qty_sum -
+                              first_last_barter_cont.last.market_barter_volume.participation_period_last_barter_qty_sum)
+        if last_n_sec_trd_vol < 0:
+            if first_last_barter_cont.first.exch_time == first_last_barter_cont.last.exch_time:
+                last_n_sec_trd_vol = abs(last_n_sec_trd_vol)
+                logging.debug(f"{first_last_barter_cont=}")
+            else:
+                first_mtv = first_last_barter_cont.first.market_barter_volume
+                last_mtv = first_last_barter_cont.last.market_barter_volume
+                logging.error(f"unexpected {last_n_sec_trd_vol=} found -ive for {symbol=}, "
+                              f"{first_mtv.participation_period_last_barter_qty_sum=}, "
+                              f"{last_mtv.participation_period_last_barter_qty_sum=};;;{first_mtv=}, {last_mtv=}, "
+                              f"{symbol_side_key=}")
+                last_n_sec_trd_vol = 0
+            return [LastNSecMarketBarterVol(last_n_sec_barter_vol=last_n_sec_trd_vol)]
 
-        return [LastNSecMarketTradeVol(last_n_sec_trade_vol=last_n_sec_trade_vol)]
+
+    async def get_last_n_sec_total_barter_qty_query_pre(
+            self, last_sec_market_barter_vol_class_type: Type[LastNSecMarketBarterVol],
+            symbol: str, last_n_sec: int) -> List[LastNSecMarketBarterVol]:
+        last_barter_obj_list = \
+            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_last_barter_http(
+                get_last_n_sec_total_barter_qty(symbol, last_n_sec))
+        last_n_sec_barter_vol = 0
+        if last_barter_obj_list:
+            last_n_sec_barter_vol = \
+                last_barter_obj_list[-1].market_barter_volume.participation_period_last_barter_qty_sum
+
+        return [LastNSecMarketBarterVol(last_n_sec_barter_vol=last_n_sec_barter_vol)]
 
     async def put_strat_to_snooze_query_pre(self, strat_status_class_type: Type[StratStatus]):
         # removing current strat_status
@@ -3083,16 +3145,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
             # making force publish flag back to false for current strat's symbol's symbol_overview
             await self._force_unpublish_symbol_overview_from_unload_strat()
-
-        # removing strat_alert
-        try:
-            log_book_service_http_client.delete_strat_alert_client(self.pair_strat_id)
-        except Exception as e:
-            if '{"detail":"Id not Found:' in str(e):
-                logging.info(f"Strat Alert with id: {self.pair_strat_id} not found while deleting strat_alert")
-            else:
-                err_str_ = f"Some Error occurred while removing strat_alerts in snoozing strat process, exception: {e}"
-                raise HTTPException(detail=err_str_, status_code=500)
 
         # cleaning executor config.yaml file
         try:
@@ -3142,12 +3194,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 return [cached_strat_brief]
         return []
 
-    async def get_new_order_from_cache_query_pre(self, new_order_class_type: Type[NewOrder]):
-        cached_new_order_tuple = self.strat_cache.get_new_order()
-        if cached_new_order_tuple is not None:
-            cached_new_order, _ = cached_new_order_tuple
-            if cached_new_order is not None:
-                return cached_new_order
+    async def get_new_chore_from_cache_query_pre(self, new_chore_class_type: Type[NewChore]):
+        cached_new_chore_tuple = self.strat_cache.get_new_chore()
+        if cached_new_chore_tuple is not None:
+            cached_new_chore, _ = cached_new_chore_tuple
+            if cached_new_chore is not None:
+                return cached_new_chore
         return []
 
     async def get_strat_limits_from_cache_query_pre(self, strat_limits_class_type: Type[StratLimits]):
@@ -3158,12 +3210,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 return [cached_strat_limits]
         return []
 
-    async def get_order_journals_from_cache_query_pre(self, order_journal_class_type: Type[OrderJournal]):
-        cached_order_journal_tuple = self.strat_cache.get_order_journal()
-        if cached_order_journal_tuple is not None:
-            cached_order_journal, _ = cached_order_journal_tuple
-            if cached_order_journal is not None:
-                return cached_order_journal
+    async def get_chore_journals_from_cache_query_pre(self, chore_journal_class_type: Type[ChoreJournal]):
+        cached_chore_journal_tuple = self.strat_cache.get_chore_journal()
+        if cached_chore_journal_tuple is not None:
+            cached_chore_journal, _ = cached_chore_journal_tuple
+            if cached_chore_journal is not None:
+                return cached_chore_journal
         return []
 
     async def get_fills_journal_from_cache_query_pre(self, fills_journal_class_type: Type[FillsJournal]):
@@ -3174,12 +3226,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 return cached_fills_journal
         return []
 
-    async def get_order_snapshots_from_cache_query_pre(self, order_snapshot_class_type: Type[OrderSnapshot]):
-        cached_order_snapshot_tuple = self.strat_cache.get_order_snapshot()
-        if cached_order_snapshot_tuple is not None:
-            cached_order_snapshot, _ = cached_order_snapshot_tuple
-            if cached_order_snapshot is not None:
-                return cached_order_snapshot
+    async def get_chore_snapshots_from_cache_query_pre(self, chore_snapshot_class_type: Type[ChoreSnapshot]):
+        cached_chore_snapshot_tuple = self.strat_cache.get_chore_snapshot()
+        if cached_chore_snapshot_tuple is not None:
+            cached_chore_snapshot, _ = cached_chore_snapshot_tuple
+            if cached_chore_snapshot is not None:
+                return cached_chore_snapshot
         return []
 
     async def get_tob_of_book_from_cache_query_pre(self, top_of_book_class_type: Type[TopOfBook]):
@@ -3194,51 +3246,51 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 tob_list.append(leg_1_tob_of_book)
 
         if leg_2_tob_of_book is not None:
-            with MobileBookMutexManager(self.mobile_book_provider, leg_1_tob_of_book):
+            with MobileBookMutexManager(self.mobile_book_provider, leg_2_tob_of_book):
                 tob_list.append(leg_2_tob_of_book)
         return tob_list
 
     #########################
-    # Trade Simulator Queries
+    # Barter Simulator Queries
     #########################
 
-    async def trade_simulator_place_new_order_query_pre(
-            self, trade_simulator_process_new_order_class_type: Type[TradeSimulatorProcessNewOrder],
-            px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
+    async def barter_simulator_place_new_chore_query_pre(
+            self, barter_simulator_process_new_chore_class_type: Type[BarterSimulatorProcessNewChore],
+            px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str,
             underlying_account: str, exchange: str | None = None):
-        if TradeSimulator.symbol_configs is None:
-            TradeSimulator.reload_symbol_configs()
-        await TradeSimulator.place_new_order(px, qty, side, trading_sec_id, system_sec_id, underlying_account, exchange)
+        if BarterSimulator.symbol_configs is None:
+            BarterSimulator.reload_symbol_configs()
+        await BarterSimulator.place_new_chore(px, qty, side, bartering_sec_id, system_sec_id, underlying_account, exchange)
         return []
 
-    async def trade_simulator_place_cxl_order_query_pre(
-            self, trade_simulator_process_cxl_order_class_type: Type[TradeSimulatorProcessCxlOrder],
-            order_id: str, side: Side | None = None, trading_sec_id: str | None = None,
+    async def barter_simulator_place_cxl_chore_query_pre(
+            self, barter_simulator_process_cxl_chore_class_type: Type[BarterSimulatorProcessCxlChore],
+            chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
             system_sec_id: str | None = None, underlying_account: str | None = None):
-        if TradeSimulator.symbol_configs is None:
-            TradeSimulator.reload_symbol_configs()
-        await TradeSimulator.place_cxl_order(order_id, side, trading_sec_id, system_sec_id, underlying_account)
+        if BarterSimulator.symbol_configs is None:
+            BarterSimulator.reload_symbol_configs()
+        await BarterSimulator.place_cxl_chore(chore_id, side, bartering_sec_id, system_sec_id, underlying_account)
         return []
 
-    async def trade_simulator_process_order_ack_query_pre(
-            self, trade_simulator_process_order_ack_class_type: Type[TradeSimulatorProcessOrderAck], order_id: str,
+    async def barter_simulator_process_chore_ack_query_pre(
+            self, barter_simulator_process_chore_ack_class_type: Type[BarterSimulatorProcessChoreAck], chore_id: str,
             px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
-        if TradeSimulator.symbol_configs is None:
-            TradeSimulator.reload_symbol_configs()
-        await TradeSimulator.process_order_ack(order_id, px, qty, side, sec_id, underlying_account)
+        if BarterSimulator.symbol_configs is None:
+            BarterSimulator.reload_symbol_configs()
+        await BarterSimulator.process_chore_ack(chore_id, px, qty, side, sec_id, underlying_account)
         return []
 
-    async def trade_simulator_process_fill_query_pre(
-            self, trade_simulator_process_fill_class_type: Type[TradeSimulatorProcessFill], order_id: str,
+    async def barter_simulator_process_fill_query_pre(
+            self, barter_simulator_process_fill_class_type: Type[BarterSimulatorProcessFill], chore_id: str,
             px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
-        if TradeSimulator.symbol_configs is None:
-            TradeSimulator.reload_symbol_configs()
-        await TradeSimulator.process_fill(order_id, px, qty, side, sec_id, underlying_account)
+        if BarterSimulator.symbol_configs is None:
+            BarterSimulator.reload_symbol_configs()
+        await BarterSimulator.process_fill(chore_id, px, qty, side, sec_id, underlying_account)
         return []
 
-    async def trade_simulator_reload_config_query_pre(
-            self, trade_simulator_reload_config_class_type: Type[TradeSimulatorReloadConfig]):
-        TradeSimulator.reload_symbol_configs()
+    async def barter_simulator_reload_config_query_pre(
+            self, barter_simulator_reload_config_class_type: Type[BarterSimulatorReloadConfig]):
+        BarterSimulator.reload_symbol_configs()
         return []
 
     ###################
@@ -3248,11 +3300,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     async def filtered_notify_tob_update_query_ws_pre(self):
         return tob_filter_callable
 
-    async def filtered_notify_order_journal_update_query_ws_pre(self):
-        return filter_ws_order_journal
+    async def filtered_notify_chore_journal_update_query_ws_pre(self):
+        return filter_ws_chore_journal
 
-    async def filtered_notify_order_snapshot_update_query_ws_pre(self):
-        return filter_ws_order_snapshot
+    async def filtered_notify_chore_snapshot_update_query_ws_pre(self):
+        return filter_ws_chore_snapshot
 
     async def filtered_notify_symbol_side_snapshot_update_query_ws_pre(self):
         return filter_ws_symbol_side_snapshot
@@ -3264,11 +3316,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         return filter_ws_strat_brief
 
 
-def filter_ws_order_journal(order_journal_obj_json: Dict, **kwargs):
+def filter_ws_chore_journal(chore_journal_obj_json: Dict, **kwargs):
     symbols = kwargs.get("symbols")
-    order = order_journal_obj_json.get("order")
-    if order is not None:
-        security = order.get("security")
+    chore = chore_journal_obj_json.get("chore")
+    if chore is not None:
+        security = chore.get("security")
         if security is not None:
             sec_id = security.get("sec_id")
             if sec_id is not None:
@@ -3277,11 +3329,11 @@ def filter_ws_order_journal(order_journal_obj_json: Dict, **kwargs):
     return False
 
 
-def filter_ws_order_snapshot(order_snapshot_obj_json: Dict, **kwargs):
+def filter_ws_chore_snapshot(chore_snapshot_obj_json: Dict, **kwargs):
     symbols = kwargs.get("symbols")
-    order = order_snapshot_obj_json.get("order")
-    if order is not None:
-        security = order.get("security")
+    chore = chore_snapshot_obj_json.get("chore")
+    if chore is not None:
+        security = chore.get("security")
         if security is not None:
             sec_id = security.get("sec_id")
             if sec_id is not None:
@@ -3312,11 +3364,11 @@ def filter_ws_fills_journal(fills_journal_obj_json: Dict, **kwargs):
 
 def filter_ws_strat_brief(strat_brief_obj_json: Dict, **kwargs):
     symbols = kwargs.get("symbols")
-    pair_buy_side_trading_brief = strat_brief_obj_json.get("pair_buy_side_trading_brief")
-    pair_sell_side_trading_brief = strat_brief_obj_json.get("pair_sell_side_trading_brief")
-    if pair_buy_side_trading_brief is not None and pair_sell_side_trading_brief is not None:
-        security_buy = pair_buy_side_trading_brief.get("security")
-        security_sell = pair_sell_side_trading_brief.get("security")
+    pair_buy_side_bartering_brief = strat_brief_obj_json.get("pair_buy_side_bartering_brief")
+    pair_sell_side_bartering_brief = strat_brief_obj_json.get("pair_sell_side_bartering_brief")
+    if pair_buy_side_bartering_brief is not None and pair_sell_side_bartering_brief is not None:
+        security_buy = pair_buy_side_bartering_brief.get("security")
+        security_sell = pair_sell_side_bartering_brief.get("security")
         if security_buy is not None and security_sell is not None:
             sec1_id = security_buy.get("sec_id")
             sec2_id = security_sell.get("sec_id")

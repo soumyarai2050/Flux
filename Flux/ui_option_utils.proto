@@ -43,8 +43,25 @@ enum UILayouts{
   UI_CHART = 6;
 }
 
+enum UICRUDType{
+  GET_ = 0;
+  GET_ALL = 1;
+}
+
 message WebPageUIData{
   optional Theme theme = 1;
+}
+
+message UIQueryParam{
+  required string query_param_field = 1;
+  required string query_param_field_src = 2;
+}
+
+message OverrideDefaultCRUD{
+  required UICRUDType ui_crud_type = 1;
+  required string query_name = 2;
+  required string query_src_model_name = 3;  // Source can be only one
+  repeated UIQueryParam ui_query_params = 4;
 }
 
 message WidgetUIDataElement {
@@ -73,6 +90,9 @@ message WidgetUIDataElement {
                                           // on which current model is dependent
   optional bool depends_on_other_model_for_id = 18 [default=false];
   optional bool depends_on_other_model_for_dynamic_url = 19 [default=false];
+  optional bool depends_on_model_name_for_port = 20 [default=false];
+  repeated OverrideDefaultCRUD override_default_crud = 21;
+  optional bool is_model_alert_type = 22;
 }
 
 message ColumnOrder {

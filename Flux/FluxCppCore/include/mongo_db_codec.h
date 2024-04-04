@@ -23,14 +23,16 @@ namespace FluxCppCore {
                     int32_t &r_new_generated_id_out) {
             r_new_generated_id_out = get_next_insert_id();
             update_id_in_document(r_bson_doc, r_new_generated_id_out);
-            auto insert_result = m_mongo_db_collection.insert_one(r_bson_doc.view());
-            auto inserted_id = insert_result->inserted_id().get_int32().value;
-            if (inserted_id == r_new_generated_id_out) {
+            try {
+                auto insert_result = m_mongo_db_collection.insert_one(r_bson_doc.view());
+                auto inserted_id = insert_result->inserted_id().get_int32().value;
+                assert(r_new_generated_id_out == inserted_id && __func__ && "Insert failed");
                 m_root_model_key_to_db_id[kr_root_model_key] = r_new_generated_id_out;
-                return true;
-            } else {
+            } catch (std::exception &e) {
+                std::cerr << "Error: " << e.what() << __func__ << std::endl;
                 return false;
             }
+            return true;
         }
 
         bool bulk_insert(const RootModelListType &kr_root_model_list_obj,
@@ -72,17 +74,18 @@ namespace FluxCppCore {
                               int32_t &r_new_generated_id_out) {
             bool status = false;
             bsoncxx::builder::basic::document bson_doc{};
-
             auto found = m_root_model_key_to_db_id.find(r_root_model_key_in_n_out);
             if (found == m_root_model_key_to_db_id.end()) {
                 // Key does not exist, so it's a new object. Insert it into the database
                 prepare_doc(kr_root_model_obj, bson_doc);
                 status = insert(bson_doc, r_root_model_key_in_n_out, r_new_generated_id_out);
+                assert(status && __func__ && "Insert failed");
 
             } else {
                 // Key already exists, so update the existing object in the database
                 prepare_doc(kr_root_model_obj, bson_doc);
                 status = update_or_patch(found->second, bson_doc);
+                assert(status && __func__ && "Update failed");
             }
             return status;
         }
@@ -161,12 +164,24 @@ namespace FluxCppCore {
             auto update_filter = FluxCppCore::make_document(FluxCppCore::kvp("_id", kr_model_doc_id));
             auto update_document = FluxCppCore::make_document(
                     FluxCppCore::kvp("$set", kr_bson_doc.view()));
-            auto result = m_mongo_db_collection.update_many(update_filter.view(), update_document.view());
-            if (result->modified_count() > 0) {
-                return true;
-            } else {
+
+            get_data_by_id_from_collection(root_model_type_, kr_model_doc_id);
+            bsoncxx::builder::basic::document existing_doc;
+            prepare_doc(root_model_type_, existing_doc);
+
+            try {
+                auto result = m_mongo_db_collection.update_one(update_filter.view(), update_document.view());
+                bsoncxx::builder::basic::document new_doc;
+                RootModelType rootModelType;
+                get_data_by_id_from_collection(rootModelType, kr_model_doc_id);
+                prepare_doc(rootModelType, new_doc);
+                assert(result->modified_count() == 1 && __func__ && "Update failed");
+
+            } catch (std::exception &e) {
+                std::cerr << "Error: " << e.what() << __func__ << std::endl;
                 return false;
             }
+            return true;
         }
 
         // Bulk patch the data (update specific documents)

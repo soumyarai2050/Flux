@@ -16,7 +16,7 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC  # noqa
 
 # project specific imports
-from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.web_ui.utility_test_functions import (
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import (
     click_button_with_name, set_tree_input_field, confirm_save, create_strat_limits_using_tree_view, switch_layout,
     activate_strat, validate_strat_limits, set_table_input_field,
     save_layout, get_common_keys, get_replaced_common_keys, get_table_headers, get_select_box_value,
@@ -32,12 +32,12 @@ from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.web_ui.utility_te
     double_click, hover_over_on_element, set_val_max_input_fld,
     set_val_min_input_fld, get_server_populate_fld, set_input_value_for_comma_seperated,
     get_val_max_from_input_fld, input_n_validate_progress_bar, is_table_cell_enabled, get_number_format_from_input_fld)
-from CodeGenProjects.addressbook.ProjectGroup.phone_book.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
+from CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
                                                                                              SearchType)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import TopOfBookBaseModel, QuoteOptional
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_routes import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import TopOfBookBaseModel, QuoteOptional
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_routes import (
     PairStratBaseModel, StratState, UILayoutBaseModel, WidgetUIDataElementOptional)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import \
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import \
     StreetBookServiceHttpClient
 
 # to parameterize all tests. to add support for other browsers, add the DriverType here
@@ -105,9 +105,9 @@ def test_update_strat_limits_n_activate_using_table_view(clean_and_set_limits, d
 
     click_button_with_name(widget=strat_limits_widget, button_name="Edit")
 
-    # max_open_per_orders_side
-    xpath = "max_open_orders_per_side"
-    value = strat_limits["max_open_orders_per_side"]
+    # max_open_per_chores_side
+    xpath = "max_open_chores_per_side"
+    value = strat_limits["max_open_chores_per_side"]
     is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
     if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
@@ -161,23 +161,23 @@ def test_update_strat_limits_n_activate_using_table_view(clean_and_set_limits, d
     if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
-    # waived_min_orders
-    xpath = "cancel_rate.waived_min_orders"
-    value = strat_limits["cancel_rate"]["waived_min_orders"]
+    # waived_min_chores
+    xpath = "cancel_rate.waived_min_chores"
+    value = strat_limits["cancel_rate"]["waived_min_chores"]
     is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
     if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # max_participation_rate
-    xpath = "market_trade_volume_participation.max_participation_rate"
-    value = strat_limits["market_trade_volume_participation"]["max_participation_rate"]
+    xpath = "market_barter_volume_participation.max_participation_rate"
+    value = strat_limits["market_barter_volume_participation"]["max_participation_rate"]
     is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
     if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # applicable_period_seconds
-    xpath = "market_trade_volume_participation.applicable_period_seconds"
-    value = strat_limits["market_trade_volume_participation"]["applicable_period_seconds"]
+    xpath = "market_barter_volume_participation.applicable_period_seconds"
+    value = strat_limits["market_barter_volume_participation"]["applicable_period_seconds"]
     is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
     if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
@@ -306,7 +306,7 @@ def test_nested_pair_strat_n_strats_limits(clean_and_set_limits, driver_type, we
     click_button_with_name(widget=strat_limits_widget, button_name="Edit")
     strat_limits_td_elements = strat_limits_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
 
-    xpath: str = "max_open_orders_per_side"
+    xpath: str = "max_open_chores_per_side"
     is_enabled = is_table_cell_enabled(widget=pair_strat_params_widget, xpath=xpath)
     if is_enabled:
         double_click(driver=driver, element=strat_limits_td_elements[0])
@@ -347,16 +347,16 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
     assert result[0]
     print(result)
 
-    # order_limits_n_portfolio_limits_table_layout_val_max_for_valid_scenario
+    # chore_limits_n_portfolio_limits_table_layout_val_max_for_valid_scenario
     set_val_max_input_fld(driver=driver,layout=Layout.TABLE, input_type="valid", schema_dict=copy.deepcopy(schema_dict))
 
-    # order_limits_n_portfolio_limits_tree_layout_val_max_for_valid_scenario
+    # chore_limits_n_portfolio_limits_tree_layout_val_max_for_valid_scenario
     set_val_max_input_fld(driver=driver,layout=Layout.TREE, input_type="valid", schema_dict=copy.deepcopy(schema_dict))
 
-    # order_limits_n_portfolio_limits_table_layout_above_val_max_for_invalid_scenario
+    # chore_limits_n_portfolio_limits_table_layout_above_val_max_for_invalid_scenario
     set_val_max_input_fld(driver=driver,layout=Layout.TABLE, input_type="invalid", schema_dict=copy.deepcopy(schema_dict))
 
-    # order_limits_n_portfolio_limits_tree_layout_above_val_max_for_invalid_scenario
+    # chore_limits_n_portfolio_limits_tree_layout_above_val_max_for_invalid_scenario
     set_val_max_input_fld(driver=driver, layout=Layout.TREE, input_type="invalid", schema_dict=copy.deepcopy(schema_dict))
 
 
@@ -383,19 +383,19 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
                                           widget_type=WidgetType.INDEPENDENT, flux_property="val_min")
     assert result[0]
 
-    # order_limits_n_portfolio_limits_table_layout_val_min_for_valid_scenario
+    # chore_limits_n_portfolio_limits_table_layout_val_min_for_valid_scenario
     set_val_min_input_fld(driver=driver, layout=Layout.TABLE, input_type="valid",
                           schema_dict=copy.deepcopy(schema_dict))
 
-    # order_limits_n_portfolio_limits_tree_layout_val_min_for_valid_scenario
+    # chore_limits_n_portfolio_limits_tree_layout_val_min_for_valid_scenario
     set_val_min_input_fld(driver=driver, layout=Layout.TREE, input_type="valid",
                           schema_dict=copy.deepcopy(schema_dict))
 
-    # order_limits_n_portfolio_limits_table_layout_below_val_min_for_invalid_scenario
+    # chore_limits_n_portfolio_limits_table_layout_below_val_min_for_invalid_scenario
     set_val_min_input_fld(driver=driver, layout=Layout.TABLE, input_type="invalid",
                           schema_dict=copy.deepcopy(schema_dict))
 
-    # order_limits_n_portfolio_limits_tree_layout_below_val_min_for_invalid_scenario
+    # chore_limits_n_portfolio_limits_tree_layout_below_val_min_for_invalid_scenario
     set_val_min_input_fld(driver=driver, layout=Layout.TREE, input_type="invalid",
                           schema_dict=copy.deepcopy(schema_dict))
 
@@ -426,7 +426,7 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
     # ui bug in table layout
     # TEST CASE IS BROKEN
 
-    # order_limits_n_portfolio_limits
+    # chore_limits_n_portfolio_limits
     # help_for_valid_scenario
     # TABLE LAYOUT
     for widget_query in result[1]:
@@ -471,7 +471,7 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
                                           flux_property="help")
 
-    # order limits, n portfolio limits
+    # chore limits, n portfolio limits
     # TABLE LAYOUT help for valid scenario
     for widget_query in result[1]:
         driver.refresh()
@@ -513,7 +513,7 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
     print(result)
     assert result[0]
 
-    # portfolio limits, order limits and portfolio status
+    # portfolio limits, chore limits and portfolio status
     # TABLE LAYOUT
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
@@ -882,7 +882,7 @@ class TestMultiTab:
         self.switch_tab(driver=driver, switch_tab_no=1)
         time.sleep(Delay.SHORT.value)
 
-        widget = driver.find_element(By.ID, "order_limits")
+        widget = driver.find_element(By.ID, "chore_limits")
         click_button_with_name(widget=widget, button_name="Edit")
 
         xpath: str = "max_basis_points"
@@ -894,7 +894,7 @@ class TestMultiTab:
         # open_1st_tab
         self.switch_tab(driver=driver, switch_tab_no=0)
         time.sleep(Delay.SHORT.value)
-        widget = driver.find_element(By.ID, "order_limits")
+        widget = driver.find_element(By.ID, "chore_limits")
         click_button_with_name(widget=widget, button_name="Edit")
         xpath: str = "max_basis_points"
         value: str = "400"
@@ -908,7 +908,7 @@ class TestMultiTab:
         if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
-        xpath: str = "min_order_notional"
+        xpath: str = "min_chore_notional"
         value: str = "10000"
         is_enabled = is_table_cell_enabled(widget=widget, xpath=xpath)
         if is_enabled:
@@ -928,7 +928,7 @@ class TestMultiTab:
         # open_1st_tab
         self.switch_tab(driver=driver, switch_tab_no=0)
         time.sleep(Delay.SHORT.value)
-        widget = driver.find_element(By.ID, "order_limits")
+        widget = driver.find_element(By.ID, "chore_limits")
         click_button_with_name(widget=widget, button_name="Edit")
 
         xpath: str = "max_basis_points"
@@ -940,7 +940,7 @@ class TestMultiTab:
         # open_2nd_tab
         self.switch_tab(driver=driver, switch_tab_no=1)
         time.sleep(Delay.SHORT.value)
-        widget = driver.find_element(By.ID, "order_limits")
+        widget = driver.find_element(By.ID, "chore_limits")
 
         xpath: str = "max_basis_points"
         value: str = "40"
@@ -954,7 +954,7 @@ class TestMultiTab:
         if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
-        xpath: str = "min_order_notional"
+        xpath: str = "min_chore_notional"
         value: str = "1200"
         is_enabled = is_table_cell_enabled(widget=widget, xpath=xpath)
         if is_enabled:
@@ -982,7 +982,7 @@ class TestMultiTab:
         click_button_with_name(widget=widget, button_name="Edit")
         switch_layout(widget=widget, layout=Layout.TREE)
 
-        xpath: str = "max_open_orders_per_side"
+        xpath: str = "max_open_chores_per_side"
         value: str = "4"
         is_enabled = is_table_cell_enabled(widget=widget, xpath=xpath)
         if is_enabled:
@@ -997,7 +997,7 @@ class TestMultiTab:
         click_button_with_name(widget=widget, button_name="Edit")
         switch_layout(widget=widget, layout=Layout.TREE)
 
-        xpath: str = "max_open_orders_per_side"
+        xpath: str = "max_open_chores_per_side"
         value: str = "3"
         is_enabled = is_table_cell_enabled(widget=widget, xpath=xpath)
         if is_enabled:
@@ -1021,7 +1021,7 @@ class TestMultiTab:
         if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
-        xpath: str = "market_trade_volume_participation.max_participation_rate"
+        xpath: str = "market_barter_volume_participation.max_participation_rate"
         value: str = "20"
         is_enabled = is_table_cell_enabled(widget=widget, xpath=xpath)
         if is_enabled:
@@ -1036,7 +1036,7 @@ class TestMultiTab:
 
         unsaved_changes_field_name = get_unsaved_changes_discarded_key(driver=driver)
         unsaved_changes_field_name = unsaved_changes_field_name.replace('"', '')
-        assert unsaved_changes_field_name == "max_open_orders_per_side"
+        assert unsaved_changes_field_name == "max_open_chores_per_side"
         click_on_okay_button_unsaved_changes_popup(driver=driver)
 
         # with_active_local_changes
@@ -1046,7 +1046,7 @@ class TestMultiTab:
         time.sleep(Delay.SHORT.value)
         widget = driver.find_element(By.ID, "strat_limits")
         # widget.find_element(By.NAME, "Edit").click()
-        xpath: str = "max_open_orders_per_side"
+        xpath: str = "max_open_chores_per_side"
         value: str = "2"
         is_enabled = is_table_cell_enabled(widget=widget, xpath=xpath)
         if is_enabled:
@@ -1056,7 +1056,7 @@ class TestMultiTab:
         time.sleep(Delay.SHORT.value)
         widget = driver.find_element(By.ID, "strat_limits")
 
-        xpath: str = "max_open_orders_per_side"
+        xpath: str = "max_open_chores_per_side"
         value: str = "1"
         is_enabled = is_table_cell_enabled(widget=widget, xpath=xpath)
         if is_enabled:
@@ -1215,9 +1215,9 @@ def test_flux_fld_default_value_in_widget(clean_and_set_limits, web_project, dri
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                           flux_property="default")
     print(result)
-    # order_limits_obj = OrderLimitsBaseModel(id=55, max_px_deviation=44)
+    # chore_limits_obj = ChoreLimitsBaseModel(id=55, max_px_deviation=44)
     # email_book_service_native_web_client.delete_pair_strat_client(pair_strat_id=1)
-    email_book_service_native_web_client.delete_order_limits_client(order_limits_id=1)
+    email_book_service_native_web_client.delete_chore_limits_client(chore_limits_id=1)
     email_book_service_native_web_client.delete_portfolio_limits_client(portfolio_limits_id=1)
     email_book_service_native_web_client.delete_portfolio_status_client(portfolio_status_id=1)
 
@@ -1248,8 +1248,8 @@ def test_flux_fld_default_value_in_widget(clean_and_set_limits, web_project, dri
 
     result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="default")
     print(result)
-    # order_limits_obj = OrderLimitsBaseModel(id=55, max_px_deviation=44)
-    email_book_service_native_web_client.delete_order_limits_client(order_limits_id=1)
+    # chore_limits_obj = ChoreLimitsBaseModel(id=55, max_px_deviation=44)
+    email_book_service_native_web_client.delete_chore_limits_client(chore_limits_id=1)
     email_book_service_native_web_client.delete_portfolio_limits_client(portfolio_limits_id=1)
     email_book_service_native_web_client.delete_portfolio_status_client(portfolio_status_id=1)
     driver.refresh()
@@ -1706,7 +1706,7 @@ def test_edit_layout(clean_and_set_limits, web_project, driver, driver_type, sch
         # else: Not required
 
 
-def test_column_orders(clean_and_set_limits, web_project, driver, driver_type, schema_dict):
+def test_column_chores(clean_and_set_limits, web_project, driver, driver_type, schema_dict):
 
     for widget_name, widget_schema in schema_dict.items():
         i: int = 1
@@ -1764,19 +1764,19 @@ def test_disable_ws_on_edit(clean_and_set_limits, web_project, driver, driver_ty
 
     top_of_book: TopOfBookBaseModel = TopOfBookBaseModel()
     top_of_book.id = 1
-    top_of_book.total_trading_security_size = 55
+    top_of_book.total_bartering_security_size = 55
     top_of_book.bid_quote = QuoteOptional()
     top_of_book.bid_quote.px = 10
     top_of_book.ask_quote = QuoteOptional()
     top_of_book.ask_quote.px = 104
-    top_of_book.last_trade = QuoteOptional()
-    top_of_book.last_trade.px = 11
+    top_of_book.last_barter = QuoteOptional()
+    top_of_book.last_barter.px = 11
     # top_of_book: Dict[str, any] = {
     #     'id': 1,
-    #     'total_trading_security_size': 55,
+    #     'total_bartering_security_size': 55,
     #     'bid_quote': {'px': 10},
     #     'ask_quote': {'px': 104},
-    #     'last_trade': {'px': 11}
+    #     'last_barter': {'px': 11}
     # }
 
     pair_strat: PairStratBaseModel = email_book_service_native_web_client.get_all_pair_strat_client()[-1]
@@ -1797,7 +1797,7 @@ def test_disable_ws_on_edit(clean_and_set_limits, web_project, driver, driver_ty
             common_key_items: Dict[str, any] = get_commonkey_items(widget)
             for field_query in widget_query.fields:
                 field_name: str = field_query.field_name
-                if field_name == "px" or field_name == "total_trading_security_size":
+                if field_name == "px" or field_name == "total_bartering_security_size":
                     default_field: str = field_query.properties["parent_title"]
                     default_field = default_field + "." + field_name
                     common_key_fld = common_key_items[default_field]

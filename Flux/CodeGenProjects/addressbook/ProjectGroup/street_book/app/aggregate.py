@@ -20,8 +20,8 @@ def get_symbol_side_snapshot_from_symbol_side(security_id: str, side: str):
     ]}
 
 
-def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
-    # Model - OrderSnapshot
+def get_chore_total_sum_of_last_n_sec(symbol: str, n: int):
+    # Model - ChoreSnapshot
     return {"aggregate": [
         {
             "$match": {
@@ -35,7 +35,7 @@ def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
         },
         {
             "$match": {
-                "order_brief.security.sec_id": symbol
+                "chore_brief.security.sec_id": symbol
             }
         },
         {
@@ -45,7 +45,7 @@ def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
                 },
                 "output": {
                     "last_n_sec_total_qty": {
-                        "$sum": "$order_brief.qty",
+                        "$sum": "$chore_brief.qty",
                         "window": {
                             "range": [
                                 -n,
@@ -57,7 +57,7 @@ def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
                 }
             }
         },
-        # Sorting in descending order since limit only takes first n objects
+        # Sorting in descending chore since limit only takes first n objects
         {
             "$sort": {"create_date_time": -1}
         },
@@ -67,29 +67,29 @@ def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
     ]}
 
 
-def get_order_by_order_id_filter(order_id: str):
+def get_chore_by_chore_id_filter(chore_id: str):
     return {"aggregate": [
         {
             "$match": {
-                "order_id": order_id
+                "chore_id": chore_id
             }
         }
     ]}
 
 
 # careful with special chars on regex match !!
-def get_order_of_matching_suffix_order_id_filter(order_id_suffix: str, sort: int = 0, limit: int = 0):
+def get_chore_of_matching_suffix_chore_id_filter(chore_id_suffix: str, sort: int = 0, limit: int = 0):
     """
     Note: careful with special chars on regex match !!
-    :param order_id_suffix:
+    :param chore_id_suffix:
     :param sort: 0: no sort, 1 or -1: passed as is to sort param of aggregation, any other number treated as 0 (no sort)
     :param limit: val <= 0: no limit, else number passed as is to aggregate limit parameter
     :return:formatted mongo aggregate query
     """
-    regex_order_id_suffix: str = f".*{order_id_suffix}$"
+    regex_chore_id_suffix: str = f".*{chore_id_suffix}$"
     agg_pipeline = {"aggregate": [{
         "$match": {
-            "order.order_id": {"$regex": regex_order_id_suffix}
+            "chore.chore_id": {"$regex": regex_chore_id_suffix}
         }
     }
     ]}
@@ -112,12 +112,12 @@ def get_strat_brief_from_symbol(security_id: str):
             "$match": {
                 "$or": [
                     {
-                        "pair_buy_side_trading_brief.security.sec_id": {
+                        "pair_buy_side_bartering_brief.security.sec_id": {
                             "$eq": security_id
                         }
                     },
                     {
-                        "pair_sell_side_trading_brief.security.sec_id": {
+                        "pair_sell_side_bartering_brief.security.sec_id": {
                             "$eq": security_id
                         }
                     }
@@ -149,8 +149,8 @@ def get_max_market_depth_obj(symbol: str, side: str):
     ]}
 
 
-def get_last_n_sec_total_trade_qty(symbol: str, last_n_sec: float):
-    # Model - LastTrade
+def get_last_n_sec_first_n_last_barter(symbol: str, last_n_sec: float):
+    # Model - LastBarter
     return {"aggregate": [
         {
             "$match": {
@@ -163,8 +163,37 @@ def get_last_n_sec_total_trade_qty(symbol: str, last_n_sec: float):
             }
         },
         {
+            "$match": {"symbol_n_exch_id.symbol": symbol}
+        },
+        {
+            "$sort": {"exch_time": -1}
+        },
+        {
+            "$group": {
+                "_id": None,
+                "first": {"$first": "$$ROOT"},
+                "last": {"$last": "$$ROOT"}
+            }
+        }
+    ]}
+
+
+def get_last_n_sec_total_barter_qty(symbol: str, last_n_sec: float):
+    # Model - LastBarter
+    return {"aggregate": [
+        {
             "$match": {
                 "symbol_n_exch_id.symbol": symbol
+            }
+        },
+        {
+            "$match": {
+                "$expr": {
+                    "$gte": [
+                        "$exch_time",
+                        {"$dateSubtract": {"startDate": "$$NOW", "unit": "second", "amount": last_n_sec}}
+                    ]
+                }
             }
         },
         {
@@ -174,7 +203,7 @@ def get_last_n_sec_total_trade_qty(symbol: str, last_n_sec: float):
                     "exch_time": 1.0
                 },
                 "output": {
-                    "market_trade_volume.participation_period_last_trade_qty_sum": {
+                    "market_barter_volume.participation_period_last_barter_qty_sum": {
                         "$sum": "$qty",
                         "window": {
                             "range": [
@@ -187,7 +216,7 @@ def get_last_n_sec_total_trade_qty(symbol: str, last_n_sec: float):
                 }
             }
         },
-        # Sorting in descending order since limit only takes first n objects
+        # Sorting in descending chore since limit only takes first n objects
         {
             "$sort": {"exch_time": -1}
         },
@@ -217,7 +246,7 @@ def get_symbol_overview_from_symbol(symbol: str):
     ]}
 
 
-def get_last_trade_with_symbol_n_start_n_end_time(symbol: str, start_datetime: DateTime, end_datetime: DateTime):
+def get_last_barter_with_symbol_n_start_n_end_time(symbol: str, start_datetime: DateTime, end_datetime: DateTime):
     agg_pipline = {"aggregate": [
         {
             "$match": {
@@ -247,44 +276,44 @@ def get_last_trade_with_symbol_n_start_n_end_time(symbol: str, start_datetime: D
     ]}
     return agg_pipline
 
-def get_order_snapshot_order_id_filter_json(order_id: str):
+def get_chore_snapshot_chore_id_filter_json(chore_id: str):
     return {"aggregate": [
         {
             "$match": {
-                "order_brief.order_id": order_id
+                "chore_brief.chore_id": chore_id
             }
         }
     ]}
 
 
-def get_order_snapshot_from_sec_symbol(symbol: str):
+def get_chore_snapshot_from_sec_symbol(symbol: str):
     return {"aggregate": [
         {
             "$match": {
-                "order_brief.security.sec_id": symbol
+                "chore_brief.security.sec_id": symbol
             }
         }
     ]}
 
 
-def get_order_snapshots_by_order_status_list(order_status_list: List[str]):
-    order_status_match = []
-    for order_status in order_status_list:
-        order_status_match.append({"order_status": order_status})
+def get_chore_snapshots_by_chore_status_list(chore_status_list: List[str]):
+    chore_status_match = []
+    for chore_status in chore_status_list:
+        chore_status_match.append({"chore_status": chore_status})
     return {"aggregate": [
         {
             "$match": {
-                '$or': order_status_match
+                '$or': chore_status_match
             }
         }
     ]}
 
 
-def get_last_n_order_journals_from_order_id(order_id: str, journal_count: int):
+def get_last_n_chore_journals_from_chore_id(chore_id: str, journal_count: int):
     return {"aggregate": [
         {
             "$match": {
-                "order.order_id": order_id
+                "chore.chore_id": chore_id
             },
         },
         {
@@ -336,7 +365,7 @@ def get_symbol_side_underlying_account_cumulative_fill_qty(symbol: str, side: st
     ]}
 
 
-def get_open_order_snapshots_for_symbol(symbol: str):
+def get_open_chore_snapshots_for_symbol(symbol: str):
     return {"aggregate": [
         {
             "$match": {
@@ -344,20 +373,20 @@ def get_open_order_snapshots_for_symbol(symbol: str):
                     {
                         "$and": [
                             {
-                                "order_brief.security.sec_id": symbol
+                                "chore_brief.security.sec_id": symbol
                             },
                             {
-                                "order_status": "OE_UNACK"
+                                "chore_status": "OE_UNACK"
                             }
                         ]
                     },
                     {
                         "$and": [
                             {
-                                "order_brief.security.sec_id": symbol
+                                "chore_brief.security.sec_id": symbol
                             },
                             {
-                                "order_status": "OE_ACKED"
+                                "chore_status": "OE_ACKED"
                             }
                         ]
                     }

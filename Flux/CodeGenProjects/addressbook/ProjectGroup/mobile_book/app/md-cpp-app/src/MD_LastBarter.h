@@ -3,18 +3,18 @@
 
 namespace md_handler {
 
-    class MD_LastTrade{
+    class MD_LastBarter{
     public:
-        explicit MD_LastTrade()= default;
+        explicit MD_LastBarter()= default;
 
-        MD_LastTrade(const std::string &symbol_, const double px_, const int64_t qty_,
+        MD_LastBarter(const std::string &symbol_, const double px_, const int64_t qty_,
                      const int64_t milliseconds_since_epoch_ = 0, const std::string &exchange_ = "",
                      const std::string &special_conditions_ = "", const bool &past_limit_ = false,
                      const bool &unreported_ = false, const int64_t last_n_sec_total_qty_ = 0,
                      const int64_t applicable_period_seconds_ = 0):
                 symbol(symbol_), px(px_), qty(qty_), milliseconds_since_epoch(milliseconds_since_epoch_), exchange(exchange_),
                 special_conditions(special_conditions_), past_limit(past_limit_), unreported(unreported_),
-                last_trade_qty_sum(last_n_sec_total_qty_), applicable_period_seconds(applicable_period_seconds_){}
+                last_barter_qty_sum(last_n_sec_total_qty_), applicable_period_seconds(applicable_period_seconds_){}
 
         [[nodiscard]] int64_t getQty() const {
             return qty;
@@ -27,12 +27,12 @@ namespace md_handler {
             return applicable_period_seconds;
         }
 
-        [[nodiscard]] int64_t getLastTradeQtySum() const{
-            return last_trade_qty_sum;
+        [[nodiscard]] int64_t getLastBarterQtySum() const{
+            return last_barter_qty_sum;
         }
 
-        void setLastTradeQtySum(int64_t lastTradeQtySum) {
-            last_trade_qty_sum = lastTradeQtySum;
+        void setLastBarterQtySum(int64_t lastBarterQtySum) {
+            last_barter_qty_sum = lastBarterQtySum;
         }
 
         [[nodiscard]] const std::string &getSymbol() const {
@@ -71,7 +71,7 @@ namespace md_handler {
         const std::string special_conditions;
         bool past_limit = false;
         bool unreported = false;
-        int64_t last_trade_qty_sum = 0;
+        int64_t last_barter_qty_sum = 0;
         int64_t applicable_period_seconds = 0;
         int64_t milliseconds_since_epoch = 0;
 
@@ -81,18 +81,18 @@ namespace md_handler {
 
     class MD_MktOverview{
     public:
-        [[nodiscard]] MD_LastTrade &getLastTrade() const {
-            return last_trade;
+        [[nodiscard]] MD_LastBarter &getLastBarter() const {
+            return last_barter;
         }
-        [[nodiscard]] int64_t getTotalTradingSecSize() const {
-            return total_trading_sec_size;
+        [[nodiscard]] int64_t getTotalBarteringSecSize() const {
+            return total_bartering_sec_size;
         }
 
-        MD_MktOverview(MD_LastTrade &last_trade_, const long total_trading_sec_size_)
-        :last_trade(last_trade_), total_trading_sec_size(total_trading_sec_size_){}
+        MD_MktOverview(MD_LastBarter &last_barter_, const long total_bartering_sec_size_)
+        :last_barter(last_barter_), total_bartering_sec_size(total_bartering_sec_size_){}
     protected:
-        MD_LastTrade &last_trade;
-        int64_t total_trading_sec_size;
+        MD_LastBarter &last_barter;
+        int64_t total_bartering_sec_size;
     };
 }
 

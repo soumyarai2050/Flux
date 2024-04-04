@@ -241,13 +241,116 @@ class CppConstantsHandlerPlugin(BaseProtoPlugin):
         output_content += self.const_string_generate_handler(file)
         output_content += "\n"
 
+        cache_msg_list: List[str] = ["market_depth", "top_of_book", "last_trade"]
+        output_content += f"\n\n\t// keys for the {package_name} cython cache\n"
+        output_content += f'\tconst std::string {package_name}_cache_module_name = "{package_name}_cache";\n'
+        output_content += '\tconst std::string get_mutex_key = "get_mutex";\n'
+        output_content += '\tconst std::string set_bid_market_depth_key = "set_bid_market_depth";\n'
+        output_content += '\tconst std::string set_ask_market_depth_key = "set_ask_market_depth";\n'
+        output_content += '\tconst std::string set_bid_market_depth_symbol_key = "set_bid_market_depth_symbol";\n'
+        output_content += '\tconst std::string set_ask_market_depth_symbol_key = "set_ask_market_depth_symbol";\n'
+        output_content += '\tconst std::string set_bid_market_depth_exch_time_key = "set_bid_market_depth_exch_time";\n'
+        output_content += '\tconst std::string set_ask_market_depth_exch_time_key = "set_ask_market_depth_exch_time";\n'
+        output_content += ('\tconst std::string set_bid_market_depth_arrival_time_key = '
+                           '"set_bid_market_depth_arrival_time";\n')
+        output_content += ('\tconst std::string set_ask_market_depth_arrival_time_key = '
+                           '"set_ask_market_depth_arrival_time";\n')
+        output_content += '\tconst std::string set_bid_market_depth_side_key = "set_bid_market_depth_side";\n'
+        output_content += '\tconst std::string set_ask_market_depth_side_key = "set_ask_market_depth_side";\n'
+        output_content += '\tconst std::string set_bid_market_depth_px_key = "set_bid_market_depth_px";\n'
+        output_content += '\tconst std::string set_ask_market_depth_px_key = "set_ask_market_depth_px";\n'
+        output_content += '\tconst std::string set_bid_market_depth_qty_key = "set_bid_market_depth_qty";\n'
+        output_content += '\tconst std::string set_ask_market_depth_qty_key = "set_ask_market_depth_qty";\n'
+        output_content += ('\tconst std::string set_bid_market_depth_market_maker_key = '
+                           '"set_bid_market_depth_market_maker";\n')
+        output_content += ('\tconst std::string set_ask_market_depth_market_maker_key = '
+                           '"set_ask_market_depth_market_maker";\n')
+        output_content += ('\tconst std::string set_bid_market_depth_is_smart_depth_key = '
+                           '"set_bid_market_depth_is_smart_depth";\n')
+        output_content += ('\tconst std::string set_ask_market_depth_is_smart_depth_key = '
+                           '"set_ask_market_depth_is_smart_depth";\n')
+        output_content += ('\tconst std::string set_bid_market_depth_cumulative_notional_key = '
+                           '"set_bid_market_depth_cumulative_notional";\n')
+        output_content += ('\tconst std::string set_ask_market_depth_cumulative_notional_key = '
+                           '"set_ask_market_depth_cumulative_notional";\n')
+        output_content += ('\tconst std::string set_bid_market_depth_cumulative_qty_key = '
+                           '"set_bid_market_depth_cumulative_qty";\n')
+        output_content += ('\tconst std::string set_ask_market_depth_cumulative_qty_key = '
+                           '"set_ask_market_depth_cumulative_qty";\n')
+        output_content += ('\tconst std::string set_bid_market_depth_cumulative_avg_px_key = '
+                           '"set_bid_market_depth_cumulative_avg_px";\n')
+        output_content += ('\tconst std::string set_ask_market_depth_cumulative_avg_px_key = '
+                           '"set_ask_market_depth_cumulative_avg_px";\n')
+        output_content += (f'\tconst std::string get_bid_market_depth_from_depth_key = '
+                           f'"get_bid_market_depth_from_depth";\n')
+        output_content += (f'\tconst std::string get_ask_market_depth_from_depth_key = '
+                           f'"get_ask_market_depth_from_depth";\n')
+        output_content += f'\tconst std::string get_last_trade_key = "get_last_trade";\n'
+        output_content += f'\tconst std::string set_last_trade_key = "set_last_trade";\n'
+        output_content += f'\tconst std::string set_last_trade_exch_id_key = "set_last_trade_exch_id";\n'
+        output_content += f'\tconst std::string set_last_trade_exch_time_key = "set_last_trade_exch_time";\n'
+        output_content += f'\tconst std::string set_last_trade_arrival_time_key = "set_last_trade_arrival_time";\n'
+        output_content += f'\tconst std::string set_last_trade_px_key = "set_last_trade_px";\n'
+        output_content += f'\tconst std::string set_last_trade_qty_key = "set_last_trade_qty";\n'
+        output_content += f'\tconst std::string set_last_trade_premium_key = "set_last_trade_premium";\n'
+        output_content += (f'\tconst std::string '
+                           f'set_last_trade_market_trade_volume_participation_period_last_trade_qty_sum_key = '
+                           f'"set_last_trade_market_trade_volume_participation_period_last_trade_qty_sum";\n')
+        output_content += (f'\tconst std::string set_last_trade_market_trade_volume_applicable_period_seconds_key = '
+                           f'"set_last_trade_market_trade_volume_applicable_period_seconds";\n')
+        output_content += f'\tconst std::string get_top_of_book_key = "get_top_of_book";\n'
+        output_content += f'\tconst std::string set_top_of_book_key = "set_top_of_book";\n'
+        output_content += f'\tconst std::string get_top_of_book_bid_quote_key = "get_top_of_book_bid_quote";\n'
+        output_content += f'\tconst std::string set_top_of_book_bid_quote_key = "set_top_of_book_bid_quote";\n'
+        output_content += f'\tconst std::string set_top_of_book_bid_quote_px_key = "set_top_of_book_bid_quote_px";\n'
+        output_content += f'\tconst std::string set_top_of_book_bid_quote_qty_key = "set_top_of_book_bid_quote_qty";\n'
+        output_content += (f'\tconst std::string set_top_of_book_bid_quote_premium_key = '
+                           f'"set_top_of_book_bid_quote_premium";\n')
+        output_content += (f'\tconst std::string set_top_of_book_bid_quote_last_update_date_time_key = '
+                           f'"set_top_of_book_bid_quote_last_update_date_time";\n')
+        output_content += f'\tconst std::string get_top_of_book_ask_quote_key = "get_top_of_book_ask_quote";\n'
+        output_content += f'\tconst std::string set_top_of_book_ask_quote_key = "set_top_of_book_ask_quote";\n'
+        output_content += f'\tconst std::string set_top_of_book_ask_quote_px_key = "set_top_of_book_ask_quote_px";\n'
+        output_content += f'\tconst std::string set_top_of_book_ask_quote_qty_key = "set_top_of_book_ask_quote_qty";\n'
+        output_content += (f'\tconst std::string set_top_of_book_ask_quote_premium_key = '
+                           f'"set_top_of_book_ask_quote_premium";\n')
+        output_content += (f'\tconst std::string set_top_of_book_ask_quote_last_update_date_time_key = '
+                           f'"set_top_of_book_ask_quote_last_update_date_time";\n')
+        output_content += f'\tconst std::string get_top_of_book_last_trade_key = "get_top_of_book_last_trade";\n'
+        output_content += f'\tconst std::string set_top_of_book_last_trade_key = "set_top_of_book_last_trade";\n'
+        output_content += f'\tconst std::string set_top_of_book_last_trade_px_key = "set_top_of_book_last_trade_px";\n'
+        output_content += f'\tconst std::string set_top_of_book_last_trade_qty_key = "set_top_of_book_last_trade_qty";\n'
+        output_content += (f'\tconst std::string set_top_of_book_last_trade_premium_key = '
+                           f'"set_top_of_book_last_trade_premium";\n')
+        output_content += (f'\tconst std::string set_top_of_book_last_trade_last_update_date_time_key = '
+                           f'"set_top_of_book_last_trade_last_update_date_time";\n')
+        output_content += (f'\tconst std::string set_top_of_book_total_trading_security_size_key = '
+                           f'"set_top_of_book_total_trading_security_size";\n')
+        output_content += (f'\tconst std::string '
+                           f'set_top_of_book_market_trade_volume_participation_period_last_trade_qty_sum_key = '
+                           f'"set_top_of_book_market_trade_volume_participation_period_last_trade_qty_sum";\n')
+        output_content += (f'\tconst std::string set_top_of_book_market_trade_volume_applicable_period_seconds_key = '
+                           f'"set_top_of_book_market_trade_volume_applicable_period_seconds";\n')
+        output_content += (f'\tconst std::string set_top_of_book_last_update_date_time_key = '
+                           f'"set_top_of_book_last_update_date_time";\n')
+        output_content += f'\tconst std::string market_data_cache_key = "market_data_cache";\n'
+        output_content += f'\tconst std::string add_container_obj_for_symbol_key = "add_container_obj_for_symbol";\n'
+        output_content += f'\tconst std::string get_market_data_container_key = "get_market_data_container";\n'
+        # output_content += f'\tconst std::string last_trade_port_key = "last_trade_port";\n'
+        output_content += (f'\tconst std::string set_top_of_book_market_trade_volume_key = '
+                           f'"set_top_of_book_market_trade_volume";\n\n')
+
         for message in self.root_message_list:
             message_name = message.proto.name
             message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+            if message_name == cache_msg_list[0]:
+                pass
             if CppConstantsHandlerPlugin.is_option_enabled(message, CppConstantsHandlerPlugin.flux_msg_json_root):
+                output_content += f'\tconst std::string {message_name_snake_cased}_port_key = "{message_name_snake_cased}_port";\n'
                 output_content += self.generate_client_url(message_name_snake_cased, class_name_snake_cased)
             elif CppConstantsHandlerPlugin.is_option_enabled\
                 (message, CppConstantsHandlerPlugin.flux_msg_json_root_time_series):
+                output_content += f'\tconst std::string {message_name_snake_cased}_port_key = "{message_name_snake_cased}_port";\n'
                 output_content += self.generate_time_series_model_client_url(message_name_snake_cased, class_name_snake_cased)
 
         output_content += '\tconst std::string max_id_val_key = "max_id_val";\n'

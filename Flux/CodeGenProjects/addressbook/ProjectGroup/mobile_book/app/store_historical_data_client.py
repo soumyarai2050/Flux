@@ -4,7 +4,7 @@ from typing import Dict
 from datetime import datetime
 from pathlib import PurePath
 from ibapi.common import BarData, TickerId
-from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
 
 os.environ["DBType"] = "beanie"
@@ -51,11 +51,11 @@ class StoreHistoricalDataClient(IbApiClient):
                 HISTORICAL_VOLATILITY
                 OPTION_IMPLIED_VOLATILITY
             useRTH:int - Determines whether to return all data available during the requested time span,
-                or only data that falls within regular trading hours. Valid values include:
+                or only data that falls within regular bartering hours. Valid values include:
 
                 0 - all data is returned even where the market in question was outside of its
-                regular trading hours.
-                1 - only data within the regular trading hours is returned, even if the
+                regular bartering hours.
+                1 - only data within the regular bartering hours is returned, even if the
                 requested time span falls partially or completely outside of the RTH.
             formatDate: int - Determines the date format applied to returned bars. validd values include:
 
@@ -97,7 +97,7 @@ class StoreHistoricalDataClient(IbApiClient):
                                    self.bar_size_setting, self.what_to_show, self.use_RTH, self.format_date,
                                    self.keep_up_to_date, [])
 
-    def error(self, req_id: TickerId, error_code: int, error_string: str, advanced_order_reject_json=""):
+    def error(self, req_id: TickerId, error_code: int, error_string: str, advanced_chore_reject_json=""):
         logging.debug(f"Error: , {req_id}, {error_code}, {error_string}")
 
     def historicalData(self, ticker_id: int, bar: BarData):

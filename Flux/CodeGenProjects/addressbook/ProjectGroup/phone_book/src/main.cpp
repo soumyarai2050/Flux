@@ -5,12 +5,12 @@ int main() {
 
 
     SerializeAndDeserializeProto2 serializeAndDeserializeProto2;
-    auto order_journal = serializeAndDeserializeProto2.create_order_journal();
-    std::string serialized_json = serializeAndDeserializeProto2.serialize_order_journal(order_journal);
+    auto chore_journal = serializeAndDeserializeProto2.create_chore_journal();
+    std::string serialized_json = serializeAndDeserializeProto2.serialize_chore_journal(chore_journal);
 
-    std::cout << "Serialized OrderJournal:\n" << serialized_json << std::endl;
+    std::cout << "Serialized ChoreJournal:\n" << serialized_json << std::endl;
 
-    std::cout << "Deserialized OrderJournal:\n" << serializeAndDeserializeProto2.deserialize_order_journal(serialized_json).DebugString() << std::endl;
+    std::cout << "Deserialized ChoreJournal:\n" << serializeAndDeserializeProto2.deserialize_chore_journal(serialized_json).DebugString() << std::endl;
     google::protobuf::ShutdownProtobufLibrary();
 
     return 0;

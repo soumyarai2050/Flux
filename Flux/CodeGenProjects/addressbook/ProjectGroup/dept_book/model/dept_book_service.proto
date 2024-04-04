@@ -3,7 +3,7 @@ syntax = "proto2";
 import "flux_options.proto";
 import "ui_option_utils.proto";
 import "projects_core.proto";
-import "trade_core.proto";
+import "barter_core.proto";
 import "dept_book_n_mobile_book_n_street_book_core.proto";
 import "dept_book_n_phone_book_core.proto";
 import "dept_book_core.proto";

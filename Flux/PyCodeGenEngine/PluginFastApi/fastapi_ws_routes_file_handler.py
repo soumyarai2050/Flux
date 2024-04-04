@@ -99,7 +99,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                      f" {field_params}, filter_agg_pipeline: Any = None):\n"
         output_str += f'    """ Index route of {message.proto.name} """\n'
         output_str += f"    await callback_class.index_of_{message_name_snake_cased}_ws_pre()\n"
-        filter_configs_var_name = self._get_filter_configs_var_name(message)
+        filter_configs_var_name = self._get_filter_configs_var_name(message, None)
         if filter_configs_var_name:
             output_str += f"    indexed_filter = copy.deepcopy({filter_configs_var_name})\n"
             output_str += f"    indexed_filter['match'] = [{self._get_filter_tuple_str(index_fields)}]\n"
@@ -164,7 +164,8 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                     (f"        await generic_read_by_id_ws(websocket, "
                      f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
                      f"{message_name}, {message_name_snake_cased}_id, "
-                     f"{self._get_filter_configs_var_name(message)}, has_links={msg_has_links}, "
+                     f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_id')}, "
+                     f"has_links={msg_has_links}, "
                      f"need_initial_snapshot=need_initial_snapshot)\n")
             case FastapiWsRoutesFileHandler.aggregation_type_update | FastapiWsRoutesFileHandler.aggregation_type_both:
                 err_str = "Update Aggregation type is not supported in read by id operations, " \
@@ -206,8 +207,9 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = f"async def underlying_read_{message_name_snake_cased}_ws(websocket: WebSocket, " \
-                     f"filter_agg_pipeline: Any = None, need_initial_snapshot: bool | None = True) -> None:\n"
+        output_str = (f"async def underlying_read_{message_name_snake_cased}_ws(websocket: WebSocket, " \
+                      f"filter_agg_pipeline: Any = None, need_initial_snapshot: bool | None = True, "
+                      f"limit_obj_count: int | None = None) -> None:\n")
         output_str += f'    """ Get All {message_name} using websocket """\n'
 
         output_str += f"    await callback_class.read_all_ws_{message_name_snake_cased}_pre()\n"
@@ -221,17 +223,21 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             case FastapiWsRoutesFileHandler.aggregation_type_filter:
                 output_str += \
                     (f"        await generic_read_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                     f"{message_name}, {self._get_filter_configs_var_name(message)}, has_links={msg_has_links}, "
-                     f"need_initial_snapshot=need_initial_snapshot)\n")
+                     f"{message_name}, {self._get_filter_configs_var_name(message, None, put_limit=True)}, "
+                     f"has_links={msg_has_links}, need_initial_snapshot=need_initial_snapshot)\n")
             case FastapiWsRoutesFileHandler.aggregation_type_update | FastapiWsRoutesFileHandler.aggregation_type_both:
                 err_str = "Update Aggregation type is not supported in real all websocket operations, " \
                           f"but aggregation type {aggregation_type} received in message {message.proto.name}"
                 logging.exception(err_str)
                 raise Exception(err_str)
             case other:
+                output_str += "        limit_filter_agg: Dict[str, Any] | None = None\n"
+                output_str += "        if limit_obj_count is not None:\n"
+                output_str += "            limit_filter_agg = {'agg': get_limited_objs(limit_obj_count)}\n"
                 output_str += \
-                    f"        await generic_read_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                    f"{message_name}, has_links={msg_has_links}, need_initial_snapshot=need_initial_snapshot)\n"
+                    (f"        await generic_read_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                     f"{message_name}, limit_filter_agg, has_links={msg_has_links}, "
+                     f"need_initial_snapshot=need_initial_snapshot)\n")
         output_str += f"    await callback_class.read_all_ws_{message_name_snake_cased}_post()\n\n"
         return output_str
 
@@ -243,9 +249,21 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f"\n"
         output_str += (f'@{self.api_router_app_name}.websocket("/get-all-{message_name_snake_cased}-ws")\n')
         output_str += (f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket, "
-                       f"need_initial_snapshot: bool | None = True) -> None:\n")
-        output_str += (f"    await underlying_read_{message_name_snake_cased}_ws(websocket, "
-                       f"need_initial_snapshot=need_initial_snapshot)\n\n\n")
+                       f"need_initial_snapshot: bool | None = True, limit_obj_count: int | None = None) -> None:\n")
+        additional_agg_option_val_dict = \
+            self.get_complex_option_value_from_proto(message,
+                                                     FastapiWsRoutesFileHandler.flux_msg_main_crud_operations_agg)
+        override_default_get_all_limit = additional_agg_option_val_dict.get("override_get_all_limit_handling")
+        if not override_default_get_all_limit:
+            output_str += "    limit_filter_agg: Dict[str, Any] | None = None\n"
+            output_str += "    if limit_obj_count is not None:\n"
+            output_str += "        limit_filter_agg = {'agg': get_limited_objs(limit_obj_count)}\n"
+            output_str += (f"    await underlying_read_{message_name_snake_cased}_ws(websocket, "
+                           f"limit_filter_agg, need_initial_snapshot)\n\n\n")
+        else:
+            output_str += (f"    await underlying_read_{message_name_snake_cased}_ws(websocket, "
+                           f"need_initial_snapshot=need_initial_snapshot, "
+                           f"limit_obj_count=limit_obj_count)\n\n\n")
         return output_str
 
     def handle_field_web_socket_gen(self, message: protogen.Message, field: protogen.Field):
@@ -320,7 +338,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         shared_mutex_list = self._get_list_of_shared_lock_for_message(message)
 
         if (aggregation_type := option_val_dict.get(
-                FastapiWsRoutesFileHandler.flux_json_root_read_by_id_websocket_field)) is not None:
+                FastapiWsRoutesFileHandler.flux_json_root_read_field)) is not None:
             output_str += \
                 self.handle_GET_ALL_ws_gen(message, aggregation_type.strip(), shared_mutex_list)
         # else not required: avoiding find_all route for this message if read_ws_field of json_root option is not set
@@ -350,8 +368,35 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         return output_str
 
     def _handle_ws_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
-                             query_params_with_type_str: str, query_args_dict_str: str,
-                             projection_model_name: str | None = None) -> str:
+                             query_params_with_type_str: str, query_args_dict_str: str) -> str:
+        output_str = "@perf_benchmark\n"
+        output_str += (f"async def underlying_{query_name}_query_ws(websocket: WebSocket, "
+                       f"{query_params_with_type_str}, need_initial_snapshot: bool | None = True):\n")
+        output_str += (f"    filter_callable, filter_agg_pipeline_list = "
+                       f"await callback_class.{query_name}_query_ws_pre({query_params_str})\n")
+        output_str += "    filter_agg_pipeline_dict = {'agg': filter_agg_pipeline_list}\n"
+        output_str += f'    params_json = {query_args_dict_str}\n'
+        output_str += (f"    await generic_query_ws(websocket, "
+                       f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                       f"{message.proto.name}, filter_callable, params_json, "
+                       f"filter_agg_pipeline=filter_agg_pipeline_dict")
+        output_str += ", need_initial_snapshot=need_initial_snapshot)\n"
+        output_str += f"    await callback_class.{query_name}_query_ws_post()\n"
+        output_str += f"\n\n"
+        output_str += f'@{self.api_router_app_name}.websocket("/ws-query-{query_name}")\n'
+        output_str += (f"async def {query_name}_query_ws(websocket: WebSocket, {query_params_with_type_str}, "
+                       f"need_initial_snapshot: bool | None = True):\n")
+        output_str += f'    """\n'
+        output_str += f'    WS Query of {message.proto.name} with aggregate - {query_name}\n'
+        output_str += f'    """\n'
+        output_str += (f"    await underlying_{query_name}_query_ws(websocket, {query_params_str}, "
+                       f"need_initial_snapshot)")
+        output_str += "\n\n\n"
+        return output_str
+
+    def _handle_projection_ws_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
+                                        query_params_with_type_str: str, query_args_dict_str: str,
+                                        projection_model_name: str | None = None) -> str:
         output_str = "@perf_benchmark\n"
         output_str += (f"async def underlying_{query_name}_query_ws(websocket: WebSocket, "
                        f"{query_params_with_type_str}, need_initial_snapshot: bool | None = True):\n")
@@ -359,14 +404,15 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"    filter_callable, projection_agg_pipeline_callable = "
                            f"await callback_class.{query_name}_query_ws_pre()\n")
             output_str += f"    agg_params = {query_args_dict_str}\n"
-            output_str += f"    await generic_query_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                          f"{message.proto.name}, filter_callable, agg_params"
+            output_str += (f"    await generic_projection_query_ws(websocket, "
+                           f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                           f"{message.proto.name}, filter_callable, agg_params")
             output_str += (f", projection_agg_pipeline_callable=projection_agg_pipeline_callable, "
                            f"projection_model={projection_model_name}, need_initial_snapshot=need_initial_snapshot)\n")
         else:
             output_str += f"    filter_callable = await callback_class.{query_name}_query_ws_pre()\n"
             output_str += f'    params_json = {query_args_dict_str}\n'
-            output_str += (f"    await generic_query_ws(websocket, "
+            output_str += (f"    await generic_projection_query_ws(websocket, "
                            f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
                            f"{message.proto.name}, filter_callable, params_json")
             output_str += ", need_initial_snapshot=need_initial_snapshot)\n"
@@ -413,8 +459,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 query_params_str = ", ".join(query_params)
                 query_args_str = ', '.join([f'"{param}": {param}' for param in query_params])
                 query_args_dict_str = "{" + f"{query_args_str}" + "}"
-
-            if query_type == "ws" and query_type == "both":
+            if query_type == "ws" or query_type == "both":
                 output_str += self._handle_ws_query_str(message, query_name, query_params_str,
                                                         query_params_with_type_str, query_args_dict_str)
 
@@ -486,9 +531,9 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             query_param_dict_str += '"start_date_time": start_date_time, "end_date_time": end_date_time}'
 
             # WS method
-            output_str += self._handle_ws_query_str(message, query_name, query_param_str,
-                                                    query_param_with_type_str, query_param_dict_str,
-                                                    container_model_name)
+            output_str += self._handle_projection_ws_query_str(message, query_name, query_param_str,
+                                                               query_param_with_type_str, query_param_dict_str,
+                                                               container_model_name)
         return output_str
 
     def handle_ws_CRUD_task(self) -> str:

@@ -1,7 +1,7 @@
 syntax = "proto2";
 
 import "flux_options.proto";
-import "trade_core.proto";
+import "barter_core.proto";
 
 package dept_book;
 
@@ -69,7 +69,7 @@ message DashLeg {
     optional string company = 4 [(FluxFldServerPopulate) = true];
     optional float vwap = 5 [(FluxFldServerPopulate) = true];
     optional float vwap_change = 6 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against yesterday close px"];
-    optional float market_notional = 7 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "market current total last trade notional"];
+    optional float market_notional = 7 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "market current total last barter notional"];
     optional float consumed_notional = 8 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "all strat total leg filled notional"];
 }
 

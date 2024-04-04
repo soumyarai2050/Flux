@@ -65,7 +65,7 @@ const Cell = (props) => {
 
     useEffect(() => {
         setInputValue(currentValue);
-    }, [props.index])
+    }, [props.index, mode])
 
     useEffect(() => {
         if (props.forceUpdate) {
@@ -113,8 +113,10 @@ const Cell = (props) => {
     }
 
     const onFocusIn = useCallback(() => {
-        setActive(true);
-    }, [])
+        if (mode === Modes.EDIT_MODE) {
+            setActive(true);
+        }
+    }, [mode])
 
     const onFocusOut = useCallback(() => {
         setActive(false);
@@ -193,7 +195,7 @@ const Cell = (props) => {
     }
     const placeholder = collection.placeholder ? collection.placeholder : !required ? 'optional' : null;
 
-    if (mode === Modes.EDIT_MODE && active && !disabled) {
+    if (mode === Modes.EDIT_MODE && active && !disabled && !(props.widgetType === 'repeatedRoot' && !props.selected)) {
         if (collection.autocomplete) {
             validationError.current = validateConstraints(collection, value);
 

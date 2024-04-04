@@ -78,3 +78,11 @@ export const HoverTextType = {
     HoverTextType_PERCENTAGE: 'percentage',
     HoverTextType_VALUE_AND_PERCENTAGE: 'valueAndPercentage'
 }
+
+export const SeverityType = {
+    Severity_CRITICAL: 5,
+    Severity_ERROR: 4,
+    Severity_WARNING: 3,
+    Severity_INFO: 2,
+    Severity_DEBUG: 1
+}

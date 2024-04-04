@@ -112,7 +112,11 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
                                                    filter_agg_pipeline=filter_agg_pipeline,
                                                    has_links=has_links, projection_model=projection_model)
         if pydantic_obj_list:
-            json_data = jsonable_encoder(pydantic_obj_list, by_alias=True)
+            if dummy_pydantic_model:
+                # if it's delete case then sending only _id
+                json_data = jsonable_encoder(pydantic_obj_list, by_alias=True, exclude_none=True)
+            else:
+                json_data = jsonable_encoder(pydantic_obj_list, by_alias=True)
             json_str = json.dumps(json_data)
             await broadcast_callable(json_str, ws_data, tasks_list)
         # else not required: not going to broadcast if not a valid update for this ws
@@ -148,7 +152,11 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], py
             if projection_agg_pipeline_callable is not None:
                 pydantic_obj = [pydantic_obj]
 
-            json_data = jsonable_encoder(pydantic_obj, by_alias=True)
+            if dummy_pydantic_model:
+                # if it's delete case then sending only _id
+                json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_none=True)
+            else:
+                json_data = jsonable_encoder(pydantic_obj, by_alias=True)
             json_str = json.dumps(json_data)
             if broadcast_with_id:
                 await broadcast_callable(json_str, pydantic_obj_id, ws_data, tasks_list)
@@ -758,11 +766,9 @@ async def generic_read_http(pydantic_class_type: Type[DocumentModel], proto_pack
     return pydantic_list
 
 
-@http_except_n_log_error(status_code=500)
-async def generic_read_ws(ws: WebSocket, project_name: str, pydantic_class_type: Type[DocumentModel],
-                          filter_agg_pipeline: Any = None, has_links: bool = False, need_initial_snapshot: bool = True):
-    is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.connect(ws)
-    logging.debug(f"websocket client requested to connect: {ws.client}")
+async def _generic_read_ws(pydantic_class_type: Type[DocumentModel], ws: WebSocket,
+                           filter_agg_pipeline, need_initial_snapshot: bool,
+                           is_new_ws: bool, has_links: bool):
     need_disconnect = False
     try:
         if need_initial_snapshot is None or need_initial_snapshot:
@@ -774,7 +780,7 @@ async def generic_read_ws(ws: WebSocket, project_name: str, pydantic_class_type:
                 send_json_to_websocket(fetched_pydantic_list_json_str, ws)
         # else not required: no initial snapshot is provided on this connection
 
-        need_disconnect = await handle_ws(ws, is_new_ws)    # Blocking call
+        need_disconnect = await handle_ws(ws, is_new_ws)  # Blocking call
     except WebSocketException as e:
         need_disconnect = True
         logging.info(f"WebSocketException in ws: {ws.client}: {e}")
@@ -797,6 +803,10 @@ async def generic_read_ws(ws: WebSocket, project_name: str, pydantic_class_type:
         need_disconnect = True
         logging.info(f"RuntimeError: web socket raised runtime error within while loop in ws {ws.client}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException as http_e:
+        need_disconnect = True
+        logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws {ws.client}: {http_e}")
+        raise HTTPException(status_code=404, detail=str(http_e))
     except Exception as e:
         need_disconnect = True
         logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws {ws.client}: {e}")
@@ -808,12 +818,33 @@ async def generic_read_ws(ws: WebSocket, project_name: str, pydantic_class_type:
 
 
 @http_except_n_log_error(status_code=500)
+async def generic_read_ws(ws: WebSocket, project_name: str, pydantic_class_type: Type[DocumentModel],
+                          filter_agg_pipeline: Any = None, has_links: bool = False, need_initial_snapshot: bool = True):
+    is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.connect(ws)
+    logging.debug(f"websocket client requested to connect: {ws.client}")
+
+    await _generic_read_ws(pydantic_class_type, ws, filter_agg_pipeline, need_initial_snapshot, is_new_ws, has_links)
+
+
+@http_except_n_log_error(status_code=500)
 async def generic_query_ws(ws: WebSocket, project_name: str, pydantic_class_type: Type[DocumentModel],
-                           filter_callable: Callable[..., Any] | None = None,
-                           filter_callable_kwargs: Dict[Any, Any] | None = None,
-                           projection_agg_pipeline_callable: Callable[..., Any] | None = None,
-                           projection_model: Type[PydanticModel] | None = None,
+                           ws_filter_callable: Callable[..., Any] | None = None,
+                           ws_filter_callable_kwargs: Dict[Any, Any] | None = None,
+                           filter_agg_pipeline: Any = None, has_links: bool = False,
                            need_initial_snapshot: bool = True):
+    is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.connect(ws, ws_filter_callable,
+                                                                                           ws_filter_callable_kwargs)
+    logging.debug(f"websocket client requested to connect: {ws.client}")
+    await _generic_read_ws(pydantic_class_type, ws, filter_agg_pipeline, need_initial_snapshot, is_new_ws, has_links)
+
+
+@http_except_n_log_error(status_code=500)
+async def generic_projection_query_ws(ws: WebSocket, project_name: str, pydantic_class_type: Type[DocumentModel],
+                                      filter_callable: Callable[..., Any] | None = None,
+                                      filter_callable_kwargs: Dict[Any, Any] | None = None,
+                                      projection_agg_pipeline_callable: Callable[..., Any] | None = None,
+                                      projection_model: Type[PydanticModel] | None = None,
+                                      need_initial_snapshot: bool = True):
     if filter_callable_kwargs is None:
         filter_callable_kwargs = {}
 
@@ -861,6 +892,10 @@ async def generic_query_ws(ws: WebSocket, project_name: str, pydantic_class_type
         need_disconnect = True
         logging.info(f"RuntimeError: web socket raised runtime error within while loop in ws {ws.client}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException as http_e:
+        need_disconnect = True
+        logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws {ws.client}: {http_e}")
+        raise HTTPException(status_code=404, detail=str(http_e))
     except Exception as e:
         need_disconnect = True
         logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws {ws.client}: {e}")
@@ -930,6 +965,10 @@ async def generic_read_by_id_ws(ws: WebSocket, project_name: str, pydantic_class
         need_disconnect = True
         logging.info(f"RuntimeError: web socket raised runtime error within while loop in ws {ws.client}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException as http_e:
+        need_disconnect = True
+        logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws {ws.client}: {http_e}")
+        raise HTTPException(status_code=404, detail=str(http_e))
     except Exception as e:
         need_disconnect = True
         logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws {ws.client}:"
@@ -972,6 +1011,42 @@ async def get_obj_list(pydantic_class_type: Type[DocumentModel], find_ids: List[
     except ValidationError as e:
         logging.exception(f"Pydantic validation error: {e}")
         raise Exception(e)
+
+
+# {'aggregate': }
+@http_except_n_log_error(status_code=500)
+@generic_perf_benchmark
+async def projection_read_http(pydantic_class_type: Type[DocumentModel], proto_package_name: str,
+                               filter_agg_pipeline: Any, has_links: bool = False, projection_model = None):
+    if not projection_model:
+        logging.error(f"projection_read_http called for: {pydantic_class_type=} with no projection_model;;;"
+                      f"{filter_agg_pipeline=}")
+        return None
+    # prevent polluting caller provided filter_agg_pipeline
+    filter_agg_pipeline_copy = deepcopy(filter_agg_pipeline)
+    agg_pipeline = get_aggregate_pipeline(filter_agg_pipeline_copy)
+    if projection_model is None:
+        projection_model = pydantic_class_type
+    else:
+        agg_pipeline = filter_agg_pipeline["aggregate"]
+    find_all_resp = pydantic_class_type.find()
+    try:
+        agg_query_obj = find_all_resp.aggregate(
+            aggregation_pipeline=agg_pipeline,
+            # projection_model=projection_model,
+            session=None,
+            ignore_cache=True)
+        agg_query_resp_list = await agg_query_obj.to_list()
+    except Exception as e:
+        logging.error(f"projection failed with exception: {e}")
+        return None
+    else:
+        projection_model_obj = None
+        if agg_query_resp_list:
+            projection_model_obj = projection_model.model_validate(agg_query_resp_list[0])
+        else:
+            logging.error(f"projection failed - no data returned")
+        return projection_model_obj
 
 
 async def get_filtered_obj_list(filter_agg_pipeline: Dict, pydantic_class_type: Type[DocumentModel],

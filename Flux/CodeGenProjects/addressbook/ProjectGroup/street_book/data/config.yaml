@@ -9,6 +9,7 @@ main_server_beanie_port: "8040"
 main_server_cache_port: "8035"
 min_refresh_interval: 20
 custom_logger_lvls:
+  - DB: 25
   - TIMING: 15
   - JUNK: 5
 
@@ -16,29 +17,18 @@ log_mongo_uri: True
 mongo_server: "mongodb://localhost:27017"
 avoid_top_of_book_db_update: True  # to be used in routes to bypass db updates if True
 avoid_market_depth_db_update: True  # to be used in routes to bypass db updates if True
-avoid_last_trade_db_update: True  # to be used in routes to bypass db updates if True
+avoid_last_barter_db_update: True  # to be used in routes to bypass db updates if True
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
 beanie_override_type: "native"
 cache_override_type: "bare"
 
-# to be used in pair_strat_log_book to take out counts of created from waiting queue to execute create in db
-portfolio_alert_configs:
-  transaction_counts_per_call: 5
-  transaction_timeout_secs: 2  # secs
-strat_alert_config:
-  transaction_counts_per_call: 5
-  transaction_timeout_secs: 2  # secs
-raw_perf_data_config:
-  transaction_counts_per_call: 500
-  transaction_timeout_secs: 60  # secs
-
 # to be used in loop wait in script to update performance analysis data
 raw_performance_data_processor_loop_wait: 2  # sec
 
 is_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
-allow_multiple_open_orders_per_strat: False
+allow_multiple_open_chores_per_strat: False
 
-pause_fulfill_post_order_dod: False   # if true pauses strat which gets order update to make any order_snapshot fully filled post order is DOD
+pause_fulfill_post_chore_dod: False   # if true pauses strat which gets chore update to make any chore_snapshot fully filled post chore is DOD

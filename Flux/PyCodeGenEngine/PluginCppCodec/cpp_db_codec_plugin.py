@@ -28,6 +28,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         super().__init__(base_dir_path)
         self.root_message_list: List[protogen.Message] = []
         self.field = []
+        self.package_name: str = ""
 
     def get_all_root_message(self, messages: List[protogen.Message]) -> None:
         for message in messages:
@@ -94,6 +95,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         # output_content += f'#include "../../FluxCppCore/include/market_data_json_codec.h"\n'
         # output_content += f'#include "../CppUtilGen/{class_name}_max_id_handler.h"\n'
         output_content += f'#include "../../../../../../FluxCppCore/include/json_codec.h"\n'
+        output_content += f'#include "../CppUtilGen/market_data_get_str_from_enum.h"\n'
         output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n\n'
         return output_content
 
@@ -702,9 +704,14 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     if field_name != "id":
                         if not CppDbHandlerPlugin.is_option_enabled(field, CppDbHandlerPlugin.flux_fld_val_time_field):
                             if field_type == "required":
-                                output_content += (f"\t\tr_{message_name_snake_cased}_document.append(FluxCppCore"
-                                                   f"::kvp({package_name}_handler::{field_name}_fld_name, "
-                                                   f"kr_{message_name_snake_cased}_obj.{field_name}()));\n")
+                                if field.kind.name != "ENUM":
+                                    output_content += (f"\t\tr_{message_name_snake_cased}_document.append(FluxCppCore"
+                                                       f"::kvp({package_name}_handler::{field_name}_fld_name, "
+                                                       f"kr_{message_name_snake_cased}_obj.{field_name}()));\n")
+                                else:
+                                    output_content += (f"\t\tr_{message_name_snake_cased}_document.append(FluxCppCore"
+                                                       f"::kvp({package_name}_handler::{field_name}_fld_name, "
+                                                       f"get_str_from_enum(kr_{message_name_snake_cased}_obj.{field_name}())));\n")
                             else:
                                 output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.has_{field_name}())\n"
                                 output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::" \
@@ -854,6 +861,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         self.get_field_names(self.root_message_list)
         file_name = str(file.proto.name).split(".")[0]
         package_name = str(file.proto.package)
+        self.package_name = package_name
         output_content = ""
 
         class_name_list = package_name.split("_")

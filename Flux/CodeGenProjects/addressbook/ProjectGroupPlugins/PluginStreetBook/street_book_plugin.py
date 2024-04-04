@@ -38,8 +38,8 @@ class StreetBookPlugin(BaseProtoPlugin):
         self.ws_data_manager_file_name: str = ""
         self.base_strat_cache_file_name: str = ""
         self.base_strat_cache_class_name: str = ""
-        self.base_trading_cache_file_name: str = ""
-        self.base_trading_cache_class_name: str = ""
+        self.base_bartering_cache_file_name: str = ""
+        self.base_bartering_cache_class_name: str = ""
         self.key_handler_file_name: str = ""
 
 
@@ -93,8 +93,8 @@ class StreetBookPlugin(BaseProtoPlugin):
         self.ws_data_manager_file_name = f"{file_name_snake_cased}_ws_data_manager"
         self.base_strat_cache_file_name = f"{file_name_snake_cased}_base_strat_cache"
         self.base_strat_cache_class_name = f"{self.file_name_cap_camel_cased}BaseStratCache"
-        self.base_trading_cache_file_name = f"{file_name_snake_cased}_base_trading_cache"
-        self.base_trading_cache_class_name = f"{self.file_name_cap_camel_cased}BaseTradingCache"
+        self.base_bartering_cache_file_name = f"{file_name_snake_cased}_base_bartering_cache"
+        self.base_bartering_cache_class_name = f"{self.file_name_cap_camel_cased}BaseBarteringCache"
         self.model_file_name = f"{file_name_snake_cased}_beanie_model"
         self.key_handler_file_name = f"{file_name_snake_cased}_key_handler"
 
@@ -139,10 +139,10 @@ class StreetBookPlugin(BaseProtoPlugin):
                       f'{message_name_snake_cased}_: {message_name}BaseModel | {message_name}, **kwargs):\n'
         content_str += f"\t\twith self.{message_name_snake_cased}_ws_get_all_cont.single_obj_lock:\n"
         content_str += f"\t\t\t{message_name_snake_cased}_tuple = " \
-                       f"self.trading_cache.get_{message_name_snake_cased}()\n"
+                       f"self.bartering_cache.get_{message_name_snake_cased}()\n"
         content_str += f"\t\t\tif {message_name_snake_cased}_tuple is None or " \
                        f"{message_name_snake_cased}_tuple[0] is None:\n"
-        content_str += f"\t\t\t\tself.trading_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
+        content_str += f"\t\t\t\tself.bartering_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
         content_str += "\t\t\t\tkwargs = {'"+f"{message_name_snake_cased}_"+"': "+f"{message_name_snake_cased}_"+"}\n"
         content_str += f"\t\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
         content_str += f"\t\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
@@ -160,7 +160,7 @@ class StreetBookPlugin(BaseProtoPlugin):
         else:
             content_str += f"\t\t\t\t{message_name_snake_cased}, _ = {message_name_snake_cased}_tuple\n"
         content_str += f"\t\t\t\tif {message_name_snake_cased}.id == {message_name_snake_cased}_.id:\n"
-        content_str += f"\t\t\t\t\tself.trading_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
+        content_str += f"\t\t\t\t\tself.bartering_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
         content_str += "\t\t\t\t\tkwargs = {'" + f"{message_name_snake_cased}_" + "': " + f"{message_name_snake_cased}_" + "}\n"
         content_str += f"\t\t\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
         content_str += f"\t\t\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
@@ -209,10 +209,10 @@ class StreetBookPlugin(BaseProtoPlugin):
         base_strat_cache_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
                                                                      self.base_strat_cache_file_name)
         content_str += f"from {base_strat_cache_import_path} import {self.base_strat_cache_class_name}\n"
-        base_trading_cache_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
-                                                                       self.base_trading_cache_file_name)
+        base_bartering_cache_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
+                                                                       self.base_bartering_cache_file_name)
         content_str += \
-            f"from {base_trading_cache_import_path} import {self.base_trading_cache_class_name}\n"
+            f"from {base_bartering_cache_import_path} import {self.base_bartering_cache_class_name}\n"
         key_handler_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.key_handler_file_name)
         key_handler_class_name = convert_to_capitalized_camel_case(self.key_handler_file_name)
         content_str += \
@@ -236,7 +236,7 @@ class StreetBookPlugin(BaseProtoPlugin):
         content_str += f"\t\tsuper().__init__(host, port)\n"
         content_str += "\t\tself.strat_cache = strat_cache\n"
         content_str += \
-            f"\t\tself.trading_cache: {self.base_trading_cache_class_name} = {self.base_trading_cache_class_name}()\n"
+            f"\t\tself.bartering_cache: {self.base_bartering_cache_class_name} = {self.base_bartering_cache_class_name}()\n"
         for message in self.ws_manager_required_messages:
             message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
             option_dict = \
@@ -515,7 +515,7 @@ class StreetBookPlugin(BaseProtoPlugin):
 
         return output_str
 
-    def base_trading_cache_file_content(self, file: protogen.File):
+    def base_bartering_cache_file_content(self, file: protogen.File):
         output_str = "# primary imports\n"
         output_str += "from typing import Tuple, List\n"
         output_str += "from pendulum import DateTime\n\n"
@@ -524,8 +524,8 @@ class StreetBookPlugin(BaseProtoPlugin):
         model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
-        trading_cache_class_name = f"{self.file_name_cap_camel_cased}BaseTradingCache"
-        output_str += f"class {trading_cache_class_name}:\n\n"
+        bartering_cache_class_name = f"{self.file_name_cap_camel_cased}BaseBarteringCache"
+        output_str += f"class {bartering_cache_class_name}:\n\n"
         output_str += "\tdef __init__(self):\n"
         if self.ws_manager_required_top_lvl_messages:
             for message in self.ws_manager_required_messages:
@@ -557,7 +557,7 @@ class StreetBookPlugin(BaseProtoPlugin):
                     is_repeated = option_value_dict.get(StreetBookPlugin.executor_option_is_repeated_field)
 
                     output_str += self._strat_cache_get_model_interface_content(message, is_repeated)
-                    # output_str += self._trading_cache_set_model_interface_content(message, is_repeated)
+                    # output_str += self._bartering_cache_set_model_interface_content(message, is_repeated)
                     output_str += self._strat_cache_set_model_interface_content(message, is_repeated)
         else:
             output_str += "\t\tpass\n"
@@ -596,7 +596,7 @@ class StreetBookPlugin(BaseProtoPlugin):
             self.ws_data_manager_file_name + f".py": self.ws_data_manager_file_content(file),
             self.base_strat_cache_file_name + f".py": self.base_strat_cache_file_content(file),
             self.key_handler_file_name + ".py": self.keys_handler_file_content(file),
-            self.base_trading_cache_file_name + ".py": self.base_trading_cache_file_content(file)
+            self.base_bartering_cache_file_name + ".py": self.base_bartering_cache_file_content(file)
         }
 
         return output_dict

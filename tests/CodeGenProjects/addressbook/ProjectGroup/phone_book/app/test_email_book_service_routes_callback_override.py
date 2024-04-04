@@ -9,11 +9,11 @@ import random
 import traceback
 
 # project imports
-from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import get_strat_key_from_pair_strat
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import AlertOptional
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_strat_key_from_pair_strat
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import AlertOptional
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 
 email_book_service_beanie_web_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient.set_or_get_if_instance_exists(HOST, parse_to_int(PAIR_STRAT_BEANIE_PORT))
@@ -27,7 +27,7 @@ else:
 
 
 # test cases requires phone_book and log_book database to be present
-def _test_deep_clean_database_n_logs():
+def test_deep_clean_database_n_logs():
     drop_all_databases()
     clean_project_logs()
 
@@ -39,13 +39,13 @@ def _test_clean_database_n_logs():
 
 def _test_sanity_create_strat_parallel(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
                                        expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
-                                       top_of_book_list_, market_depth_basemodel_list):
+                                       market_depth_basemodel_list):
     max_count = int(len(buy_sell_symbol_list)/2)
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_count) as executor:
         results = [executor.submit(create_n_activate_strat, buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                    copy.deepcopy(expected_strat_limits_),
                                    copy.deepcopy(expected_start_status_), copy.deepcopy(symbol_overview_obj_list),
-                                   copy.deepcopy(top_of_book_list_), copy.deepcopy(market_depth_basemodel_list))
+                                   copy.deepcopy(market_depth_basemodel_list), None, None)
                    for buy_symbol, sell_symbol in buy_sell_symbol_list[:max_count]]
 
         for future in concurrent.futures.as_completed(results):
@@ -98,61 +98,61 @@ def test_patch_with_missing_id_param(get_missing_id_json):
 
 @pytest.mark.nightly
 @pytest.mark.parametrize("web_client", clients_list)
-def test_create_get_put_patch_delete_order_limits_client(clean_and_set_limits, web_client):
+def test_create_get_put_patch_delete_chore_limits_client(clean_and_set_limits, web_client):
     for index, return_type_param in enumerate([True, None, False]):
-        order_limits_obj = OrderLimitsBaseModel(id=2 + index, max_px_deviation=2)
-        # testing create_order_limits_client()
-        created_order_limits_obj = web_client.create_order_limits_client(order_limits_obj,
+        chore_limits_obj = ChoreLimitsBaseModel(id=2 + index, max_px_deviation=2)
+        # testing create_chore_limits_client()
+        created_chore_limits_obj = web_client.create_chore_limits_client(chore_limits_obj,
                                                                          return_obj_copy=return_type_param)
         if return_type_param:
-            assert created_order_limits_obj == order_limits_obj, \
-                f"Created obj {created_order_limits_obj} mismatched expected order_limits_obj {order_limits_obj}"
+            assert created_chore_limits_obj == chore_limits_obj, \
+                f"Created obj {created_chore_limits_obj} mismatched expected chore_limits_obj {chore_limits_obj}"
         else:
-            assert created_order_limits_obj
+            assert created_chore_limits_obj
 
         # checking if created obj present in get_all objects
-        fetched_order_limits_list = web_client.get_all_order_limits_client()
-        assert order_limits_obj in fetched_order_limits_list, \
-            f"Couldn't find expected order_limits_obj {order_limits_obj} in get-all fetched list of objects"
+        fetched_chore_limits_list = web_client.get_all_chore_limits_client()
+        assert chore_limits_obj in fetched_chore_limits_list, \
+            f"Couldn't find expected chore_limits_obj {chore_limits_obj} in get-all fetched list of objects"
 
         # Checking get_by_id client
-        fetched_order_limits_obj = web_client.get_order_limits_client(order_limits_obj.id)
-        assert fetched_order_limits_obj == order_limits_obj, \
-            f"Mismatched expected order_limits_obj {order_limits_obj} from " \
-            f"fetched_order_limits obj fetched by get_by_id {fetched_order_limits_obj}"
+        fetched_chore_limits_obj = web_client.get_chore_limits_client(chore_limits_obj.id)
+        assert fetched_chore_limits_obj == chore_limits_obj, \
+            f"Mismatched expected chore_limits_obj {chore_limits_obj} from " \
+            f"fetched_chore_limits obj fetched by get_by_id {fetched_chore_limits_obj}"
 
         # checking put operation client
-        order_limits_obj.max_basis_points = 2
-        updated_order_limits_obj = web_client.put_order_limits_client(order_limits_obj,
+        chore_limits_obj.max_basis_points = 2
+        updated_chore_limits_obj = web_client.put_chore_limits_client(chore_limits_obj,
                                                                       return_obj_copy=return_type_param)
         if return_type_param:
-            assert updated_order_limits_obj == order_limits_obj, \
-                f"Mismatched expected order_limits_obj: {order_limits_obj} from updated obj: {updated_order_limits_obj}"
+            assert updated_chore_limits_obj == chore_limits_obj, \
+                f"Mismatched expected chore_limits_obj: {chore_limits_obj} from updated obj: {updated_chore_limits_obj}"
         else:
-            assert updated_order_limits_obj
+            assert updated_chore_limits_obj
 
         # checking patch operation client
-        patch_order_limits_obj = OrderLimitsBaseModel(id=order_limits_obj.id, max_px_levels=2)
+        patch_chore_limits_obj = ChoreLimitsBaseModel(id=chore_limits_obj.id, max_px_levels=2)
         # making changes to expected_obj
-        order_limits_obj.max_px_levels = patch_order_limits_obj.max_px_levels
+        chore_limits_obj.max_px_levels = patch_chore_limits_obj.max_px_levels
 
-        patch_updated_order_limits_obj = \
-            web_client.patch_order_limits_client(json.loads(patch_order_limits_obj.model_dump_json(by_alias=True,
+        patch_updated_chore_limits_obj = \
+            web_client.patch_chore_limits_client(json.loads(patch_chore_limits_obj.model_dump_json(by_alias=True,
                                                                                                    exclude_none=True)),
                                                  return_obj_copy=return_type_param)
         if return_type_param:
-            assert patch_updated_order_limits_obj == order_limits_obj, \
-                f"Mismatched expected obj: {order_limits_obj} from patch updated obj {patch_updated_order_limits_obj}"
+            assert patch_updated_chore_limits_obj == chore_limits_obj, \
+                f"Mismatched expected obj: {chore_limits_obj} from patch updated obj {patch_updated_chore_limits_obj}"
         else:
-            assert patch_updated_order_limits_obj
+            assert patch_updated_chore_limits_obj
 
         # checking delete operation client
-        delete_resp = web_client.delete_order_limits_client(order_limits_obj.id, return_obj_copy=return_type_param)
+        delete_resp = web_client.delete_chore_limits_client(chore_limits_obj.id, return_obj_copy=return_type_param)
         if return_type_param:
             assert isinstance(delete_resp, dict), \
                 f"Mismatched type of delete resp, expected dict received {type(delete_resp)}"
-            assert delete_resp.get("id") == order_limits_obj.id, \
-                f"Mismatched delete resp id, expected {order_limits_obj.id} received {delete_resp.get('id')}"
+            assert delete_resp.get("id") == chore_limits_obj.id, \
+                f"Mismatched delete resp id, expected {chore_limits_obj.id} received {delete_resp.get('id')}"
         else:
             assert delete_resp
 
@@ -161,19 +161,19 @@ def test_create_get_put_patch_delete_order_limits_client(clean_and_set_limits, w
 @pytest.mark.parametrize("web_client", clients_list)
 def test_post_all(clean_and_set_limits, web_client):
     for index, return_value_type in enumerate([True, None, False]):
-        order_limits_objects_list = [
-            OrderLimitsBaseModel(id=2 + (index * 3), max_px_deviation=2),
-            OrderLimitsBaseModel(id=3 + (index * 3), max_px_deviation=3),
-            OrderLimitsBaseModel(id=4 + (index * 3), max_px_deviation=4)
+        chore_limits_objects_list = [
+            ChoreLimitsBaseModel(id=2 + (index * 3), max_px_deviation=2),
+            ChoreLimitsBaseModel(id=3 + (index * 3), max_px_deviation=3),
+            ChoreLimitsBaseModel(id=4 + (index * 3), max_px_deviation=4)
         ]
 
-        fetched_email_book_beanie = web_client.get_all_order_limits_client()
+        fetched_email_book_beanie = web_client.get_all_chore_limits_client()
 
-        for obj in order_limits_objects_list:
+        for obj in chore_limits_objects_list:
             assert obj not in fetched_email_book_beanie, f"Object {obj} must not be present in get-all list " \
                                                             f"{fetched_email_book_beanie} before post-all operation"
 
-        return_value = web_client.create_all_order_limits_client(order_limits_objects_list,
+        return_value = web_client.create_all_chore_limits_client(chore_limits_objects_list,
                                                                  return_obj_copy=return_value_type)
         if return_value_type:
             assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
@@ -181,9 +181,9 @@ def test_post_all(clean_and_set_limits, web_client):
         else:
             assert return_value
 
-        fetched_email_book_beanie = web_client.get_all_order_limits_client()
+        fetched_email_book_beanie = web_client.get_all_chore_limits_client()
 
-        for obj in order_limits_objects_list:
+        for obj in chore_limits_objects_list:
             assert obj in fetched_email_book_beanie, f"Couldn't find object {obj} in get-all list " \
                                                         f"{fetched_email_book_beanie}"
 
@@ -192,25 +192,25 @@ def test_post_all(clean_and_set_limits, web_client):
 @pytest.mark.parametrize("web_client", clients_list)
 def test_put_all(clean_and_set_limits, web_client):
     for index, return_value_type in enumerate([True, None, False]):
-        order_limits_objects_list = [
-            OrderLimitsBaseModel(id=2 + (index * 3), max_px_deviation=2),
-            OrderLimitsBaseModel(id=3 + (index * 3), max_px_deviation=3),
-            OrderLimitsBaseModel(id=4 + (index * 3), max_px_deviation=4)
+        chore_limits_objects_list = [
+            ChoreLimitsBaseModel(id=2 + (index * 3), max_px_deviation=2),
+            ChoreLimitsBaseModel(id=3 + (index * 3), max_px_deviation=3),
+            ChoreLimitsBaseModel(id=4 + (index * 3), max_px_deviation=4)
         ]
 
-        web_client.create_all_order_limits_client(order_limits_objects_list)
+        web_client.create_all_chore_limits_client(chore_limits_objects_list)
 
-        fetched_email_book_beanie = web_client.get_all_order_limits_client()
+        fetched_email_book_beanie = web_client.get_all_chore_limits_client()
 
-        for obj in order_limits_objects_list:
+        for obj in chore_limits_objects_list:
             assert obj in fetched_email_book_beanie, f"Couldn't find object {obj} in get-all list " \
                                                         f"{fetched_email_book_beanie}"
 
         # updating values
-        for obj in order_limits_objects_list:
+        for obj in chore_limits_objects_list:
             obj.max_contract_qty = obj.id
 
-        return_value = web_client.put_all_order_limits_client(order_limits_objects_list,
+        return_value = web_client.put_all_chore_limits_client(chore_limits_objects_list,
                                                               return_obj_copy=return_value_type)
         if return_value_type:
             assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
@@ -218,11 +218,11 @@ def test_put_all(clean_and_set_limits, web_client):
         else:
             assert return_value
 
-        updated_order_limits_list = web_client.get_all_order_limits_client()
+        updated_chore_limits_list = web_client.get_all_chore_limits_client()
 
-        for expected_obj in order_limits_objects_list:
-            assert expected_obj in updated_order_limits_list, \
-                f"expected obj {expected_obj} not found in updated list of objects: {updated_order_limits_list}"
+        for expected_obj in chore_limits_objects_list:
+            assert expected_obj in updated_chore_limits_list, \
+                f"expected obj {expected_obj} not found in updated list of objects: {updated_chore_limits_list}"
 
 
 @pytest.mark.nightly
@@ -288,7 +288,7 @@ def test_create_get_put_patch_delete_time_series_model(clean_and_set_limits, web
         formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         sample_ts_model_obj = SampleTSModelBaseModel(_id=index+1, sample=f"sample{index}",
                                                      date=pendulum.parse(formatted_dt_utc))
-        # testing create_order_limits_client()
+        # testing create_chore_limits_client()
         created_sample_ts_model_obj = web_client.create_sample_ts_model_client(sample_ts_model_obj,
                                                                                return_obj_copy=return_type_param)
         if return_type_param:
@@ -510,28 +510,28 @@ def test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_
 @pytest.mark.nightly
 def test_create_pair_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                            expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                           top_of_book_list_, market_depth_basemodel_list):
+                           market_depth_basemodel_list):
     # creates and activates multiple pair_strats
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:1]
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         create_n_activate_strat(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                expected_strat_status_, symbol_overview_obj_list, top_of_book_list_,
+                                expected_strat_status_, symbol_overview_obj_list,
                                 market_depth_basemodel_list)
 
 
-def _place_sanity_orders(buy_symbol, sell_symbol, pair_strat_,
+def _place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
                          expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                         last_trade_fixture_list, market_depth_basemodel_list,
-                         top_of_book_list_, max_loop_count_per_side, refresh_sec_update_fixture):
-    expected_strat_limits_.max_open_orders_per_side = 10
+                         last_barter_fixture_list, market_depth_basemodel_list,
+                         max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.max_open_chores_per_side = 10
     expected_strat_limits_.residual_restriction.max_residual = 111360
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     created_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -544,38 +544,58 @@ def _place_sanity_orders(buy_symbol, sell_symbol, pair_strat_,
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_web_client.trade_simulator_reload_config_query_client()
+        executor_web_client.barter_simulator_reload_config_query_client()
 
-        total_order_count_for_each_side = max_loop_count_per_side
+        total_chore_count_for_each_side = max_loop_count_per_side
 
-        # Placing buy orders
-        buy_ack_order_id = None
-        for loop_count in range(total_order_count_for_each_side):
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
+        bid_buy_top_market_depth = None
+        ask_sell_top_market_depth = None
+        stored_market_depth = executor_web_client.get_all_market_depth_client()
+        for market_depth in stored_market_depth:
+            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                bid_buy_top_market_depth = market_depth
+            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                ask_sell_top_market_depth = market_depth
 
-            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+        # Placing buy chores
+        buy_ack_chore_id = None
+        for loop_count in range(total_chore_count_for_each_side):
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+
+            time.sleep(1)
+            # update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+            #                                                    ask_sell_top_market_depth)
+            # todo: temp fix - needs to be reverted and fixed
+            place_new_chore(buy_symbol, Side.BUY, 100, 90, executor_web_client)
+
+            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                buy_symbol, executor_web_client,
-                                                                               last_order_id=buy_ack_order_id)
-            buy_ack_order_id = ack_order_journal.order.order_id
+                                                                               last_chore_id=buy_ack_chore_id)
+            buy_ack_chore_id = ack_chore_journal.chore.chore_id
 
-            if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
-                # Sleeping to let the order get cxlled
+            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+                # Sleeping to let the chore get cxlled
                 time.sleep(residual_wait_sec)
 
-        # Placing sell orders
-        sell_ack_order_id = None
-        for loop_count in range(total_order_count_for_each_side):
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
+        # Placing sell chores
+        sell_ack_chore_id = None
+        for loop_count in range(total_chore_count_for_each_side):
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+            # required to make buy side tob latest
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
 
-            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+            # update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+            #                                                     bid_buy_top_market_depth)
+            # todo: temp fix - needs to be reverted and fixed
+            place_new_chore(sell_symbol, Side.SELL, 110, 70, executor_web_client)
+
+            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                sell_symbol, executor_web_client,
-                                                                               last_order_id=sell_ack_order_id)
-            sell_ack_order_id = ack_order_journal.order.order_id
+                                                                               last_chore_id=sell_ack_chore_id)
+            sell_ack_chore_id = ack_chore_journal.chore.chore_id
 
-            if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
-                # Sleeping to let the order get cxlled
+            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+                # Sleeping to let the chore get cxlled
                 time.sleep(residual_wait_sec)
 
     except AssertionError as e:
@@ -588,32 +608,32 @@ def _place_sanity_orders(buy_symbol, sell_symbol, pair_strat_,
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-# sanity test to create orders
+# sanity test to create chores
 @pytest.mark.nightly
-def test_place_sanity_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+def test_place_sanity_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                              expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                             last_trade_fixture_list, market_depth_basemodel_list,
-                             top_of_book_list_, buy_order_, sell_order_,
+                             last_barter_fixture_list, market_depth_basemodel_list,
+                             buy_chore_, sell_chore_,
                              max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    _place_sanity_orders(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-                         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-                         top_of_book_list_, max_loop_count_per_side, refresh_sec_update_fixture)
+    _place_sanity_chores(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+                         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+                         max_loop_count_per_side, refresh_sec_update_fixture)
 
 
-def test_place_sanity_parallel_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                       expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                                      last_trade_fixture_list, market_depth_basemodel_list,
-                                      top_of_book_list_, buy_order_, sell_order_,
+                                      last_barter_fixture_list, market_depth_basemodel_list,
+                                      buy_chore_, sell_chore_,
                                       max_loop_count_per_side, refresh_sec_update_fixture):
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(_place_sanity_orders, leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
+        results = [executor.submit(_place_sanity_chores, leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
                                    copy.deepcopy(expected_strat_limits_),
                                    copy.deepcopy(expected_strat_status_), copy.deepcopy(symbol_overview_obj_list),
-                                   copy.deepcopy(last_trade_fixture_list), copy.deepcopy(market_depth_basemodel_list),
-                                   copy.deepcopy(top_of_book_list_), max_loop_count_per_side,
+                                   copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
+                                    max_loop_count_per_side,
                                    refresh_sec_update_fixture)
                    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
 
@@ -622,19 +642,19 @@ def test_place_sanity_parallel_orders(static_data_, clean_and_set_limits, leg1_l
                 raise Exception(future.exception())
 
 
-def _place_sanity_complete_buy_orders(buy_symbol, sell_symbol, pair_strat_,
+def _place_sanity_complete_buy_chores(buy_symbol, sell_symbol, pair_strat_,
                                       expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                                      last_trade_fixture_list, market_depth_basemodel_list,
-                                      top_of_book_list_, max_loop_count_per_side, refresh_sec_update_fixture):
-    expected_strat_limits_.max_open_orders_per_side = 10
+                                      last_barter_fixture_list, market_depth_basemodel_list,
+                                      max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.max_open_chores_per_side = 10
     expected_strat_limits_.residual_restriction.max_residual = 111360
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     created_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -647,25 +667,25 @@ def _place_sanity_complete_buy_orders(buy_symbol, sell_symbol, pair_strat_,
             config_dict["symbol_configs"][symbol]["fill_percent"] = 100
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_web_client.trade_simulator_reload_config_query_client()
+        executor_web_client.barter_simulator_reload_config_query_client()
 
-        total_order_count_for_each_side = max_loop_count_per_side
+        total_chore_count_for_each_side = max_loop_count_per_side
 
-        # Placing buy orders
-        buy_ack_order_id = None
+        # Placing buy chores
+        buy_ack_chore_id = None
         px = 10
         qty = 90
-        for loop_count in range(total_order_count_for_each_side):
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            # run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
+        for loop_count in range(total_chore_count_for_each_side):
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
+                           create_counts_per_side=2)
 
-            buy_order: NewOrderBaseModel = place_new_order(buy_symbol, Side.BUY, px, qty, executor_web_client)
+            buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client)
 
-            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
-                                                                               buy_symbol, executor_web_client,
-                                                                               last_order_id=buy_ack_order_id)
-            buy_ack_order_id = ack_order_journal.order.order_id
-            # fills_journal = get_latest_fill_journal_from_order_id(buy_ack_order_id, executor_web_client)
+            # ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            #                                                                    buy_symbol, executor_web_client,
+            #                                                                    last_chore_id=buy_ack_chore_id)
+            # buy_ack_chore_id = ack_chore_journal.chore.chore_id
+            # fills_journal = get_latest_fill_journal_from_chore_id(buy_ack_chore_id, executor_web_client)
         return buy_symbol, sell_symbol, created_pair_strat, executor_web_client
 
     except AssertionError as e:
@@ -678,8 +698,8 @@ def _place_sanity_complete_buy_orders(buy_symbol, sell_symbol, pair_strat_,
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def _place_sanity_complete_sell_orders(buy_symbol, sell_symbol, created_pair_strat,
-                                       last_trade_fixture_list, max_loop_count_per_side, executor_web_client):
+def _place_sanity_complete_sell_chores(buy_symbol, sell_symbol, created_pair_strat,
+                                       last_barter_fixture_list, max_loop_count_per_side, executor_web_client):
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -692,23 +712,32 @@ def _place_sanity_complete_sell_orders(buy_symbol, sell_symbol, created_pair_str
             config_dict["symbol_configs"][symbol]["fill_percent"] = 100
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_web_client.trade_simulator_reload_config_query_client()
+        executor_web_client.barter_simulator_reload_config_query_client()
 
-        total_order_count_for_each_side = max_loop_count_per_side
+        total_chore_count_for_each_side = max_loop_count_per_side
 
-        # Placing sell orders
-        sell_ack_order_id = None
+        # Placing sell chores
+        sell_ack_chore_id = None
         px = 110
         qty = 7
-        for loop_count in range(total_order_count_for_each_side):
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            sell_order: OrderJournal = place_new_order(sell_symbol, Side.SELL, px, qty, executor_web_client)
-
-            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+        for loop_count in range(total_chore_count_for_each_side):
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
+                           create_counts_per_side=2)
+            sell_chore: ChoreJournal = place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
+            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                sell_symbol, executor_web_client,
-                                                                               last_order_id=sell_ack_order_id)
-            sell_ack_order_id = ack_order_journal.order.order_id
-            # fills_journal = get_latest_fill_journal_from_order_id(sell_ack_order_id, executor_web_client)
+                                                                               last_chore_id=sell_ack_chore_id)
+            strat_status: StratStatusBaseModel = executor_web_client.get_strat_status_client(created_pair_strat.id)
+            # time.sleep(2)
+            strat_view: StratViewBaseModel = email_book_service_native_web_client.get_strat_view_client(created_pair_strat.id)
+            assert strat_status.balance_notional == strat_view.balance_notional, \
+                f"Mismatched {strat_status.balance_notional = }, {strat_view.balance_notional = }"
+
+            # ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            #                                                                    sell_symbol, executor_web_client,
+            #                                                                    last_chore_id=sell_ack_chore_id)
+            sell_ack_chore_id = ack_chore_journal.chore.chore_id
+            # fills_journal = get_latest_fill_journal_from_chore_id(sell_ack_chore_id, executor_web_client)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -721,20 +750,26 @@ def _place_sanity_complete_sell_orders(buy_symbol, sell_symbol, created_pair_str
 
 
 @pytest.mark.nightly
-def test_place_sanity_parallel_complete_orders(
+def test_place_sanity_parallel_complete_chores(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_,
-        max_loop_count_per_side, refresh_sec_update_fixture):
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, expected_portfolio_limits_, refresh_sec_update_fixture):
+    # Updating portfolio limits
+    expected_portfolio_limits_.rolling_max_chore_count.max_rolling_tx_count = 51
+    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+
     temp_list = []
+    max_loop_count_per_side = 10
+    leg1_leg2_symbol_list = []
+    for i in range(1, 21):
+        leg1_leg2_symbol_list.append((f"CB_Sec_{i}", f"EQT_Sec_{i}"))
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(_place_sanity_complete_buy_orders, leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
-                                   copy.deepcopy(expected_strat_limits_),
+        results = [executor.submit(_place_sanity_complete_buy_chores, leg1_symbol, leg2_symbol,
+                                   copy.deepcopy(pair_strat_), copy.deepcopy(expected_strat_limits_),
                                    copy.deepcopy(expected_strat_status_), copy.deepcopy(symbol_overview_obj_list),
-                                   copy.deepcopy(last_trade_fixture_list), copy.deepcopy(market_depth_basemodel_list),
-                                   copy.deepcopy(top_of_book_list_), max_loop_count_per_side,
-                                   refresh_sec_update_fixture)
+                                   copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
+                                   max_loop_count_per_side, refresh_sec_update_fixture)
                    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
 
         for future in concurrent.futures.as_completed(results):
@@ -745,17 +780,21 @@ def test_place_sanity_parallel_complete_orders(
 
     px = 10
     qty = 90
+    strats_count = len(leg1_leg2_symbol_list)
     portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
-    assert portfolio_status.overall_buy_notional == 10 * 10 * qty * get_px_in_usd(px), \
-        (f"Mismatched: overall_buy_notional must be {10 * 10 * qty * get_px_in_usd(px)}, found "
+    assert portfolio_status.overall_buy_notional == strats_count * max_loop_count_per_side * qty * get_px_in_usd(px), \
+        (f"Mismatched: overall_buy_notional must be "
+         f"{strats_count * max_loop_count_per_side * qty * get_px_in_usd(px)}, found "
          f"{portfolio_status.overall_buy_notional}")
-    assert portfolio_status.overall_buy_fill_notional == 10 * 10 * qty * get_px_in_usd(px), \
-        (f"Mismatched: overall_buy_fill_notional must be {10 * 10 * qty * get_px_in_usd(px)}, "
+    assert (portfolio_status.overall_buy_fill_notional ==
+            strats_count * max_loop_count_per_side * qty * get_px_in_usd(px)), \
+        (f"Mismatched: overall_buy_fill_notional must be "
+         f"{strats_count * max_loop_count_per_side * qty * get_px_in_usd(px)}, "
          f"found {portfolio_status.overall_buy_fill_notional}")
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(temp_list)) as executor:
-        results = [executor.submit(_place_sanity_complete_sell_orders, buy_symbol_, sell_symbol_,
-                                   created_pair_strat, copy.deepcopy(last_trade_fixture_list),
+        results = [executor.submit(_place_sanity_complete_sell_chores, buy_symbol_, sell_symbol_,
+                                   created_pair_strat, copy.deepcopy(last_barter_fixture_list),
                                    max_loop_count_per_side, executor_web_client)
                    for buy_symbol_, sell_symbol_, created_pair_strat, executor_web_client in temp_list]
 
@@ -766,57 +805,204 @@ def test_place_sanity_parallel_complete_orders(
     px = 110
     qty = 7
     portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
-    assert portfolio_status.overall_sell_notional == 10 * 10 * qty * get_px_in_usd(px), \
-        (f"Mismatched: overall_sell_notional must be {10 * 10 * qty * get_px_in_usd(px)}, found "
+    assert portfolio_status.overall_sell_notional == strats_count * max_loop_count_per_side * qty * get_px_in_usd(px), \
+        (f"Mismatched: overall_sell_notional must be "
+         f"{strats_count * max_loop_count_per_side * qty * get_px_in_usd(px)}, found "
          f"{portfolio_status.overall_sell_notional}")
-    assert portfolio_status.overall_sell_fill_notional == 10 * 10 * qty * get_px_in_usd(px), \
-        (f"Mismatched: overall_sell_fill_notional must be {10 * 10 * qty * get_px_in_usd(px)}, "
+    assert (portfolio_status.overall_sell_fill_notional ==
+            strats_count * max_loop_count_per_side * qty * get_px_in_usd(px)), \
+        (f"Mismatched: overall_sell_fill_notional must be "
+         f"{strats_count * max_loop_count_per_side * qty * get_px_in_usd(px)}, "
          f"found {portfolio_status.overall_sell_fill_notional}")
     return created_pair_strat, executor_web_client
 
+
+def _place_sanity_complete_buy_chores_with_pair_strat(
+        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list, max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.max_open_chores_per_side = 10
+    expected_strat_limits_.residual_restriction.max_residual = 111360
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_web_client = move_snoozed_pair_strat_to_ready_n_then_active(
+        pair_strat_, market_depth_basemodel_list, symbol_overview_obj_list,
+        expected_strat_limits_, expected_strat_status_)
+
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 100
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        executor_web_client.barter_simulator_reload_config_query_client()
+
+        total_chore_count_for_each_side = max_loop_count_per_side
+
+        # Placing buy chores
+        buy_ack_chore_id = None
+        px = 10
+        qty = 90
+        for loop_count in range(total_chore_count_for_each_side):
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
+                           create_counts_per_side=2)
+
+            buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client)
+
+            # ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            #                                                                    buy_symbol, executor_web_client,
+            #                                                                    last_chore_id=buy_ack_chore_id)
+            # buy_ack_chore_id = ack_chore_journal.chore.chore_id
+            # fills_journal = get_latest_fill_journal_from_chore_id(buy_ack_chore_id, executor_web_client)
+        return buy_symbol, sell_symbol, active_pair_strat, executor_web_client
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_place_sanity_parallel_complete_chores_to_check_strat_view(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, expected_portfolio_limits_, refresh_sec_update_fixture):
+    # Updating portfolio limits
+    expected_portfolio_limits_.rolling_max_chore_count.max_rolling_tx_count = 51
+    expected_portfolio_limits_.max_open_baskets = 51
+    expected_portfolio_limits_.max_gross_n_open_notional = 5_000_000
+    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+
+    temp_list = []
+    max_loop_count_per_side = 50
+    leg1_leg2_symbol_list = []
+    total_strats = 20
+    pair_strat_list = []
+    for i in range(1, total_strats+1):
+        leg1_symbol = f"CB_Sec_{i}"
+        leg2_symbol = f"EQT_Sec_{i}"
+        leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
+
+        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        pair_strat_list.append(stored_pair_strat_basemodel)
+        time.sleep(2)
+        
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
+        results = [executor.submit(_place_sanity_complete_buy_chores_with_pair_strat, leg1_leg2_symbol_tuple[0],
+                                   leg1_leg2_symbol_tuple[1], pair_strat_list[idx],
+                                   copy.deepcopy(expected_strat_limits_), copy.deepcopy(expected_strat_status_),
+                                   copy.deepcopy(symbol_overview_obj_list),
+                                   copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
+                                   max_loop_count_per_side, refresh_sec_update_fixture)
+                   for idx, leg1_leg2_symbol_tuple in enumerate(leg1_leg2_symbol_list)]
+
+        done, not_done = concurrent.futures.wait(
+            results, return_when=concurrent.futures.FIRST_EXCEPTION
+        )
+        if not_done:
+            # at least one future has raised - you can return here
+            # or propagate the exception
+            # list(not_done)[0].result()  # re-raises exception here
+            if list(not_done)[0].exception() is not None:
+                raise Exception(list(not_done)[0].exception())
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
+            buy_symbol_, sell_symbol_, created_pair_strat, executor_web_client = future.result()
+            temp_list.append((buy_symbol_, sell_symbol_, created_pair_strat, executor_web_client))
+
+    px = 10
+    qty = 90
+    strats_count = len(leg1_leg2_symbol_list)
+    strat_view_list = email_book_service_native_web_client.get_all_strat_view_client()
+    expected_balance_notional = (expected_strat_limits_.max_single_leg_notional -
+                                 strats_count * max_loop_count_per_side * qty * get_px_in_usd(px))
+    for strat_view in strat_view_list:
+        assert (strat_view.balance_notional == expected_balance_notional,
+           (f"Mismatched: overall_buy_notional must be "
+            f"{expected_balance_notional}, found {strat_view.balance_notional}"))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(temp_list)) as executor:
+        results = [executor.submit(_place_sanity_complete_sell_chores, buy_symbol_, sell_symbol_,
+                                   created_pair_strat, copy.deepcopy(last_barter_fixture_list),
+                                   max_loop_count_per_side, executor_web_client)
+                   for buy_symbol_, sell_symbol_, created_pair_strat, executor_web_client in temp_list]
+
+        if not_done:
+            # at least one future has raised - you can return here
+            # or propagate the exception
+            # list(not_done)[0].result()  # re-raises exception here
+            if list(not_done)[0].exception() is not None:
+                raise Exception(list(not_done)[0].exception())
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
+
+    px = 110
+    qty = 7
+    strats_count = len(leg1_leg2_symbol_list)
+    strat_view_list = email_book_service_native_web_client.get_all_strat_view_client()
+    expected_balance_notional = (expected_strat_limits_.max_single_leg_notional -
+                                 strats_count * max_loop_count_per_side * qty * get_px_in_usd(px))
+    for strat_view in strat_view_list:
+        assert (strat_view.balance_notional == expected_balance_notional,
+                (f"Mismatched: overall_buy_notional must be "
+                 f"{expected_balance_notional}, found {strat_view.balance_notional}"))
+    return created_pair_strat, executor_web_client
 
 
 # Test for some manual check - not checking anything functionally
 # def handle_test_buy_sell_with_sleep_delays(buy_symbol: str, sell_symbol: str, pair_strat_: PairStratBaseModel,
 #                                            expected_strat_limits_: StratLimits,
 #                                            expected_strat_status_: StratStatus,
-#                                            last_trade_fixture_list: List[Dict],
+#                                            last_barter_fixture_list: List[Dict],
 #                                            symbol_overview_obj_list: List[SymbolOverviewBaseModel],
-#                                            market_depth_basemodel_list: List[MarketDepthBaseModel],
-#                                            top_of_book_list_: List[Dict]):
-#     order_counts = 10
+#                                            market_depth_basemodel_list: List[MarketDepthBaseModel]):
+#     chore_counts = 10
 #     active_strat, executor_web_client = (
-#         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+#         create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
 #                                            expected_strat_status_, symbol_overview_obj_list,
-#                                            last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
+#                                            last_barter_fixture_list, market_depth_basemodel_list))
 #
-#     for order_count in range(order_counts):
-#         # Buy Order
-#         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-#         print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-#         # Running TopOfBook (this triggers expected buy order)
-#         run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], False)
+#     for chore_count in range(chore_counts):
+#         # Buy Chore
+#         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+#         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+#         # Running TopOfBook (this triggers expected buy chore)
+#         run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client[0], False)
 #
-#         # Sell Order
-#         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-#         print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-#         # Running TopOfBook (this triggers expected buy order)
-#         run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1], False)
+#         # Sell Chore
+#         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+#         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+#         # Running TopOfBook (this triggers expected buy chore)
+#         run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client[1], False)
 #
 #         time.sleep(10)
 #
 #
-# def test_place_sanity_orders_with_sleep_delays(clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+# def test_place_sanity_chores_with_sleep_delays(clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
 #                                                expected_strat_limits_,
-#                                                expected_strat_status_, last_trade_fixture_list,
-#                                                symbol_overview_obj_list, market_depth_basemodel_list,
-#                                                top_of_book_list_):
+#                                                expected_strat_status_, last_barter_fixture_list,
+#                                                symbol_overview_obj_list, market_depth_basemodel_list):
 #     symbol_pair_counter = 1
 #     with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
 #         results = [executor.submit(handle_test_buy_sell_with_sleep_delays, buy_symbol, sell_symbol,
 #                                    pair_strat_, expected_strat_limits_, expected_strat_status_,
-#                                    last_trade_fixture_list, symbol_overview_obj_list, market_depth_basemodel_list,
-#                                    top_of_book_list_)
+#                                    last_barter_fixture_list, symbol_overview_obj_list, market_depth_basemodel_list)
 #                    for buy_symbol, sell_symbol in buy_sell_symbol_list]
 #
 #         for future in concurrent.futures.as_completed(results):
@@ -824,7 +1010,7 @@ def test_place_sanity_parallel_complete_orders(
 #                 raise Exception(future.exception())
 
 
-# def test_create_sanity_last_trade(static_data_, clean_and_set_limits, last_trade_fixture_list):
+# def test_create_sanity_last_barter(static_data_, clean_and_set_limits, last_barter_fixture_list):
 #     symbols = ["CB_Sec_1", "CB_Sec_2", "CB_Sec_3", "CB_Sec_4"]
 #     px_portions = [(40, 55), (56, 70), (71, 85), (86, 100)]
 #     total_loops = 600
@@ -837,13 +1023,13 @@ def test_place_sanity_parallel_complete_orders(
 #             qty = random.randint(1000, 2000)
 #             qty = qty + 400
 #
-#             last_trade_obj = LastTradeBaseModel(**last_trade_fixture_list[0])
-#             last_trade_obj.symbol_n_exch_id.symbol = symbol
-#             last_trade_obj.arrival_time = current_time
-#             last_trade_obj.px = random.randint(px_portion[0], px_portion[1])
-#             last_trade_obj.qty = qty
+#             last_barter_obj = LastBarterBaseModel(**last_barter_fixture_list[0])
+#             last_barter_obj.symbol_n_exch_id.symbol = symbol
+#             last_barter_obj.arrival_time = current_time
+#             last_barter_obj.px = random.randint(px_portion[0], px_portion[1])
+#             last_barter_obj.qty = qty
 #
-#             mobile_book_web_client.create_last_trade_client(last_trade_obj)
+#             mobile_book_web_client.create_last_barter_client(last_barter_obj)
 #
 #         time.sleep(loop_wait)
 #
@@ -953,14 +1139,14 @@ def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
 
 
 @pytest.mark.nightly
-def test_buy_sell_order_multi_pair_serialized(static_data_, clean_and_set_limits, pair_securities_with_sides_,
-                                              buy_order_, sell_order_, buy_fill_journal_,
-                                              sell_fill_journal_, expected_buy_order_snapshot_,
-                                              expected_sell_order_snapshot_, expected_symbol_side_snapshot_,
+def test_buy_sell_chore_multi_pair_serialized(static_data_, clean_and_set_limits, pair_securities_with_sides_,
+                                              buy_chore_, sell_chore_, buy_fill_journal_,
+                                              sell_fill_journal_, expected_buy_chore_snapshot_,
+                                              expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
                                               pair_strat_, expected_strat_limits_, expected_strat_status_,
-                                              expected_strat_brief_, expected_portfolio_status_, top_of_book_list_,
-                                              last_trade_fixture_list, symbol_overview_obj_list,
-                                              market_depth_basemodel_list, expected_order_limits_,
+                                              expected_strat_brief_, expected_portfolio_status_,
+                                              last_barter_fixture_list, symbol_overview_obj_list,
+                                              market_depth_basemodel_list, expected_chore_limits_,
                                               expected_portfolio_limits_, max_loop_count_per_side,
                                               leg1_leg2_symbol_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:int(len(leg1_leg2_symbol_list) / 2)]
@@ -970,12 +1156,12 @@ def test_buy_sell_order_multi_pair_serialized(static_data_, clean_and_set_limits
     overall_sell_fill_notional = 0
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = (
-            handle_test_buy_sell_order(leg1_symbol, leg2_symbol, max_loop_count_per_side,
-                                       refresh_sec_update_fixture, buy_order_, sell_order_, buy_fill_journal_,
-                                       sell_fill_journal_, expected_buy_order_snapshot_, expected_sell_order_snapshot_,
+            handle_test_buy_sell_chore(leg1_symbol, leg2_symbol, max_loop_count_per_side,
+                                       refresh_sec_update_fixture, buy_chore_, sell_chore_, buy_fill_journal_,
+                                       sell_fill_journal_, expected_buy_chore_snapshot_, expected_sell_chore_snapshot_,
                                        expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
                                        expected_strat_status_, expected_strat_brief_,
-                                       top_of_book_list_, last_trade_fixture_list, symbol_overview_obj_list,
+                                       last_barter_fixture_list, symbol_overview_obj_list,
                                        market_depth_basemodel_list))
         overall_buy_notional += strat_buy_notional
         overall_sell_notional += strat_sell_notional
@@ -990,14 +1176,14 @@ def test_buy_sell_order_multi_pair_serialized(static_data_, clean_and_set_limits
 
 
 @pytest.mark.nightly
-def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
-                                            buy_order_, sell_order_, buy_fill_journal_,
-                                            sell_fill_journal_, expected_buy_order_snapshot_,
-                                            expected_sell_order_snapshot_, expected_symbol_side_snapshot_,
+def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
+                                            buy_chore_, sell_chore_, buy_fill_journal_,
+                                            sell_fill_journal_, expected_buy_chore_snapshot_,
+                                            expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
                                             pair_strat_, expected_strat_limits_, expected_strat_status_,
-                                            expected_strat_brief_, expected_portfolio_status_, top_of_book_list_,
-                                            last_trade_fixture_list, symbol_overview_obj_list,
-                                            market_depth_basemodel_list, expected_order_limits_,
+                                            expected_strat_brief_, expected_portfolio_status_,
+                                            last_barter_fixture_list, symbol_overview_obj_list,
+                                            market_depth_basemodel_list, expected_chore_limits_,
                                             expected_portfolio_limits_, max_loop_count_per_side,
                                             leg1_leg2_symbol_list, refresh_sec_update_fixture):
     overall_buy_notional = 0
@@ -1005,16 +1191,16 @@ def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
     overall_buy_fill_notional = 0
     overall_sell_fill_notional = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(handle_test_buy_sell_order, leg1_symbol, leg2_symbol, max_loop_count_per_side,
-                                   refresh_sec_update_fixture, copy.deepcopy(buy_order_),
-                                   copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_order_snapshot_),
-                                   copy.deepcopy(expected_sell_order_snapshot_),
+        results = [executor.submit(handle_test_buy_sell_chore, leg1_symbol, leg2_symbol, max_loop_count_per_side,
+                                   refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
+                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), copy.deepcopy(pair_strat_),
                                    copy.deepcopy(expected_strat_limits_),
                                    copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
-                                   copy.deepcopy(top_of_book_list_),
-                                   copy.deepcopy(last_trade_fixture_list), copy.deepcopy(symbol_overview_obj_list),
+
+                                   copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
                    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
 
@@ -1036,14 +1222,14 @@ def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
 
 
 @pytest.mark.nightly
-def test_sell_buy_order_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
-                                            buy_order_, sell_order_, buy_fill_journal_,
-                                            sell_fill_journal_, expected_buy_order_snapshot_,
-                                            expected_sell_order_snapshot_, expected_symbol_side_snapshot_,
+def test_sell_buy_chore_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
+                                            buy_chore_, sell_chore_, buy_fill_journal_,
+                                            sell_fill_journal_, expected_buy_chore_snapshot_,
+                                            expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
                                             pair_strat_, expected_strat_limits_, expected_strat_status_,
-                                            expected_strat_brief_, expected_portfolio_status_, top_of_book_list_,
-                                            last_trade_fixture_list, symbol_overview_obj_list,
-                                            market_depth_basemodel_list, expected_order_limits_,
+                                            expected_strat_brief_, expected_portfolio_status_,
+                                            last_barter_fixture_list, symbol_overview_obj_list,
+                                            market_depth_basemodel_list, expected_chore_limits_,
                                             expected_portfolio_limits_, max_loop_count_per_side,
                                             leg1_leg2_symbol_list, refresh_sec_update_fixture):
     overall_buy_notional = 0
@@ -1051,16 +1237,16 @@ def test_sell_buy_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
     overall_buy_fill_notional = 0
     overall_sell_fill_notional = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(handle_test_sell_buy_order, leg1_symbol, leg2_symbol, max_loop_count_per_side,
-                                   refresh_sec_update_fixture, copy.deepcopy(buy_order_),
-                                   copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_order_snapshot_),
-                                   copy.deepcopy(expected_sell_order_snapshot_),
+        results = [executor.submit(handle_test_sell_buy_chore, leg1_symbol, leg2_symbol, max_loop_count_per_side,
+                                   refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
+                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), copy.deepcopy(pair_strat_),
                                    copy.deepcopy(expected_strat_limits_),
                                    copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
-                                   copy.deepcopy(expected_portfolio_status_), copy.deepcopy(top_of_book_list_),
-                                   copy.deepcopy(last_trade_fixture_list), copy.deepcopy(symbol_overview_obj_list),
+                                   copy.deepcopy(expected_portfolio_status_),
+                                   copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
                    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
 
@@ -1082,18 +1268,17 @@ def test_sell_buy_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
 
 
 @pytest.mark.nightly
-def test_buy_sell_non_systematic_order_multi_pair_serialized(static_data_, clean_and_set_limits,
+def test_buy_sell_non_systematic_chore_multi_pair_serialized(static_data_, clean_and_set_limits,
                                                              pair_securities_with_sides_,
-                                                             buy_order_, sell_order_, buy_fill_journal_,
-                                                             sell_fill_journal_, expected_buy_order_snapshot_,
-                                                             expected_sell_order_snapshot_,
+                                                             buy_chore_, sell_chore_, buy_fill_journal_,
+                                                             sell_fill_journal_, expected_buy_chore_snapshot_,
+                                                             expected_sell_chore_snapshot_,
                                                              expected_symbol_side_snapshot_,
                                                              pair_strat_, expected_strat_limits_,
                                                              expected_strat_status_,
                                                              expected_strat_brief_, expected_portfolio_status_,
-                                                             top_of_book_list_,
-                                                             last_trade_fixture_list, symbol_overview_obj_list,
-                                                             market_depth_basemodel_list, expected_order_limits_,
+                                                             last_barter_fixture_list, symbol_overview_obj_list,
+                                                             market_depth_basemodel_list, expected_chore_limits_,
                                                              expected_portfolio_limits_, max_loop_count_per_side,
                                                              leg1_leg2_symbol_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:int(len(leg1_leg2_symbol_list) / 2)]
@@ -1103,12 +1288,12 @@ def test_buy_sell_non_systematic_order_multi_pair_serialized(static_data_, clean
     overall_sell_fill_notional = 0
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = (
-            handle_test_buy_sell_order(leg1_symbol, leg2_symbol, max_loop_count_per_side,
-                                       refresh_sec_update_fixture, buy_order_, sell_order_, buy_fill_journal_,
-                                       sell_fill_journal_, expected_buy_order_snapshot_, expected_sell_order_snapshot_,
+            handle_test_buy_sell_chore(leg1_symbol, leg2_symbol, max_loop_count_per_side,
+                                       refresh_sec_update_fixture, buy_chore_, sell_chore_, buy_fill_journal_,
+                                       sell_fill_journal_, expected_buy_chore_snapshot_, expected_sell_chore_snapshot_,
                                        expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
                                        expected_strat_status_, expected_strat_brief_,
-                                       top_of_book_list_, last_trade_fixture_list, symbol_overview_obj_list,
+                                       last_barter_fixture_list, symbol_overview_obj_list,
                                        market_depth_basemodel_list, is_non_systematic_run=True))
         overall_buy_notional += strat_buy_notional
         overall_sell_notional += strat_sell_notional
@@ -1123,17 +1308,16 @@ def test_buy_sell_non_systematic_order_multi_pair_serialized(static_data_, clean
 
 
 @pytest.mark.nightly
-def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_and_set_limits,
+def test_buy_sell_non_systematic_chore_multi_pair_parallel(static_data_, clean_and_set_limits,
                                                            pair_securities_with_sides_,
-                                                           buy_order_, sell_order_, buy_fill_journal_,
-                                                           sell_fill_journal_, expected_buy_order_snapshot_,
-                                                           expected_sell_order_snapshot_,
+                                                           buy_chore_, sell_chore_, buy_fill_journal_,
+                                                           sell_fill_journal_, expected_buy_chore_snapshot_,
+                                                           expected_sell_chore_snapshot_,
                                                            expected_symbol_side_snapshot_,
                                                            pair_strat_, expected_strat_limits_, expected_strat_status_,
                                                            expected_strat_brief_, expected_portfolio_status_,
-                                                           top_of_book_list_,
-                                                           last_trade_fixture_list, symbol_overview_obj_list,
-                                                           market_depth_basemodel_list, expected_order_limits_,
+                                                           last_barter_fixture_list, symbol_overview_obj_list,
+                                                           market_depth_basemodel_list, expected_chore_limits_,
                                                            expected_portfolio_limits_, max_loop_count_per_side,
                                                            leg1_leg2_symbol_list, refresh_sec_update_fixture):
     overall_buy_notional = 0
@@ -1141,16 +1325,15 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_a
     overall_buy_fill_notional = 0
     overall_sell_fill_notional = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(handle_test_buy_sell_order, buy_symbol, sell_symbol, max_loop_count_per_side,
-                                   refresh_sec_update_fixture, copy.deepcopy(buy_order_),
-                                   copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_order_snapshot_),
-                                   copy.deepcopy(expected_sell_order_snapshot_),
+        results = [executor.submit(handle_test_buy_sell_chore, buy_symbol, sell_symbol, max_loop_count_per_side,
+                                   refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
+                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), copy.deepcopy(pair_strat_),
                                    copy.deepcopy(expected_strat_limits_),
                                    copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
-                                   copy.deepcopy(top_of_book_list_),
-                                   copy.deepcopy(last_trade_fixture_list), copy.deepcopy(symbol_overview_obj_list),
+                                   copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), True)
                    for buy_symbol, sell_symbol in leg1_leg2_symbol_list]
 
@@ -1172,30 +1355,30 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_a
 
 
 @pytest.mark.nightly
-def test_buy_sell_pair_order(
+def test_buy_sell_pair_chore(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_order_, sell_order_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_order_snapshot_,
-        expected_sell_order_snapshot_, expected_symbol_side_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_, top_of_book_list_,
-        last_trade_fixture_list, symbol_overview_obj_list,
-        market_depth_basemodel_list, expected_order_limits_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
         expected_portfolio_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
-    triggers buy & sell pair order (single buy order followed by single sell order) for max_loop_count_per_side times
+    triggers buy & sell pair chore (single buy chore followed by single sell chore) for max_loop_count_per_side times
     """
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:1]
     leg1_symbol, leg2_symbol = leg1_leg2_symbol_list[0]
     overall_buy_notional, overall_sell_notional, overall_buy_fill_notional, overall_sell_fill_notional = (
-        handle_test_buy_sell_pair_order(
+        handle_test_buy_sell_pair_chore(
             leg1_symbol, leg2_symbol, max_loop_count_per_side,
-            refresh_sec_update_fixture, buy_order_, sell_order_, buy_fill_journal_,
-            sell_fill_journal_, expected_buy_order_snapshot_, expected_sell_order_snapshot_,
+            refresh_sec_update_fixture, buy_chore_, sell_chore_, buy_fill_journal_,
+            sell_fill_journal_, expected_buy_chore_snapshot_, expected_sell_chore_snapshot_,
             expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
             expected_strat_status_, expected_strat_brief_,
-            top_of_book_list_, last_trade_fixture_list, symbol_overview_obj_list,
+            last_barter_fixture_list, symbol_overview_obj_list,
             market_depth_basemodel_list))
 
     expected_portfolio_status_.overall_buy_notional = overall_buy_notional
@@ -1206,30 +1389,30 @@ def test_buy_sell_pair_order(
 
 
 @pytest.mark.nightly
-def test_sell_buy_pair_order(
+def test_sell_buy_pair_chore(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_order_, sell_order_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_order_snapshot_,
-        expected_sell_order_snapshot_, expected_symbol_side_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_, top_of_book_list_,
-        last_trade_fixture_list, symbol_overview_obj_list,
-        market_depth_basemodel_list, expected_order_limits_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
         expected_portfolio_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
-    triggers buy & sell pair order (single buy order followed by single sell order) for max_loop_count_per_side times
+    triggers buy & sell pair chore (single buy chore followed by single sell chore) for max_loop_count_per_side times
     """
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:1]
     leg1_symbol, leg2_symbol = leg1_leg2_symbol_list[0]
     overall_buy_notional, overall_sell_notional, overall_buy_fill_notional, overall_sell_fill_notional = (
-        handle_test_sell_buy_pair_order(
+        handle_test_sell_buy_pair_chore(
             leg1_symbol, leg2_symbol, max_loop_count_per_side,
-            refresh_sec_update_fixture, buy_order_, sell_order_, buy_fill_journal_,
-            sell_fill_journal_, expected_buy_order_snapshot_, expected_sell_order_snapshot_,
+            refresh_sec_update_fixture, buy_chore_, sell_chore_, buy_fill_journal_,
+            sell_fill_journal_, expected_buy_chore_snapshot_, expected_sell_chore_snapshot_,
             expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
             expected_strat_status_, expected_strat_brief_,
-            top_of_book_list_, last_trade_fixture_list, symbol_overview_obj_list,
+            last_barter_fixture_list, symbol_overview_obj_list,
             market_depth_basemodel_list))
 
     expected_portfolio_status_.overall_buy_notional = overall_buy_notional
@@ -1242,24 +1425,35 @@ def test_sell_buy_pair_order(
 @pytest.mark.nightly
 def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                         expected_strat_limits_, expected_strat_status_,
-                                        symbol_overview_obj_list, last_trade_fixture_list,
-                                        market_depth_basemodel_list, top_of_book_list_, refresh_sec_update_fixture):
+                                        symbol_overview_obj_list, last_barter_fixture_list,
+                                        market_depth_basemodel_list, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     created_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list,
-                                           last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+                                           last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_web_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == leg1_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == leg2_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
 
     # positive test
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    time.sleep(1)
+    update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                       ask_sell_top_market_depth)
 
-    # internally checks order_journal existence
-    order_journal: OrderJournal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+    # internally checks chore_journal existence
+    chore_journal: ChoreJournal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                  leg1_symbol, executor_web_client)
 
     # negative test
@@ -1269,8 +1463,8 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
     assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
 
     time.sleep(2)
-    # validating if trading_link.trigger_kill_switch got called
-    check_str = "Called TradingLink.trigger_kill_switch"
+    # validating if bartering_link.trigger_kill_switch got called
+    check_str = "Called BarteringLink.trigger_kill_switch"
     portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
     for alert in portfolio_alert.alerts:
         if re.search(check_str, alert.alert_brief):
@@ -1278,46 +1472,53 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
     else:
         assert False, f"Can't find portfolio alert saying '{check_str}'"
 
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
-    # internally checking buy order
-    order_journal = \
-        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    time.sleep(1)
+    update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                       ask_sell_top_market_depth)
+    # internally checking buy chore
+    chore_journal = \
+        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg1_symbol, executor_web_client,
-                                                       last_order_id=order_journal.order.order_id,
-                                                       expect_no_order=True)
+                                                       last_chore_id=chore_journal.chore.chore_id,
+                                                       expect_no_chore=True)
 
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[1])
-    # internally checking sell order
-    order_journal = \
-        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
-                                                       leg2_symbol, executor_web_client, expect_no_order=True)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    # required to make buy side tob latest
+    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], executor_web_client)
+
+    update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                        bid_buy_top_market_depth)
+    # internally checking sell chore
+    chore_journal = \
+        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                       leg2_symbol, executor_web_client, expect_no_chore=True)
 
 
 @pytest.mark.nightly
 def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                             pair_strat_, expected_strat_limits_,
                                             expected_strat_status_, symbol_overview_obj_list,
-                                            last_trade_fixture_list, market_depth_basemodel_list,
-                                            top_of_book_list_, buy_order_, sell_order_,
+                                            last_barter_fixture_list, market_depth_basemodel_list,
+                                            buy_chore_, sell_chore_,
                                             refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     created_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list,
-                                           last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+                                           last_barter_fixture_list,
+                                           market_depth_basemodel_list))
     # positive test
-    # placing buy order
-    place_new_order(leg1_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty, executor_web_client)
+    # placing buy chore
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    place_new_chore(leg1_symbol, Side.BUY, buy_chore_.chore.px, buy_chore_.chore.qty, executor_web_client)
     time.sleep(2)
-    # internally checking buy order
-    order_journal: OrderJournal = \
-        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+    # internally checking buy chore
+    chore_journal: ChoreJournal = \
+        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg1_symbol, executor_web_client)
 
     # negative test
@@ -1327,8 +1528,8 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
     assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
 
     time.sleep(5)
-    # validating if trading_link.trigger_kill_switch got called
-    check_str = "Called TradingLink.trigger_kill_switch"
+    # validating if bartering_link.trigger_kill_switch got called
+    check_str = "Called BarteringLink.trigger_kill_switch"
     portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
     for alert in portfolio_alert.alerts:
         if re.search(check_str, alert.alert_brief):
@@ -1336,39 +1537,41 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
     else:
         assert False, f"Can't find portfolio alert saying '{check_str}'"
 
-    # placing buy order
-    place_new_order(leg1_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty, executor_web_client)
+    # placing buy chore
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    place_new_chore(leg1_symbol, Side.BUY, buy_chore_.chore.px, buy_chore_.chore.qty, executor_web_client)
     time.sleep(2)
-    # internally checking buy order
-    order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+    # internally checking buy chore
+    chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                    leg1_symbol, executor_web_client,
-                                                                   last_order_id=order_journal.order.order_id,
-                                                                   expect_no_order=True)
+                                                                   last_chore_id=chore_journal.chore.chore_id,
+                                                                   expect_no_chore=True)
 
-    # placing sell order
-    place_new_order(leg2_symbol, Side.SELL, sell_order_.order.px, sell_order_.order.qty, executor_web_client)
+    # placing sell chore
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    place_new_chore(leg2_symbol, Side.SELL, sell_chore_.chore.px, sell_chore_.chore.qty, executor_web_client)
     time.sleep(2)
-    # internally checking sell order
-    order_journal = \
-        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
-                                                       leg2_symbol, executor_web_client, expect_no_order=True)
+    # internally checking sell chore
+    chore_journal = \
+        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                       leg2_symbol, executor_web_client, expect_no_chore=True)
 
 
 @pytest.mark.nightly
 def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                             expected_strat_limits_, expected_strat_status_,
-                            symbol_overview_obj_list, last_trade_fixture_list,
-                            market_depth_basemodel_list, top_of_book_list_, refresh_sec_update_fixture):
+                            symbol_overview_obj_list, last_barter_fixture_list,
+                            market_depth_basemodel_list, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
     created_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list,
-                                           last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+                                           last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     # positive test
     system_control = SystemControlBaseModel(_id=1, kill_switch=True)
@@ -1376,20 +1579,34 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
         jsonable_encoder(system_control, by_alias=True, exclude_none=True))
     assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
 
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_web_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == leg1_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == leg2_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
     time.sleep(2)
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
-    # internally checking buy order
-    order_journal = \
-        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
-                                                       leg1_symbol, executor_web_client, expect_no_order=True)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    time.sleep(1)
+    update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                       ask_sell_top_market_depth)
+    # internally checking buy chore
+    chore_journal = \
+        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                       leg1_symbol, executor_web_client, expect_no_chore=True)
 
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[1])
-    # internally checking sell order
-    order_journal = \
-        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
-                                                       leg2_symbol, executor_web_client, expect_no_order=True)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    # required to make buy side tob latest
+    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], executor_web_client)
+
+    update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                        bid_buy_top_market_depth)
+    # internally checking sell chore
+    chore_journal = \
+        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                       leg2_symbol, executor_web_client, expect_no_chore=True)
 
     # negative test
     system_control = SystemControlBaseModel(_id=1, kill_switch=False)
@@ -1398,8 +1615,8 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     assert not updated_system_control.kill_switch, "Unexpected: kill_switch is True, expected to be False"
 
     time.sleep(2)
-    # validating if trading_link.trigger_kill_switch got called
-    check_str = "Called TradingLink.revoke_kill_switch_n_resume_trading"
+    # validating if bartering_link.trigger_kill_switch got called
+    check_str = "Called BarteringLink.revoke_kill_switch_n_resume_bartering"
     portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
     for alert in portfolio_alert.alerts:
         if re.search(check_str, alert.alert_brief):
@@ -1407,24 +1624,25 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     else:
         assert False, f"Can't find portfolio alert saying '{check_str}'"
 
-    # empty sell tob to align tob pattern - self._top_of_books_update_date_time in street_book doesn't get updated
-    # when kill switch is enabled, to make is aligned with last_update_time placing non-order triggering tob once
-    # kill switch revoked
-    run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0], avoid_order_trigger=True)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    time.sleep(1)
+    update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                       ask_sell_top_market_depth)
 
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
-
-    # internally checks order_journal existence
-    order_journal: OrderJournal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+    # internally checks chore_journal existence
+    chore_journal: ChoreJournal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                  leg1_symbol, executor_web_client)
     time.sleep(residual_wait_sec)
 
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[1])
-    # internally checking sell order
-    order_journal = \
-        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    # required to make buy side tob latest
+    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], executor_web_client)
+
+    update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                        bid_buy_top_market_depth)
+    # internally checking sell chore
+    chore_journal = \
+        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg2_symbol, executor_web_client)
 
 
@@ -1432,8 +1650,8 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
 def test_trigger_switch_fail(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_trade_fixture_list,
-        market_depth_basemodel_list, top_of_book_list_):
+        symbol_overview_obj_list, last_barter_fixture_list,
+        market_depth_basemodel_list):
 
     config_file_path = STRAT_EXECUTOR / "data" / f"kill_switch_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -1452,7 +1670,7 @@ def test_trigger_switch_fail(
             email_book_service_native_web_client.patch_system_control_client(
                 jsonable_encoder(system_control, by_alias=True, exclude_none=True))
         except Exception as e:
-            if "trading_link.trigger_kill_switch failed" not in str(e):
+            if "bartering_link.trigger_kill_switch failed" not in str(e):
                 raise Exception("Something went wrong while enabling kill_switch kill switch")
         else:
             assert False, ("Configured simulate config to return False from trigger_kill_switch to fail enable "
@@ -1474,8 +1692,8 @@ def test_trigger_switch_fail(
 def test_revoke_switch_fail(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_trade_fixture_list,
-        market_depth_basemodel_list, top_of_book_list_):
+        symbol_overview_obj_list, last_barter_fixture_list,
+        market_depth_basemodel_list):
     config_file_path = STRAT_EXECUTOR / "data" / f"kill_switch_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
@@ -1486,7 +1704,7 @@ def test_revoke_switch_fail(
     assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
     try:
         # updating yaml_configs according to this test
-        config_dict["revoke_kill_switch_n_resume_trading"] = False
+        config_dict["revoke_kill_switch_n_resume_bartering"] = False
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1497,10 +1715,10 @@ def test_revoke_switch_fail(
             email_book_service_native_web_client.patch_system_control_client(
                 jsonable_encoder(system_control, by_alias=True, exclude_none=True))
         except Exception as e:
-            if "trading_link.revoke_kill_switch_n_resume_trading failed" not in str(e):
+            if "bartering_link.revoke_kill_switch_n_resume_bartering failed" not in str(e):
                 raise Exception("Something went wrong while disabling kill_switch kill switch")
         else:
-            assert False, ("Configured simulate config to return False from revoke_kill_switch_n_resume_trading to "
+            assert False, ("Configured simulate config to return False from revoke_kill_switch_n_resume_bartering to "
                            "fail disable kill switch, but patch went successful - check why simulate didn't work")
 
     except AssertionError as e:
@@ -1519,8 +1737,8 @@ def test_revoke_switch_fail(
 def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                  pair_strat_, expected_strat_limits_,
                                  expected_strat_status_, symbol_overview_obj_list,
-                                 last_trade_fixture_list, market_depth_basemodel_list,
-                                 top_of_book_list_, buy_order_, sell_order_,
+                                 last_barter_fixture_list, market_depth_basemodel_list,
+                                 buy_chore_, sell_chore_,
                                  max_loop_count_per_side, refresh_sec_update_fixture):
     partial_filled_qty: int | None = None
     unfilled_amount: int | None = None
@@ -1533,10 +1751,10 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list,
+                                               market_depth_basemodel_list))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -1550,21 +1768,21 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
 
             # buy fills check
             for check_symbol in [leg1_symbol, leg2_symbol]:
-                order_id = None
+                chore_id = None
                 total_partial_filled_qty = 0
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    order_id, partial_filled_qty = \
+                    chore_id, partial_filled_qty = \
                         underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, leg1_symbol,
                                                                        leg2_symbol,
-                                                                       last_trade_fixture_list, top_of_book_list_,
-                                                                       order_id, config_dict, executor_http_client)
+                                                                       last_barter_fixture_list,
+                                                                       chore_id, config_dict, executor_http_client)
                     total_partial_filled_qty += partial_filled_qty
-                    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
-                        # Sleeping to let the order get cxlled
+                    if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+                        # Sleeping to let the chore get cxlled
                         time.sleep(residual_wait_sec)
                 time.sleep(5)
                 strat_status: StratStatusBaseModel = executor_http_client.get_strat_status_client(created_pair_strat.id)
@@ -1590,8 +1808,8 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
 def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                        pair_strat_, expected_strat_limits_,
                                        expected_strat_status_, symbol_overview_obj_list,
-                                       last_trade_fixture_list, market_depth_basemodel_list,
-                                       top_of_book_list_, buy_order_, sell_order_,
+                                       last_barter_fixture_list, market_depth_basemodel_list,
+                                       buy_chore_, sell_chore_,
                                        max_loop_count_per_side, refresh_sec_update_fixture):
 
     partial_filled_qty: int | None = None
@@ -1604,9 +1822,9 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list, market_depth_basemodel_list))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -1621,19 +1839,19 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
 
             # buy fills check
             for check_symbol in [leg1_symbol, leg2_symbol]:
-                order_id = None
+                chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    order_id, partial_filled_qty = \
+                    chore_id, partial_filled_qty = \
                         underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbol, leg1_symbol,
-                                                                             leg2_symbol, last_trade_fixture_list,
-                                                                             top_of_book_list_, order_id,
+                                                                             leg2_symbol, last_barter_fixture_list,
+                                                                             chore_id,
                                                                              executor_http_client, config_dict)
-                    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
-                        # Sleeping to let the order get cxlled
+                    if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+                        # Sleeping to let the chore get cxlled
                         time.sleep(residual_wait_sec)
 
                 symbol_configs = get_symbol_configs(check_symbol, config_dict)
@@ -1660,16 +1878,16 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_
 def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                        pair_strat_, expected_strat_limits_,
                        expected_strat_status_, symbol_overview_obj_list,
-                       last_trade_fixture_list, market_depth_basemodel_list,
-                       top_of_book_list_, buy_order_, sell_order_, refresh_sec_update_fixture):
+                       last_barter_fixture_list, market_depth_basemodel_list,
+                       buy_chore_, sell_chore_, refresh_sec_update_fixture):
         buy_symbol = leg1_leg2_symbol_list[0][0]
         sell_symbol = leg1_leg2_symbol_list[0][1]
         expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+            create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                               expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                               market_depth_basemodel_list))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -1683,37 +1901,44 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
+
+            bid_buy_top_market_depth = None
+            ask_sell_top_market_depth = None
+            stored_market_depth = executor_http_client.get_all_market_depth_client()
+            for market_depth in stored_market_depth:
+                if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                    bid_buy_top_market_depth = market_depth
+                if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                    ask_sell_top_market_depth = market_depth
 
             # buy fills check
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-            loop_count = 1
-            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0],
-                                avoid_order_trigger=True)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+
             px = 100
             qty = 90
-            place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
-            time.sleep(2)  # delay for order to get placed
+            place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client)
+            time.sleep(2)  # delay for chore to get placed
 
-            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol,
+            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
                                                                                executor_http_client)
-            latest_fill_journal = get_latest_fill_journal_from_order_id(ack_order_journal.order.order_id,
+            latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
                                                                         executor_http_client)
             last_fill_date_time = latest_fill_journal.fill_date_time
-            filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_order_journal.order.qty)
+            filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_chore_journal.chore.qty)
             assert latest_fill_journal.fill_qty == filled_qty, f"filled_qty mismatched: expected filled_qty {filled_qty} " \
                                                                f"received {latest_fill_journal.fill_qty}"
-            order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
-            assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
-                                                                            f"OrderStatusType.OE_ACKED received " \
-                                                                            f"{order_snapshot.order_status}"
+            chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client)
+            assert chore_snapshot.chore_status == ChoreStatusType.OE_ACKED, "ChoreStatus mismatched: expected status " \
+                                                                            f"ChoreStatusType.OE_ACKED received " \
+                                                                            f"{chore_snapshot.chore_status}"
 
             # processing remaining 50% fills
-            executor_http_client.trade_simulator_process_fill_query_client(
-                ack_order_journal.order.order_id, ack_order_journal.order.px,
-                ack_order_journal.order.qty, ack_order_journal.order.side,
-                ack_order_journal.order.security.sec_id, ack_order_journal.order.underlying_account)
-            latest_fill_journal = get_latest_fill_journal_from_order_id(ack_order_journal.order.order_id,
+            executor_http_client.barter_simulator_process_fill_query_client(
+                ack_chore_journal.chore.chore_id, ack_chore_journal.chore.px,
+                ack_chore_journal.chore.qty, ack_chore_journal.chore.side,
+                ack_chore_journal.chore.security.sec_id, ack_chore_journal.chore.underlying_account)
+            latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
                                                                         executor_http_client)
             assert latest_fill_journal.fill_date_time != last_fill_date_time, "last_fill_date_time mismatched: " \
                                                                               f"expected {latest_fill_journal} " \
@@ -1722,10 +1947,10 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
                                                                f"received {latest_fill_journal.fill_qty}"
 
-            order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
-            assert order_snapshot.order_status == OrderStatusType.OE_FILLED, "OrderStatus mismatched: expected status " \
-                                                                             f"OrderStatusType.OE_FILLED received " \
-                                                                             f"{order_snapshot.order_status}"
+            chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client)
+            assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, "ChoreStatus mismatched: expected status " \
+                                                                             f"ChoreStatusType.OE_FILLED received " \
+                                                                             f"{chore_snapshot.chore_status}"
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -1739,19 +1964,19 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
 @pytest.mark.nightly
 def test_over_fill_case_1(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                           expected_strat_status_, symbol_overview_obj_list,
-                          last_trade_fixture_list, market_depth_basemodel_list,
-                          top_of_book_list_, buy_order_, sell_order_, refresh_sec_update_fixture):
+                          last_barter_fixture_list, market_depth_basemodel_list,
+                          buy_chore_, sell_chore_, refresh_sec_update_fixture):
     """
-    Test case when order_snapshot is in OE_ACKED and fill is triggered to make it over_filled
+    Test case when chore_snapshot is in OE_ACKED and fill is triggered to make it over_filled
     """
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -1765,34 +1990,44 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        bid_buy_top_market_depth = None
+        ask_sell_top_market_depth = None
+        stored_market_depth = executor_http_client.get_all_market_depth_client()
+        for market_depth in stored_market_depth:
+            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                bid_buy_top_market_depth = market_depth
+            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                ask_sell_top_market_depth = market_depth
 
         # buy fills check
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        loop_count = 1
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
-        time.sleep(2)  # delay for order to get placed
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+                                                           ask_sell_top_market_depth)
+        time.sleep(2)  # delay for chore to get placed
 
-        ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol,
+        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
                                                                            executor_http_client)
-        latest_fill_journal = get_latest_fill_journal_from_order_id(ack_order_journal.order.order_id,
+        latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
                                                                     executor_http_client)
         last_fill_date_time = latest_fill_journal.fill_date_time
-        filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_order_journal.order.qty)
+        filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_chore_journal.chore.qty)
         assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
                                                            f"received {latest_fill_journal.fill_qty}"
-        order_snapshot_before_over_fill = (
-            get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client))
-        assert order_snapshot_before_over_fill.order_status == OrderStatusType.OE_ACKED, \
-            "OrderStatus mismatched: expected status OrderStatusType.OE_ACKED received " \
-            f"{order_snapshot_before_over_fill.order_status}"
+        chore_snapshot_before_over_fill = (
+            get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client))
+        assert chore_snapshot_before_over_fill.chore_status == ChoreStatusType.OE_ACKED, \
+            "ChoreStatus mismatched: expected status ChoreStatusType.OE_ACKED received " \
+            f"{chore_snapshot_before_over_fill.chore_status}"
 
         # processing fill for over_fill
-        executor_http_client.trade_simulator_process_fill_query_client(
-            ack_order_journal.order.order_id, ack_order_journal.order.px,
-            ack_order_journal.order.qty, ack_order_journal.order.side,
-            ack_order_journal.order.security.sec_id, ack_order_journal.order.underlying_account)
-        latest_fill_journal = get_latest_fill_journal_from_order_id(ack_order_journal.order.order_id,
+        executor_http_client.barter_simulator_process_fill_query_client(
+            ack_chore_journal.chore.chore_id, ack_chore_journal.chore.px,
+            ack_chore_journal.chore.qty, ack_chore_journal.chore.side,
+            ack_chore_journal.chore.security.sec_id, ack_chore_journal.chore.underlying_account)
+        latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
                                                                     executor_http_client)
         assert latest_fill_journal.fill_date_time != last_fill_date_time, "last_fill_date_time mismatched: " \
                                                                           f"expected {latest_fill_journal} " \
@@ -1801,30 +2036,20 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
                                                            f"received {latest_fill_journal.fill_qty}"
 
-        order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
-        assert order_snapshot.filled_qty == order_snapshot_before_over_fill.filled_qty, \
-            "order_snapshot filled_qty mismatch: expected unchanged fill as before fill to trigger over-fill, i.e.," \
-            f"{order_snapshot_before_over_fill.filled_qty} but received {order_snapshot.filled_qty}"
-        assert order_snapshot.order_status == order_snapshot_before_over_fill.order_status, \
-            f"OrderStatus mismatched: expected status {order_snapshot_before_over_fill.order_status} received " \
-            f"{order_snapshot.order_status}"
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client)
+        assert chore_snapshot.filled_qty == chore_snapshot_before_over_fill.filled_qty, \
+            "chore_snapshot filled_qty mismatch: expected unchanged fill as before fill to trigger over-fill, i.e.," \
+            f"{chore_snapshot_before_over_fill.filled_qty} but received {chore_snapshot.filled_qty}"
+        assert chore_snapshot.chore_status == chore_snapshot_before_over_fill.chore_status, \
+            f"ChoreStatus mismatched: expected status {chore_snapshot_before_over_fill.chore_status} received " \
+            f"{chore_snapshot.chore_status}"
 
         time.sleep(15)
         strat_alerts: StratAlertBaseModel = log_book_web_client.get_strat_alert_client(created_pair_strat.id)
 
-        check_str = "Unexpected: Received fill that will make order_snapshot OVER_FILLED"
-        for alert in strat_alerts.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            # Checking alert in portfolio_alert if reason failed to add in strat_alert
-            portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-            for alert in portfolio_alert.alerts:
-                if re.search(check_str, alert.alert_brief):
-                    break
-            else:
-                assert False, f"Couldn't find any alert saying: {check_str}"
-        assert True
+        check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
+        assert_fail_msg = f"Couldn't find any alert saying: {check_str}"
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(created_pair_strat.id, check_str, assert_fail_msg)
 
         # Checking if strat went to pause
         pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
@@ -1844,19 +2069,19 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
 @pytest.mark.nightly
 def test_over_fill_case_2(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                           expected_strat_status_, symbol_overview_obj_list,
-                          last_trade_fixture_list, market_depth_basemodel_list,
-                          top_of_book_list_, buy_order_, sell_order_, refresh_sec_update_fixture):
+                          last_barter_fixture_list, market_depth_basemodel_list,
+                          buy_chore_, sell_chore_, refresh_sec_update_fixture):
     """
-    Test case when order_snapshot is in OE_FILLED and fill is triggered to make it over_filled
+    Test case when chore_snapshot is in OE_FILLED and fill is triggered to make it over_filled
     """
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -1870,38 +2095,48 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        bid_buy_top_market_depth = None
+        ask_sell_top_market_depth = None
+        stored_market_depth = executor_http_client.get_all_market_depth_client()
+        for market_depth in stored_market_depth:
+            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                bid_buy_top_market_depth = market_depth
+            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                ask_sell_top_market_depth = market_depth
 
         # buy fills check
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        loop_count = 1
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
-        time.sleep(5)  # delay for order to get placed
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+                                                           ask_sell_top_market_depth)
+        time.sleep(5)  # delay for chore to get placed
 
-        ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol,
+        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
                                                                            executor_http_client)
-        latest_fill_journal = get_latest_fill_journal_from_order_id(ack_order_journal.order.order_id,
+        latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
                                                                     executor_http_client)
         last_fill_date_time = latest_fill_journal.fill_date_time
-        filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_order_journal.order.qty)
+        filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_chore_journal.chore.qty)
         assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
                                                            f"received {latest_fill_journal.fill_qty}"
-        order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
-        assert order_snapshot.filled_qty == order_snapshot.order_brief.qty, "order_snapshot filled_qty mismatch: " \
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client)
+        assert chore_snapshot.filled_qty == chore_snapshot.chore_brief.qty, "chore_snapshot filled_qty mismatch: " \
                                                                             f"expected complete fill, i.e.," \
-                                                                            f"{order_snapshot.order_brief.qty} " \
-                                                                            f"received {order_snapshot.filled_qty}"
-        assert order_snapshot.order_status == OrderStatusType.OE_FILLED, "OrderStatus mismatched: expected status " \
-                                                                         f"OrderStatusType.OE_FILLED received " \
-                                                                         f"{order_snapshot.order_status}"
+                                                                            f"{chore_snapshot.chore_brief.qty} " \
+                                                                            f"received {chore_snapshot.filled_qty}"
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, "ChoreStatus mismatched: expected status " \
+                                                                         f"ChoreStatusType.OE_FILLED received " \
+                                                                         f"{chore_snapshot.chore_status}"
 
         # processing fill for over_fill
-        executor_http_client.trade_simulator_process_fill_query_client(
-            ack_order_journal.order.order_id, ack_order_journal.order.px,
-            ack_order_journal.order.qty, ack_order_journal.order.side,
-            ack_order_journal.order.security.sec_id, ack_order_journal.order.underlying_account)
+        executor_http_client.barter_simulator_process_fill_query_client(
+            ack_chore_journal.chore.chore_id, ack_chore_journal.chore.px,
+            ack_chore_journal.chore.qty, ack_chore_journal.chore.side,
+            ack_chore_journal.chore.security.sec_id, ack_chore_journal.chore.underlying_account)
         time.sleep(2)
-        latest_fill_journal = get_latest_fill_journal_from_order_id(ack_order_journal.order.order_id,
+        latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
                                                                     executor_http_client)
         assert latest_fill_journal.fill_date_time != last_fill_date_time, "last_fill_date_time mismatched: " \
                                                                           f"expected {latest_fill_journal} " \
@@ -1909,28 +2144,18 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
                                                                           f"{latest_fill_journal.fill_date_time}"
         assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
                                                            f"received {latest_fill_journal.fill_qty}"
-        order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id,
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id,
                                                           executor_http_client)
-        assert order_snapshot.order_status == OrderStatusType.OE_FILLED, "OrderStatus mismatched: expected status " \
-                                                                         f"OrderStatusType.OE_FILLED received " \
-                                                                         f"{order_snapshot.order_status}"
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, "ChoreStatus mismatched: expected status " \
+                                                                         f"ChoreStatusType.OE_FILLED received " \
+                                                                         f"{chore_snapshot.chore_status}"
 
         time.sleep(15)
         strat_alerts: StratAlertBaseModel = log_book_web_client.get_strat_alert_client(created_pair_strat.id)
 
-        check_str = "Unsupported - Fill received for completely filled order_snapshot"
-        for alert in strat_alerts.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            # Checking alert in portfolio_alert if reason failed to add in strat_alert
-            portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-            for alert in portfolio_alert.alerts:
-                if re.search(check_str, alert.alert_brief):
-                    break
-            else:
-                assert False, f"Couldn't find any alert saying: {check_str}, received strat_alert: {strat_alerts}"
-        assert True
+        check_str = "Unsupported - Fill received for completely filled chore_snapshot"
+        assert_fail_msg = f"Couldn't find any alert saying: {check_str}, received strat_alert: {strat_alerts}"
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(created_pair_strat.id, check_str, assert_fail_msg)
 
         # Checking if strat went to pause
         pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
@@ -1948,10 +2173,10 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
 
 
 @pytest.mark.nightly
-def test_ack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+def test_ack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                            expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                           last_trade_fixture_list, market_depth_basemodel_list,
-                           top_of_book_list_, max_loop_count_per_side, refresh_sec_update_fixture):
+                           last_barter_fixture_list, market_depth_basemodel_list,
+                           max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
@@ -1959,12 +2184,12 @@ def test_ack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        # explicitly setting waived_min_orders to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_min_orders = 10
+        # explicitly setting waived_min_chores to 10 for this test case
+        expected_strat_limits_.cancel_rate.waived_min_chores = 10
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list, market_depth_basemodel_list))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -1975,14 +2200,14 @@ def test_ack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
                 config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-                config_dict["symbol_configs"][symbol]["simulate_ack_to_reject_orders"] = True
+                config_dict["symbol_configs"][symbol]["simulate_ack_to_reject_chores"] = True
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_rej_order_test(leg1_symbol, leg2_symbol, expected_strat_limits_,
-                                  last_trade_fixture_list, top_of_book_list_, max_loop_count_per_side,
+            handle_rej_chore_test(leg1_symbol, leg2_symbol, expected_strat_limits_,
+                                  last_barter_fixture_list, max_loop_count_per_side,
                                   True, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
@@ -1996,10 +2221,10 @@ def test_ack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_
 
 
 @pytest.mark.nightly
-def test_unack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+def test_unack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                              expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                             last_trade_fixture_list, market_depth_basemodel_list,
-                             top_of_book_list_, max_loop_count_per_side, refresh_sec_update_fixture):
+                             last_barter_fixture_list, market_depth_basemodel_list,
+                             max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
@@ -2007,12 +2232,12 @@ def test_unack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbo
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        # explicitly setting waived_min_orders to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_min_orders = 10
+        # explicitly setting waived_min_chores to 10 for this test case
+        expected_strat_limits_.cancel_rate.waived_min_chores = 10
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list, market_depth_basemodel_list))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2023,14 +2248,14 @@ def test_unack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbo
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
                 config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-                config_dict["symbol_configs"][symbol]["simulate_new_to_reject_orders"] = True
+                config_dict["symbol_configs"][symbol]["simulate_new_to_reject_chores"] = True
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_rej_order_test(leg1_symbol, leg2_symbol, expected_strat_limits_,
-                                  last_trade_fixture_list, top_of_book_list_, max_loop_count_per_side,
+            handle_rej_chore_test(leg1_symbol, leg2_symbol, expected_strat_limits_,
+                                  last_barter_fixture_list, max_loop_count_per_side,
                                   False, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
@@ -2047,8 +2272,8 @@ def test_unack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbo
 def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                    pair_strat_, expected_strat_limits_,
                                    expected_strat_status_, symbol_overview_obj_list,
-                                   last_trade_fixture_list, market_depth_basemodel_list,
-                                   top_of_book_list_, buy_order_, sell_order_,
+                                   last_barter_fixture_list, market_depth_basemodel_list,
+                                   buy_chore_, sell_chore_,
                                    max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
@@ -2057,10 +2282,10 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list,
+                                               market_depth_basemodel_list))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2069,46 +2294,63 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
         try:
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
-                config_dict["symbol_configs"][symbol]["simulate_ack_to_cxl_rej_orders"] = True
+                config_dict["symbol_configs"][symbol]["simulate_ack_to_cxl_rej_chores"] = True
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
                 config_dict["symbol_configs"][symbol]["fill_percent"] = 50
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
+
+            bid_buy_top_market_depth = None
+            ask_sell_top_market_depth = None
+            stored_market_depth = executor_http_client.get_all_market_depth_client()
+            for market_depth in stored_market_depth:
+                if market_depth.symbol == leg1_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                    bid_buy_top_market_depth = market_depth
+                if market_depth.symbol == leg2_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                    ask_sell_top_market_depth = market_depth
 
             for check_symbol in [leg1_symbol, leg2_symbol]:
-                continues_order_count, continues_special_order_count = get_continuous_order_configs(check_symbol,
+                continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(check_symbol,
                                                                                                     config_dict)
-                order_count = 0
-                special_order_count = 0
-                last_cxl_order_id = None
-                last_cxl_rej_order_id = None
+                chore_count = 0
+                special_chore_count = 0
+                last_cxl_chore_id = None
+                last_cxl_rej_chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
+                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
                     if check_symbol == leg1_symbol:
-                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0])
+                        time.sleep(1)
+                        update_tob_through_market_depth_to_place_buy_chore(executor_http_client,
+                                                                           bid_buy_top_market_depth,
+                                                                           ask_sell_top_market_depth)
                     else:
-                        run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1])
-                    time.sleep(10)  # delay for order to get placed and trigger cxl
+                        # required to make buy side tob latest
+                        run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], executor_http_client)
 
-                    if order_count < continues_order_count:
-                        check_order_event = OrderEventType.OE_CXL_ACK
-                        order_count += 1
+                        update_tob_through_market_depth_to_place_sell_chore(executor_http_client,
+                                                                            ask_sell_top_market_depth,
+                                                                            bid_buy_top_market_depth)
+                    time.sleep(10)  # delay for chore to get placed and trigger cxl
+
+                    if chore_count < continues_chore_count:
+                        check_chore_event = ChoreEventType.OE_CXL_ACK
+                        chore_count += 1
                     else:
-                        if special_order_count < continues_special_order_count:
-                            check_order_event = "REJ"
-                            special_order_count += 1
+                        if special_chore_count < continues_special_chore_count:
+                            check_chore_event = "REJ"
+                            special_chore_count += 1
                         else:
-                            check_order_event = OrderEventType.OE_CXL_ACK
-                            order_count = 1
-                            special_order_count = 0
+                            check_chore_event = ChoreEventType.OE_CXL_ACK
+                            chore_count = 1
+                            special_chore_count = 0
 
                     # internally contains assert statements
-                    last_cxl_order_id, last_cxl_rej_order_id = verify_cxl_rej(last_cxl_order_id, last_cxl_rej_order_id,
-                                                                              check_order_event, check_symbol,
+                    last_cxl_chore_id, last_cxl_rej_chore_id = verify_cxl_rej(last_cxl_chore_id, last_cxl_rej_chore_id,
+                                                                              check_chore_event, check_symbol,
                                                                               executor_http_client,
-                                                                              OrderStatusType.OE_ACKED)
+                                                                              ChoreStatusType.OE_ACKED)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -2124,8 +2366,8 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
 def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                    pair_strat_, expected_strat_limits_,
                                    expected_strat_status_, symbol_overview_obj_list,
-                                   last_trade_fixture_list, market_depth_basemodel_list,
-                                   top_of_book_list_, buy_order_, sell_order_,
+                                   last_barter_fixture_list, market_depth_basemodel_list,
+                                   buy_chore_, sell_chore_,
                                    max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
@@ -2134,10 +2376,10 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list,
+                                               market_depth_basemodel_list))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2146,47 +2388,66 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
         try:
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
-                config_dict["symbol_configs"][symbol]["simulate_new_to_cxl_rej_orders"] = True
+                config_dict["symbol_configs"][symbol]["simulate_new_to_cxl_rej_chores"] = True
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
                 config_dict["symbol_configs"][symbol]["fill_percent"] = 50
 
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
+
+            bid_buy_top_market_depth = None
+            ask_sell_top_market_depth = None
+            stored_market_depth = executor_http_client.get_all_market_depth_client()
+            for market_depth in stored_market_depth:
+                if (market_depth.symbol == leg1_symbol and market_depth.position == 0 and
+                        market_depth.side == TickType.BID):
+                    bid_buy_top_market_depth = market_depth
+                if (market_depth.symbol == leg2_symbol and market_depth.position == 0 and
+                        market_depth.side == TickType.ASK):
+                    ask_sell_top_market_depth = market_depth
 
             for check_symbol in [leg1_symbol, leg2_symbol]:
-                continues_order_count, continues_special_order_count = get_continuous_order_configs(check_symbol,
+                continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(check_symbol,
                                                                                                     config_dict)
-                order_count = 0
-                special_order_count = 0
-                last_cxl_order_id = None
-                last_cxl_rej_order_id = None
+                chore_count = 0
+                special_chore_count = 0
+                last_cxl_chore_id = None
+                last_cxl_rej_chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
+                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
                     if check_symbol == leg1_symbol:
-                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0])
+                        time.sleep(1)
+                        update_tob_through_market_depth_to_place_buy_chore(executor_http_client,
+                                                                           bid_buy_top_market_depth,
+                                                                           ask_sell_top_market_depth)
                     else:
-                        run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1])
-                    time.sleep(10)  # delay for order to get placed and trigger cxl
+                        # required to make buy side tob latest
+                        run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], executor_http_client)
 
-                    if order_count < continues_order_count:
-                        check_order_event = OrderEventType.OE_CXL_ACK
-                        order_count += 1
+                        update_tob_through_market_depth_to_place_sell_chore(executor_http_client,
+                                                                            ask_sell_top_market_depth,
+                                                                            bid_buy_top_market_depth)
+                    time.sleep(10)  # delay for chore to get placed and trigger cxl
+
+                    if chore_count < continues_chore_count:
+                        check_chore_event = ChoreEventType.OE_CXL_ACK
+                        chore_count += 1
                     else:
-                        if special_order_count < continues_special_order_count:
-                            check_order_event = "REJ"
-                            special_order_count += 1
+                        if special_chore_count < continues_special_chore_count:
+                            check_chore_event = "REJ"
+                            special_chore_count += 1
                         else:
-                            check_order_event = OrderEventType.OE_CXL_ACK
-                            order_count = 1
-                            special_order_count = 0
+                            check_chore_event = ChoreEventType.OE_CXL_ACK
+                            chore_count = 1
+                            special_chore_count = 0
 
                     # internally contains assert statements
-                    last_cxl_order_id, last_cxl_rej_order_id = verify_cxl_rej(last_cxl_order_id, last_cxl_rej_order_id,
-                                                                              check_order_event, check_symbol,
+                    last_cxl_chore_id, last_cxl_rej_chore_id = verify_cxl_rej(last_cxl_chore_id, last_cxl_rej_chore_id,
+                                                                              check_chore_event, check_symbol,
                                                                               executor_http_client,
-                                                                              OrderStatusType.OE_UNACK)
+                                                                              ChoreStatusType.OE_UNACK)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -2202,8 +2463,8 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
 def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                     pair_strat_, expected_strat_limits_,
                                     expected_strat_status_, symbol_overview_obj_list,
-                                    last_trade_fixture_list, market_depth_basemodel_list,
-                                    top_of_book_list_, buy_order_, sell_order_,
+                                    last_barter_fixture_list, market_depth_basemodel_list,
+                                    buy_chore_, sell_chore_,
                                     max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
@@ -2212,10 +2473,10 @@ def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list,
+                                               market_depth_basemodel_list))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2227,70 +2488,66 @@ def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
                 config_dict["symbol_configs"][symbol]["fill_percent"] = 50
                 config_dict["symbol_configs"][symbol]["force_fully_fill"] = True
-                config_dict["symbol_configs"][symbol]["simulate_ack_to_cxl_rej_orders"] = True
+                config_dict["symbol_configs"][symbol]["simulate_ack_to_cxl_rej_chores"] = True
 
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
 
             for check_symbol in [leg1_symbol, leg2_symbol]:
-                continues_order_count, continues_special_order_count = get_continuous_order_configs(check_symbol,
+                continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(check_symbol,
                                                                                                     config_dict)
-                order_count = 0
-                special_order_count = 0
-                last_cxl_order_id = None
-                last_cxl_rej_order_id = None
+                chore_count = 0
+                special_chore_count = 0
+                last_cxl_chore_id = None
+                last_cxl_rej_chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
+                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
                     if check_symbol == leg1_symbol:
-                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0],
-                                            avoid_order_trigger=True)
                         px = 100
                         qty = 90
-                        place_new_order(leg1_symbol, Side.BUY, px, qty, executor_http_client)
+                        place_new_chore(leg1_symbol, Side.BUY, px, qty, executor_http_client)
                     else:
-                        run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1],
-                                             avoid_order_trigger=True)
                         px = 110
                         qty = 70
-                        place_new_order(leg2_symbol, Side.SELL, px, qty, executor_http_client)
-                    time.sleep(10)  # delay for order to get placed and trigger cxl
+                        place_new_chore(leg2_symbol, Side.SELL, px, qty, executor_http_client)
+                    time.sleep(10)  # delay for chore to get placed and trigger cxl
 
-                    if order_count < continues_order_count:
-                        check_order_event = OrderEventType.OE_CXL_ACK
-                        order_count += 1
+                    if chore_count < continues_chore_count:
+                        check_chore_event = ChoreEventType.OE_CXL_ACK
+                        chore_count += 1
                     else:
-                        if special_order_count < continues_special_order_count:
-                            check_order_event = "REJ"
-                            special_order_count += 1
+                        if special_chore_count < continues_special_chore_count:
+                            check_chore_event = "REJ"
+                            special_chore_count += 1
                         else:
-                            check_order_event = OrderEventType.OE_CXL_ACK
-                            order_count = 1
-                            special_order_count = 0
+                            check_chore_event = ChoreEventType.OE_CXL_ACK
+                            chore_count = 1
+                            special_chore_count = 0
 
                     # internally contains assert statements
-                    if check_order_event == "REJ":
-                        # internally checks order_journal is not None else raises assert exception internally
-                        latest_cxl_rej_order_journal = \
-                            get_latest_order_journal_with_events_and_symbol([OrderEventType.OE_CXL_INT_REJ,
-                                                                             OrderEventType.OE_CXL_BRK_REJ,
-                                                                             OrderEventType.OE_CXL_EXH_REJ],
+                    if check_chore_event == "REJ":
+                        # internally checks chore_journal is not None else raises assert exception internally
+                        latest_cxl_rej_chore_journal = \
+                            get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_INT_REJ,
+                                                                             ChoreEventType.OE_CXL_BRK_REJ,
+                                                                             ChoreEventType.OE_CXL_EXH_REJ],
                                                                             check_symbol, executor_http_client,
-                                                                            last_order_id=last_cxl_rej_order_id)
-                        last_cxl_rej_order_id = latest_cxl_rej_order_journal.order.order_id
+                                                                            last_chore_id=last_cxl_rej_chore_id)
+                        last_cxl_rej_chore_id = latest_cxl_rej_chore_journal.chore.chore_id
 
-                        order_snapshot = get_order_snapshot_from_order_id(latest_cxl_rej_order_journal.order.order_id,
+                        chore_snapshot = get_chore_snapshot_from_chore_id(latest_cxl_rej_chore_journal.chore.chore_id,
                                                                           executor_http_client)
-                        assert order_snapshot.order_status == OrderStatusType.OE_FILLED, \
-                            f"Unexpected order_snapshot.order_status: expected {OrderStatusType.OE_FILLED}, " \
-                            f"received {order_snapshot.order_status}"
+                        assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
+                            f"Unexpected chore_snapshot.chore_status: expected {ChoreStatusType.OE_FILLED}, " \
+                            f"received {chore_snapshot.chore_status}"
                     else:
-                        # checks order_journal is not None else raises assert exception internally
-                        latest_cxl_order_journal = get_latest_order_journal_with_event_and_symbol(
-                            OrderEventType.OE_CXL_ACK, check_symbol, executor_http_client,
-                            last_order_id=last_cxl_order_id)
-                        last_cxl_order_id = latest_cxl_order_journal.order.order_id
+                        # checks chore_journal is not None else raises assert exception internally
+                        latest_cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(
+                            ChoreEventType.OE_CXL_ACK, check_symbol, executor_http_client,
+                            last_chore_id=last_cxl_chore_id)
+                        last_cxl_chore_id = latest_cxl_chore_journal.chore.chore_id
 
         except AssertionError as e:
             raise AssertionError(e)
@@ -2307,7 +2564,7 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
         pair_strat_, expected_strat_limits_,
         expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
+        market_depth_basemodel_list, last_barter_fixture_list,
         refresh_sec_update_fixture):
     # creating strat
     buy_symbol = leg1_leg2_symbol_list[0][0]
@@ -2315,10 +2572,10 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
     max_loop_count_per_side = 2
     residual_wait_sec = 4 * refresh_sec_update_fixture
     created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list,
-                                           last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+                                           last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2334,17 +2591,28 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+        bid_buy_top_market_depth = None
+        ask_sell_top_market_depth = None
+        stored_market_depth = executor_http_client.get_all_market_depth_client()
+        for market_depth in stored_market_depth:
+            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                bid_buy_top_market_depth = market_depth
+            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                ask_sell_top_market_depth = market_depth
 
-        cxl_req_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL,
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+                                                           ask_sell_top_market_depth)
+
+        cxl_req_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL,
                                                                                buy_symbol, executor_http_client)
         time.sleep(residual_wait_sec)
-        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL,
-                                                       buy_symbol, executor_http_client, expect_no_order=True,
-                                                       last_order_id=cxl_req_order_journal.order.order_id)
+        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL,
+                                                       buy_symbol, executor_http_client, expect_no_chore=True,
+                                                       last_chore_id=cxl_req_chore_journal.chore.chore_id)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -2360,14 +2628,14 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
 def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                        pair_strat_, expected_strat_limits_,
                                        expected_strat_status_, sample_alert, symbol_overview_obj_list,
-                                       top_of_book_list_, market_depth_basemodel_list):
+                                       market_depth_basemodel_list):
     # creating strat
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     total_loop_count = 5
     active_pair_strat, executor_http_client = create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_,
                                                                       expected_strat_limits_, expected_strat_status_,
-                                                                      symbol_overview_obj_list, top_of_book_list_,
+                                                                      symbol_overview_obj_list,
                                                                       market_depth_basemodel_list)
     alert_id_list = []
     broker_id_list = []
@@ -2394,7 +2662,7 @@ def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, leg1_
         alert_id_list.append(alert.id)
         broker_id_list.append(broker.id)
 
-        # check to add more impacted orders and update alert
+        # check to add more impacted chores and update alert
         updated_alert = copy.deepcopy(alert)
         updated_alert.alert_brief = "Updated alert"
         strat_alerts: StratAlertBaseModel = StratAlertBaseModel(_id=active_pair_strat.id,
@@ -2435,34 +2703,48 @@ def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, leg1_
 def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                       pair_strat_, expected_strat_limits_,
                                                       expected_strat_status_, symbol_overview_obj_list,
-                                                      last_trade_fixture_list, market_depth_basemodel_list,
-                                                      top_of_book_list_, refresh_sec_update_fixture):
+                                                      last_barter_fixture_list, market_depth_basemodel_list,
+                                                      refresh_sec_update_fixture):
     underlying_account_prefix: str = "Acc"
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
-    buy_order_id = None
-    sell_order_id = None
+    buy_chore_id = None
+    sell_chore_id = None
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
         residual_wait_sec = 4 * refresh_sec_update_fixture
         active_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list, market_depth_basemodel_list))
+
+        bid_buy_top_market_depth = None
+        ask_sell_top_market_depth = None
+        stored_market_depth = executor_http_client.get_all_market_depth_client()
+        for market_depth in stored_market_depth:
+            if market_depth.symbol == leg1_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                bid_buy_top_market_depth = market_depth
+            if market_depth.symbol == leg2_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                ask_sell_top_market_depth = market_depth
+
         # buy handling
-        buy_tob_last_update_date_time_tracker, buy_order_id = \
-            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol, top_of_book_list_,
-                                                     buy_tob_last_update_date_time_tracker, buy_order_id,
-                                                     underlying_account_prefix, Side.BUY, executor_http_client)
+        buy_tob_last_update_date_time_tracker, buy_chore_id = \
+            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol,
+                                                     buy_tob_last_update_date_time_tracker, buy_chore_id,
+                                                     underlying_account_prefix, Side.BUY, executor_http_client,
+                                                     bid_buy_top_market_depth, ask_sell_top_market_depth,
+                                                     last_barter_fixture_list)
 
         time.sleep(residual_wait_sec)   #
 
         # sell handling
-        sell_tob_last_update_date_time_tracker, sell_order_id = \
-            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol, top_of_book_list_,
-                                                     sell_tob_last_update_date_time_tracker, sell_order_id,
-                                                     underlying_account_prefix, Side.SELL, executor_http_client)
+        sell_tob_last_update_date_time_tracker, sell_chore_id = \
+            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol,
+                                                     sell_tob_last_update_date_time_tracker, sell_chore_id,
+                                                     underlying_account_prefix, Side.SELL, executor_http_client,
+                                                     bid_buy_top_market_depth, ask_sell_top_market_depth,
+                                                     last_barter_fixture_list)
 
         for symbol, side in [(leg1_symbol, "BUY"), (leg2_symbol, "SELL")]:
             underlying_account_cumulative_fill_qty_obj_list = \
@@ -2493,24 +2775,24 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
 
 
 @pytest.mark.nightly
-def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+def test_last_n_sec_chore_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                   pair_strat_, expected_strat_limits_,
                                   expected_strat_status_, symbol_overview_obj_list,
-                                  last_trade_fixture_list, market_depth_basemodel_list,
-                                  top_of_book_list_, buy_fill_journal_, refresh_sec_update_fixture):
+                                  last_barter_fixture_list, market_depth_basemodel_list,
+                                  buy_fill_journal_, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    total_order_count_for_each_side = 5
+    total_chore_count_for_each_side = 5
     expected_strat_limits_ = copy.deepcopy(expected_strat_limits_)
     expected_strat_limits_.residual_restriction.max_residual = 105000
-    expected_strat_limits_.max_open_orders_per_side = 10
+    expected_strat_limits_.max_open_chores_per_side = 10
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2524,46 +2806,57 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        bid_buy_top_market_depth = None
+        ask_sell_top_market_depth = None
+        stored_market_depth = executor_http_client.get_all_market_depth_client()
+        for market_depth in stored_market_depth:
+            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                bid_buy_top_market_depth = market_depth
+            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                ask_sell_top_market_depth = market_depth
 
         # buy testing
-        buy_new_order_id = None
-        order_create_time_list = []
-        order_qty_list = []
-        for loop_count in range(total_order_count_for_each_side):
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+        buy_new_chore_id = None
+        chore_create_time_list = []
+        chore_qty_list = []
+        for loop_count in range(total_chore_count_for_each_side):
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            time.sleep(1)
+            update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+                                                               ask_sell_top_market_depth)
 
-            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client,
-                                                                               last_order_id=buy_new_order_id)
-            buy_new_order_id = ack_order_journal.order.order_id
-            order_create_time_list.append(ack_order_journal.order_event_date_time)
-            order_qty_list.append(ack_order_journal.order.qty)
-            if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
-                time.sleep(residual_wait_sec)   # wait for this order to get cancelled by residual
+                                                                               last_chore_id=buy_new_chore_id)
+            buy_new_chore_id = ack_chore_journal.chore.chore_id
+            chore_create_time_list.append(ack_chore_journal.chore_event_date_time)
+            chore_qty_list.append(ack_chore_journal.chore.qty)
+            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+                time.sleep(residual_wait_sec)   # wait for this chore to get cancelled by residual
             else:
                 time.sleep(2)
 
-        order_create_time_list.reverse()
-        order_qty_list.reverse()
+        chore_create_time_list.reverse()
+        chore_qty_list.reverse()
         last_n_sec_qty = 0
-        for loop_count in range(total_order_count_for_each_side):
-            delta = DateTime.utcnow() - order_create_time_list[loop_count]
+        for loop_count in range(total_chore_count_for_each_side):
+            delta = DateTime.utcnow() - chore_create_time_list[loop_count]
             last_n_sec = int(math.ceil(delta.total_seconds())) + 1
-            last_n_sec_qty += order_qty_list[loop_count]
+            last_n_sec_qty += chore_qty_list[loop_count]
 
-            # making portfolio_limits_obj.rolling_max_order_count.rolling_tx_count_period_seconds computed last_n_sec(s)
-            # this is required as last_n_sec_order_qty takes internally this limit as last_n_sec to provide order_qty
+            # making portfolio_limits_obj.rolling_max_chore_count.rolling_tx_count_period_seconds computed last_n_sec(s)
+            # this is required as last_n_sec_chore_qty takes internally this limit as last_n_sec to provide chore_qty
             # in query
-            rolling_max_order_count = RollingMaxOrderCountOptional(rolling_tx_count_period_seconds=last_n_sec)
-            portfolio_limits = PortfolioLimitsBaseModel(_id=1, rolling_max_order_count=rolling_max_order_count)
+            rolling_max_chore_count = RollingMaxChoreCountOptional(rolling_tx_count_period_seconds=last_n_sec)
+            portfolio_limits = PortfolioLimitsBaseModel(_id=1, rolling_max_chore_count=rolling_max_chore_count)
             updated_portfolio_limits = \
                 email_book_service_native_web_client.patch_portfolio_limits_client(
                     portfolio_limits.model_dump(by_alias=True, exclude_none=True))
-            assert updated_portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds == last_n_sec, \
+            assert updated_portfolio_limits.rolling_max_chore_count.rolling_tx_count_period_seconds == last_n_sec, \
                 f"Unexpected last_n_sec value: expected {last_n_sec}, " \
-                f"received {updated_portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds}"
+                f"received {updated_portfolio_limits.rolling_max_chore_count.rolling_tx_count_period_seconds}"
 
             call_date_time = DateTime.utcnow()
             executor_check_snapshot_obj = \
@@ -2572,8 +2865,8 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
             assert len(executor_check_snapshot_obj) == 1, \
                 f"Received unexpected length of list of executor_check_snapshot_obj from query," \
                 f"expected one obj received {len(executor_check_snapshot_obj)}"
-            assert executor_check_snapshot_obj[0].last_n_sec_order_qty == last_n_sec_qty, \
-                f"Order qty mismatched for last {last_n_sec} " \
+            assert executor_check_snapshot_obj[0].last_n_sec_chore_qty == last_n_sec_qty, \
+                f"Chore qty mismatched for last {last_n_sec} " \
                 f"secs of {buy_symbol} from {call_date_time} for side {Side.BUY}"
     except AssertionError as e:
         raise AssertionError(e)
@@ -2589,8 +2882,8 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
 @pytest.mark.nightly
 def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                               last_trade_fixture_list, market_depth_basemodel_list,
-                               top_of_book_list_, buy_order_, sell_order_,
+                               last_barter_fixture_list, market_depth_basemodel_list,
+                               buy_chore_, sell_chore_,
                                max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
@@ -2599,12 +2892,12 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_sym
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        # explicitly setting waived_min_orders to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_min_orders = 10
+        # explicitly setting waived_min_chores to 10 for this test case
+        expected_strat_limits_.cancel_rate.waived_min_chores = 10
         active_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                               expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                               market_depth_basemodel_list))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2615,14 +2908,14 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_sym
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
                 config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-                config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
+                config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_chores"] = True
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, last_trade_fixture_list, max_loop_count_per_side,
-                                   top_of_book_list_, executor_http_client, config_dict, residual_wait_sec)
+            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, last_barter_fixture_list, max_loop_count_per_side,
+                                   executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -2637,8 +2930,8 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_sym
 @pytest.mark.nightly
 def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                                  expected_strat_status_, symbol_overview_obj_list,
-                                 last_trade_fixture_list, market_depth_basemodel_list,
-                                 top_of_book_list_, buy_order_, sell_order_,
+                                 last_barter_fixture_list, market_depth_basemodel_list,
+                                 buy_chore_, sell_chore_,
                                  max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
@@ -2647,13 +2940,13 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_s
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        # explicitly setting waived_min_orders to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_min_orders = 10
+        # explicitly setting waived_min_chores to 10 for this test case
+        expected_strat_limits_.cancel_rate.waived_min_chores = 10
         active_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list,
+                                               market_depth_basemodel_list))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2664,14 +2957,14 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_s
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
                 config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-                config_dict["symbol_configs"][symbol]["simulate_new_unsolicited_cxl_orders"] = True
+                config_dict["symbol_configs"][symbol]["simulate_new_unsolicited_cxl_chores"] = True
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, last_trade_fixture_list, max_loop_count_per_side,
-                                   top_of_book_list_, executor_http_client, config_dict, residual_wait_sec)
+            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, last_barter_fixture_list, max_loop_count_per_side,
+                                   executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -2686,8 +2979,8 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_s
 @pytest.mark.nightly
 def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                    pair_strat_, expected_strat_limits_, expected_strat_status_,
-                                                   symbol_overview_obj_list, last_trade_fixture_list,
-                                                   market_depth_basemodel_list, top_of_book_list_,
+                                                   symbol_overview_obj_list, last_barter_fixture_list,
+                                                   market_depth_basemodel_list,
                                                    refresh_sec_update_fixture):
     activated_strats = []
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
@@ -2695,9 +2988,9 @@ def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_l
     # creates and activates multiple pair_strats
     for buy_symbol, sell_symbol in leg1_leg2_symbol_list:
         activated_strat, executor_http_client = (
-            create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list, market_depth_basemodel_list))
         activated_strats.append((activated_strat, executor_http_client))
 
     for index, (activated_strat, executor_http_client) in enumerate(activated_strats):
@@ -2767,8 +3060,8 @@ def test_portfolio_alert_updates(static_data_, clean_and_set_limits, sample_aler
 
 @pytest.mark.nightly
 def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
-                     expected_strat_limits_, top_of_book_list_,
-                     expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                     expected_strat_limits_,
+                     expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                      market_depth_basemodel_list, leg1_leg2_symbol_list, refresh_sec_update_fixture):
     partial_ack_qty: int | None = None
 
@@ -2780,10 +3073,10 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         active_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list,
+                                               market_depth_basemodel_list))
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
@@ -2796,26 +3089,24 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
+            executor_http_client.barter_simulator_reload_config_query_client()
 
             # buy fills check
-            new_order_id = None
-            acked_order_id = None
+            new_chore_id = None
+            acked_chore_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
-                run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
-                run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0],
-                                    avoid_order_trigger=True)
+                run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
                 px = 100
                 qty = 90
-                place_new_order(leg1_symbol, Side.BUY, px, qty, executor_http_client)
-                time.sleep(2)  # delay for order to get placed
+                place_new_chore(leg1_symbol, Side.BUY, px, qty, executor_http_client)
+                time.sleep(2)  # delay for chore to get placed
 
-                new_order_id, acked_order_id, partial_ack_qty = \
-                    handle_partial_ack_checks(leg1_symbol, new_order_id, acked_order_id, executor_http_client,
+                new_chore_id, acked_chore_id, partial_ack_qty = \
+                    handle_partial_ack_checks(leg1_symbol, new_chore_id, acked_chore_id, executor_http_client,
                                               config_dict)
 
-                if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
-                    time.sleep(residual_wait_sec)    # wait to make this open order residual
+                if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+                    time.sleep(residual_wait_sec)    # wait to make this open chore residual
 
             time.sleep(5)
             strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
@@ -2824,23 +3115,21 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
                 f"received {strat_status.total_fill_buy_qty}"
 
             # sell fills check
-            new_order_id = None
-            acked_order_id = None
+            new_chore_id = None
+            acked_chore_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
-                run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
-                run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1],
-                                     avoid_order_trigger=True)
+                run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
                 px = 110
                 qty = 70
-                place_new_order(leg2_symbol, Side.SELL, px, qty, executor_http_client)
+                place_new_chore(leg2_symbol, Side.SELL, px, qty, executor_http_client)
                 time.sleep(2)
 
-                new_order_id, acked_order_id, partial_ack_qty = \
-                    handle_partial_ack_checks(leg2_symbol, new_order_id, acked_order_id, executor_http_client,
+                new_chore_id, acked_chore_id, partial_ack_qty = \
+                    handle_partial_ack_checks(leg2_symbol, new_chore_id, acked_chore_id, executor_http_client,
                                               config_dict)
 
-                if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
-                    time.sleep(residual_wait_sec)    # wait to make this open order residual
+                if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+                    time.sleep(residual_wait_sec)    # wait to make this open chore residual
 
             strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
             assert partial_ack_qty * max_loop_count_per_side == strat_status.total_fill_sell_qty, \
@@ -2860,25 +3149,21 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
 @pytest.mark.nightly
 def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+                               last_barter_fixture_list, market_depth_basemodel_list,
                                refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     active_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list,
-                                           last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+                                           last_barter_fixture_list,
+                                           market_depth_basemodel_list))
     total_loop_count = 5
     residual_qty = 5
 
-    # creating tobs
-    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], avoid_order_trigger=True)
-
-    # Since both side have same last trade px in test cases
-    buy_last_trade_px = top_of_book_list_[0].get("last_trade").get("px")
-    sell_last_trade_px = top_of_book_list_[1].get("last_trade").get("px")
+    # Since both side have same last barter px in test cases
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
     buy_residual_qty = 0
     sell_residual_qty = 0
@@ -2894,11 +3179,11 @@ def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_sym
         # since only one strat is created in this test
         strat_brief = strat_brief_list[0]
 
-        buy_residual_notional = buy_residual_qty * get_px_in_usd(buy_last_trade_px)
+        buy_residual_notional = buy_residual_qty * get_px_in_usd(buy_last_barter_px)
         residual_notional = abs(buy_residual_notional - sell_residual_notional)
-        assert buy_residual_qty == strat_brief.pair_buy_side_trading_brief.residual_qty, \
+        assert buy_residual_qty == strat_brief.pair_buy_side_bartering_brief.residual_qty, \
             f"Mismatch residual_qty: expected {buy_residual_qty} received " \
-            f"{strat_brief.pair_buy_side_trading_brief.residual_qty}"
+            f"{strat_brief.pair_buy_side_bartering_brief.residual_qty}"
         assert residual_notional == strat_status.residual.residual_notional, \
             f"Mismatch buy residual_notional, expected {residual_notional}, received " \
             f"{strat_status.residual.residual_notional}"
@@ -2912,11 +3197,11 @@ def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_sym
         # since only one strat is created in this test
         strat_brief = strat_brief_list[0]
 
-        sell_residual_notional = sell_residual_qty * get_px_in_usd(sell_last_trade_px)
+        sell_residual_notional = sell_residual_qty * get_px_in_usd(sell_last_barter_px)
         residual_notional = abs(buy_residual_notional - sell_residual_notional)
-        assert sell_residual_qty == strat_brief.pair_sell_side_trading_brief.residual_qty, \
+        assert sell_residual_qty == strat_brief.pair_sell_side_bartering_brief.residual_qty, \
             f"Mismatch residual_qty: expected {sell_residual_qty}, received " \
-            f"{strat_brief.pair_sell_side_trading_brief.residual_qty}"
+            f"{strat_brief.pair_sell_side_bartering_brief.residual_qty}"
         assert strat_status.residual.residual_notional == residual_notional, \
             (f"Mismatch sell residual_notional: expected {residual_notional} received "
              f"{strat_status.residual.residual_notional}")
@@ -2925,8 +3210,8 @@ def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_sym
 @pytest.mark.nightly
 def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                   expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                                  last_trade_fixture_list, market_depth_basemodel_list,
-                                  top_of_book_list_, buy_order_, sell_order_,
+                                  last_barter_fixture_list, market_depth_basemodel_list,
+                                  buy_chore_, sell_chore_,
                                   max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
@@ -2934,9 +3219,9 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2946,90 +3231,330 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["simulate_new_unsolicited_cxl_orders"] = True
-            config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1
+            config_dict["symbol_configs"][symbol]["simulate_new_unsolicited_cxl_chores"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        bid_buy_top_market_depth = None
+        ask_sell_top_market_depth = None
+        stored_market_depth = executor_http_client.get_all_market_depth_client()
+        for market_depth in stored_market_depth:
+            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                bid_buy_top_market_depth = market_depth
+            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                ask_sell_top_market_depth = market_depth
 
         # buy test
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        loop_count = 1
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        px = 100
+        qty = 90
+        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client)
 
-        latest_unack_obj = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW, buy_symbol,
+        latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                           executor_http_client)
-        latest_cxl_ack_obj = get_latest_order_journal_with_events_and_symbol([OrderEventType.OE_CXL_ACK,
-                                                                              OrderEventType.OE_UNSOL_CXL], buy_symbol,
+        latest_cxl_ack_obj = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
+                                                                              ChoreEventType.OE_UNSOL_CXL], buy_symbol,
                                                                              executor_http_client)
 
-        executor_http_client.trade_simulator_process_order_ack_query_client(
-            latest_unack_obj.order.order_id,
-            latest_unack_obj.order.px,
-            latest_unack_obj.order.qty,
-            latest_unack_obj.order.side,
-            latest_unack_obj.order.security.sec_id,
-            latest_unack_obj.order.underlying_account)
+        executor_http_client.barter_simulator_process_chore_ack_query_client(
+            latest_unack_obj.chore.chore_id,
+            latest_unack_obj.chore.px,
+            latest_unack_obj.chore.qty,
+            latest_unack_obj.chore.side,
+            latest_unack_obj.chore.security.sec_id,
+            latest_unack_obj.chore.underlying_account)
 
-        order_snapshot = get_order_snapshot_from_order_id(latest_unack_obj.order.order_id,
+        chore_snapshot = get_chore_snapshot_from_chore_id(latest_unack_obj.chore.chore_id,
+                                                          executor_http_client)
+
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
+            f"Mismatched: Chore status must be DOD but found: {chore_snapshot.chore_status = }"
+
+        time.sleep(2)
+        check_str = "Unexpected: Received chore_journal of event: OE_ACK on chore of chore_snapshot status: OE_DOD"
+        assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_fulfill_post_unack_unsol_cxl(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["simulate_new_unsolicited_cxl_chores"] = True
+            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # buy test
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        px = 100
+        qty = 90
+        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client)
+
+        latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
+                                                                          executor_http_client)
+        latest_cxl_ack_obj = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
+                                                                              ChoreEventType.OE_UNSOL_CXL], buy_symbol,
+                                                                             executor_http_client)
+
+        chore_snapshot = get_chore_snapshot_from_chore_id(latest_unack_obj.chore.chore_id,
+                                                          executor_http_client)
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
+            f"Mismatched: Chore status must be DOD but found: {chore_snapshot.chore_status = }"
+
+        # applying ack leading to fulfill
+        executor_http_client.barter_simulator_process_chore_ack_query_client(
+            latest_unack_obj.chore.chore_id,
+            latest_unack_obj.chore.px,
+            latest_unack_obj.chore.qty,
+            latest_unack_obj.chore.side,
+            latest_unack_obj.chore.security.sec_id,
+            latest_unack_obj.chore.underlying_account)
+
+        chore_snapshot = get_chore_snapshot_from_chore_id(latest_unack_obj.chore.chore_id,
                                                           executor_http_client)
         executor_config_file_path = STRAT_EXECUTOR / "data" / f"config.yaml"
         executor_config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(executor_config_file_path)
 
-        if executor_config_dict.get("pause_fulfill_post_order_dod"):
-            assert order_snapshot.filled_qty == 0, f"Mismatch order_snapshot.filled_qty, expected 0, " \
-                                                   f"received {order_snapshot.filled_qty}"
-            assert order_snapshot.cxled_qty == order_snapshot.order_brief.qty, \
-                f"Mismatch order_snapshot.cxled_qty: expected {order_snapshot.order_brief.qty}, received " \
-                f"{order_snapshot.cxled_qty}"
-            assert order_snapshot.order_status == OrderStatusType.OE_DOD, \
-                f"Mismatch order_snapshot.order_status: expected OrderStatusType.OE_DOD, " \
-                f"received {order_snapshot.order_status}"
+        if executor_config_dict.get("pause_fulfill_post_chore_dod"):
+            assert chore_snapshot.filled_qty == 0, f"Mismatch chore_snapshot.filled_qty, expected 0, " \
+                                                   f"received {chore_snapshot.filled_qty}"
+            assert chore_snapshot.cxled_qty == chore_snapshot.chore_brief.qty, \
+                f"Mismatch chore_snapshot.cxled_qty: expected {chore_snapshot.chore_brief.qty}, received " \
+                f"{chore_snapshot.cxled_qty}"
+            assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
+                f"Mismatch chore_snapshot.chore_status: expected ChoreStatusType.OE_DOD, " \
+                f"received {chore_snapshot.chore_status}"
         else:
-            assert order_snapshot.filled_qty == order_snapshot.order_brief.qty, \
-                (f"Mismatch order_snapshot.filled_qty, expected {order_snapshot.order_brief.qty}, "
-                 f"received {order_snapshot.filled_qty}")
-            assert order_snapshot.cxled_qty == 0, \
-                f"Mismatch order_snapshot.cxled_qty: expected 0, received {order_snapshot.cxled_qty}"
-            assert order_snapshot.order_status == OrderStatusType.OE_FILLED, \
-                f"Mismatch order_snapshot.order_status: expected OrderStatusType.OE_FILLED, " \
-                f"received {order_snapshot.order_status}"
+            assert chore_snapshot.filled_qty == chore_snapshot.chore_brief.qty, \
+                (f"Mismatch chore_snapshot.filled_qty, expected {chore_snapshot.chore_brief.qty}, "
+                 f"received {chore_snapshot.filled_qty}")
+            assert chore_snapshot.cxled_qty == 0, \
+                f"Mismatch chore_snapshot.cxled_qty: expected 0, received {chore_snapshot.cxled_qty}"
+            assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
+                f"Mismatch chore_snapshot.chore_status: expected ChoreStatusType.OE_FILLED, " \
+                f"received {chore_snapshot.chore_status}"
 
         time.sleep(2)
-        check_str = "_check_state_and_get_order_snapshot_obj: order_journal of key:"
-        # Checking alert in strat_alert
-        strat_alert = log_book_web_client.get_strat_alert_client(active_pair_strat.id)
-        for alert in strat_alert.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            # Checking alert in portfolio_alert if reason failed to add in strat_alert
-            portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-            for alert in portfolio_alert.alerts:
-                if re.search(check_str, alert.alert_brief):
-                    break
-            else:
-                assert False, f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
-
-        if executor_config_dict.get("pause_fulfill_post_order_dod"):
-            check_str = ("Unexpected: Received fill that makes order_snapshot OE_FILLED which is already of "
+        if executor_config_dict.get("pause_fulfill_post_chore_dod"):
+            check_str = ("Unexpected: Received fill that makes chore_snapshot OE_FILLED which is already of "
                          "state OE_DOD, ignoring this fill and putting this strat to PAUSE")
             time.sleep(2)
-            # Checking alert in strat_alert
-            strat_alert = log_book_web_client.get_strat_alert_client(active_pair_strat.id)
-            for alert in strat_alert.alerts:
-                if re.search(check_str, alert.alert_brief):
-                    break
-            else:
-                # Checking alert in portfolio_alert if reason failed to add in strat_alert
-                portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-                for alert in portfolio_alert.alerts:
-                    if re.search(check_str, alert.alert_brief):
-                        break
-                else:
-                    assert False, f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
+
+            pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
+            assert pair_strat.strat_state == StratState.StratState_PAUSED, \
+                f"Mismatch: pair_strat must have strat_state PAUSED but found {pair_strat.strat_state = }"
+        else:
+            check_str = "Received fill that makes chore_snapshot OE_FILLED which is already of state OE_DOD"
+            time.sleep(2)
+
+        # Checking alert in strat_alert
+        strat_alert = log_book_web_client.get_strat_alert_client(active_pair_strat.id)
+        assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_fill_pre_chore_ack(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["simulate_avoid_fill_after_ack"] = True
+            config_dict["symbol_configs"][symbol]["simulate_fills_pre_chore_ack"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # buy test
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        px = 100
+        qty = 90
+        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client)
+
+        latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
+                                                                          executor_http_client)
+
+        check_str = ("Received fill for chore that has status: OE_UNACK, putting chore to OE_ACKED status and "
+                     "applying fill")
+        assert_fail_msg = f"can't find alert saying {check_str!r}"
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+
+        fills_journal_list: List[FillsJournalBaseModel] = (
+            get_fill_journals_for_chore_id(latest_unack_obj.chore.chore_id, executor_http_client))
+        chore_snapshot = get_chore_snapshot_from_chore_id(latest_unack_obj.chore.chore_id,
+                                                          executor_http_client)
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_ACKED, \
+            f"Mismatched: Chore status must be OE_ACKED but found: {chore_snapshot.chore_status = }"
+        assert chore_snapshot.filled_qty == fills_journal_list[0].fill_qty, \
+            (f"Mismatch chore_snapshot.filled_qty, expected {fills_journal_list[0].fill_qty}, "
+             f"received {chore_snapshot.filled_qty}")
+
+        # applying ack post fills received
+        executor_http_client.barter_simulator_process_chore_ack_query_client(
+            latest_unack_obj.chore.chore_id,
+            latest_unack_obj.chore.px,
+            latest_unack_obj.chore.qty,
+            latest_unack_obj.chore.side,
+            latest_unack_obj.chore.security.sec_id,
+            latest_unack_obj.chore.underlying_account)
+
+        time.sleep(2)
+        check_str = "Unexpected: Received chore_journal of event: OE_ACK on chore of chore_snapshot status: OE_ACKED"
+        assert_fail_msg = f"can't find alert saying {check_str!r}"
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_fulfill_pre_chore_ack(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["simulate_avoid_fill_after_ack"] = True
+            config_dict["symbol_configs"][symbol]["simulate_fills_pre_chore_ack"] = True
+            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # buy test
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        px = 100
+        qty = 90
+        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client)
+
+        latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
+                                                                          executor_http_client)
+
+        check_str = ("Received fill for chore that has status: OE_UNACK that makes chore fulfilled, "
+                     "putting chore to OE_FILLED status and applying fill")
+        assert_fail_msg = f"can't find alert saying {check_str!r}"
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+
+        fills_journal_list: List[FillsJournalBaseModel] = (
+            get_fill_journals_for_chore_id(latest_unack_obj.chore.chore_id, executor_http_client))
+        chore_snapshot = get_chore_snapshot_from_chore_id(latest_unack_obj.chore.chore_id,
+                                                          executor_http_client)
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
+            f"Mismatched: Chore status must be OE_FILLED but found: {chore_snapshot.chore_status = }"
+        assert chore_snapshot.filled_qty == fills_journal_list[0].fill_qty, \
+            (f"Mismatch chore_snapshot.filled_qty, expected {fills_journal_list[0].fill_qty}, "
+             f"received {chore_snapshot.filled_qty}")
+
+        # applying ack post fills received
+        executor_http_client.barter_simulator_process_chore_ack_query_client(
+            latest_unack_obj.chore.chore_id,
+            latest_unack_obj.chore.px,
+            latest_unack_obj.chore.qty,
+            latest_unack_obj.chore.side,
+            latest_unack_obj.chore.security.sec_id,
+            latest_unack_obj.chore.underlying_account)
+
+        time.sleep(2)
+        check_str = "Unexpected: Received chore_journal of event: OE_ACK on chore of chore_snapshot status: OE_FILLED"
+        assert_fail_msg = f"can't find alert saying {check_str!r}"
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -3047,8 +3572,8 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
 def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                  pair_strat_, expected_strat_limits_,
                                                  expected_strat_status_, symbol_overview_obj_list,
-                                                 last_trade_fixture_list, market_depth_basemodel_list,
-                                                 top_of_book_list_, buy_order_, sell_order_,
+                                                 last_barter_fixture_list, market_depth_basemodel_list,
+                                                 buy_chore_, sell_chore_,
                                                  refresh_sec_update_fixture):
 
     expected_strat_limits_.residual_restriction.max_residual = 0
@@ -3058,8 +3583,7 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_strat_status_, symbol_overview_obj_list,
-                                                 last_trade_fixture_list, market_depth_basemodel_list,
-                                                 top_of_book_list_))
+                                                 last_barter_fixture_list, market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -3073,38 +3597,27 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
 
         residual_qty = 10
         executor_http_client.update_residuals_query_client(buy_symbol, Side.BUY, residual_qty)
 
-        # placing new non-systematic new_order
+        # placing new non-systematic new_chore
         px = 100
         qty = 90
-        check_str = "residual notional: .* > max residual"
-        assert_fail_message = "Could not find any alert containing message to block orders " \
+        check_str = "residual_notional = .* > max_residual"
+        assert_fail_message = "Could not find any alert containing message to block chores " \
                               "due to residual notional breach"
-        # placing new non-systematic new_order
-        place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
-        print(f"symbol: {buy_symbol}, Created new_order obj")
+        # placing new non-systematic new_chore
+        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client)
+        print(f"symbol: {buy_symbol}, Created new_chore obj")
 
-        new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW, buy_symbol,
+        new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                            executor_http_client)
 
         time.sleep(2)
         strat_alert = log_book_web_client.get_strat_alert_client(active_pair_strat.id)
-        for alert in strat_alert.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            # Checking alert in portfolio_alert if reason failed to add in strat_alert
-            portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-            for alert in portfolio_alert.alerts:
-                if re.search(check_str, alert.alert_brief):
-                    break
-            else:
-                assert False, assert_fail_message
-        assert True
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_message)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -3121,22 +3634,22 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(static_data_, c
                                                                  leg1_leg2_symbol_list,
                                                                  pair_strat_, expected_strat_limits_,
                                                                  expected_strat_status_, symbol_overview_obj_list,
-                                                                 last_trade_fixture_list, market_depth_basemodel_list,
-                                                                 top_of_book_list_, buy_order_, sell_order_,
+                                                                 last_barter_fixture_list, market_depth_basemodel_list,
+                                                                 buy_chore_, sell_chore_,
                                                                  refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 0
+    # explicitly setting waived_min_chores to 10 for this test case
+    expected_strat_limits_.cancel_rate.waived_min_chores = 0
     expected_strat_limits_.cancel_rate.max_cancel_rate = 1
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -3146,17 +3659,17 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(static_data_, c
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
-            config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1
+            config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_chores"] = True
+            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
 
         handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(
-            buy_symbol, sell_symbol, active_pair_strat.id, last_trade_fixture_list,
-            top_of_book_list_, Side.BUY, executor_http_client)
+            buy_symbol, sell_symbol, active_pair_strat.id, last_barter_fixture_list,
+            Side.BUY, executor_http_client)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -3173,22 +3686,22 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, 
                                                                   leg1_leg2_symbol_list,
                                                                   pair_strat_, expected_strat_limits_,
                                                                   expected_strat_status_, symbol_overview_obj_list,
-                                                                  last_trade_fixture_list, market_depth_basemodel_list,
-                                                                  top_of_book_list_, buy_order_, sell_order_,
+                                                                  last_barter_fixture_list, market_depth_basemodel_list,
+                                                                  buy_chore_, sell_chore_,
                                                                   refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    # explicitly setting waived_min_orders to 0 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 0
+    # explicitly setting waived_min_chores to 0 for this test case
+    expected_strat_limits_.cancel_rate.waived_min_chores = 0
     expected_strat_limits_.cancel_rate.max_cancel_rate = 1
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_, leg1_side=Side.SELL,
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list, leg1_side=Side.SELL,
                                            leg2_side=Side.BUY))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
@@ -3199,17 +3712,17 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, 
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
-            config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1
+            config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_chores"] = True
+            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
 
         handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(
-            buy_symbol, sell_symbol, active_pair_strat.id, last_trade_fixture_list,
-            top_of_book_list_, Side.SELL, executor_http_client, leg1_side=Side.SELL, leg2_side=Side.BUY)
+            buy_symbol, sell_symbol, active_pair_strat.id, last_barter_fixture_list,
+            Side.SELL, executor_http_client, leg1_side=Side.SELL, leg2_side=Side.BUY)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -3225,22 +3738,22 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, 
 def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                               pair_strat_, expected_strat_limits_,
                                                               expected_strat_status_, symbol_overview_obj_list,
-                                                              last_trade_fixture_list, market_depth_basemodel_list,
-                                                              top_of_book_list_, buy_order_, sell_order_,
+                                                              last_barter_fixture_list, market_depth_basemodel_list,
+                                                              buy_chore_, sell_chore_,
                                                               refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 0
+    # explicitly setting waived_min_chores to 10 for this test case
+    expected_strat_limits_.cancel_rate.waived_min_chores = 0
     expected_strat_limits_.cancel_rate.max_cancel_rate = 19
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -3254,11 +3767,11 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(static_data_, clea
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
 
         handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
-            buy_symbol, sell_symbol, active_pair_strat.id, last_trade_fixture_list,
-            top_of_book_list_, Side.BUY, executor_http_client)
+            buy_symbol, sell_symbol, active_pair_strat.id, last_barter_fixture_list,
+            Side.BUY, executor_http_client)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -3275,21 +3788,21 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(static_data_, cle
                                                                leg1_leg2_symbol_list,
                                                                pair_strat_, expected_strat_limits_,
                                                                expected_strat_status_, symbol_overview_obj_list,
-                                                               last_trade_fixture_list, market_depth_basemodel_list,
-                                                               top_of_book_list_, buy_order_, sell_order_,
+                                                               last_barter_fixture_list, market_depth_basemodel_list,
+                                                               buy_chore_, sell_chore_,
                                                                refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 0
+    # explicitly setting waived_min_chores to 10 for this test case
+    expected_strat_limits_.cancel_rate.waived_min_chores = 0
     expected_strat_limits_.cancel_rate.max_cancel_rate = 19
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_, leg1_side=Side.SELL,
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list, leg1_side=Side.SELL,
                                            leg2_side=Side.BUY))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
@@ -3304,11 +3817,11 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(static_data_, cle
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
 
         handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
-            buy_symbol, sell_symbol, active_pair_strat.id, last_trade_fixture_list,
-            top_of_book_list_, Side.SELL, executor_http_client, leg1_side=Side.SELL,
+            buy_symbol, sell_symbol, active_pair_strat.id, last_barter_fixture_list,
+            Side.SELL, executor_http_client, leg1_side=Side.SELL,
             leg2_side=Side.BUY)
 
     except AssertionError as e:
@@ -3587,32 +4100,32 @@ def test_alert_id(clean_and_set_limits, sample_alert):
 
 @pytest.mark.nightly
 def test_get_max_id_query(clean_and_set_limits):
-    order_limits_max_id = email_book_service_native_web_client.get_order_limits_max_id_client()
-    assert order_limits_max_id.max_id_val == 1, f"max_id mismatch, expected 1 received {order_limits_max_id.max_id_val}"
+    chore_limits_max_id = email_book_service_native_web_client.get_chore_limits_max_id_client()
+    assert chore_limits_max_id.max_id_val == 1, f"max_id mismatch, expected 1 received {chore_limits_max_id.max_id_val}"
 
-    order_limits_basemodel = OrderLimitsBaseModel(_id=2)
-    created_order_limits_obj = email_book_service_native_web_client.create_order_limits_client(order_limits_basemodel)
+    chore_limits_basemodel = ChoreLimitsBaseModel(_id=2)
+    created_chore_limits_obj = email_book_service_native_web_client.create_chore_limits_client(chore_limits_basemodel)
 
-    order_limits_max_id = email_book_service_native_web_client.get_order_limits_max_id_client()
-    assert order_limits_max_id.max_id_val == created_order_limits_obj.id, \
-        f"max_id mismatch, expected {created_order_limits_obj.id} received {order_limits_max_id.max_id_val}"
+    chore_limits_max_id = email_book_service_native_web_client.get_chore_limits_max_id_client()
+    assert chore_limits_max_id.max_id_val == created_chore_limits_obj.id, \
+        f"max_id mismatch, expected {created_chore_limits_obj.id} received {chore_limits_max_id.max_id_val}"
 
 
 @pytest.mark.nightly
 def test_get_market_depths_query(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list, top_of_book_list_,
-        market_depth_basemodel_list, last_trade_fixture_list, refresh_sec_update_fixture):
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        market_depth_basemodel_list, last_barter_fixture_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
 
     pair_strat_n_http_client_tuple_list = []
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
         activated_pair_start, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list,
+                                               market_depth_basemodel_list))
 
         pair_strat_n_http_client_tuple_list.append((activated_pair_start, executor_http_client))
 
@@ -3685,8 +4198,8 @@ def test_get_market_depths_query(
 @pytest.mark.nightly
 def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                  expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                                 last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-                                 buy_order_, sell_order_, max_loop_count_per_side,
+                                 last_barter_fixture_list, market_depth_basemodel_list,
+                                 buy_chore_, sell_chore_, max_loop_count_per_side,
                                  buy_fill_journal_, sell_fill_journal_, expected_strat_brief_,
                                  refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
@@ -3695,9 +4208,9 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -3711,57 +4224,53 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
             config_dict["symbol_configs"][symbol]["avoid_cxl_ack_after_cxl_req"] = True
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
 
         for symbol, side in [(buy_symbol, Side.BUY), (sell_symbol, Side.SELL)]:
-            # Placing buy orders
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+            # Placing buy chores
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
             if symbol == buy_symbol:
-                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0],
-                                    avoid_order_trigger=True)
                 px = 100
                 qty = 90
-                place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
+                place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client)
             else:
-                run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1],
-                                     avoid_order_trigger=True)
                 px = 110
                 qty = 70
-                place_new_order(sell_symbol, Side.SELL, px, qty, executor_http_client)
+                place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client)
 
-            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                symbol, executor_http_client)
-            ack_order_id = ack_order_journal.order.order_id
+            ack_chore_id = ack_chore_journal.chore.chore_id
 
-            executor_http_client.trade_simulator_place_cxl_order_query_client(
-                ack_order_id, side, symbol, symbol, ack_order_journal.order.underlying_account)
+            executor_http_client.barter_simulator_place_cxl_chore_query_client(
+                ack_chore_id, side, symbol, symbol, ack_chore_journal.chore.underlying_account)
             time.sleep(2)
 
-            executor_http_client.trade_simulator_process_fill_query_client(
-                ack_order_journal.order.order_id, ack_order_journal.order.px, ack_order_journal.order.qty,
-                side, symbol, ack_order_journal.order.underlying_account)
+            executor_http_client.barter_simulator_process_fill_query_client(
+                ack_chore_journal.chore.chore_id, ack_chore_journal.chore.px, ack_chore_journal.chore.qty,
+                side, symbol, ack_chore_journal.chore.underlying_account)
             time.sleep(2)
 
-            order_snapshot = get_order_snapshot_from_order_id(ack_order_id, executor_http_client)
-            assert order_snapshot.order_status == OrderStatusType.OE_FILLED, \
-                (f"Mismatched: OrderStatus must be OE_FILLED, found: {order_snapshot.order_status}, "
-                 f"order_snapshot: {order_snapshot}")
+            chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_id, executor_http_client)
+            assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
+                (f"Mismatched: ChoreStatus must be OE_FILLED, found: {chore_snapshot.chore_status}, "
+                 f"chore_snapshot: {chore_snapshot}")
 
-            # Sending CXL_ACk after order is fully filled
+            # Sending CXL_ACk after chore is fully filled
 
-            cxl_ack_order_journal = OrderJournalBaseModel(order=ack_order_journal.order,
-                                                          order_event_date_time=DateTime.utcnow(),
-                                                          order_event=OrderEventType.OE_CXL_ACK)
-            executor_http_client.create_order_journal_client(cxl_ack_order_journal)
+            cxl_ack_chore_journal = ChoreJournalBaseModel(chore=ack_chore_journal.chore,
+                                                          chore_event_date_time=DateTime.utcnow(),
+                                                          chore_event=ChoreEventType.OE_CXL_ACK)
+            executor_http_client.create_chore_journal_client(cxl_ack_chore_journal)
             time.sleep(2)
 
-            # This must not impact any change in order states, checking that
-            order_snapshot = get_order_snapshot_from_order_id(cxl_ack_order_journal.order.order_id,
+            # This must not impact any change in chore states, checking that
+            chore_snapshot = get_chore_snapshot_from_chore_id(cxl_ack_chore_journal.chore.chore_id,
                                                               executor_http_client)
 
-            assert order_snapshot.order_status == OrderStatusType.OE_FILLED, \
-                (f"Mismatched: OrderStatus must be OE_FILLED, found: {order_snapshot.order_status}, "
-                 f"order_snapshot: {order_snapshot}")
+            assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
+                (f"Mismatched: ChoreStatus must be OE_FILLED, found: {chore_snapshot.chore_status}, "
+                 f"chore_snapshot: {chore_snapshot}")
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -3776,24 +4285,24 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
 @pytest.mark.nightly
 def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                      expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                                     last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-                                     buy_order_, sell_order_, max_loop_count_per_side,
+                                     last_barter_fixture_list, market_depth_basemodel_list,
+                                     buy_chore_, sell_chore_, max_loop_count_per_side,
                                      buy_fill_journal_, sell_fill_journal_,
                                      expected_strat_brief_, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 10
+    # explicitly setting waived_min_chores to 10 for this test case
+    expected_strat_limits_.cancel_rate.waived_min_chores = 10
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -3804,47 +4313,62 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
-            config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1  # all orders - unsol_cxl
+            config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_chores"] = True
+            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1  # all chores - unsol_cxl
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        bid_buy_top_market_depth = None
+        ask_sell_top_market_depth = None
+        stored_market_depth = executor_http_client.get_all_market_depth_client()
+        for market_depth in stored_market_depth:
+            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                bid_buy_top_market_depth = market_depth
+            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                ask_sell_top_market_depth = market_depth
 
         for symbol in [buy_symbol, sell_symbol]:
 
             print(f"Checking symbol: {symbol}")
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
             if symbol == buy_symbol:
-                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+                time.sleep(1)
+                update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+                                                                   ask_sell_top_market_depth)
             else:
-                run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
-            time.sleep(2)  # delay for order to get placed
+                run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]],
+                               executor_http_client)
 
-            latest_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_UNSOL_CXL,
+                update_tob_through_market_depth_to_place_sell_chore(executor_http_client, ask_sell_top_market_depth,
+                                                                    bid_buy_top_market_depth)
+            time.sleep(2)  # delay for chore to get placed
+
+            latest_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_UNSOL_CXL,
                                                                                   symbol, executor_http_client)
-            order_snapshot_list = executor_http_client.get_all_order_snapshot_client(-100)
-            for order_snapshot in order_snapshot_list:
-                if order_snapshot.order_brief.order_id == latest_order_journal.order.order_id:
-                    order_snapshot_before_fill = order_snapshot
+            chore_snapshot_list = executor_http_client.get_all_chore_snapshot_client(-100)
+            for chore_snapshot in chore_snapshot_list:
+                if chore_snapshot.chore_brief.chore_id == latest_chore_journal.chore.chore_id:
+                    chore_snapshot_before_fill = chore_snapshot
                     break
             else:
                 assert False, \
-                    ("Unexpected: Can't find order_snapshot having order_id in "
-                     f"order_snapshot list, order_id: {latest_order_journal.order.order_id}, "
-                     f"order_snapshot_list: {order_snapshot_list}")
+                    ("Unexpected: Can't find chore_snapshot having chore_id in "
+                     f"chore_snapshot list, chore_id: {latest_chore_journal.chore.chore_id}, "
+                     f"chore_snapshot_list: {chore_snapshot_list}")
 
             symbol_side_snapshot_list = executor_http_client.get_all_symbol_side_snapshot_client()
             for symbol_side_snapshot in symbol_side_snapshot_list:
-                if symbol_side_snapshot.security.sec_id == latest_order_journal.order.security.sec_id:
+                if symbol_side_snapshot.security.sec_id == latest_chore_journal.chore.security.sec_id:
                     symbol_side_snapshot_before_fill = symbol_side_snapshot
                     break
             else:
                 assert False, \
                     ("Unexpected: Can't find symbol_side_snapshot having symbol: "
-                     f"{latest_order_journal.order.security.sec_id}, "
-                     f"order_snapshot_list: {order_snapshot_list}")
+                     f"{latest_chore_journal.chore.security.sec_id}, "
+                     f"chore_snapshot_list: {chore_snapshot_list}")
 
             strat_brief_list = executor_http_client.get_all_strat_brief_client()
             assert len(strat_brief_list) == 1, \
@@ -3857,7 +4381,7 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
 
             portfolio_status_before_fill = email_book_service_native_web_client.get_portfolio_status_client(1)
 
-            # Placing Fill after order_snapshot is OE_DOD
+            # Placing Fill after chore_snapshot is OE_DOD
             if buy_fill_journal_.fill_symbol == symbol:
                 fill_journal_obj = copy.deepcopy(buy_fill_journal_)
             else:
@@ -3865,63 +4389,63 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
 
             fill_journal_obj.fill_qty = 20
             if symbol == buy_symbol:
-                executor_http_client.trade_simulator_process_fill_query_client(
-                    latest_order_journal.order.order_id, fill_journal_obj.fill_px, fill_journal_obj.fill_qty,
+                executor_http_client.barter_simulator_process_fill_query_client(
+                    latest_chore_journal.chore.chore_id, fill_journal_obj.fill_px, fill_journal_obj.fill_qty,
                     Side.BUY, symbol, fill_journal_obj.underlying_account)
             else:
-                executor_http_client.trade_simulator_process_fill_query_client(
-                    latest_order_journal.order.order_id, fill_journal_obj.fill_px, fill_journal_obj.fill_qty,
+                executor_http_client.barter_simulator_process_fill_query_client(
+                    latest_chore_journal.chore.chore_id, fill_journal_obj.fill_px, fill_journal_obj.fill_qty,
                     Side.SELL, symbol, fill_journal_obj.underlying_account)
 
-            placed_fill_journal_obj = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id,
+            placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(latest_chore_journal.chore.chore_id,
                                                                             executor_http_client)
-            # OrderSnapshot check
-            order_snapshot_list = executor_http_client.get_all_order_snapshot_client(-100)
-            for order_snapshot in order_snapshot_list:
-                if order_snapshot.order_brief.order_id == placed_fill_journal_obj.order_id:
-                    order_snapshot_after_fill = order_snapshot_list[0]
+            # ChoreSnapshot check
+            chore_snapshot_list = executor_http_client.get_all_chore_snapshot_client(-100)
+            for chore_snapshot in chore_snapshot_list:
+                if chore_snapshot.chore_brief.chore_id == placed_fill_journal_obj.chore_id:
+                    chore_snapshot_after_fill = chore_snapshot_list[0]
                     break
             else:
                 assert False, \
-                    ("Unexpected: Can't find order_snapshot having order_id in "
-                     f"order_snapshot list, order_id: {placed_fill_journal_obj.order_id}, "
-                     f"order_snapshot_list: {order_snapshot_list}")
-            assert order_snapshot_after_fill.order_status == OrderStatusType.OE_DOD, \
-                (f"Unexpected: OrderStatus mismatched, expected order_status: {OrderStatusType.OE_DOD}, "
-                 f"received order_status: {order_snapshot_after_fill.order_status}")
+                    ("Unexpected: Can't find chore_snapshot having chore_id in "
+                     f"chore_snapshot list, chore_id: {placed_fill_journal_obj.chore_id}, "
+                     f"chore_snapshot_list: {chore_snapshot_list}")
+            assert chore_snapshot_after_fill.chore_status == ChoreStatusType.OE_DOD, \
+                (f"Unexpected: ChoreStatus mismatched, expected chore_status: {ChoreStatusType.OE_DOD}, "
+                 f"received chore_status: {chore_snapshot_after_fill.chore_status}")
             filled_qty = get_partial_allowed_fill_qty(symbol, config_dict, fill_journal_obj.fill_qty)
-            assert order_snapshot_after_fill.filled_qty == order_snapshot_before_fill.filled_qty + filled_qty, \
-                (f"Unexpected: OrderSnapshot's filled_qty mismatched, "
-                 f"expected: {order_snapshot_before_fill.filled_qty + filled_qty}, "
-                 f"received {order_snapshot_after_fill.filled_qty}")
-            assert order_snapshot_after_fill.fill_notional == (
-                    order_snapshot_before_fill.fill_notional +
+            assert chore_snapshot_after_fill.filled_qty == chore_snapshot_before_fill.filled_qty + filled_qty, \
+                (f"Unexpected: ChoreSnapshot's filled_qty mismatched, "
+                 f"expected: {chore_snapshot_before_fill.filled_qty + filled_qty}, "
+                 f"received {chore_snapshot_after_fill.filled_qty}")
+            assert chore_snapshot_after_fill.fill_notional == (
+                    chore_snapshot_before_fill.fill_notional +
                     (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))), \
-                (f"Unexpected: OrderSnapshot's fill_notional mismatched, "
-                 f"expected: {order_snapshot_before_fill.fill_notional + (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))}, "
-                 f"received {order_snapshot_after_fill.fill_notional}")
-            assert order_snapshot_after_fill.cxled_qty == order_snapshot_before_fill.cxled_qty - filled_qty, \
-                (f"Unexpected: OrderSnapshot's cxled_qty mismatched, "
-                 f"expected: {order_snapshot_before_fill.cxled_qty - filled_qty}, "
-                 f"received {order_snapshot_after_fill.cxled_qty}")
-            assert order_snapshot_after_fill.cxled_notional == (
-                    order_snapshot_before_fill.cxled_notional -
-                    (get_px_in_usd(order_snapshot_after_fill.order_brief.px)*filled_qty)), \
-                (f"Unexpected: OrderSnapshot's cxled_notional mismatched, "
-                 f"expected: {order_snapshot_before_fill.cxled_notional - (get_px_in_usd(order_snapshot_after_fill.order_brief.px)*filled_qty)}, "
-                 f"received {order_snapshot_after_fill.cxled_notional}")
+                (f"Unexpected: ChoreSnapshot's fill_notional mismatched, "
+                 f"expected: {chore_snapshot_before_fill.fill_notional + (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))}, "
+                 f"received {chore_snapshot_after_fill.fill_notional}")
+            assert chore_snapshot_after_fill.cxled_qty == chore_snapshot_before_fill.cxled_qty - filled_qty, \
+                (f"Unexpected: ChoreSnapshot's cxled_qty mismatched, "
+                 f"expected: {chore_snapshot_before_fill.cxled_qty - filled_qty}, "
+                 f"received {chore_snapshot_after_fill.cxled_qty}")
+            assert chore_snapshot_after_fill.cxled_notional == (
+                    chore_snapshot_before_fill.cxled_notional -
+                    (get_px_in_usd(chore_snapshot_after_fill.chore_brief.px)*filled_qty)), \
+                (f"Unexpected: ChoreSnapshot's cxled_notional mismatched, "
+                 f"expected: {chore_snapshot_before_fill.cxled_notional - (get_px_in_usd(chore_snapshot_after_fill.chore_brief.px)*filled_qty)}, "
+                 f"received {chore_snapshot_after_fill.cxled_notional}")
 
             # SymbolSideSnapshot check
             symbol_side_snapshot_list = executor_http_client.get_all_symbol_side_snapshot_client()
             for symbol_side_snapshot in symbol_side_snapshot_list:
-                if symbol_side_snapshot.security.sec_id == latest_order_journal.order.security.sec_id:
+                if symbol_side_snapshot.security.sec_id == latest_chore_journal.chore.security.sec_id:
                     symbol_side_snapshot_after_fill = symbol_side_snapshot
                     break
             else:
                 assert False, \
                     ("Unexpected: Can't find symbol_side_snapshot having symbol: "
-                     f"{latest_order_journal.order.security.sec_id}, "
-                     f"order_snapshot_list: {order_snapshot_list}")
+                     f"{latest_chore_journal.chore.security.sec_id}, "
+                     f"chore_snapshot_list: {chore_snapshot_list}")
             assert (symbol_side_snapshot_after_fill.total_filled_qty ==
                     symbol_side_snapshot_before_fill.total_filled_qty + filled_qty), \
                 (f"Unexpected: SymbolSideSnapshot's total_filled_qty mismatched, "
@@ -3940,9 +4464,9 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                  f"received {symbol_side_snapshot_after_fill.total_cxled_qty}")
             assert symbol_side_snapshot_after_fill.total_cxled_notional == (
                     symbol_side_snapshot_before_fill.total_cxled_notional -
-                    (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)), \
+                    (get_px_in_usd(chore_snapshot_after_fill.chore_brief.px) * filled_qty)), \
                 (f"Unexpected: SymbolSideSnapshot's total_cxled_notional mismatched, "
-                 f"expected: {symbol_side_snapshot_before_fill.total_cxled_notional - (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)}, "
+                 f"expected: {symbol_side_snapshot_before_fill.total_cxled_notional - (get_px_in_usd(chore_snapshot_after_fill.chore_brief.px) * filled_qty)}, "
                  f"received {symbol_side_snapshot_after_fill.total_cxled_notional}")
 
             # StratBrief Check
@@ -3961,38 +4485,31 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                 else:
                     assert False, \
                         ("Unexpected: Can't find symbol_side_snapshot having symbol: "
-                         f"{latest_order_journal.order.security.sec_id}, "
-                         f"order_snapshot_list: {order_snapshot_list}")
-                update_expected_strat_brief_for_buy(order_snapshot_after_fill,
+                         f"{latest_chore_journal.chore.security.sec_id}, "
+                         f"chore_snapshot_list: {chore_snapshot_list}")
+                update_expected_strat_brief_for_buy(chore_snapshot_after_fill,
                                                     symbol_side_snapshot_after_fill,
                                                     other_leg_symbol_side_snapshot_after_fill,
                                                     expected_strat_limits_, expected_strat_brief_,
-                                                    order_snapshot_after_fill.last_update_date_time,
-                                                    leg1_last_trade_px, leg2_last_trade_px, True)
-                strat_brief_after_fill.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-                strat_brief_after_fill.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
+                                                    chore_snapshot_after_fill.last_update_date_time,
+                                                    buy_last_barter_px, sell_last_barter_px, True)
+                strat_brief_after_fill.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+                strat_brief_after_fill.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
                 # Since sell side of strat_brief is not updated in this test
-                strat_brief_after_fill.pair_sell_side_trading_brief = expected_strat_brief_.pair_sell_side_trading_brief
-                strat_brief_after_fill.pair_buy_side_trading_brief.last_update_date_time = None
-                expected_strat_brief_.pair_buy_side_trading_brief.last_update_date_time = None
+                strat_brief_after_fill.pair_sell_side_bartering_brief = expected_strat_brief_.pair_sell_side_bartering_brief
+                strat_brief_after_fill.pair_buy_side_bartering_brief.last_update_date_time = None
+                expected_strat_brief_.pair_buy_side_bartering_brief.last_update_date_time = None
                 expected_strat_brief_.id = active_pair_strat.id
 
                 # Updating residual_qty and indicative_consumable_residual since handling in
                 # update_expected_strat_brief_for_buy is not for this case
-                expected_strat_brief_.pair_buy_side_trading_brief.residual_qty = (
-                        strat_brief_before_fill.pair_buy_side_trading_brief.residual_qty - filled_qty)
-                leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-                if active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-                    buy_last_trade_px = leg1_last_trade_px
-                    sell_last_trade_px = leg2_last_trade_px
-                else:
-                    sell_last_trade_px = leg1_last_trade_px
-                    buy_last_trade_px = leg2_last_trade_px
-                expected_strat_brief_.pair_buy_side_trading_brief.indicative_consumable_residual = \
+                expected_strat_brief_.pair_buy_side_bartering_brief.residual_qty = (
+                        strat_brief_before_fill.pair_buy_side_bartering_brief.residual_qty - filled_qty)
+                expected_strat_brief_.pair_buy_side_bartering_brief.indicative_consumable_residual = \
                     expected_strat_limits_.residual_restriction.max_residual - \
-                    ((expected_strat_brief_.pair_buy_side_trading_brief.residual_qty *
-                      get_px_in_usd(buy_last_trade_px)) - (0 * get_px_in_usd(sell_last_trade_px)))
-                expected_strat_brief_.pair_buy_side_trading_brief.consumable_open_orders = 5
+                    ((expected_strat_brief_.pair_buy_side_bartering_brief.residual_qty *
+                      get_px_in_usd(buy_last_barter_px)) - (0 * get_px_in_usd(sell_last_barter_px)))
+                expected_strat_brief_.pair_buy_side_bartering_brief.consumable_open_chores = 5
                 assert expected_strat_brief_ == strat_brief_after_fill, \
                     f"Unexpected: Mismatched strat_brief, expected {expected_strat_brief_}, received {strat_brief_list}"
             else:
@@ -4003,42 +4520,35 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                 else:
                     assert False, \
                         ("Unexpected: Can't find symbol_side_snapshot having symbol: "
-                         f"{latest_order_journal.order.security.sec_id}, "
-                         f"order_snapshot_list: {order_snapshot_list}")
-                update_expected_strat_brief_for_sell(order_snapshot_after_fill,
+                         f"{latest_chore_journal.chore.security.sec_id}, "
+                         f"chore_snapshot_list: {chore_snapshot_list}")
+                update_expected_strat_brief_for_sell(chore_snapshot_after_fill,
                                                      symbol_side_snapshot_after_fill,
                                                      other_leg_symbol_side_snapshot_after_fill,
                                                      expected_strat_limits_, expected_strat_brief_,
-                                                     order_snapshot_after_fill.last_update_date_time,
-                                                     leg1_last_trade_px, leg2_last_trade_px, True)
+                                                     chore_snapshot_after_fill.last_update_date_time,
+                                                     buy_last_barter_px, sell_last_barter_px, True)
                 expected_strat_brief_.id = active_pair_strat.id
                 # Since buy side of strat_brief is already checked
-                strat_brief_after_fill.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-                strat_brief_after_fill.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-                strat_brief_after_fill.pair_sell_side_trading_brief.last_update_date_time = None
-                expected_strat_brief_.pair_sell_side_trading_brief.last_update_date_time = None
+                strat_brief_after_fill.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+                strat_brief_after_fill.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+                strat_brief_after_fill.pair_sell_side_bartering_brief.last_update_date_time = None
+                expected_strat_brief_.pair_sell_side_bartering_brief.last_update_date_time = None
 
                 # Updating residual_qty and indicative_consumable_residual since handling in
                 # update_expected_strat_brief_for_buy is not for this case
-                expected_strat_brief_.pair_sell_side_trading_brief.residual_qty = (
-                        strat_brief_before_fill.pair_sell_side_trading_brief.residual_qty - filled_qty)
-                leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-                if active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-                    buy_last_trade_px = leg1_last_trade_px
-                    sell_last_trade_px = leg2_last_trade_px
-                else:
-                    sell_last_trade_px = leg1_last_trade_px
-                    buy_last_trade_px = leg2_last_trade_px
-                expected_strat_brief_.pair_sell_side_trading_brief.indicative_consumable_residual = \
+                expected_strat_brief_.pair_sell_side_bartering_brief.residual_qty = (
+                        strat_brief_before_fill.pair_sell_side_bartering_brief.residual_qty - filled_qty)
+                expected_strat_brief_.pair_sell_side_bartering_brief.indicative_consumable_residual = \
                     expected_strat_limits_.residual_restriction.max_residual - \
-                    ((expected_strat_brief_.pair_sell_side_trading_brief.residual_qty *
-                      get_px_in_usd(sell_last_trade_px)) -
-                     (strat_brief_after_fill.pair_buy_side_trading_brief.residual_qty *
-                      get_px_in_usd(buy_last_trade_px)))
-                expected_strat_brief_.pair_sell_side_trading_brief.consumable_open_orders = 5
+                    ((expected_strat_brief_.pair_sell_side_bartering_brief.residual_qty *
+                      get_px_in_usd(sell_last_barter_px)) -
+                     (strat_brief_after_fill.pair_buy_side_bartering_brief.residual_qty *
+                      get_px_in_usd(buy_last_barter_px)))
+                expected_strat_brief_.pair_sell_side_bartering_brief.consumable_open_chores = 5
 
-                assert (expected_strat_brief_.pair_sell_side_trading_brief ==
-                        strat_brief_after_fill.pair_sell_side_trading_brief), \
+                assert (expected_strat_brief_.pair_sell_side_bartering_brief ==
+                        strat_brief_after_fill.pair_sell_side_bartering_brief), \
                     f"Unexpected: Mismatched strat_brief, expected {expected_strat_brief_}, received {strat_brief_list}"
 
             # StratStatus Check
@@ -4065,20 +4575,20 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                      f"received {strat_status_after_fill.total_cxl_buy_qty}")
                 assert strat_status_after_fill.total_cxl_buy_notional == (
                         strat_status_before_fill.total_cxl_buy_notional -
-                        (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)), \
+                        (get_px_in_usd(chore_snapshot_after_fill.chore_brief.px) * filled_qty)), \
                     (f"Unexpected: Mismatched strat_status's total_cxl_buy_notional, "
-                     f"expected {strat_status_before_fill.total_cxl_buy_notional - (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)}, "
+                     f"expected {strat_status_before_fill.total_cxl_buy_notional - (get_px_in_usd(chore_snapshot_after_fill.chore_brief.px) * filled_qty)}, "
                      f"received {strat_status_after_fill.total_cxl_buy_notional}")
                 assert (strat_status_after_fill.total_cxl_exposure ==
                         strat_status_before_fill.total_cxl_exposure -
-                        (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)), \
+                        (get_px_in_usd(chore_snapshot_after_fill.chore_brief.px) * filled_qty)), \
                     (f"Unexpected: Mismatched strat_status's total_cxl_exposure, "
-                     f"expected {strat_status_before_fill.total_cxl_exposure - (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)}, "
+                     f"expected {strat_status_before_fill.total_cxl_exposure - (get_px_in_usd(chore_snapshot_after_fill.chore_brief.px) * filled_qty)}, "
                      f"received {strat_status_after_fill.total_cxl_exposure}")
-                residual_notional = abs((strat_brief_after_fill.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
-                    buy_last_trade_px)) -
-                                        (strat_brief_after_fill.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
-                                            sell_last_trade_px)))
+                residual_notional = abs((strat_brief_after_fill.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+                    buy_last_barter_px)) -
+                                        (strat_brief_after_fill.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+                                            sell_last_barter_px)))
                 residual = ResidualOptional(security=active_pair_strat.pair_strat_params.strat_leg1.sec,
                                     residual_notional=residual_notional)
                 assert strat_status_after_fill.residual == residual, \
@@ -4113,9 +4623,9 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                      f"received {strat_status_after_fill.total_cxl_sell_qty}")
                 assert strat_status_after_fill.total_cxl_sell_notional == (
                         strat_status_before_fill.total_cxl_sell_notional -
-                        (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)), \
+                        (get_px_in_usd(chore_snapshot_after_fill.chore_brief.px) * filled_qty)), \
                     (f"Unexpected: Mismatched strat_status's total_cxl_sell_notional, "
-                     f"expected {strat_status_before_fill.total_cxl_sell_notional - (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)}, "
+                     f"expected {strat_status_before_fill.total_cxl_sell_notional - (get_px_in_usd(chore_snapshot_after_fill.chore_brief.px) * filled_qty)}, "
                      f"received {strat_status_after_fill.total_cxl_sell_notional}")
                 assert (strat_status_after_fill.total_cxl_exposure ==
                         strat_status_after_fill.total_cxl_buy_notional - strat_status_after_fill.total_cxl_sell_notional), \
@@ -4123,10 +4633,10 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                      f"expected {strat_status_after_fill.total_cxl_buy_notional - (strat_status_after_fill.total_fill_sell_notional + (filled_qty * get_px_in_usd(fill_journal_obj.fill_px)))}, "
                      f"received {strat_status_after_fill.total_cxl_exposure}")
                 residual_notional = abs(
-                    (strat_brief_after_fill.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
-                        buy_last_trade_px)) -
-                    (strat_brief_after_fill.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
-                        sell_last_trade_px)))
+                    (strat_brief_after_fill.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+                        buy_last_barter_px)) -
+                    (strat_brief_after_fill.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+                        sell_last_barter_px)))
                 residual = ResidualOptional(
                     security=active_pair_strat.pair_strat_params.strat_leg1.sec,
                     residual_notional=residual_notional)
@@ -4179,16 +4689,16 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
 def test_unload_reload_strat_from_collection(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     created_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -4201,12 +4711,12 @@ def test_unload_reload_strat_from_collection(
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_web_client.trade_simulator_reload_config_query_client()
+        executor_web_client.barter_simulator_reload_config_query_client()
 
-        total_order_count_for_each_side = 2
-        place_sanity_orders_for_executor(
-            buy_symbol, sell_symbol, total_order_count_for_each_side, last_trade_fixture_list,
-            top_of_book_list_, residual_wait_sec, executor_web_client)
+        total_chore_count_for_each_side = 1
+        place_sanity_chores_for_executor(
+            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            residual_wait_sec, executor_web_client)
 
         # Unloading Strat
         # making this strat DONE
@@ -4283,15 +4793,15 @@ def test_unload_reload_strat_from_collection(
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
 
-        # To update tob without triggering any order
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], avoid_order_trigger=True)
+        # updating market_depth to update cache in reloaded strat
+        update_market_depth(executor_http_client)
 
-        total_order_count_for_each_side = 2
-        place_sanity_orders_for_executor(
-            buy_symbol, sell_symbol, total_order_count_for_each_side, last_trade_fixture_list,
-            top_of_book_list_, residual_wait_sec, executor_http_client, True)
+        total_chore_count_for_each_side = 2
+        place_sanity_chores_for_executor(
+            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            residual_wait_sec, executor_http_client, True)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -4306,27 +4816,27 @@ def test_unload_reload_strat_from_collection(
 @pytest.mark.nightly
 def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_buy(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side,
-        expected_order_limits_, refresh_sec_update_fixture):
+        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side,
+        expected_chore_limits_, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     # First created strat is already active, checking if next strat, if tries to get activated with same symbol-side
     # gets exception
 
     try:
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+                                               last_barter_fixture_list,
+                                               market_depth_basemodel_list))
     except Exception as e:
         err_str_ = ("Ongoing strat already exists with same symbol-side pair legs - can't activate this "
                     "strat till other strat is ongoing")
@@ -4341,17 +4851,17 @@ def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_buy(
 @pytest.mark.nightly
 def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_sell(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side,
-        expected_order_limits_, refresh_sec_update_fixture):
+        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side,
+        expected_chore_limits_, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_, leg1_side=Side.SELL,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list, leg1_side=Side.SELL,
                                            leg2_side=Side.BUY))
 
     # First created strat is already active, checking if next strat, if tries to get activated with same symbol-side
@@ -4359,10 +4869,10 @@ def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_sell(
 
     try:
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_, leg1_side=Side.SELL,
+                                               last_barter_fixture_list,
+                                               market_depth_basemodel_list, leg1_side=Side.SELL,
                                                leg2_side=Side.BUY))
     except Exception as e:
         err_str_ = ("Ongoing strat already exists with same symbol-side pair legs - can't activate this "
@@ -4378,53 +4888,53 @@ def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_sell(
 @pytest.mark.nightly
 def test_sequenced_fully_consume_same_symbol_strats(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side,
-        expected_order_limits_, refresh_sec_update_fixture):
+        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side,
+        expected_chore_limits_, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    # updating order_limits
-    expected_order_limits_.min_order_notional = 15000
-    expected_order_limits_.id = 1
-    email_book_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
+    # updating chore_limits
+    expected_chore_limits_.min_chore_notional = 15000
+    expected_chore_limits_.id = 1
+    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_, return_obj_copy=False)
 
     expected_strat_limits_.max_single_leg_notional = 18000
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, Side.BUY)
 
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, Side.BUY)
 
 
 @pytest.mark.nightly
 def test_opp_symbol_strat_activate_block_in_single_day_with_buy_first(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, expected_order_limits_,
+        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, expected_chore_limits_,
         refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # updating order_limits
-    expected_order_limits_.min_order_notional = 15000
-    expected_order_limits_.id = 1
-    email_book_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
+    # updating chore_limits
+    expected_chore_limits_.min_chore_notional = 15000
+    expected_chore_limits_.id = 1
+    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_, return_obj_copy=False)
 
     expected_strat_limits_.max_single_leg_notional = 18000
     strat_done_after_exhausted_consumable_notional(
         leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, Side.BUY)
 
     try:
         strat_done_after_exhausted_consumable_notional(
             leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-            symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+            symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
             refresh_sec_update_fixture, Side.BUY, leg_1_side=Side.SELL, leg_2_side=Side.BUY)
     except Exception as e:
         err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides - "
@@ -4440,27 +4950,27 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_buy_first(
 @pytest.mark.nightly
 def test_opp_symbol_strat_activate_block_in_single_day_with_sell_first(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, expected_order_limits_,
+        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, expected_chore_limits_,
         refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # updating order_limits
-    expected_order_limits_.min_order_notional = 15000
-    expected_order_limits_.id = 1
-    email_book_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
+    # updating chore_limits
+    expected_chore_limits_.min_chore_notional = 15000
+    expected_chore_limits_.id = 1
+    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_, return_obj_copy=False)
 
     expected_strat_limits_.max_single_leg_notional = 18000
     strat_done_after_exhausted_consumable_notional(
         leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, Side.SELL, leg_1_side=Side.SELL, leg_2_side=Side.BUY)
 
     try:
         strat_done_after_exhausted_consumable_notional(
             leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-            symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+            symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
             refresh_sec_update_fixture, Side.SELL)
     except Exception as e:
         err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides - "
@@ -4476,28 +4986,28 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_sell_first(
 @pytest.mark.nightly
 def test_sequenced_fully_consume_diff_symbol_strats(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, expected_order_limits_,
+        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, expected_chore_limits_,
         refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    # updating order_limits
-    expected_order_limits_.min_order_notional = 15000
-    expected_order_limits_.id = 1
-    email_book_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
+    # updating chore_limits
+    expected_chore_limits_.min_chore_notional = 15000
+    expected_chore_limits_.id = 1
+    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_, return_obj_copy=False)
 
     expected_strat_limits_.max_single_leg_notional = 18000
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, Side.BUY)
 
     buy_symbol = leg1_leg2_symbol_list[1][0]
     sell_symbol = leg1_leg2_symbol_list[1][1]
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, Side.BUY)
 
 
@@ -4505,7 +5015,7 @@ def test_sequenced_fully_consume_diff_symbol_strats(
 def test_reactivate_after_pause_strat(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
+        market_depth_basemodel_list, last_barter_fixture_list,
         refresh_sec_update_fixture):
     # creates and activates multiple pair_strats
     buy_symbol = leg1_leg2_symbol_list[0][0]
@@ -4515,7 +5025,7 @@ def test_reactivate_after_pause_strat(
 
     activated_pair_strat, executor_http_client = (
         create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                expected_strat_status_, symbol_overview_obj_list, top_of_book_list_,
+                                expected_strat_status_, symbol_overview_obj_list,
                                 market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activated_pair_strat.id}_simulate_config.yaml"
@@ -4529,23 +5039,25 @@ def test_reactivate_after_pause_strat(
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
 
         time.sleep(2)
-        pause_pair_strat = PairStratBaseModel(_id=activated_pair_strat.id, strat_state=StratState.StratState_PAUSED)
+        pause_pair_strat = PairStratBaseModel(_id=activated_pair_strat.id,
+                                              strat_state=StratState.StratState_PAUSED)
         email_book_service_native_web_client.patch_pair_strat_client(
             jsonable_encoder(pause_pair_strat, by_alias=True, exclude_none=True))
 
         time.sleep(2)
-        reactivate_pair_strat = PairStratBaseModel(_id=activated_pair_strat.id, strat_state=StratState.StratState_ACTIVE)
+        reactivate_pair_strat = PairStratBaseModel(_id=activated_pair_strat.id,
+                                                   strat_state=StratState.StratState_ACTIVE)
         email_book_service_native_web_client.patch_pair_strat_client(
             jsonable_encoder(reactivate_pair_strat, by_alias=True, exclude_none=True))
 
         time.sleep(2)
-        total_order_count_for_each_side = 2
-        place_sanity_orders_for_executor(
-            buy_symbol, sell_symbol, total_order_count_for_each_side, last_trade_fixture_list,
-            top_of_book_list_, residual_wait_sec, executor_http_client)
+        total_chore_count_for_each_side = 2
+        place_sanity_chores_for_executor(
+            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            residual_wait_sec, executor_http_client)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -4559,10 +5071,10 @@ def test_reactivate_after_pause_strat(
 @pytest.mark.nightly
 def test_pause_done_n_unload_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                    expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                                   top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
+                                   market_depth_basemodel_list, last_barter_fixture_list,
                                    refresh_sec_update_fixture):
     # making limits suitable for this test
-    expected_strat_limits_.max_open_orders_per_side = 10
+    expected_strat_limits_.max_open_chores_per_side = 10
     expected_strat_limits_.residual_restriction.max_residual = 105000
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
@@ -4570,9 +5082,9 @@ def test_pause_done_n_unload_strat(static_data_, clean_and_set_limits, leg1_leg2
     active_strat_list: List[PairStratBaseModel] = []
     for buy_symbol, sell_symbol in leg1_leg2_symbol_list[:2]:
         activated_pair_strat, executor_web_client = (
-            create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+            create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                               expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                               market_depth_basemodel_list))
         active_strat_list.append(activated_pair_strat)
 
     email_book_service_native_web_client.patch_pair_strat_client(
@@ -4629,15 +5141,15 @@ def test_pause_done_n_unload_strat(static_data_, clean_and_set_limits, leg1_leg2
 
 def _frequent_update_strat_view_in_strat(buy_symbol, sell_symbol, pair_strat_,
         expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
-        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec):
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_wait_sec = 4 * refresh_sec
 
     created_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
 
     loop_count = 2000
     for i in range(loop_count):
@@ -4661,15 +5173,15 @@ def _frequent_update_strat_view_in_strat(buy_symbol, sell_symbol, pair_strat_,
 def test_log_book_frequent_pair_strat_updates(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-        top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
+        market_depth_basemodel_list, last_barter_fixture_list,
         refresh_sec_update_fixture):
     symbols_n_strat_state_list = leg1_leg2_symbol_list
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_strat_state_list)) as executor:
         results = [executor.submit(_frequent_update_strat_view_in_strat, buy_symbol, sell_symbol,
                                    deepcopy(pair_strat_),
                                    deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
-                                   deepcopy(symbol_overview_obj_list), deepcopy(top_of_book_list_),
-                                   deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
+                                   deepcopy(symbol_overview_obj_list),
+                                   deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    refresh_sec_update_fixture)
                    for buy_symbol, sell_symbol in symbols_n_strat_state_list]
 
@@ -4678,19 +5190,19 @@ def test_log_book_frequent_pair_strat_updates(
                 raise Exception(future.exception())
 
 
-# def test_log_trade_simulator_trigger_kill_switch_and_resume_trading():
+# def test_log_barter_simulator_trigger_kill_switch_and_resume_bartering():
 #     log_dir: PurePath = PurePath(
 #         __file__).parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects" / "phone_book" / "log "
-#     configure_logger("debug", str(log_dir), "test_log_trade_simulator.log")
+#     configure_logger("debug", str(log_dir), "test_log_barter_simulator.log")
 #
-#     LogTradeSimulator.trigger_kill_switch()
+#     LogBarterSimulator.trigger_kill_switch()
 #     time.sleep(5)
 #
 #     portfolio_status_id = 1
 #     portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(portfolio_status_id)
 #     assert portfolio_status.kill_switch
 #
-#     LogTradeSimulator.revoke_kill_switch_n_resume_trading()
+#     LogBarterSimulator.revoke_kill_switch_n_resume_bartering()
 #     time.sleep(5)
 #
 #     portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(portfolio_status_id)

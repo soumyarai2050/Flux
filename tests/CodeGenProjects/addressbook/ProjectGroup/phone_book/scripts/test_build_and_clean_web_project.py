@@ -3,7 +3,7 @@ from pathlib import PurePath
 
 
 def test_build_and_clean_web_project(root_dir: PurePath, build_and_clean_web_project_path: PurePath):
-    list_of_generated_files: list = ['Layout.jsx', 'OrderLimits.jsx', 'orderLimitsSlice.js', 'PairStratParams.jsx',
+    list_of_generated_files: list = ['Layout.jsx', 'ChoreLimits.jsx', 'choreLimitsSlice.js', 'PairStratParams.jsx',
                                      'pairStratSlice.js', 'PortfolioLimits.jsx', 'portfolioLimitsSlice.js',
                                      'PortfolioStatus.jsx', 'portfolioStatusSlice.js', 'projectSpecificUtils.js',
                                      'store.js', 'strat_core_pb2.py', 'email_book_service_beanie_database.py',

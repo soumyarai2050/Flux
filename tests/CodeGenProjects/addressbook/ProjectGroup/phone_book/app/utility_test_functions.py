@@ -6,6 +6,8 @@ import threading
 import time
 import copy
 import re
+
+import pendulum
 import pexpect
 from csv import writer
 import os
@@ -16,33 +18,33 @@ os.environ["PORT"] = "8081"
 os.environ["DBType"] = "beanie"
 
 # project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import \
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import \
     EmailBookServiceHttpClient
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 from FluxPythonUtils.scripts.utility_functions import clean_mongo_collections, YAMLConfigurationManager, parse_to_int, \
-    get_mongo_db_list, drop_mongo_database, avg_of_new_val_sum_to_avg
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
+    get_mongo_db_list, drop_mongo_database, avg_of_new_val_sum_to_avg, run_gbd_terminal_with_pid, get_pid_from_port
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
     LogBookServiceHttpClient)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.app.post_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
     post_book_service_http_client)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 
 code_gen_projects_dir_path = (PurePath(__file__).parent.parent.parent.parent.parent.parent.parent
                               / "Flux" / "CodeGenProjects")
 
-PAIR_STRAT_ENGINE_DIR = code_gen_projects_dir_path / "addressbook" / "ProjectGroup" / "phone_book"
+PAIR_STRAT_ENGINE_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "phone_book"
 ps_config_yaml_path: PurePath = PAIR_STRAT_ENGINE_DIR / "data" / "config.yaml"
 ps_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(ps_config_yaml_path))
 
-LOG_ANALYZER_DIR = code_gen_projects_dir_path / "addressbook" / "ProjectGroup" / "log_book"
+LOG_ANALYZER_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "log_book"
 la_config_yaml_path = LOG_ANALYZER_DIR / "data" / "config.yaml"
 la_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(la_config_yaml_path))
 
-STRAT_EXECUTOR = code_gen_projects_dir_path / "addressbook" / "ProjectGroup" / "street_book"
+STRAT_EXECUTOR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "street_book"
 executor_config_yaml_path: PurePath = STRAT_EXECUTOR / "data" / "config.yaml"
 executor_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(executor_config_yaml_path))
 
@@ -67,12 +69,20 @@ log_book_web_client: LogBookServiceHttpClient = (
 
 static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
 project_dir_path = \
-    (PurePath(__file__).parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects" / "addressbook" /
+    (PurePath(__file__).parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects" / "AddressBook" /
      "ProjectGroup" / "phone_book")
 project_app_dir_path = project_dir_path / "app"
 test_project_dir_path = PurePath(__file__).parent.parent / 'data'
 test_config_file_path: PurePath = test_project_dir_path / "config.yaml"
 static_data_dir: PurePath = project_dir_path / "data"
+
+
+def get_utc_date_time() -> pendulum.DateTime:
+    # used wherever datetime needs to be set to any model field, required to make it symmetric with the
+    # format of datetime fields of models fetched from db
+    # mongo strips micro secs from stored datetime
+    formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    return pendulum.parse(formatted_dt_utc)
 
 
 def clean_all_collections_ignoring_ui_layout(db_names_list: List[str]) -> None:
@@ -103,31 +113,32 @@ def drop_all_databases() -> None:
 
 def clean_project_logs():
     # clean all project log file, strat json.lock files, generated md, so scripts and script logs
-    phone_book_dir: PurePath = code_gen_projects_path / "addressbook" / "ProjectGroup" / "phone_book"
-    log_book_dir: PurePath = code_gen_projects_path / "addressbook" / "ProjectGroup" / "log_book"
-    post_book_dir: PurePath = code_gen_projects_path / "addressbook" / "ProjectGroup" / "post_book"
-    street_book_dir: PurePath = code_gen_projects_path / "addressbook" / "ProjectGroup" / "street_book"
-    log_file: str
-    # delete phone_book, log_book, post_book, street_book log files
-    projects: List[str] = ["phone_book", "log_book", "post_book", "street_book"]
-    for project in projects:
-        log_files: List[str] = glob.glob(str(code_gen_projects_path / f"{project}" / "log" / "*.log*"))
-        for log_file in log_files:
-            os.remove(log_file)
-    # delete fx_so script and script log
-    fx_script_n_log_files: List[str] = glob.glob(str(phone_book_dir / "scripts" / "fx_so.sh*"))
-    for log_file in fx_script_n_log_files:
-        os.remove(log_file)
-    lock_files: List[str] = glob.glob(str(phone_book_dir / "data" / "*.json.lock"))
-    for lock_file in lock_files:
-        os.remove(lock_file)
-    # delete strat json.lock files, executor simulate config files, so/md scripts and script logs
-    executor_config_files: List[str] = glob.glob(str(street_book_dir / "data" / "executor_*_simulate_config.yaml"))
-    for executor_config_file in executor_config_files:
-        os.remove(executor_config_file)
-    ps_id_scripts_n_log_files: List[str] = glob.glob(str(street_book_dir / "scripts" / "*ps_id_*.sh*"))
-    for ps_id_file in ps_id_scripts_n_log_files:
-        os.remove(ps_id_file)
+    barter_engine_dir: PurePath = code_gen_projects_path / "AddressBook" / "ProjectGroup"
+    phone_book_dir: PurePath = barter_engine_dir / "phone_book"
+    post_book_dir: PurePath = barter_engine_dir / "post_book"
+    log_book_dir: PurePath = barter_engine_dir / "log_book"
+    street_book_dir: PurePath = barter_engine_dir / "street_book"
+
+    delete_file_glob_pattens: List[str] = [
+        str(phone_book_dir / "log" / "*.log*"),
+        str(post_book_dir / "log" / "*.log*"),
+        str(log_book_dir / "log" / "*.log*"),
+        str(street_book_dir / "log" / "*.log*"),
+        str(phone_book_dir / "scripts" / "fx_so.sh*"),
+        str(phone_book_dir / "data" / "*.json.lock"),
+        str(log_book_dir / "log" / "tail_executors" / "*.log*"),
+        str(street_book_dir / "data" / "executor_*_simulate_config.yaml"),
+        str(street_book_dir / "scripts" / "*ps_id_*.sh*")
+    ]
+
+    files_to_delete: List[str] = []
+    pattern: str
+    for pattern in delete_file_glob_pattens:
+        files: List[str] = glob.glob(pattern)
+        files_to_delete.extend(files)
+
+    for matched_file in files_to_delete:
+        os.remove(matched_file)
 
 #
 # def run_pair_strat_log_book(executor_n_log_book: 'ExecutorNLogBookManager'):
@@ -167,7 +178,7 @@ def clean_project_logs():
 #
 # class ExecutorNLogBookManager:
 #     """
-#     Context manager to handle running of trade_executor and log_book in threads and after test is completed,
+#     Context manager to handle running of barter_executor and log_book in threads and after test is completed,
 #     handling killing of the both processes and cleaning the slate
 #     """
 #
@@ -187,7 +198,7 @@ def clean_project_logs():
 #
 #     def __exit__(self, exc_type, exc_value, exc_traceback):
 #         assert kill_process(self.executor_pid), \
-#             f"Something went wrong while killing trade_executor process, pid: {self.executor_pid}"
+#             f"Something went wrong while killing barter_executor process, pid: {self.executor_pid}"
 #         assert kill_process(self.pair_strat_log_book_pid), \
 #             f"Something went wrong while killing pair_strat_log_book process, " \
 #             f"pid: {self.pair_strat_log_book_pid}"
@@ -205,9 +216,9 @@ def clean_project_logs():
 #             time.sleep(parse_to_int(post_test_delay))
 
 
-def get_continuous_order_configs(symbol: str, config_dict: Dict) -> Tuple[int | None, int | None]:
+def get_continuous_chore_configs(symbol: str, config_dict: Dict) -> Tuple[int | None, int | None]:
     symbol_configs = get_symbol_configs(symbol, config_dict)
-    return symbol_configs.get("continues_order_count"), symbol_configs.get("continues_special_order_count")
+    return symbol_configs.get("continues_chore_count"), symbol_configs.get("continues_special_chore_count")
 
 
 def position_fixture():
@@ -261,159 +272,172 @@ def broker_fixture():
     return broker1
 
 
-# def get_buy_order_related_values():
-#     single_buy_order_px = 100
-#     single_buy_order_qty = 90
+# def get_buy_chore_related_values():
+#     single_buy_chore_px = 100
+#     single_buy_chore_qty = 90
 #     single_buy_filled_px = 90
 #     single_buy_filled_qty = 50
-#     single_buy_unfilled_qty = single_buy_order_qty - single_buy_filled_qty
-#     return single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
+#     single_buy_unfilled_qty = single_buy_chore_qty - single_buy_filled_qty
+#     return single_buy_chore_px, single_buy_chore_qty, single_buy_filled_px, single_buy_filled_qty, \
 #         single_buy_unfilled_qty
 #
 #
-# def get_sell_order_related_values():
-#     single_sell_order_px = 110
-#     single_sell_order_qty = 70
+# def get_sell_chore_related_values():
+#     single_sell_chore_px = 110
+#     single_sell_chore_qty = 70
 #     single_sell_filled_px = 120
 #     single_sell_filled_qty = 30
-#     single_sell_unfilled_qty = single_sell_order_qty - single_sell_filled_qty
-#     return single_sell_order_px, single_sell_order_qty, single_sell_filled_px, single_sell_filled_qty, \
+#     single_sell_unfilled_qty = single_sell_chore_qty - single_sell_filled_qty
+#     return single_sell_chore_px, single_sell_chore_qty, single_sell_filled_px, single_sell_filled_qty, \
 #         single_sell_unfilled_qty
 
 
-def get_both_leg_last_trade_px():
-    current_leg_last_trade_px = 116
-    other_leg_last_trade_px = 117
-    return current_leg_last_trade_px, other_leg_last_trade_px
+def get_both_side_last_barter_px():
+    buy_side_last_barter_px = 116
+    sell_side_last_barter_px = 117
+    return buy_side_last_barter_px, sell_side_last_barter_px
 
 
-def update_expected_strat_brief_for_buy(expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol: str,
+                                      sell_symbol: str) -> Tuple[MarketDepthBaseModel, MarketDepthBaseModel]:
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_http_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
+    return bid_buy_top_market_depth, ask_sell_top_market_depth
+
+
+def update_expected_strat_brief_for_buy(expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                         expected_other_leg_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                         expected_strat_limits: StratLimits,
                                         expected_strat_brief_obj: StratBriefBaseModel,
-                                        date_time_for_cmp: DateTime, buy_last_trade_px, sell_last_trade_px,
+                                        date_time_for_cmp: DateTime, buy_last_barter_px, sell_last_barter_px,
                                         fill_update_after_dod: bool = False):
     max_net_filled_notional = expected_strat_limits.max_net_filled_notional
 
-    if expected_order_snapshot_obj.order_status == OrderStatusType.OE_UNACK:
-        expected_strat_brief_obj.pair_buy_side_trading_brief.open_qty += expected_order_snapshot_obj.order_brief.qty
-        expected_strat_brief_obj.pair_buy_side_trading_brief.open_notional += (
-                expected_order_snapshot_obj.order_brief.qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
-        expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 4
-    elif expected_order_snapshot_obj.order_status == OrderStatusType.OE_ACKED:
-        expected_strat_brief_obj.pair_buy_side_trading_brief.open_qty -= expected_order_snapshot_obj.last_update_fill_qty
-        expected_strat_brief_obj.pair_buy_side_trading_brief.open_notional -= (
-                expected_order_snapshot_obj.last_update_fill_qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
-        expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 4
-    elif expected_order_snapshot_obj.order_status == OrderStatusType.OE_DOD:
-        # cxl order
+    if expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_UNACK:
+        expected_strat_brief_obj.pair_buy_side_bartering_brief.open_qty += expected_chore_snapshot_obj.chore_brief.qty
+        expected_strat_brief_obj.pair_buy_side_bartering_brief.open_notional += (
+                expected_chore_snapshot_obj.chore_brief.qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
+        expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 4
+    elif expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_ACKED:
+        expected_strat_brief_obj.pair_buy_side_bartering_brief.open_qty -= expected_chore_snapshot_obj.last_update_fill_qty
+        expected_strat_brief_obj.pair_buy_side_bartering_brief.open_notional -= (
+                expected_chore_snapshot_obj.last_update_fill_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
+        expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 4
+    elif expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_DOD:
+        # cxl chore
         if not fill_update_after_dod:
-            unfilled_qty = expected_order_snapshot_obj.order_brief.qty - expected_order_snapshot_obj.filled_qty
-            expected_strat_brief_obj.pair_buy_side_trading_brief.open_qty -= unfilled_qty
-            expected_strat_brief_obj.pair_buy_side_trading_brief.open_notional -= (
-                    unfilled_qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
-            expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty += (
-                    expected_order_snapshot_obj.order_brief.qty - expected_order_snapshot_obj.filled_qty)
-            expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 5
+            unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
+            expected_strat_brief_obj.pair_buy_side_bartering_brief.open_qty -= unfilled_qty
+            expected_strat_brief_obj.pair_buy_side_bartering_brief.open_notional -= (
+                    unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
+            expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty += (
+                    expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty)
+            expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 5
         else:
-            expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty -= (
-                expected_order_snapshot_obj.last_update_fill_qty)
-            expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 5
+            expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty -= (
+                expected_chore_snapshot_obj.last_update_fill_qty)
+            expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 5
 
-    open_qty = expected_strat_brief_obj.pair_buy_side_trading_brief.open_qty
-    open_notional = expected_strat_brief_obj.pair_buy_side_trading_brief.open_notional
-    expected_strat_brief_obj.pair_buy_side_trading_brief.all_bkr_cxlled_qty = \
+    open_qty = expected_strat_brief_obj.pair_buy_side_bartering_brief.open_qty
+    open_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.open_notional
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.all_bkr_cxlled_qty = \
         expected_symbol_side_snapshot.total_cxled_qty
-    expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_notional = \
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_notional = \
         expected_strat_limits.max_single_leg_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
-    expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_notional = \
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_notional = \
         expected_strat_limits.max_open_single_leg_notional - open_notional
     total_security_size: int = \
-        static_data.get_security_float_from_ticker(expected_order_snapshot_obj.order_brief.security.sec_id)
-    expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_concentration = \
+        static_data.get_security_float_from_ticker(expected_chore_snapshot_obj.chore_brief.security.sec_id)
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_concentration = \
         (total_security_size / 100 * expected_strat_limits.max_concentration) - (
                 open_qty + expected_symbol_side_snapshot.total_filled_qty)
     # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
-    expected_strat_brief_obj.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
-    expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_cxl_qty = \
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_cxl_qty = \
         (((open_qty + expected_symbol_side_snapshot.total_filled_qty +
            expected_symbol_side_snapshot.total_cxled_qty) / 100) * expected_strat_limits.cancel_rate.max_cancel_rate) - \
         expected_symbol_side_snapshot.total_cxled_qty
     # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
-    expected_strat_brief_obj.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-    sell_side_residual_qty = expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty
-    expected_strat_brief_obj.pair_buy_side_trading_brief.indicative_consumable_residual = \
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+    sell_side_residual_qty = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.indicative_consumable_residual = \
         expected_strat_limits.residual_restriction.max_residual - \
-        ((expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty *
-          get_px_in_usd(buy_last_trade_px)) - (sell_side_residual_qty * get_px_in_usd(sell_last_trade_px)))
-    expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = date_time_for_cmp
+        ((expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty *
+          get_px_in_usd(buy_last_barter_px)) - (sell_side_residual_qty * get_px_in_usd(sell_last_barter_px)))
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = date_time_for_cmp
     expected_strat_brief_obj.consumable_nett_filled_notional = (
             max_net_filled_notional - abs(expected_symbol_side_snapshot.total_fill_notional -
                                           expected_other_leg_symbol_side_snapshot.total_fill_notional))
 
 
-def update_expected_strat_brief_for_sell(expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def update_expected_strat_brief_for_sell(expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                          expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                          expected_other_leg_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                          expected_strat_limits: StratLimits,
                                          expected_strat_brief_obj: StratBriefBaseModel,
-                                         date_time_for_cmp: DateTime, buy_last_trade_px, sell_last_trade_px,
+                                         date_time_for_cmp: DateTime, buy_last_barter_px, sell_last_barter_px,
                                          fill_update_after_dod: bool = False):
     max_net_filled_notional = expected_strat_limits.max_net_filled_notional
 
-    if expected_order_snapshot_obj.order_status == OrderStatusType.OE_UNACK:
-        expected_strat_brief_obj.pair_sell_side_trading_brief.open_qty += expected_order_snapshot_obj.order_brief.qty
-        expected_strat_brief_obj.pair_sell_side_trading_brief.open_notional += (
-                expected_order_snapshot_obj.order_brief.qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
-        expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 4
-    elif expected_order_snapshot_obj.order_status == OrderStatusType.OE_ACKED:
-        expected_strat_brief_obj.pair_sell_side_trading_brief.open_qty -= expected_order_snapshot_obj.last_update_fill_qty
-        expected_strat_brief_obj.pair_sell_side_trading_brief.open_notional -= (
-                expected_order_snapshot_obj.last_update_fill_qty * get_px_in_usd(
-                expected_order_snapshot_obj.order_brief.px))
-        expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 4
-    elif expected_order_snapshot_obj.order_status == OrderStatusType.OE_DOD:
-        # cxl order
+    if expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_UNACK:
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.open_qty += expected_chore_snapshot_obj.chore_brief.qty
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.open_notional += (
+                expected_chore_snapshot_obj.chore_brief.qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_open_chores = 4
+    elif expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_ACKED:
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.open_qty -= expected_chore_snapshot_obj.last_update_fill_qty
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.open_notional -= (
+                expected_chore_snapshot_obj.last_update_fill_qty * get_px_in_usd(
+                expected_chore_snapshot_obj.chore_brief.px))
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_open_chores = 4
+    elif expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_DOD:
+        # cxl chore
         if not fill_update_after_dod:
-            unfilled_qty = expected_order_snapshot_obj.order_brief.qty - expected_order_snapshot_obj.filled_qty
-            expected_strat_brief_obj.pair_sell_side_trading_brief.open_qty -= unfilled_qty
-            expected_strat_brief_obj.pair_sell_side_trading_brief.open_notional -= (
-                    unfilled_qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
-            expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty += (
-                    expected_order_snapshot_obj.order_brief.qty - expected_order_snapshot_obj.filled_qty)
-            expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 5
+            unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
+            expected_strat_brief_obj.pair_sell_side_bartering_brief.open_qty -= unfilled_qty
+            expected_strat_brief_obj.pair_sell_side_bartering_brief.open_notional -= (
+                    unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
+            expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty += (
+                    expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty)
+            expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_open_chores = 5
         else:
-            expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty -= (
-                expected_order_snapshot_obj.last_update_fill_qty)
-            expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 5
-    open_qty = expected_strat_brief_obj.pair_sell_side_trading_brief.open_qty
-    open_notional = expected_strat_brief_obj.pair_sell_side_trading_brief.open_notional
-    expected_strat_brief_obj.pair_sell_side_trading_brief.all_bkr_cxlled_qty = \
+            expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty -= (
+                expected_chore_snapshot_obj.last_update_fill_qty)
+            expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 5
+    open_qty = expected_strat_brief_obj.pair_sell_side_bartering_brief.open_qty
+    open_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.open_notional
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.all_bkr_cxlled_qty = \
         expected_symbol_side_snapshot.total_cxled_qty
-    expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_notional = \
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_notional = \
         expected_strat_limits.max_single_leg_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
-    expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_notional = \
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_open_notional = \
         expected_strat_limits.max_open_single_leg_notional - open_notional
     total_security_size: int = \
-        static_data.get_security_float_from_ticker(expected_order_snapshot_obj.order_brief.security.sec_id)
-    expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_concentration = \
+        static_data.get_security_float_from_ticker(expected_chore_snapshot_obj.chore_brief.security.sec_id)
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_concentration = \
         (total_security_size / 100 * expected_strat_limits.max_concentration) - (
                 open_qty + expected_symbol_side_snapshot.total_filled_qty)
     # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
-    expected_strat_brief_obj.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-    expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_cxl_qty = \
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_cxl_qty = \
         (((open_qty + expected_symbol_side_snapshot.total_filled_qty +
            expected_symbol_side_snapshot.total_cxled_qty) / 100) * expected_strat_limits.cancel_rate.max_cancel_rate) - \
         expected_symbol_side_snapshot.total_cxled_qty
     # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
-    expected_strat_brief_obj.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-    buy_side_residual_qty = expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty
-    expected_strat_brief_obj.pair_sell_side_trading_brief.indicative_consumable_residual = \
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+    buy_side_residual_qty = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.indicative_consumable_residual = \
         expected_strat_limits.residual_restriction.max_residual - \
-        ((expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(sell_last_trade_px)) -
-         (buy_side_residual_qty * get_px_in_usd(buy_last_trade_px)))
-    expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = date_time_for_cmp
+        ((expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(sell_last_barter_px)) -
+         (buy_side_residual_qty * get_px_in_usd(buy_last_barter_px)))
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = date_time_for_cmp
     expected_strat_brief_obj.consumable_nett_filled_notional = (
             max_net_filled_notional - abs(expected_symbol_side_snapshot.total_fill_notional -
                                           expected_other_leg_symbol_side_snapshot.total_fill_notional))
@@ -430,10 +454,10 @@ def check_strat_view_computes(strat_view_id: int, strat_status_obj: StratStatusB
          f"received: {strat_view.max_single_leg_notional}")
 
 
-def check_placed_buy_order_computes_before_all_sells(loop_count: int,
-                                                     expected_order_id: str, symbol: str,
-                                                     buy_placed_order_journal: OrderJournalBaseModel,
-                                                     expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
+                                                     expected_chore_id: str, symbol: str,
+                                                     buy_placed_chore_journal: ChoreJournalBaseModel,
+                                                     expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                      expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                      other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                      pair_strat_: PairStratBaseModel,
@@ -442,50 +466,44 @@ def check_placed_buy_order_computes_before_all_sells(loop_count: int,
                                                      expected_strat_brief_obj: StratBriefBaseModel,
                                                      executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
-    StratBrief and PortfolioStatus after order is triggered
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
+    StratBrief and PortfolioStatus after chore is triggered
     """
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
-    assert buy_placed_order_journal in order_journal_obj_list, \
-        f"Couldn't find {buy_placed_order_journal} in {order_journal_obj_list}"
+    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
+    assert buy_placed_chore_journal in chore_journal_obj_list, \
+        f"Couldn't find {buy_placed_chore_journal} in {chore_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.order_brief.px = buy_placed_order_journal.order.px
-    expected_order_snapshot_obj.order_brief.qty = buy_placed_order_journal.order.qty
-    expected_order_snapshot_obj.order_brief.order_notional = (buy_placed_order_journal.order.qty *
-                                                              get_px_in_usd(buy_placed_order_journal.order.px))
-    expected_order_snapshot_obj.order_status = OrderStatusType.OE_UNACK
-    expected_order_snapshot_obj.last_update_date_time = buy_placed_order_journal.order_event_date_time
-    expected_order_snapshot_obj.create_date_time = buy_placed_order_journal.order_event_date_time
-    expected_order_snapshot_obj.order_brief.text.extend(buy_placed_order_journal.order.text)
+    # Checking chore_snapshot
+    expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
+    expected_chore_snapshot_obj.chore_brief.px = buy_placed_chore_journal.chore.px
+    expected_chore_snapshot_obj.chore_brief.qty = buy_placed_chore_journal.chore.qty
+    expected_chore_snapshot_obj.chore_brief.chore_notional = (buy_placed_chore_journal.chore.qty *
+                                                              get_px_in_usd(buy_placed_chore_journal.chore.px))
+    expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_UNACK
+    expected_chore_snapshot_obj.last_update_date_time = buy_placed_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.create_date_time = buy_placed_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.chore_brief.text.extend(buy_placed_chore_journal.chore.text)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # updating below field from received_order_snapshot_list for comparison
-    for order_snapshot in order_snapshot_list:
-        order_snapshot.id = None
-    for order_snapshot in order_snapshot_list:
-        if order_snapshot == expected_order_snapshot_obj:
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # updating below field from received_chore_snapshot_list for comparison
+    for chore_snapshot in chore_snapshot_list:
+        chore_snapshot.id = None
+    for chore_snapshot in chore_snapshot_list:
+        if chore_snapshot == expected_chore_snapshot_obj:
             break
     else:
-        assert False, f"Couldn't find expected_order_snapshot {expected_order_snapshot_obj} in {order_snapshot_list}"
+        assert False, f"Couldn't find expected_chore_snapshot {expected_chore_snapshot_obj} in {chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.order_count = loop_count
+    expected_symbol_side_snapshot.chore_count = loop_count
     expected_symbol_side_snapshot.avg_px = (
         avg_of_new_val_sum_to_avg(expected_symbol_side_snapshot.avg_px,
-                                  buy_placed_order_journal.order.px,
-                                  expected_symbol_side_snapshot.order_count))
-    expected_symbol_side_snapshot.total_qty += buy_placed_order_journal.order.qty
-    expected_symbol_side_snapshot.last_update_date_time = buy_placed_order_journal.order_event_date_time
+                                  buy_placed_chore_journal.chore.px,
+                                  expected_symbol_side_snapshot.chore_count))
+    expected_symbol_side_snapshot.total_qty += buy_placed_chore_journal.chore.qty
+    expected_symbol_side_snapshot.last_update_date_time = buy_placed_chore_journal.chore_event_date_time
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -496,22 +514,22 @@ def check_placed_buy_order_computes_before_all_sells(loop_count: int,
 
     # Checking start_brief
     expected_strat_brief_obj.id = pair_strat_.id  # since strat's id is synced with strat_brief
-    update_expected_strat_brief_for_buy(expected_order_snapshot_obj,
+    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
-                                        buy_placed_order_journal.order_event_date_time,
-                                        buy_last_trade_px, sell_last_trade_px)
+                                        buy_placed_chore_journal.chore_event_date_time,
+                                        buy_last_barter_px, sell_last_barter_px)
 
     print(f"@@@ fetching strat_brief for symbol: {symbol} at {DateTime.utcnow()}")
     strat_brief = executor_web_client.get_strat_brief_client(pair_strat_.id)
 
-    strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-    strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
-    strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
+    strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+    strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+    strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
     # Since sell side of strat_brief is not updated till sell cycle
-    expected_strat_brief_obj.pair_sell_side_trading_brief = strat_brief.pair_sell_side_trading_brief
-    expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_sell_side_bartering_brief = strat_brief.pair_sell_side_bartering_brief
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
     assert expected_strat_brief_obj == strat_brief, \
         f"Mismatched: expected strat_brief {expected_strat_brief_obj}, received strat_brief {strat_brief}"
 
@@ -529,23 +547,23 @@ def check_placed_buy_order_computes_before_all_sells(loop_count: int,
         assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
                        f"strat_limits_list: {strat_limits_obj_list}")
 
-    expected_strat_status.total_buy_qty += expected_order_snapshot_obj.order_brief.qty
-    expected_strat_status.total_order_qty += expected_order_snapshot_obj.order_brief.qty
-    expected_strat_status.total_open_buy_qty = expected_order_snapshot_obj.order_brief.qty
-    expected_strat_status.total_open_buy_notional = (expected_order_snapshot_obj.order_brief.qty *
-                                                     get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+    expected_strat_status.total_buy_qty += expected_chore_snapshot_obj.chore_brief.qty
+    expected_strat_status.total_chore_qty += expected_chore_snapshot_obj.chore_brief.qty
+    expected_strat_status.total_open_buy_qty = expected_chore_snapshot_obj.chore_brief.qty
+    expected_strat_status.total_open_buy_notional = (expected_chore_snapshot_obj.chore_brief.qty *
+                                                     get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_strat_status.avg_open_buy_px = (
         get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
         expected_strat_status.total_open_buy_qty)
     expected_strat_status.total_open_exposure = expected_strat_status.total_open_buy_notional
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
-        buy_last_trade_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
-        sell_last_trade_px)
+    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        buy_last_barter_px)
+    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+        sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
-    security = expected_strat_brief_obj.pair_buy_side_trading_brief.security if \
+    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_trading_brief.security
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
     expected_strat_status.residual = ResidualOptional(security=security,
                                                       residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
@@ -572,9 +590,9 @@ def check_placed_buy_order_computes_before_all_sells(loop_count: int,
     check_strat_view_computes(pair_strat_.id, strat_status_obj, strat_limits_obj)
 
 
-def check_placed_buy_order_computes_after_sells(loop_count: int, expected_order_id: str, symbol: str,
-                                                buy_placed_order_journal: OrderJournalBaseModel,
-                                                expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_id: str, symbol: str,
+                                                buy_placed_chore_journal: ChoreJournalBaseModel,
+                                                expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                 expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                 other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                 expected_pair_strat: PairStratBaseModel,
@@ -583,52 +601,46 @@ def check_placed_buy_order_computes_after_sells(loop_count: int, expected_order_
                                                 expected_strat_brief_obj: StratBriefBaseModel,
                                                 executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
-    StratBrief and PortfolioStatus after order is triggered
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
+    StratBrief and PortfolioStatus after chore is triggered
     """
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
-    assert buy_placed_order_journal in order_journal_obj_list, \
-        f"Couldn't find {buy_placed_order_journal} in {order_journal_obj_list}"
+    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
+    assert buy_placed_chore_journal in chore_journal_obj_list, \
+        f"Couldn't find {buy_placed_chore_journal} in {chore_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.order_brief.px = buy_placed_order_journal.order.px
-    expected_order_snapshot_obj.order_brief.qty = buy_placed_order_journal.order.qty
-    expected_order_snapshot_obj.order_brief.order_notional = (buy_placed_order_journal.order.qty *
-                                                              get_px_in_usd(buy_placed_order_journal.order.px))
-    expected_order_snapshot_obj.order_status = OrderStatusType.OE_UNACK
-    expected_order_snapshot_obj.last_update_date_time = buy_placed_order_journal.order_event_date_time
-    expected_order_snapshot_obj.create_date_time = buy_placed_order_journal.order_event_date_time
-    expected_order_snapshot_obj.order_brief.text.extend(buy_placed_order_journal.order.text)
+    # Checking chore_snapshot
+    expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
+    expected_chore_snapshot_obj.chore_brief.px = buy_placed_chore_journal.chore.px
+    expected_chore_snapshot_obj.chore_brief.qty = buy_placed_chore_journal.chore.qty
+    expected_chore_snapshot_obj.chore_brief.chore_notional = (buy_placed_chore_journal.chore.qty *
+                                                              get_px_in_usd(buy_placed_chore_journal.chore.px))
+    expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_UNACK
+    expected_chore_snapshot_obj.last_update_date_time = buy_placed_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.create_date_time = buy_placed_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.chore_brief.text.extend(buy_placed_chore_journal.chore.text)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # updating below field from received_order_snapshot_list for comparison
-    for order_snapshot in order_snapshot_list:
-        order_snapshot.id = None
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # updating below field from received_chore_snapshot_list for comparison
+    for chore_snapshot in chore_snapshot_list:
+        chore_snapshot.id = None
     found_count = 0
-    for order_snapshot in order_snapshot_list:
-        if order_snapshot == expected_order_snapshot_obj:
+    for chore_snapshot in chore_snapshot_list:
+        if chore_snapshot == expected_chore_snapshot_obj:
             found_count += 1
-    print(expected_order_snapshot_obj, "in", order_snapshot_list)
-    assert found_count == 1, f"Couldn't find expected_order_snapshot {expected_order_snapshot_obj} in " \
-                             f"{order_snapshot_list}"
+    print(expected_chore_snapshot_obj, "in", chore_snapshot_list)
+    assert found_count == 1, f"Couldn't find expected_chore_snapshot {expected_chore_snapshot_obj} in " \
+                             f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.order_count = loop_count
+    expected_symbol_side_snapshot.chore_count = loop_count
     expected_symbol_side_snapshot.avg_px = (
         avg_of_new_val_sum_to_avg(expected_symbol_side_snapshot.avg_px,
-                                  buy_placed_order_journal.order.px,
-                                  expected_symbol_side_snapshot.order_count))
-    expected_symbol_side_snapshot.total_qty += buy_placed_order_journal.order.qty
-    expected_symbol_side_snapshot.last_update_date_time = buy_placed_order_journal.order_event_date_time
+                                  buy_placed_chore_journal.chore.px,
+                                  expected_symbol_side_snapshot.chore_count))
+    expected_symbol_side_snapshot.total_qty += buy_placed_chore_journal.chore.qty
+    expected_symbol_side_snapshot.last_update_date_time = buy_placed_chore_journal.chore_event_date_time
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -638,22 +650,22 @@ def check_placed_buy_order_computes_after_sells(loop_count: int, expected_order_
                                                                        f"{symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_buy(expected_order_snapshot_obj, expected_symbol_side_snapshot,
+    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj, expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
-                                        buy_placed_order_journal.order_event_date_time,
-                                        buy_last_trade_px, sell_last_trade_px)
+                                        buy_placed_chore_journal.chore_event_date_time,
+                                        buy_last_barter_px, sell_last_barter_px)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
+        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
     assert expected_strat_brief_obj in strat_brief_list, \
         f"Mismatched: {expected_strat_brief_obj} not found in {strat_brief_list}"
 
@@ -672,23 +684,23 @@ def check_placed_buy_order_computes_after_sells(loop_count: int, expected_order_
                        f"strat_limits_list: {strat_limits_obj_list}")
 
     # Checking strat_status
-    expected_strat_status.total_buy_qty += buy_placed_order_journal.order.qty
-    expected_strat_status.total_order_qty = expected_strat_status.total_buy_qty + expected_strat_status.total_sell_qty
-    expected_strat_status.total_open_buy_qty += buy_placed_order_journal.order.qty
-    expected_strat_status.total_open_buy_notional += (get_px_in_usd(buy_placed_order_journal.order.px) *
-                                                       buy_placed_order_journal.order.qty)
+    expected_strat_status.total_buy_qty += buy_placed_chore_journal.chore.qty
+    expected_strat_status.total_chore_qty = expected_strat_status.total_buy_qty + expected_strat_status.total_sell_qty
+    expected_strat_status.total_open_buy_qty += buy_placed_chore_journal.chore.qty
+    expected_strat_status.total_open_buy_notional += (get_px_in_usd(buy_placed_chore_journal.chore.px) *
+                                                       buy_placed_chore_journal.chore.qty)
     expected_strat_status.avg_open_buy_px = (
             get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
             expected_strat_status.total_open_buy_qty)
     expected_strat_status.total_open_exposure = expected_strat_status.total_open_buy_notional
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
-        buy_last_trade_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
-        sell_last_trade_px)
+    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        buy_last_barter_px)
+    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+        sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
-    security = expected_strat_brief_obj.pair_buy_side_trading_brief.security if \
+    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_trading_brief.security
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
     expected_strat_status.residual = ResidualOptional(security=security,
                                               residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
@@ -715,31 +727,31 @@ def check_placed_buy_order_computes_after_sells(loop_count: int, expected_order_
     check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
 
 
-def placed_buy_order_ack_receive(expected_order_journal: OrderJournalBaseModel,
-                                 expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def placed_buy_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
+                                 expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                  executor_web_client: StreetBookServiceHttpClient):
-    """Checking after order's ACK status is received"""
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
+    """Checking after chore's ACK status is received"""
+    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
 
-    assert expected_order_journal in order_journal_obj_list, f"Couldn't find {expected_order_journal} in list " \
-                                                             f"{order_journal_obj_list}"
+    assert expected_chore_journal in chore_journal_obj_list, f"Couldn't find {expected_chore_journal} in list " \
+                                                             f"{chore_journal_obj_list}"
 
-    # Checking order_snapshot
-    expected_order_snapshot_obj.order_status = OrderStatusType.OE_ACKED
-    expected_order_snapshot_obj.last_update_date_time = expected_order_journal.order_event_date_time
+    # Checking chore_snapshot
+    expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
+    expected_chore_snapshot_obj.last_update_date_time = expected_chore_journal.chore_event_date_time
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # updating below field from received_order_snapshot_list for comparison
-    for order_snapshot in order_snapshot_list:
-        order_snapshot.id = None
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # updating below field from received_chore_snapshot_list for comparison
+    for chore_snapshot in chore_snapshot_list:
+        chore_snapshot.id = None
 
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
 
 
-def check_fill_receive_for_placed_buy_order_before_sells(symbol: str,
+def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
                                                          buy_fill_journal: FillsJournalBaseModel,
-                                                         expected_order_snapshot_obj: OrderSnapshotBaseModel,
+                                                         expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                          expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                          other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                          expected_pair_strat: PairStratBaseModel,
@@ -748,34 +760,28 @@ def check_fill_receive_for_placed_buy_order_before_sells(symbol: str,
                                                          expected_strat_brief_obj: StratBriefBaseModel,
                                                          executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
     StratBrief and PortfolioStatus after fill is received
     """
     fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert buy_fill_journal in fill_journal_obj_list, f"Couldn't find {buy_fill_journal} in {fill_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    expected_order_snapshot_obj.filled_qty = buy_fill_journal.fill_qty
-    expected_order_snapshot_obj.avg_fill_px = buy_fill_journal.fill_px
-    expected_order_snapshot_obj.fill_notional = buy_fill_journal.fill_qty * get_px_in_usd(buy_fill_journal.fill_px)
-    expected_order_snapshot_obj.last_update_fill_qty = buy_fill_journal.fill_qty
-    expected_order_snapshot_obj.last_update_fill_px = buy_fill_journal.fill_px
-    expected_order_snapshot_obj.last_update_date_time = buy_fill_journal.fill_date_time
+    # Checking chore_snapshot
+    expected_chore_snapshot_obj.filled_qty = buy_fill_journal.fill_qty
+    expected_chore_snapshot_obj.avg_fill_px = buy_fill_journal.fill_px
+    expected_chore_snapshot_obj.fill_notional = buy_fill_journal.fill_qty * get_px_in_usd(buy_fill_journal.fill_px)
+    expected_chore_snapshot_obj.last_update_fill_qty = buy_fill_journal.fill_qty
+    expected_chore_snapshot_obj.last_update_fill_px = buy_fill_journal.fill_px
+    expected_chore_snapshot_obj.last_update_date_time = buy_fill_journal.fill_date_time
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # removing below field from received_order_snapshot_list for comparison
-    for symbol_side_snapshot in order_snapshot_list:
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # removing below field from received_chore_snapshot_list for comparison
+    for symbol_side_snapshot in chore_snapshot_list:
         symbol_side_snapshot.id = None
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
     expected_symbol_side_snapshot.last_update_date_time = buy_fill_journal.fill_date_time
@@ -796,20 +802,20 @@ def check_fill_receive_for_placed_buy_order_before_sells(symbol: str,
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_buy(expected_order_snapshot_obj,
+    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
                                         buy_fill_journal.fill_date_time,
-                                        buy_last_trade_px, sell_last_trade_px)
+                                        buy_last_barter_px, sell_last_barter_px)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = None
+        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
     assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find {expected_strat_brief_obj} in " \
                                                          f"{strat_brief_list}"
 
@@ -828,7 +834,7 @@ def check_fill_receive_for_placed_buy_order_before_sells(symbol: str,
 
     expected_strat_status.total_open_buy_qty -= buy_fill_journal.fill_qty
     expected_strat_status.total_open_buy_notional -= (buy_fill_journal.fill_qty *
-                                                      get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+                                                      get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_strat_status.avg_open_buy_px = (
         get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
         expected_strat_status.total_open_buy_qty)
@@ -865,9 +871,9 @@ def check_fill_receive_for_placed_buy_order_before_sells(symbol: str,
     check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
 
 
-def check_cxl_receive_for_placed_buy_order_before_sells(symbol: str,
-                                                        buy_cxl_order_journal: OrderJournalBaseModel,
-                                                        expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
+                                                        buy_cxl_chore_journal: ChoreJournalBaseModel,
+                                                        expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                         expected_pair_strat: PairStratBaseModel,
@@ -876,46 +882,40 @@ def check_cxl_receive_for_placed_buy_order_before_sells(symbol: str,
                                                         expected_strat_brief_obj: StratBriefBaseModel,
                                                         executor_web_client: StreetBookServiceHttpClient,):
     """
-    Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
     StratBrief and PortfolioStatus after fill is received
     """
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
-    assert buy_cxl_order_journal in order_journal_obj_list, f"Couldn't find {buy_cxl_order_journal} in list " \
-                                                            f"{order_journal_obj_list}"
+    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
+    assert buy_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {buy_cxl_chore_journal} in list " \
+                                                            f"{chore_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    unfilled_qty = expected_order_snapshot_obj.order_brief.qty - expected_order_snapshot_obj.filled_qty
-    expected_order_snapshot_obj.order_status = OrderStatusType.OE_DOD
-    expected_order_snapshot_obj.last_update_date_time = buy_cxl_order_journal.order_event_date_time
-    expected_order_snapshot_obj.cxled_qty = unfilled_qty
-    expected_order_snapshot_obj.cxled_notional = (unfilled_qty *
-                                                  get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
-    expected_order_snapshot_obj.avg_cxled_px = (
-        get_usd_to_local_px_or_notional(expected_order_snapshot_obj.cxled_notional) /
-        expected_order_snapshot_obj.cxled_qty)
+    # Checking chore_snapshot
+    unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
+    expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
+    expected_chore_snapshot_obj.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.cxled_qty = unfilled_qty
+    expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
+                                                  get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
+    expected_chore_snapshot_obj.avg_cxled_px = (
+        get_usd_to_local_px_or_notional(expected_chore_snapshot_obj.cxled_notional) /
+        expected_chore_snapshot_obj.cxled_qty)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # removing below field from received_order_snapshot_list for comparison
-    for order_snapshot in order_snapshot_list:
-        order_snapshot.id = None
-        order_snapshot.order_brief.text = []
-    expected_order_snapshot_obj.order_brief.text = []
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # removing below field from received_chore_snapshot_list for comparison
+    for chore_snapshot in chore_snapshot_list:
+        chore_snapshot.id = None
+        chore_snapshot.chore_brief.text = []
+    expected_chore_snapshot_obj.chore_brief.text = []
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.last_update_date_time = buy_cxl_order_journal.order_event_date_time
+    expected_symbol_side_snapshot.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
     expected_symbol_side_snapshot.total_cxled_qty += unfilled_qty
     expected_symbol_side_snapshot.total_cxled_notional += (
-            unfilled_qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+            unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_symbol_side_snapshot.avg_cxled_px = (
         get_usd_to_local_px_or_notional(expected_symbol_side_snapshot.total_cxled_notional) /
         expected_symbol_side_snapshot.total_cxled_qty)
@@ -928,20 +928,20 @@ def check_cxl_receive_for_placed_buy_order_before_sells(symbol: str,
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_buy(expected_order_snapshot_obj,
+    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
-                                        buy_cxl_order_journal.order_event_date_time,
-                                        buy_last_trade_px, sell_last_trade_px)
+                                        buy_cxl_chore_journal.chore_event_date_time,
+                                        buy_last_barter_px, sell_last_barter_px)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = None
+        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
     assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find {expected_strat_brief_obj} in " \
                                                          f"{strat_brief_list}"
 
@@ -960,13 +960,13 @@ def check_cxl_receive_for_placed_buy_order_before_sells(symbol: str,
 
     expected_strat_status.total_cxl_buy_qty += unfilled_qty
     expected_strat_status.total_cxl_buy_notional += (unfilled_qty *
-                                                     get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+                                                     get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_strat_status.avg_cxl_buy_px = (
             get_usd_to_local_px_or_notional(expected_strat_status.total_cxl_buy_notional) /
             expected_strat_status.total_cxl_buy_qty)
     expected_strat_status.total_open_buy_qty -= unfilled_qty
     expected_strat_status.total_open_buy_notional -= (
-        get_px_in_usd(expected_order_snapshot_obj.order_brief.px) * unfilled_qty)
+        get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px) * unfilled_qty)
     if expected_strat_status.total_open_buy_qty != 0:
         expected_strat_status.avg_open_buy_px = (
             get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
@@ -976,15 +976,15 @@ def check_cxl_receive_for_placed_buy_order_before_sells(symbol: str,
     expected_strat_status.total_open_exposure = expected_strat_status.total_open_buy_notional
     expected_strat_status.total_cxl_exposure = (expected_strat_status.total_cxl_buy_notional -
                                                 expected_strat_status.total_cxl_sell_notional)
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
-        buy_last_trade_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
-        sell_last_trade_px)
+    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        buy_last_barter_px)
+    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+        sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
 
-    security = expected_strat_brief_obj.pair_buy_side_trading_brief.security if \
+    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_trading_brief.security
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
     expected_strat_status.residual = ResidualOptional(security=security,
                                               residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
@@ -1010,9 +1010,9 @@ def check_cxl_receive_for_placed_buy_order_before_sells(symbol: str,
     # checking strat_view
     check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
 
-def check_cxl_receive_for_placed_sell_order_before_buy(symbol: str,
-                                                       sell_cxl_order_journal: OrderJournalBaseModel,
-                                                       expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
+                                                       sell_cxl_chore_journal: ChoreJournalBaseModel,
+                                                       expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                        expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                        other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                        expected_pair_strat: PairStratBaseModel,
@@ -1021,46 +1021,40 @@ def check_cxl_receive_for_placed_sell_order_before_buy(symbol: str,
                                                        expected_strat_brief_obj: StratBriefBaseModel,
                                                        executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
     StratBrief and PortfolioStatus after fill is received
     """
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
-    assert sell_cxl_order_journal in order_journal_obj_list, f"Couldn't find {sell_cxl_order_journal} in list " \
-                                                            f"{order_journal_obj_list}"
+    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
+    assert sell_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {sell_cxl_chore_journal} in list " \
+                                                            f"{chore_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    unfilled_qty = expected_order_snapshot_obj.order_brief.qty - expected_order_snapshot_obj.filled_qty
-    expected_order_snapshot_obj.order_status = OrderStatusType.OE_DOD
-    expected_order_snapshot_obj.last_update_date_time = sell_cxl_order_journal.order_event_date_time
-    expected_order_snapshot_obj.cxled_qty = unfilled_qty
-    expected_order_snapshot_obj.cxled_notional = (unfilled_qty *
-                                                  get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
-    expected_order_snapshot_obj.avg_cxled_px = (
-        get_usd_to_local_px_or_notional(expected_order_snapshot_obj.cxled_notional) /
-        expected_order_snapshot_obj.cxled_qty)
+    # Checking chore_snapshot
+    unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
+    expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
+    expected_chore_snapshot_obj.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.cxled_qty = unfilled_qty
+    expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
+                                                  get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
+    expected_chore_snapshot_obj.avg_cxled_px = (
+        get_usd_to_local_px_or_notional(expected_chore_snapshot_obj.cxled_notional) /
+        expected_chore_snapshot_obj.cxled_qty)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # removing below field from received_order_snapshot_list for comparison
-    for order_snapshot in order_snapshot_list:
-        order_snapshot.id = None
-        order_snapshot.order_brief.text = []
-    expected_order_snapshot_obj.order_brief.text = []
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # removing below field from received_chore_snapshot_list for comparison
+    for chore_snapshot in chore_snapshot_list:
+        chore_snapshot.id = None
+        chore_snapshot.chore_brief.text = []
+    expected_chore_snapshot_obj.chore_brief.text = []
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.last_update_date_time = sell_cxl_order_journal.order_event_date_time
+    expected_symbol_side_snapshot.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
     expected_symbol_side_snapshot.total_cxled_qty += unfilled_qty
     expected_symbol_side_snapshot.total_cxled_notional += (
-            unfilled_qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+            unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_symbol_side_snapshot.avg_cxled_px = (
         get_usd_to_local_px_or_notional(expected_symbol_side_snapshot.total_cxled_notional) /
         expected_symbol_side_snapshot.total_cxled_qty)
@@ -1073,20 +1067,20 @@ def check_cxl_receive_for_placed_sell_order_before_buy(symbol: str,
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(expected_order_snapshot_obj,
+    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
-                                         sell_cxl_order_journal.order_event_date_time,
-                                         buy_last_trade_px, sell_last_trade_px)
+                                         sell_cxl_chore_journal.chore_event_date_time,
+                                         buy_last_barter_px, sell_last_barter_px)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
-        strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = None
+        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
     assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find {expected_strat_brief_obj} in " \
                                                          f"{strat_brief_list}"
 
@@ -1105,13 +1099,13 @@ def check_cxl_receive_for_placed_sell_order_before_buy(symbol: str,
 
     expected_strat_status.total_cxl_sell_qty += unfilled_qty
     expected_strat_status.total_cxl_sell_notional += (unfilled_qty *
-                                                      get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+                                                      get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_strat_status.avg_cxl_sell_px = (
             get_usd_to_local_px_or_notional(expected_strat_status.total_cxl_sell_notional) /
             expected_strat_status.total_cxl_sell_qty)
     expected_strat_status.total_open_sell_qty -= unfilled_qty
     expected_strat_status.total_open_sell_notional -= (
-        get_px_in_usd(expected_order_snapshot_obj.order_brief.px) * unfilled_qty)
+        get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px) * unfilled_qty)
     if expected_strat_status.total_open_sell_qty != 0:
         expected_strat_status.avg_open_sell_px = (
             get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
@@ -1121,15 +1115,15 @@ def check_cxl_receive_for_placed_sell_order_before_buy(symbol: str,
     expected_strat_status.total_open_exposure = 0
     expected_strat_status.total_cxl_exposure = (expected_strat_status.total_cxl_buy_notional -
                                                 expected_strat_status.total_cxl_sell_notional)
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
-        buy_last_trade_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
-        sell_last_trade_px)
+    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        buy_last_barter_px)
+    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+        sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
 
-    security = expected_strat_brief_obj.pair_buy_side_trading_brief.security if \
+    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_trading_brief.security
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
     expected_strat_status.residual = ResidualOptional(security=security,
                                               residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
@@ -1156,9 +1150,9 @@ def check_cxl_receive_for_placed_sell_order_before_buy(symbol: str,
     check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
 
 
-def check_fill_receive_for_placed_buy_order_after_all_sells(loop_count: int, expected_order_id: str, symbol: str,
+def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, expected_chore_id: str, symbol: str,
                                                             buy_fill_journal: FillsJournalBaseModel,
-                                                            expected_order_snapshot_obj: OrderSnapshotBaseModel,
+                                                            expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                             expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                             other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                             expected_pair_strat: PairStratBaseModel,
@@ -1167,41 +1161,35 @@ def check_fill_receive_for_placed_buy_order_after_all_sells(loop_count: int, exp
                                                             expected_strat_brief_obj: StratBriefBaseModel,
                                                             executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
     StratBrief and PortfolioStatus after fill is received
     """
     fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert buy_fill_journal in fill_journal_obj_list, f"Couldn't find {buy_fill_journal} in {fill_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.filled_qty += buy_fill_journal.fill_qty
-    expected_order_snapshot_obj.fill_notional = buy_fill_journal.fill_qty * get_px_in_usd(buy_fill_journal.fill_px)
-    expected_order_snapshot_obj.avg_fill_px = (
-            get_usd_to_local_px_or_notional(expected_order_snapshot_obj.fill_notional) /
-            expected_order_snapshot_obj.filled_qty)
-    expected_order_snapshot_obj.last_update_fill_qty = buy_fill_journal.fill_qty
-    expected_order_snapshot_obj.last_update_fill_px = buy_fill_journal.fill_px
-    expected_order_snapshot_obj.last_update_date_time = buy_fill_journal.fill_date_time
+    # Checking chore_snapshot
+    expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
+    expected_chore_snapshot_obj.filled_qty += buy_fill_journal.fill_qty
+    expected_chore_snapshot_obj.fill_notional = buy_fill_journal.fill_qty * get_px_in_usd(buy_fill_journal.fill_px)
+    expected_chore_snapshot_obj.avg_fill_px = (
+            get_usd_to_local_px_or_notional(expected_chore_snapshot_obj.fill_notional) /
+            expected_chore_snapshot_obj.filled_qty)
+    expected_chore_snapshot_obj.last_update_fill_qty = buy_fill_journal.fill_qty
+    expected_chore_snapshot_obj.last_update_fill_px = buy_fill_journal.fill_px
+    expected_chore_snapshot_obj.last_update_date_time = buy_fill_journal.fill_date_time
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # removing below field from received_order_snapshot_list for comparison
-    for symbol_side_snapshot in order_snapshot_list:
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # removing below field from received_chore_snapshot_list for comparison
+    for symbol_side_snapshot in chore_snapshot_list:
         symbol_side_snapshot.id = None
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.last_update_date_time = expected_order_snapshot_obj.last_update_date_time
-    expected_symbol_side_snapshot.order_count = loop_count
+    expected_symbol_side_snapshot.last_update_date_time = expected_chore_snapshot_obj.last_update_date_time
+    expected_symbol_side_snapshot.chore_count = loop_count
     expected_symbol_side_snapshot.total_filled_qty += buy_fill_journal.fill_qty
     expected_symbol_side_snapshot.total_fill_notional += (buy_fill_journal.fill_qty *
                                                           get_px_in_usd(buy_fill_journal.fill_px))
@@ -1219,20 +1207,20 @@ def check_fill_receive_for_placed_buy_order_after_all_sells(loop_count: int, exp
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_buy(expected_order_snapshot_obj, expected_symbol_side_snapshot,
+    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj, expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
                                         buy_fill_journal.fill_date_time,
-                                        buy_last_trade_px, sell_last_trade_px)
+                                        buy_last_barter_px, sell_last_barter_px)
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
     for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
+        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
     assert expected_strat_brief_obj in strat_brief_list, \
         f"Mismatched: Couldn't find {expected_strat_brief_obj} in any strat_brief in {strat_brief_list}"
 
@@ -1252,7 +1240,7 @@ def check_fill_receive_for_placed_buy_order_after_all_sells(loop_count: int, exp
     # Checking start_status
     expected_strat_status.total_open_buy_qty -= buy_fill_journal.fill_qty
     expected_strat_status.total_open_buy_notional -= (buy_fill_journal.fill_qty *
-                                                       get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+                                                       get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_strat_status.avg_open_buy_px = (
             get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
             expected_strat_status.total_open_buy_qty)
@@ -1288,9 +1276,9 @@ def check_fill_receive_for_placed_buy_order_after_all_sells(loop_count: int, exp
     check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
 
 
-def check_placed_sell_order_computes_before_buys(loop_count: int, expected_order_id: str,
-                                                 symbol: str, sell_placed_order_journal: OrderJournalBaseModel,
-                                                 expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore_id: str,
+                                                 symbol: str, sell_placed_chore_journal: ChoreJournalBaseModel,
+                                                 expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                  expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                  other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                  pair_strat_: PairStratBaseModel,
@@ -1298,45 +1286,39 @@ def check_placed_sell_order_computes_before_buys(loop_count: int, expected_order
                                                  expected_strat_status: StratStatus,
                                                  expected_strat_brief_obj: StratBriefBaseModel,
                                                  executor_web_client: StreetBookServiceHttpClient):
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
+    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
 
-    assert sell_placed_order_journal in order_journal_obj_list, f"Couldn't find {sell_placed_order_journal} in " \
-                                                                f"{order_journal_obj_list}"
+    assert sell_placed_chore_journal in chore_journal_obj_list, f"Couldn't find {sell_placed_chore_journal} in " \
+                                                                f"{chore_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.order_brief.px = sell_placed_order_journal.order.px
-    expected_order_snapshot_obj.order_brief.qty = sell_placed_order_journal.order.qty
-    expected_order_snapshot_obj.order_brief.order_notional = (sell_placed_order_journal.order.qty *
-                                                              get_px_in_usd(sell_placed_order_journal.order.px))
-    expected_order_snapshot_obj.order_status = OrderStatusType.OE_UNACK
-    expected_order_snapshot_obj.last_update_date_time = sell_placed_order_journal.order_event_date_time
-    expected_order_snapshot_obj.create_date_time = sell_placed_order_journal.order_event_date_time
-    expected_order_snapshot_obj.order_brief.text.extend(sell_placed_order_journal.order.text)
+    # Checking chore_snapshot
+    expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
+    expected_chore_snapshot_obj.chore_brief.px = sell_placed_chore_journal.chore.px
+    expected_chore_snapshot_obj.chore_brief.qty = sell_placed_chore_journal.chore.qty
+    expected_chore_snapshot_obj.chore_brief.chore_notional = (sell_placed_chore_journal.chore.qty *
+                                                              get_px_in_usd(sell_placed_chore_journal.chore.px))
+    expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_UNACK
+    expected_chore_snapshot_obj.last_update_date_time = sell_placed_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.create_date_time = sell_placed_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.chore_brief.text.extend(sell_placed_chore_journal.chore.text)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # updating below field from received_order_snapshot_list for comparison
-    for order_snapshot in order_snapshot_list:
-        order_snapshot.id = None
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # updating below field from received_chore_snapshot_list for comparison
+    for chore_snapshot in chore_snapshot_list:
+        chore_snapshot.id = None
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.order_count = loop_count
+    expected_symbol_side_snapshot.chore_count = loop_count
     expected_symbol_side_snapshot.avg_px = (
         avg_of_new_val_sum_to_avg(expected_symbol_side_snapshot.avg_px,
-                                  sell_placed_order_journal.order.px,
-                                  expected_symbol_side_snapshot.order_count))
-    expected_symbol_side_snapshot.total_qty += sell_placed_order_journal.order.qty
-    expected_symbol_side_snapshot.last_update_date_time = sell_placed_order_journal.order_event_date_time
+                                  sell_placed_chore_journal.chore.px,
+                                  expected_symbol_side_snapshot.chore_count))
+    expected_symbol_side_snapshot.total_qty += sell_placed_chore_journal.chore.qty
+    expected_symbol_side_snapshot.last_update_date_time = sell_placed_chore_journal.chore_event_date_time
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -1346,22 +1328,22 @@ def check_placed_sell_order_computes_before_buys(loop_count: int, expected_order
 
     # Checking start_brief
     expected_strat_brief_obj.id = pair_strat_.id  # since strat's id is synced with strat_brief
-    update_expected_strat_brief_for_sell(expected_order_snapshot_obj,
+    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
-                                         sell_placed_order_journal.order_event_date_time,
-                                         buy_last_trade_px, sell_last_trade_px)
+                                         sell_placed_chore_journal.chore_event_date_time,
+                                         buy_last_barter_px, sell_last_barter_px)
 
     print(f"@@@ fetching strat_brief for symbol: {symbol} at {DateTime.utcnow()}")
     strat_brief = executor_web_client.get_strat_brief_client(pair_strat_.id)
 
-    strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-    strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-    strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
+    strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+    strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+    strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
     # Since sell side of strat_brief is not updated till sell cycle
-    expected_strat_brief_obj.pair_buy_side_trading_brief = strat_brief.pair_buy_side_trading_brief
-    expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_buy_side_bartering_brief = strat_brief.pair_buy_side_bartering_brief
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
     assert expected_strat_brief_obj == strat_brief, \
         f"Mismatched: expected strat_brief {expected_strat_brief_obj}, received strat_brief {strat_brief}"
 
@@ -1377,23 +1359,23 @@ def check_placed_sell_order_computes_before_buys(loop_count: int, expected_order
     else:
         assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
                        f"strat_limits_list: {strat_limits_obj_list}")
-    expected_strat_status.total_sell_qty += expected_order_snapshot_obj.order_brief.qty
-    expected_strat_status.total_order_qty += expected_order_snapshot_obj.order_brief.qty
-    expected_strat_status.total_open_sell_qty = expected_order_snapshot_obj.order_brief.qty
-    expected_strat_status.total_open_sell_notional = (expected_order_snapshot_obj.order_brief.qty *
-                                                      get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+    expected_strat_status.total_sell_qty += expected_chore_snapshot_obj.chore_brief.qty
+    expected_strat_status.total_chore_qty += expected_chore_snapshot_obj.chore_brief.qty
+    expected_strat_status.total_open_sell_qty = expected_chore_snapshot_obj.chore_brief.qty
+    expected_strat_status.total_open_sell_notional = (expected_chore_snapshot_obj.chore_brief.qty *
+                                                      get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_strat_status.avg_open_sell_px = (
             get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
             expected_strat_status.total_open_sell_qty)
     expected_strat_status.total_open_exposure = - expected_strat_status.total_open_sell_notional
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
-        buy_last_trade_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
-        sell_last_trade_px)
+    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        buy_last_barter_px)
+    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+        sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
-    security = expected_strat_brief_obj.pair_sell_side_trading_brief.security if \
+    security = expected_strat_brief_obj.pair_sell_side_bartering_brief.security if \
         sell_residual_notional > buy_residual_notional else \
-        expected_strat_brief_obj.pair_buy_side_trading_brief.security
+        expected_strat_brief_obj.pair_buy_side_bartering_brief.security
     expected_strat_status.residual = ResidualOptional(security=security,
                                               residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
@@ -1420,9 +1402,9 @@ def check_placed_sell_order_computes_before_buys(loop_count: int, expected_order
     check_strat_view_computes(pair_strat_.id, strat_status_obj, strat_limits_obj)
 
 
-def check_placed_sell_order_computes_after_all_buys(loop_count: int, expected_order_id: str,
-                                                    symbol: str, sell_placed_order_journal: OrderJournalBaseModel,
-                                                    expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_chore_id: str,
+                                                    symbol: str, sell_placed_chore_journal: ChoreJournalBaseModel,
+                                                    expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                     expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                     other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                     expected_pair_strat: PairStratBaseModel,
@@ -1430,45 +1412,39 @@ def check_placed_sell_order_computes_after_all_buys(loop_count: int, expected_or
                                                     expected_strat_status: StratStatus,
                                                     expected_strat_brief_obj: StratBriefBaseModel,
                                                     executor_web_client: StreetBookServiceHttpClient):
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
+    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
 
-    assert sell_placed_order_journal in order_journal_obj_list, f"Couldn't find {sell_placed_order_journal} in " \
-                                                                f"{order_journal_obj_list}"
+    assert sell_placed_chore_journal in chore_journal_obj_list, f"Couldn't find {sell_placed_chore_journal} in " \
+                                                                f"{chore_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.order_brief.px = sell_placed_order_journal.order.px
-    expected_order_snapshot_obj.order_brief.qty = sell_placed_order_journal.order.qty
-    expected_order_snapshot_obj.order_brief.order_notional = (sell_placed_order_journal.order.qty *
-                                                              get_px_in_usd(sell_placed_order_journal.order.px))
-    expected_order_snapshot_obj.order_status = OrderStatusType.OE_UNACK
-    expected_order_snapshot_obj.last_update_date_time = sell_placed_order_journal.order_event_date_time
-    expected_order_snapshot_obj.create_date_time = sell_placed_order_journal.order_event_date_time
-    expected_order_snapshot_obj.order_brief.text.extend(sell_placed_order_journal.order.text)
+    # Checking chore_snapshot
+    expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
+    expected_chore_snapshot_obj.chore_brief.px = sell_placed_chore_journal.chore.px
+    expected_chore_snapshot_obj.chore_brief.qty = sell_placed_chore_journal.chore.qty
+    expected_chore_snapshot_obj.chore_brief.chore_notional = (sell_placed_chore_journal.chore.qty *
+                                                              get_px_in_usd(sell_placed_chore_journal.chore.px))
+    expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_UNACK
+    expected_chore_snapshot_obj.last_update_date_time = sell_placed_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.create_date_time = sell_placed_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.chore_brief.text.extend(sell_placed_chore_journal.chore.text)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # updating below field from received_order_snapshot_list for comparison
-    for order_snapshot in order_snapshot_list:
-        order_snapshot.id = None
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # updating below field from received_chore_snapshot_list for comparison
+    for chore_snapshot in chore_snapshot_list:
+        chore_snapshot.id = None
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.order_count = loop_count
+    expected_symbol_side_snapshot.chore_count = loop_count
     expected_symbol_side_snapshot.avg_px = (
         avg_of_new_val_sum_to_avg(expected_symbol_side_snapshot.avg_px,
-                                  sell_placed_order_journal.order.px,
-                                  expected_symbol_side_snapshot.order_count))
-    expected_symbol_side_snapshot.total_qty += sell_placed_order_journal.order.qty
-    expected_symbol_side_snapshot.last_update_date_time = sell_placed_order_journal.order_event_date_time
+                                  sell_placed_chore_journal.chore.px,
+                                  expected_symbol_side_snapshot.chore_count))
+    expected_symbol_side_snapshot.total_qty += sell_placed_chore_journal.chore.qty
+    expected_symbol_side_snapshot.last_update_date_time = sell_placed_chore_journal.chore_event_date_time
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -1477,23 +1453,23 @@ def check_placed_sell_order_computes_after_all_buys(loop_count: int, expected_or
     assert expected_symbol_side_snapshot in symbol_side_snapshot_list, f"Couldn't find {expected_symbol_side_snapshot} "
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(expected_order_snapshot_obj,
+    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
-                                         sell_placed_order_journal.order_event_date_time,
-                                         buy_last_trade_px, sell_last_trade_px)
+                                         sell_placed_chore_journal.chore_event_date_time,
+                                         buy_last_barter_px, sell_last_barter_px)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
+        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
     assert expected_strat_brief_obj in strat_brief_list, \
         f"Mismatched: {expected_strat_brief_obj} not found in {strat_brief_list}"
 
@@ -1511,23 +1487,23 @@ def check_placed_sell_order_computes_after_all_buys(loop_count: int, expected_or
                        f"strat_limits_list: {strat_limits_obj_list}")
 
     # Checking strat_status
-    expected_strat_status.total_sell_qty += sell_placed_order_journal.order.qty
-    expected_strat_status.total_order_qty = expected_strat_status.total_buy_qty + expected_strat_status.total_sell_qty
-    expected_strat_status.total_open_sell_qty += sell_placed_order_journal.order.qty
-    expected_strat_status.total_open_sell_notional += (get_px_in_usd(sell_placed_order_journal.order.px) *
-                                                       sell_placed_order_journal.order.qty)
+    expected_strat_status.total_sell_qty += sell_placed_chore_journal.chore.qty
+    expected_strat_status.total_chore_qty = expected_strat_status.total_buy_qty + expected_strat_status.total_sell_qty
+    expected_strat_status.total_open_sell_qty += sell_placed_chore_journal.chore.qty
+    expected_strat_status.total_open_sell_notional += (get_px_in_usd(sell_placed_chore_journal.chore.px) *
+                                                       sell_placed_chore_journal.chore.qty)
     expected_strat_status.avg_open_sell_px = (
         get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
         expected_strat_status.total_open_sell_qty)
     expected_strat_status.total_open_exposure = - expected_strat_status.total_open_sell_notional
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
-        buy_last_trade_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
-        sell_last_trade_px)
+    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        buy_last_barter_px)
+    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+        sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
-    security = expected_strat_brief_obj.pair_buy_side_trading_brief.security if \
+    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_trading_brief.security
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
     expected_strat_status.residual = ResidualOptional(security=security,
                                               residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
@@ -1554,30 +1530,30 @@ def check_placed_sell_order_computes_after_all_buys(loop_count: int, expected_or
     check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
 
 
-def placed_sell_order_ack_receive(expected_order_journal: OrderJournalBaseModel,
-                                  expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def placed_sell_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
+                                  expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                   executor_web_client: StreetBookServiceHttpClient):
-    """Checking after order's ACK status is received"""
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
+    """Checking after chore's ACK status is received"""
+    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
 
-    assert expected_order_journal in order_journal_obj_list, f"Couldn't find {expected_order_journal} in " \
-                                                             f"{order_journal_obj_list}"
+    assert expected_chore_journal in chore_journal_obj_list, f"Couldn't find {expected_chore_journal} in " \
+                                                             f"{chore_journal_obj_list}"
 
-    # Checking order_snapshot
-    expected_order_snapshot_obj.order_status = OrderStatusType.OE_ACKED
-    expected_order_snapshot_obj.last_update_date_time = expected_order_journal.order_event_date_time
+    # Checking chore_snapshot
+    expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
+    expected_chore_snapshot_obj.last_update_date_time = expected_chore_journal.chore_event_date_time
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # updating below field from received_order_snapshot_list for comparison
-    for order_snapshot in order_snapshot_list:
-        order_snapshot.id = None
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # updating below field from received_chore_snapshot_list for comparison
+    for chore_snapshot in chore_snapshot_list:
+        chore_snapshot.id = None
 
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
 
 
-def check_fill_receive_for_placed_sell_order_before_buys(
-        symbol: str, sell_fill_journal: FillsJournalBaseModel, expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def check_fill_receive_for_placed_sell_chore_before_buys(
+        symbol: str, sell_fill_journal: FillsJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         expected_pair_strat: PairStratBaseModel,
@@ -1587,28 +1563,22 @@ def check_fill_receive_for_placed_sell_order_before_buys(
     fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert sell_fill_journal in fill_journal_obj_list, f"Couldn't find {sell_fill_journal} in {fill_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    expected_order_snapshot_obj.filled_qty = sell_fill_journal.fill_qty
-    expected_order_snapshot_obj.avg_fill_px = sell_fill_journal.fill_px
-    expected_order_snapshot_obj.fill_notional = sell_fill_journal.fill_qty * get_px_in_usd(sell_fill_journal.fill_px)
-    expected_order_snapshot_obj.last_update_fill_qty = sell_fill_journal.fill_qty
-    expected_order_snapshot_obj.last_update_fill_px = sell_fill_journal.fill_px
-    expected_order_snapshot_obj.last_update_date_time = sell_fill_journal.fill_date_time
+    # Checking chore_snapshot
+    expected_chore_snapshot_obj.filled_qty = sell_fill_journal.fill_qty
+    expected_chore_snapshot_obj.avg_fill_px = sell_fill_journal.fill_px
+    expected_chore_snapshot_obj.fill_notional = sell_fill_journal.fill_qty * get_px_in_usd(sell_fill_journal.fill_px)
+    expected_chore_snapshot_obj.last_update_fill_qty = sell_fill_journal.fill_qty
+    expected_chore_snapshot_obj.last_update_fill_px = sell_fill_journal.fill_px
+    expected_chore_snapshot_obj.last_update_date_time = sell_fill_journal.fill_date_time
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # removing below field from received_order_snapshot_list for comparison
-    for symbol_side_snapshot in order_snapshot_list:
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # removing below field from received_chore_snapshot_list for comparison
+    for symbol_side_snapshot in chore_snapshot_list:
         symbol_side_snapshot.id = None
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
     expected_symbol_side_snapshot.last_update_date_time = sell_fill_journal.fill_date_time
@@ -1629,20 +1599,20 @@ def check_fill_receive_for_placed_sell_order_before_buys(
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(expected_order_snapshot_obj,
+    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_fill_journal.fill_date_time,
-                                         buy_last_trade_px, sell_last_trade_px)
+                                         buy_last_barter_px, sell_last_barter_px)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
-        strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = None
+        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
     assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find {expected_strat_brief_obj} in " \
                                                          f"{strat_brief_list}"
     # Checking Strat_Limits
@@ -1661,7 +1631,7 @@ def check_fill_receive_for_placed_sell_order_before_buys(
     # Checking strat_status
     expected_strat_status.total_open_sell_qty -= sell_fill_journal.fill_qty
     expected_strat_status.total_open_sell_notional -= (sell_fill_journal.fill_qty *
-                                                       get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+                                                       get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_strat_status.avg_open_sell_px = (
             get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
             expected_strat_status.total_open_sell_qty)
@@ -1698,9 +1668,9 @@ def check_fill_receive_for_placed_sell_order_before_buys(
     check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
 
 
-def check_fill_receive_for_placed_sell_order_after_all_buys(
-        loop_count: int, expected_order_id: str,
-        symbol: str, sell_fill_journal: FillsJournalBaseModel, expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def check_fill_receive_for_placed_sell_chore_after_all_buys(
+        loop_count: int, expected_chore_id: str,
+        symbol: str, sell_fill_journal: FillsJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         expected_pair_strat: PairStratBaseModel,
@@ -1709,35 +1679,29 @@ def check_fill_receive_for_placed_sell_order_after_all_buys(
     fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert sell_fill_journal in fill_journal_obj_list, f"Couldn't find {sell_fill_journal} in {fill_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.filled_qty += sell_fill_journal.fill_qty
-    expected_order_snapshot_obj.fill_notional = sell_fill_journal.fill_qty * get_px_in_usd(sell_fill_journal.fill_px)
-    expected_order_snapshot_obj.avg_fill_px = (
-            get_usd_to_local_px_or_notional(expected_order_snapshot_obj.fill_notional) /
-            expected_order_snapshot_obj.filled_qty)
-    expected_order_snapshot_obj.last_update_fill_qty = sell_fill_journal.fill_qty
-    expected_order_snapshot_obj.last_update_fill_px = sell_fill_journal.fill_px
-    expected_order_snapshot_obj.last_update_date_time = sell_fill_journal.fill_date_time
+    # Checking chore_snapshot
+    expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
+    expected_chore_snapshot_obj.filled_qty += sell_fill_journal.fill_qty
+    expected_chore_snapshot_obj.fill_notional = sell_fill_journal.fill_qty * get_px_in_usd(sell_fill_journal.fill_px)
+    expected_chore_snapshot_obj.avg_fill_px = (
+            get_usd_to_local_px_or_notional(expected_chore_snapshot_obj.fill_notional) /
+            expected_chore_snapshot_obj.filled_qty)
+    expected_chore_snapshot_obj.last_update_fill_qty = sell_fill_journal.fill_qty
+    expected_chore_snapshot_obj.last_update_fill_px = sell_fill_journal.fill_px
+    expected_chore_snapshot_obj.last_update_date_time = sell_fill_journal.fill_date_time
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # removing below field from received_order_snapshot_list for comparison
-    for symbol_side_snapshot in order_snapshot_list:
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # removing below field from received_chore_snapshot_list for comparison
+    for symbol_side_snapshot in chore_snapshot_list:
         symbol_side_snapshot.id = None
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.last_update_date_time = expected_order_snapshot_obj.last_update_date_time
-    expected_symbol_side_snapshot.order_count = loop_count
+    expected_symbol_side_snapshot.last_update_date_time = expected_chore_snapshot_obj.last_update_date_time
+    expected_symbol_side_snapshot.chore_count = loop_count
     expected_symbol_side_snapshot.total_filled_qty += sell_fill_journal.fill_qty
     expected_symbol_side_snapshot.total_fill_notional += (sell_fill_journal.fill_qty *
                                                           get_px_in_usd(sell_fill_journal.fill_px))
@@ -1768,33 +1732,33 @@ def check_fill_receive_for_placed_sell_order_after_all_buys(
                        f"strat_limits_list: {strat_limits_obj_list}")
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(expected_order_snapshot_obj,
+    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_fill_journal.fill_date_time,
-                                         buy_last_trade_px, sell_last_trade_px)
+                                         buy_last_barter_px, sell_last_barter_px)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
         # strat_brief.id = None
         # Since buy side of strat_brief is already checked
-        # strat_brief.pair_buy_side_trading_brief = expected_strat_brief_obj.pair_buy_side_trading_brief
-        strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
+        # strat_brief.pair_buy_side_bartering_brief = expected_strat_brief_obj.pair_buy_side_bartering_brief
+        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
     assert expected_strat_brief_obj in strat_brief_list, \
         f"Mismatched: Couldn't find {expected_strat_brief_obj} in any strat_brief in {strat_brief_list}"
 
     # Checking start_status
     expected_strat_status.total_open_sell_qty -= sell_fill_journal.fill_qty
     expected_strat_status.total_open_sell_notional -= (sell_fill_journal.fill_qty *
-                                                       get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+                                                       get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_strat_status.avg_open_sell_px = (
         get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
         expected_strat_status.total_open_sell_qty)
@@ -1830,50 +1794,44 @@ def check_fill_receive_for_placed_sell_order_after_all_buys(
     check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
 
 
-def check_cxl_receive_for_placed_sell_order_after_all_buys(
-        symbol: str, sell_cxl_order_journal: OrderJournalBaseModel, expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def check_cxl_receive_for_placed_sell_chore_after_all_buys(
+        symbol: str, sell_cxl_chore_journal: ChoreJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         expected_pair_strat: PairStratBaseModel,
         expected_strat_limits: StratLimits, expected_strat_status: StratStatus,
         expected_strat_brief_obj: StratBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
-    assert sell_cxl_order_journal in order_journal_obj_list, f"Couldn't find {sell_cxl_order_journal} in list " \
-                                                             f"{order_journal_obj_list}"
+    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
+    assert sell_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {sell_cxl_chore_journal} in list " \
+                                                             f"{chore_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    unfilled_qty = expected_order_snapshot_obj.order_brief.qty - expected_order_snapshot_obj.filled_qty
-    expected_order_snapshot_obj.order_status = OrderStatusType.OE_DOD
-    expected_order_snapshot_obj.last_update_date_time = sell_cxl_order_journal.order_event_date_time
-    expected_order_snapshot_obj.cxled_qty = unfilled_qty
-    expected_order_snapshot_obj.cxled_notional = (unfilled_qty *
-                                                  get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
-    expected_order_snapshot_obj.avg_cxled_px = (
-            get_usd_to_local_px_or_notional(expected_order_snapshot_obj.cxled_notional) /
-            expected_order_snapshot_obj.cxled_qty)
+    # Checking chore_snapshot
+    unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
+    expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
+    expected_chore_snapshot_obj.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.cxled_qty = unfilled_qty
+    expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
+                                                  get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
+    expected_chore_snapshot_obj.avg_cxled_px = (
+            get_usd_to_local_px_or_notional(expected_chore_snapshot_obj.cxled_notional) /
+            expected_chore_snapshot_obj.cxled_qty)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # removing below field from received_order_snapshot_list for comparison
-    for order_snapshot in order_snapshot_list:
-        order_snapshot.id = None
-        order_snapshot.order_brief.text = []
-    expected_order_snapshot_obj.order_brief.text = []
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # removing below field from received_chore_snapshot_list for comparison
+    for chore_snapshot in chore_snapshot_list:
+        chore_snapshot.id = None
+        chore_snapshot.chore_brief.text = []
+    expected_chore_snapshot_obj.chore_brief.text = []
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.last_update_date_time = expected_order_snapshot_obj.last_update_date_time
-    expected_symbol_side_snapshot.last_update_date_time = sell_cxl_order_journal.order_event_date_time
+    expected_symbol_side_snapshot.last_update_date_time = expected_chore_snapshot_obj.last_update_date_time
+    expected_symbol_side_snapshot.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
     expected_symbol_side_snapshot.total_cxled_qty += unfilled_qty
     expected_symbol_side_snapshot.total_cxled_notional += (
-            unfilled_qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+            unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_symbol_side_snapshot.avg_cxled_px = (
         get_usd_to_local_px_or_notional(expected_symbol_side_snapshot.total_cxled_notional) /
         expected_symbol_side_snapshot.total_cxled_qty)
@@ -1899,26 +1857,26 @@ def check_cxl_receive_for_placed_sell_order_after_all_buys(
                        f"strat_limits_list: {strat_limits_obj_list}")
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(expected_order_snapshot_obj,
+    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
-                                         sell_cxl_order_journal.order_event_date_time,
-                                         buy_last_trade_px, sell_last_trade_px)
+                                         sell_cxl_chore_journal.chore_event_date_time,
+                                         buy_last_barter_px, sell_last_barter_px)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
         # strat_brief.id = None
         # Since buy side of strat_brief is already checked
-        # strat_brief.pair_buy_side_trading_brief = expected_strat_brief_obj.pair_buy_side_trading_brief
-        strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
+        # strat_brief.pair_buy_side_bartering_brief = expected_strat_brief_obj.pair_buy_side_bartering_brief
+        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
 
     assert expected_strat_brief_obj in strat_brief_list, \
         f"Mismatched: Couldn't find {expected_strat_brief_obj} in any strat_brief in {strat_brief_list}"
@@ -1926,13 +1884,13 @@ def check_cxl_receive_for_placed_sell_order_after_all_buys(
     # Checking strat_status
     expected_strat_status.total_cxl_sell_qty += unfilled_qty
     expected_strat_status.total_cxl_sell_notional += (unfilled_qty *
-                                                      get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+                                                      get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_strat_status.avg_cxl_sell_px = (
             get_usd_to_local_px_or_notional(expected_strat_status.total_cxl_sell_notional) /
             expected_strat_status.total_cxl_sell_qty)
     expected_strat_status.total_open_sell_qty -= unfilled_qty
     expected_strat_status.total_open_sell_notional -= (
-            get_px_in_usd(expected_order_snapshot_obj.order_brief.px) * unfilled_qty)
+            get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px) * unfilled_qty)
     if expected_strat_status.total_open_sell_qty != 0:
         expected_strat_status.avg_open_sell_px = (
                 get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
@@ -1942,15 +1900,15 @@ def check_cxl_receive_for_placed_sell_order_after_all_buys(
     expected_strat_status.total_open_exposure = - expected_strat_status.total_open_sell_notional
     expected_strat_status.total_cxl_exposure = (expected_strat_status.total_cxl_buy_notional -
                                                 expected_strat_status.total_cxl_sell_notional)
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
-        buy_last_trade_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
-        sell_last_trade_px)
+    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        buy_last_barter_px)
+    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+        sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
 
-    security = expected_strat_brief_obj.pair_buy_side_trading_brief.security if \
+    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_trading_brief.security
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
     expected_strat_status.residual = ResidualOptional(security=security,
                                               residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
@@ -1977,50 +1935,44 @@ def check_cxl_receive_for_placed_sell_order_after_all_buys(
     check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
 
 
-def check_cxl_receive_for_placed_buy_order_after_all_sells(
-        symbol: str, buy_cxl_order_journal: OrderJournalBaseModel, expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def check_cxl_receive_for_placed_buy_chore_after_all_sells(
+        symbol: str, buy_cxl_chore_journal: ChoreJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         expected_pair_strat: PairStratBaseModel,
         expected_strat_limits: StratLimits, expected_strat_status: StratStatus,
         expected_strat_brief_obj: StratBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
-    assert buy_cxl_order_journal in order_journal_obj_list, f"Couldn't find {buy_cxl_order_journal} in list " \
-                                                             f"{order_journal_obj_list}"
+    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
+    assert buy_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {buy_cxl_chore_journal} in list " \
+                                                             f"{chore_journal_obj_list}"
 
-    leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
-    if expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_last_trade_px = leg1_last_trade_px
-        sell_last_trade_px = leg2_last_trade_px
-    else:
-        sell_last_trade_px = leg1_last_trade_px
-        buy_last_trade_px = leg2_last_trade_px
+    buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
-    # Checking order_snapshot
-    unfilled_qty = expected_order_snapshot_obj.order_brief.qty - expected_order_snapshot_obj.filled_qty
-    expected_order_snapshot_obj.order_status = OrderStatusType.OE_DOD
-    expected_order_snapshot_obj.last_update_date_time = buy_cxl_order_journal.order_event_date_time
-    expected_order_snapshot_obj.cxled_qty = unfilled_qty
-    expected_order_snapshot_obj.cxled_notional = (unfilled_qty *
-                                                  get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
-    expected_order_snapshot_obj.avg_cxled_px = (
-            get_usd_to_local_px_or_notional(expected_order_snapshot_obj.cxled_notional) /
-            expected_order_snapshot_obj.cxled_qty)
+    # Checking chore_snapshot
+    unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
+    expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
+    expected_chore_snapshot_obj.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.cxled_qty = unfilled_qty
+    expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
+                                                  get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
+    expected_chore_snapshot_obj.avg_cxled_px = (
+            get_usd_to_local_px_or_notional(expected_chore_snapshot_obj.cxled_notional) /
+            expected_chore_snapshot_obj.cxled_qty)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    # removing below field from received_order_snapshot_list for comparison
-    for order_snapshot in order_snapshot_list:
-        order_snapshot.id = None
-        order_snapshot.order_brief.text = []
-    expected_order_snapshot_obj.order_brief.text = []
-    assert expected_order_snapshot_obj in order_snapshot_list, f"Couldn't find {expected_order_snapshot_obj} in " \
-                                                               f"{order_snapshot_list}"
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    # removing below field from received_chore_snapshot_list for comparison
+    for chore_snapshot in chore_snapshot_list:
+        chore_snapshot.id = None
+        chore_snapshot.chore_brief.text = []
+    expected_chore_snapshot_obj.chore_brief.text = []
+    assert expected_chore_snapshot_obj in chore_snapshot_list, f"Couldn't find {expected_chore_snapshot_obj} in " \
+                                                               f"{chore_snapshot_list}"
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.last_update_date_time = expected_order_snapshot_obj.last_update_date_time
-    expected_symbol_side_snapshot.last_update_date_time = buy_cxl_order_journal.order_event_date_time
+    expected_symbol_side_snapshot.last_update_date_time = expected_chore_snapshot_obj.last_update_date_time
+    expected_symbol_side_snapshot.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
     expected_symbol_side_snapshot.total_cxled_qty += unfilled_qty
     expected_symbol_side_snapshot.total_cxled_notional += (
-            unfilled_qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+            unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_symbol_side_snapshot.avg_cxled_px = (
         get_usd_to_local_px_or_notional(expected_symbol_side_snapshot.total_cxled_notional) /
         expected_symbol_side_snapshot.total_cxled_qty)
@@ -2046,23 +1998,23 @@ def check_cxl_receive_for_placed_buy_order_after_all_sells(
                        f"strat_limits_list: {strat_limits_obj_list}")
 
     # Checking start_brief
-    update_expected_strat_brief_for_buy(expected_order_snapshot_obj,
+    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
-                                        buy_cxl_order_journal.order_event_date_time,
-                                        buy_last_trade_px, sell_last_trade_px)
+                                        buy_cxl_chore_journal.chore_event_date_time,
+                                        buy_last_barter_px, sell_last_barter_px)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
-        strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
+        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
 
     assert expected_strat_brief_obj in strat_brief_list, \
         f"Mismatched: Couldn't find {expected_strat_brief_obj} in any strat_brief in {strat_brief_list}"
@@ -2070,13 +2022,13 @@ def check_cxl_receive_for_placed_buy_order_after_all_sells(
     # Checking strat_status
     expected_strat_status.total_cxl_buy_qty += unfilled_qty
     expected_strat_status.total_cxl_buy_notional += (unfilled_qty *
-                                                      get_px_in_usd(expected_order_snapshot_obj.order_brief.px))
+                                                      get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_strat_status.avg_cxl_buy_px = (
             get_usd_to_local_px_or_notional(expected_strat_status.total_cxl_buy_notional) /
             expected_strat_status.total_cxl_buy_qty)
     expected_strat_status.total_open_buy_qty -= unfilled_qty
     expected_strat_status.total_open_buy_notional -= (
-            get_px_in_usd(expected_order_snapshot_obj.order_brief.px) * unfilled_qty)
+            get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px) * unfilled_qty)
     if expected_strat_status.total_open_buy_qty != 0:
         expected_strat_status.avg_open_buy_px = (
                 get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
@@ -2086,15 +2038,15 @@ def check_cxl_receive_for_placed_buy_order_after_all_sells(
     expected_strat_status.total_open_exposure = 0
     expected_strat_status.total_cxl_exposure = (expected_strat_status.total_cxl_buy_notional -
                                                 expected_strat_status.total_cxl_sell_notional)
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
-        buy_last_trade_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
-        sell_last_trade_px)
+    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        buy_last_barter_px)
+    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+        sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
 
-    security = expected_strat_brief_obj.pair_buy_side_trading_brief.security if \
+    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_trading_brief.security
+        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
     expected_strat_status.residual = ResidualOptional(security=security,
                                               residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
@@ -2129,7 +2081,7 @@ class TopOfBookSide(StrEnum):
 def create_tob(leg1_symbol: str, leg2_symbol: str, top_of_book_json_list: List[Dict],
                executor_web_client: StreetBookServiceHttpClient):
 
-    # For place order non-triggered run
+    # For place chore non-triggered run
     for index, top_of_book_json in enumerate(top_of_book_json_list):
         top_of_book_basemodel = TopOfBookBaseModel(**top_of_book_json)
         if index == 0:
@@ -2142,10 +2094,10 @@ def create_tob(leg1_symbol: str, leg2_symbol: str, top_of_book_json_list: List[D
             executor_web_client.create_top_of_book_client(top_of_book_basemodel)
         top_of_book_basemodel.id = stored_top_of_book_basemodel.id
         top_of_book_basemodel.last_update_date_time = stored_top_of_book_basemodel.last_update_date_time
-        for market_trade_vol in stored_top_of_book_basemodel.market_trade_volume:
-            market_trade_vol.id = None
-        for market_trade_vol in top_of_book_basemodel.market_trade_volume:
-            market_trade_vol.id = None
+        for market_barter_vol in stored_top_of_book_basemodel.market_barter_volume:
+            market_barter_vol.id = None
+        for market_barter_vol in top_of_book_basemodel.market_barter_volume:
+            market_barter_vol.id = None
         assert stored_top_of_book_basemodel == top_of_book_basemodel, \
             f"Mismatch TopOfBook, expected {top_of_book_basemodel}, received {stored_top_of_book_basemodel}"
 
@@ -2168,8 +2120,8 @@ def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side,
     updated_tob_obj = executor_web_client.patch_top_of_book_client(jsonable_encoder(tob_obj,
                                                                                     by_alias=True, exclude_none=True))
 
-    for market_trade_vol in updated_tob_obj.market_trade_volume:
-        market_trade_vol.id = None
+    for market_barter_vol in updated_tob_obj.market_barter_volume:
+        market_barter_vol.id = None
     if side == Side.BUY:
         assert updated_tob_obj.bid_quote.px == tob_obj.bid_quote.px, \
             f"Mismatch tob.bid_quote.px, expected {tob_obj.bid_quote.px} " \
@@ -2179,83 +2131,85 @@ def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side,
             f"Mismatch tob.ask_quote.px, expected {tob_obj.ask_quote.px} " \
             f"received {updated_tob_obj.ask_quote.px}"
 
+#
+# def run_buy_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: StreetBookServiceHttpClient,
+#                         tob_json_dict: Dict, avoid_chore_trigger: bool | None = None):
+#     buy_stored_tob: TopOfBookBaseModel | None = None
+#     sell_stored_tob: TopOfBookBaseModel | None = None
+#
+#     stored_tob_objs = executor_web_client.get_all_top_of_book_client()
+#     for tob_obj in stored_tob_objs:
+#         if tob_obj.symbol == buy_symbol:
+#             buy_stored_tob = tob_obj
+#         elif tob_obj.symbol == sell_symbol:
+#             sell_stored_tob = tob_obj
+#
+#     # For place chore non-triggered run
+#     sell_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
+#     executor_web_client.patch_top_of_book_client(jsonable_encoder(sell_stored_tob, by_alias=True, exclude_none=True))
+#     _update_tob(buy_stored_tob, tob_json_dict.get("bid_quote").get("px") - 10, Side.BUY, executor_web_client)
+#     if avoid_chore_trigger:
+#         px = tob_json_dict.get("bid_quote").get("px") - 10
+#     else:
+#         # For place chore trigger run
+#         px = tob_json_dict.get("bid_quote").get("px")
+#
+#     time.sleep(1)
+#     sell_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
+#     executor_web_client.patch_top_of_book_client(jsonable_encoder(sell_stored_tob, by_alias=True, exclude_none=True))
+#     _update_tob(buy_stored_tob, px, Side.BUY, executor_web_client)
+#
+#
+# def run_sell_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: StreetBookServiceHttpClient,
+#                          tob_json_dict: Dict, avoid_chore_trigger: bool | None = None):
+#     buy_stored_tob: TopOfBookBaseModel | None = None
+#     sell_stored_tob: TopOfBookBaseModel | None = None
+#
+#     stored_tob_objs = executor_web_client.get_all_top_of_book_client()
+#     for tob_obj in stored_tob_objs:
+#         if tob_obj.symbol == buy_symbol:
+#             buy_stored_tob = tob_obj
+#         elif tob_obj.symbol == sell_symbol:
+#             sell_stored_tob = tob_obj
+#
+#     # For place chore non-triggered run
+#     buy_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
+#     executor_web_client.patch_top_of_book_client(jsonable_encoder(buy_stored_tob, by_alias=True, exclude_none=True))
+#     _update_tob(sell_stored_tob, sell_stored_tob.ask_quote.px - 10, Side.SELL, executor_web_client)
+#
+#     if avoid_chore_trigger:
+#         px = tob_json_dict.get("ask_quote").get("px") - 10
+#
+#     else:
+#         # For place chore trigger run
+#         px = tob_json_dict.get("ask_quote").get("px")
+#
+#     time.sleep(1)
+#
+#     buy_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
+#     executor_web_client.patch_top_of_book_client(jsonable_encoder(buy_stored_tob, by_alias=True, exclude_none=True))
+#     _update_tob(sell_stored_tob, px, Side.SELL, executor_web_client)
 
-def run_buy_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: StreetBookServiceHttpClient,
-                        tob_json_dict: Dict, avoid_order_trigger: bool | None = None):
-    buy_stored_tob: TopOfBookBaseModel | None = None
-    sell_stored_tob: TopOfBookBaseModel | None = None
 
-    stored_tob_objs = executor_web_client.get_all_top_of_book_client()
-    for tob_obj in stored_tob_objs:
-        if tob_obj.symbol == buy_symbol:
-            buy_stored_tob = tob_obj
-        elif tob_obj.symbol == sell_symbol:
-            sell_stored_tob = tob_obj
-
-    # For place order non-triggered run
-    sell_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
-    executor_web_client.patch_top_of_book_client(jsonable_encoder(sell_stored_tob, by_alias=True, exclude_none=True))
-    _update_tob(buy_stored_tob, tob_json_dict.get("bid_quote").get("px") - 10, Side.BUY, executor_web_client)
-    if avoid_order_trigger:
-        px = tob_json_dict.get("bid_quote").get("px") - 10
-    else:
-        # For place order trigger run
-        px = tob_json_dict.get("bid_quote").get("px")
-
-    time.sleep(1)
-    sell_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
-    executor_web_client.patch_top_of_book_client(jsonable_encoder(sell_stored_tob, by_alias=True, exclude_none=True))
-    _update_tob(buy_stored_tob, px, Side.BUY, executor_web_client)
-
-
-def run_sell_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: StreetBookServiceHttpClient,
-                         tob_json_dict: Dict, avoid_order_trigger: bool | None = None):
-    buy_stored_tob: TopOfBookBaseModel | None = None
-    sell_stored_tob: TopOfBookBaseModel | None = None
-
-    stored_tob_objs = executor_web_client.get_all_top_of_book_client()
-    for tob_obj in stored_tob_objs:
-        if tob_obj.symbol == buy_symbol:
-            buy_stored_tob = tob_obj
-        elif tob_obj.symbol == sell_symbol:
-            sell_stored_tob = tob_obj
-
-    # For place order non-triggered run
-    buy_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
-    executor_web_client.patch_top_of_book_client(jsonable_encoder(buy_stored_tob, by_alias=True, exclude_none=True))
-    _update_tob(sell_stored_tob, sell_stored_tob.ask_quote.px - 10, Side.SELL, executor_web_client)
-
-    if avoid_order_trigger:
-        px = tob_json_dict.get("ask_quote").get("px") - 10
-
-    else:
-        # For place order trigger run
-        px = tob_json_dict.get("ask_quote").get("px")
-
-    time.sleep(1)
-
-    buy_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
-    executor_web_client.patch_top_of_book_client(jsonable_encoder(buy_stored_tob, by_alias=True, exclude_none=True))
-    _update_tob(sell_stored_tob, px, Side.SELL, executor_web_client)
-
-
-def run_last_trade(leg1_symbol: str, leg2_symbol: str, last_trade_json_list: List[Dict],
+def run_last_barter(leg1_symbol: str, leg2_symbol: str, last_barter_json_list: List[Dict],
                    executor_web_client: StreetBookServiceHttpClient,
                    create_counts_per_side: int | None = None):
     if create_counts_per_side is None:
         create_counts_per_side = 20
     symbol_list = [leg1_symbol, leg2_symbol]
-    for index, last_trade_json in enumerate(last_trade_json_list):
+    for index, last_barter_json in enumerate(last_barter_json_list):
         for _ in range(create_counts_per_side):
-            last_trade_obj: LastTradeBaseModel = LastTradeBaseModel(**last_trade_json)
-            last_trade_obj.symbol_n_exch_id.symbol = symbol_list[index]
-            last_trade_obj.exch_time = DateTime.utcnow()
-            created_last_trade_obj = executor_web_client.create_last_trade_client(last_trade_obj)
-            created_last_trade_obj.id = None
-            created_last_trade_obj.market_trade_volume.id = last_trade_obj.market_trade_volume.id
-            created_last_trade_obj.exch_time = last_trade_obj.exch_time
-            assert created_last_trade_obj == last_trade_obj, \
-                f"Mismatch last_trade: expected {last_trade_obj}, received {created_last_trade_obj}"
+            last_barter_obj: LastBarterBaseModel = LastBarterBaseModel(**last_barter_json)
+            last_barter_obj.symbol_n_exch_id.symbol = symbol_list[index]
+            last_barter_obj.exch_time = DateTime.utcnow()
+            created_last_barter_obj = executor_web_client.create_last_barter_client(last_barter_obj)
+            created_last_barter_obj.id = None
+            created_last_barter_obj.market_barter_volume.id = last_barter_obj.market_barter_volume.id
+            created_last_barter_obj.exch_time = last_barter_obj.exch_time
+            assert created_last_barter_obj == last_barter_obj, \
+                f"Mismatch last_barter: expected {last_barter_obj}, received {created_last_barter_obj}"
+            # putting gap in between created objs since mongodb stores datetime with milli-sec precision
+            time.sleep(0.1)
 
 
 # TODO: move it to web-ui
@@ -2333,8 +2287,7 @@ def create_strat(leg1_symbol, leg2_symbol, expected_pair_strat_obj, leg1_side=No
 
 def move_snoozed_pair_strat_to_ready_n_then_active(
         stored_pair_strat_basemodel, market_depth_basemodel_list,
-        symbol_overview_obj_list, top_of_book_json_list,
-        expected_strat_limits, expected_strat_status):
+        symbol_overview_obj_list, expected_strat_limits, expected_strat_status):
     if stored_pair_strat_basemodel.pair_strat_params.strat_leg1.side == Side.BUY:
         buy_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id
         sell_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg2.sec.sec_id
@@ -2357,11 +2310,38 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     assert updated_pair_strat.port is not None, (
-        "Once pair_strat is partially running it also must contain port, updated object has port field as None, "
-        f"updated pair_strat: {updated_pair_strat}")
+        "Once pair_strat is partially running it also must contain executor port, updated object has "
+        f"port field as None, updated pair_strat: {updated_pair_strat}")
+    assert updated_pair_strat.top_of_book_port is not None, (
+        "Once pair_strat is partially running it also must contain top_of_book_port, updated object has "
+        f"port field as None, updated pair_strat: {updated_pair_strat}")
+    assert updated_pair_strat.market_depth_port is not None, (
+        "Once pair_strat is partially running it also must contain market_depth_port, updated object has "
+        f"port field as None, updated pair_strat: {updated_pair_strat}")
+    assert updated_pair_strat.last_barter_port is not None, (
+        "Once pair_strat is partially running it also must contain last_barter_port, updated object has "
+        f"port field as None, updated pair_strat: {updated_pair_strat}")
 
     executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
         updated_pair_strat.host, updated_pair_strat.port)
+
+    test_config = YAMLConfigurationManager.load_yaml_configurations(str(test_config_file_path))
+    run_gdb_terminal = test_config.get("run_gdb_terminal")
+    if run_gdb_terminal:
+        for _ in range(10):
+            pid: int = get_pid_from_port(updated_pair_strat.port)
+            if pid is not None:
+                show_msg = (f"Terminal for strat_id: {updated_pair_strat.id} and "
+                            f"symbol-side for leg_1: {buy_symbol}-BUY and leg_2: {sell_symbol}-SELL")
+                run_gbd_terminal_with_pid(pid, show_msg)
+                print(f"Started GDB for strat_id: {updated_pair_strat.id} and pid: {pid}")
+                break
+            else:
+                print("get_pid_from_port return None instead of pid")
+            time.sleep(2)
+        else:
+            assert False, (f"Unexpected: Can't strat gdb terminal - "
+                           f"Can't find any pid from port {updated_pair_strat.port}")
 
     # creating market_depth
     create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_web_client)
@@ -2370,11 +2350,6 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
     # running symbol_overview
     run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list, executor_web_client)
     print(f"SymbolOverview created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
-    # create_tob(stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id,
-    #            stored_pair_strat_basemodel.pair_strat_params.strat_leg2.sec.sec_id,
-    #            top_of_book_json_list, executor_web_client)
-    # print(f"TOB created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     wait_time = 20
     executor_check_loop_counts = 3
@@ -2431,6 +2406,7 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # checking strat_view values
+    time.sleep(1)
     strat_view = email_book_service_native_web_client.get_strat_view_client(updated_pair_strat.id)
     assert strat_view.balance_notional == strat_status.balance_notional, \
         (f"Mismatched balance_notional in strat_view: expected: {strat_status.balance_notional}, "
@@ -2465,14 +2441,13 @@ def create_n_activate_strat(leg1_symbol: str, leg2_symbol: str,
                             expected_strat_limits: StratLimits,
                             expected_strat_status: StratStatus,
                             symbol_overview_obj_list: List[SymbolOverviewBaseModel],
-                            top_of_book_json_list: List[Dict],
                             market_depth_basemodel_list: List[MarketDepthBaseModel],
                             leg1_side: Side | None = None, leg2_side: Side | None = None
                             ) -> Tuple[PairStratBaseModel, StreetBookServiceHttpClient]:
     stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, expected_pair_strat_obj, leg1_side, leg2_side)
 
     return move_snoozed_pair_strat_to_ready_n_then_active(stored_pair_strat_basemodel, market_depth_basemodel_list,
-                                                          symbol_overview_obj_list, top_of_book_json_list,
+                                                          symbol_overview_obj_list,
                                                           expected_strat_limits, expected_strat_status)
 
 
@@ -2669,9 +2644,9 @@ def run_symbol_overview(buy_symbol: str, sell_symbol: str,
         symbol_overview_obj.id = None
         created_symbol_overview = executor_web_client.create_symbol_overview_client(symbol_overview_obj)
         symbol_overview_obj.id = created_symbol_overview.id
-        assert created_symbol_overview == symbol_overview_obj, f"Created symbol_overview {created_symbol_overview} not " \
-                                                               f"equals to expected symbol_overview " \
-                                                               f"{symbol_overview_obj}"
+        assert created_symbol_overview == symbol_overview_obj, \
+            (f"Mismatch: Created symbol_overview {created_symbol_overview} not equals to expected "
+             f"symbol_overview {symbol_overview_obj}")
 
 
 def create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list: List[MarketDepthBaseModel],
@@ -2687,10 +2662,24 @@ def create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list: Li
         created_market_depth.cumulative_notional = None
         created_market_depth.cumulative_qty = None
         assert created_market_depth == market_depth_basemodel, \
-            f"Mismatch market_depth: expected {market_depth_basemodel} received {created_market_depth}"
+            f"Mismatch created market_depth: expected {market_depth_basemodel} received {created_market_depth}"
 
 
-def wait_for_get_new_order_placed_from_tob(wait_stop_px: int | float, symbol_to_check: str,
+def update_market_depth(executor_web_client: StreetBookServiceHttpClient):
+    market_depth_list = executor_web_client.get_all_market_depth_client()
+    for index, market_depth_basemodel in enumerate(market_depth_list):
+        market_depth_basemodel.exch_time = get_utc_date_time()
+        market_depth_basemodel.arrival_time = get_utc_date_time()
+        created_market_depth = executor_web_client.put_market_depth_client(market_depth_basemodel)
+        # created_market_depth.id = None
+        # created_market_depth.cumulative_avg_px = None
+        # created_market_depth.cumulative_notional = None
+        # created_market_depth.cumulative_qty = None
+        # assert created_market_depth == market_depth_basemodel, \
+        #     f"Mismatch updated market_depth: expected {market_depth_basemodel} received {created_market_depth}"
+
+
+def wait_for_get_new_chore_placed_from_tob(wait_stop_px: int | float, symbol_to_check: str,
                                            last_update_date_time: DateTime | None, side: Side,
                                            executor_web_client: StreetBookServiceHttpClient):
     loop_counter = 0
@@ -2715,24 +2704,14 @@ def wait_for_get_new_order_placed_from_tob(wait_stop_px: int | float, symbol_to_
                           f"symbol - {symbol_to_check} and wait_stop_px - {wait_stop_px}"
 
 
-def renew_portfolio_alert():
+def clean_portfolio_alert():
     portfolio_alert_list = log_book_web_client.get_all_portfolio_alert_client()
-    if len(portfolio_alert_list) == 1:
-        portfolio_alert = portfolio_alert_list[0]
-    else:
-        err_str_ = (f"PortfolioAlert must have exactly 1 object, received {len(portfolio_alert_list)}, "
-                    f"portfolio_alert_list: {portfolio_alert_list}")
-        logging.error(err_str_)
-        raise Exception(err_str_)
 
     retaining_alerts = []
-    for alert in portfolio_alert.alerts:
-        if "Log analyzer running in simulation mode" in alert.alert_brief:
-            retaining_alerts.append(alert)
-    portfolio_alert_obj = PortfolioAlertBaseModel(_id=portfolio_alert.id,
-                                                  alerts=retaining_alerts,
-                                                  alert_update_seq_num=0)
-    log_book_web_client.put_portfolio_alert_client(portfolio_alert_obj)
+    for alert in portfolio_alert_list:
+        if "Log analyzer running in simulation mode" not in alert.alert_brief:
+            log_book_web_client.delete_portfolio_alert_client(alert.id)
+
 
 def renew_strat_collection():
     strat_collection_list: List[StratCollectionBaseModel] = (
@@ -2761,19 +2740,19 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
         datetime_str = datetime.datetime.now().strftime("%Y%m%d")
         log_simulator_log_file = str(STRAT_EXECUTOR / "log" / f"log_simulator_{pair_strat.id}_logs_{datetime_str}.log")
         if os.path.exists(log_simulator_log_file):
-            log_book_web_client.log_book_force_kill_tail_query_client(log_simulator_log_file)
+            log_book_web_client.log_book_force_kill_tail_executor_query_client(log_simulator_log_file)
         street_book_log_file = str(STRAT_EXECUTOR / "log" /
                                       f"street_book_{pair_strat.id}_logs_{datetime_str}.log")
         if os.path.exists(street_book_log_file):
-            log_book_web_client.log_book_force_kill_tail_query_client(street_book_log_file)
+            log_book_web_client.log_book_force_kill_tail_executor_query_client(street_book_log_file)
         time.sleep(2)
 
 
-def set_n_verify_limits(expected_order_limits_obj, expected_portfolio_limits_obj):
-    created_order_limits_obj = (
-        email_book_service_native_web_client.create_order_limits_client(expected_order_limits_obj))
-    assert created_order_limits_obj == expected_order_limits_obj, \
-        f"Mismatch order_limits: expected {expected_order_limits_obj} received {created_order_limits_obj}"
+def set_n_verify_limits(expected_chore_limits_obj, expected_portfolio_limits_obj):
+    created_chore_limits_obj = (
+        email_book_service_native_web_client.create_chore_limits_client(expected_chore_limits_obj))
+    assert created_chore_limits_obj == expected_chore_limits_obj, \
+        f"Mismatch chore_limits: expected {expected_chore_limits_obj} received {created_chore_limits_obj}"
 
     created_portfolio_limits_obj = \
         email_book_service_native_web_client.create_portfolio_limits_client(expected_portfolio_limits_obj)
@@ -2803,145 +2782,144 @@ def verify_portfolio_status(expected_portfolio_status: PortfolioStatusBaseModel)
                                                                f"{portfolio_status_list}"
 
 
-def get_latest_order_journal_with_event_and_symbol(expected_order_event, expected_symbol,
+def get_latest_chore_journal_with_event_and_symbol(expected_chore_event, expected_symbol,
                                                    executor_web_client: StreetBookServiceHttpClient,
-                                                   expect_no_order: bool | None = None,
-                                                   last_order_id: str | None = None,
+                                                   expect_no_chore: bool | None = None,
+                                                   last_chore_id: str | None = None,
                                                    max_loop_count: int | None = None,
                                                    loop_wait_secs: int | None = None,
                                                    assert_code: int = 0):
     start_time = DateTime.utcnow()
-    placed_order_journal = None
+    placed_chore_journal = None
     if max_loop_count is None:
         max_loop_count = 20
     if loop_wait_secs is None:
         loop_wait_secs = 2
 
     for loop_count in range(max_loop_count):
-        stored_order_journal_list = executor_web_client.get_all_order_journal_client(-100)
-        for stored_order_journal in stored_order_journal_list:
-            if stored_order_journal.order_event == expected_order_event and \
-                    stored_order_journal.order.security.sec_id == expected_symbol:
-                if last_order_id is None:
-                    placed_order_journal = stored_order_journal
+        stored_chore_journal_list = executor_web_client.get_all_chore_journal_client(-100)
+        for stored_chore_journal in stored_chore_journal_list:
+            if stored_chore_journal.chore_event == expected_chore_event and \
+                    stored_chore_journal.chore.security.sec_id == expected_symbol:
+                if last_chore_id is None:
+                    placed_chore_journal = stored_chore_journal
                 else:
-                    if last_order_id != stored_order_journal.order.order_id:
-                        placed_order_journal = stored_order_journal
-                        # since get_all return orders in descendant order of date_time, first match is latest
+                    if last_chore_id != stored_chore_journal.chore.chore_id:
+                        placed_chore_journal = stored_chore_journal
+                        # since get_all return chores in descendant chore of date_time, first match is latest
                 break
-        if placed_order_journal is not None:
+        if placed_chore_journal is not None:
             break
         time.sleep(loop_wait_secs)
 
     time_delta = DateTime.utcnow() - start_time
-    print(f"Found placed_order_journal - {placed_order_journal} in {time_delta.total_seconds()}, "
-          f"for symbol {expected_symbol}, order_event {expected_order_event}, "
-          f"expect_no_order {expect_no_order} and last_order_id {last_order_id}")
+    print(f"Found placed_chore_journal - {placed_chore_journal} in {time_delta.total_seconds()}, "
+          f"for symbol {expected_symbol}, chore_event {expected_chore_event}, "
+          f"expect_no_chore {expect_no_chore} and last_chore_id {last_chore_id}")
 
-    if expect_no_order:
-        assert placed_order_journal is None, f"Expected no new order for symbol {expected_symbol}, " \
-                                             f"received {placed_order_journal} - assert_code: {assert_code}"
-        placed_order_journal = OrderJournalBaseModel(order=OrderBriefOptional(order_id=last_order_id))
+    if expect_no_chore:
+        assert placed_chore_journal is None, f"Expected no new chore for symbol {expected_symbol}, " \
+                                             f"received {placed_chore_journal} - assert_code: {assert_code}"
+        placed_chore_journal = ChoreJournalBaseModel(chore=ChoreBriefOptional(chore_id=last_chore_id))
     else:
-        assert placed_order_journal is not None, \
-            f"Can't find any order_journal with symbol {expected_symbol} order_event {expected_order_event}, " \
-            f"expect_no_order {expect_no_order} and last_order_id {last_order_id} - assert_code: {assert_code}"
+        assert placed_chore_journal is not None, \
+            f"Can't find any chore_journal with symbol {expected_symbol} chore_event {expected_chore_event}, " \
+            f"expect_no_chore {expect_no_chore} and last_chore_id {last_chore_id} - assert_code: {assert_code}"
 
-    return placed_order_journal
+    return placed_chore_journal
 
 
-# @@@ copy of get_latest_order_journal_with_event_and_symbol - contains code repetition
-def get_latest_order_journal_with_events_and_symbol(expected_order_event_list, expected_symbol,
+# @@@ copy of get_latest_chore_journal_with_event_and_symbol - contains code repetition
+def get_latest_chore_journal_with_events_and_symbol(expected_chore_event_list, expected_symbol,
                                                     executor_web_client: StreetBookServiceHttpClient,
-                                                    expect_no_order: bool | None = None,
-                                                    last_order_id: str | None = None,
+                                                    expect_no_chore: bool | None = None,
+                                                    last_chore_id: str | None = None,
                                                     max_loop_count: int | None = None,
                                                     loop_wait_secs: int | None = None,
                                                     assert_code: int = 0):
     start_time = DateTime.utcnow()
-    placed_order_journal = None
+    placed_chore_journal = None
     if max_loop_count is None:
         max_loop_count = 20
     if loop_wait_secs is None:
         loop_wait_secs = 2
 
     for loop_count in range(max_loop_count):
-        stored_order_journal_list = executor_web_client.get_all_order_journal_client(-100)
-        for stored_order_journal in stored_order_journal_list:
-            if stored_order_journal.order_event in expected_order_event_list and \
-                    stored_order_journal.order.security.sec_id == expected_symbol:
-                if last_order_id is None:
-                    placed_order_journal = stored_order_journal
+        stored_chore_journal_list = executor_web_client.get_all_chore_journal_client(-100)
+        for stored_chore_journal in stored_chore_journal_list:
+            if stored_chore_journal.chore_event in expected_chore_event_list and \
+                    stored_chore_journal.chore.security.sec_id == expected_symbol:
+                if last_chore_id is None:
+                    placed_chore_journal = stored_chore_journal
                 else:
-                    if last_order_id != stored_order_journal.order.order_id:
-                        placed_order_journal = stored_order_journal
-                        # since get_all return orders in descendant order of date_time, first match is latest
+                    if last_chore_id != stored_chore_journal.chore.chore_id:
+                        placed_chore_journal = stored_chore_journal
+                        # since get_all return chores in descendant chore of date_time, first match is latest
                 break
-        if placed_order_journal is not None:
+        if placed_chore_journal is not None:
             break
         time.sleep(loop_wait_secs)
 
     time_delta = DateTime.utcnow() - start_time
-    print(f"Found placed_order_journal - {placed_order_journal} in {time_delta.total_seconds()}, "
-          f"for symbol {expected_symbol}, order_events {expected_order_event_list}, "
-          f"expect_no_order {expect_no_order} and last_order_id {last_order_id}")
+    print(f"Found placed_chore_journal - {placed_chore_journal} in {time_delta.total_seconds()}, "
+          f"for symbol {expected_symbol}, chore_events {expected_chore_event_list}, "
+          f"expect_no_chore {expect_no_chore} and last_chore_id {last_chore_id}")
 
-    if expect_no_order:
-        assert placed_order_journal is None, f"Expected no new order for symbol {expected_symbol}, " \
-                                             f"received {placed_order_journal} - assert_code: {assert_code}"
-        placed_order_journal = OrderJournalBaseModel(order=OrderBriefOptional(order_id=last_order_id))
+    if expect_no_chore:
+        assert placed_chore_journal is None, f"Expected no new chore for symbol {expected_symbol}, " \
+                                             f"received {placed_chore_journal} - assert_code: {assert_code}"
+        placed_chore_journal = ChoreJournalBaseModel(chore=ChoreBriefOptional(chore_id=last_chore_id))
     else:
-        assert placed_order_journal is not None, \
-            f"Can't find any order_journal with symbol {expected_symbol} order_events {expected_order_event_list}, " \
-            f"expect_no_order {expect_no_order} and last_order_id {last_order_id} - assert_code: {assert_code}"
+        assert placed_chore_journal is not None, \
+            f"Can't find any chore_journal with symbol {expected_symbol} chore_events {expected_chore_event_list}, " \
+            f"expect_no_chore {expect_no_chore} and last_chore_id {last_chore_id} - assert_code: {assert_code}"
 
-    return placed_order_journal
+    return placed_chore_journal
 
 
-def get_latest_fill_journal_from_order_id(expected_order_id: str,
+def get_latest_fill_journal_from_chore_id(expected_chore_id: str,
                                           executor_web_client: StreetBookServiceHttpClient):
     found_fill_journal = None
 
     stored_fill_journals = executor_web_client.get_all_fills_journal_client(-100)
     for stored_fill_journal in stored_fill_journals:
-        if stored_fill_journal.order_id == expected_order_id:
+        if stored_fill_journal.chore_id == expected_chore_id:
             # since fills_journal is having option to sort in descending, first occurrence will be latest
             found_fill_journal = stored_fill_journal
             break
-    assert found_fill_journal is not None, f"Can't find any fill_journal with order_id {expected_order_id}"
+    assert found_fill_journal is not None, f"Can't find any fill_journal with chore_id {expected_chore_id}"
     return found_fill_journal
 
 
-def get_fill_journals_for_order_id(expected_order_id: str,
+def get_fill_journals_for_chore_id(expected_chore_id: str,
                                    executor_web_client: StreetBookServiceHttpClient):
     found_fill_journals = []
 
     stored_fill_journals = executor_web_client.get_all_fills_journal_client(-100)
     for stored_fill_journal in stored_fill_journals:
-        if stored_fill_journal.order_id == expected_order_id:
+        if stored_fill_journal.chore_id == expected_chore_id:
             found_fill_journals.append(stored_fill_journal)
-    assert len(found_fill_journals) != 0, f"Can't find any fill_journal with order_id {expected_order_id}"
+    assert len(found_fill_journals) != 0, f"Can't find any fill_journal with chore_id {expected_chore_id}"
     return found_fill_journals
 
 
-def place_new_order(sec_id: str, side: Side, px: float, qty: int,
+def place_new_chore(sec_id: str, side: Side, px: float, qty: int,
                     executor_web_client: StreetBookServiceHttpClient):
     security = SecurityOptional(sec_id=sec_id, sec_type=SecurityType.TICKER)
-    new_order_obj = NewOrderBaseModel(security=security, side=side, px=px, qty=qty)
-    created_new_order_obj = executor_web_client.create_new_order_client(new_order_obj)
+    new_chore_obj = NewChoreBaseModel(security=security, side=side, px=px, qty=qty)
+    created_new_chore_obj = executor_web_client.create_new_chore_client(new_chore_obj)
 
-    new_order_obj.id = created_new_order_obj.id
-    assert created_new_order_obj == new_order_obj, f"Mismatch new_order_obj: expected {new_order_obj}, " \
-                                                   f"received {created_new_order_obj}"
-    return created_new_order_obj
+    new_chore_obj.id = created_new_chore_obj.id
+    assert created_new_chore_obj == new_chore_obj, f"Mismatch new_chore_obj: expected {new_chore_obj}, " \
+                                                   f"received {created_new_chore_obj}"
+    return created_new_chore_obj
 
 
-def create_pre_order_test_requirements(leg1_symbol: str, leg2_symbol: str, pair_strat_: PairStratBaseModel,
+def create_pre_chore_test_requirements(leg1_symbol: str, leg2_symbol: str, pair_strat_: PairStratBaseModel,
                                        expected_strat_limits_: StratLimits, expected_start_status_: StratStatus,
                                        symbol_overview_obj_list: List[SymbolOverviewBaseModel],
-                                       last_trade_fixture_list: List[Dict],
+                                       last_barter_fixture_list: List[Dict],
                                        market_depth_basemodel_list: List[MarketDepthBaseModel],
-                                       top_of_book_json_list: List[Dict],
                                        leg1_side: Side | None = None, leg2_side: Side | None = None,
                                        strat_mode: StratMode | None = None) -> Tuple[PairStratBaseModel,
                                                                                      StreetBookServiceHttpClient]:
@@ -2954,7 +2932,7 @@ def create_pre_order_test_requirements(leg1_symbol: str, leg2_symbol: str, pair_
     pair_strat_.pair_strat_params.strat_mode = strat_mode
     active_pair_strat, executor_web_client = create_n_activate_strat(
         leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_), copy.deepcopy(expected_strat_limits_),
-        copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_json_list,
+        copy.deepcopy(expected_start_status_), symbol_overview_obj_list,
         market_depth_basemodel_list, leg1_side, leg2_side)
     if active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
         buy_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
@@ -2964,19 +2942,19 @@ def create_pre_order_test_requirements(leg1_symbol: str, leg2_symbol: str, pair_
         sell_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
     print(f"strat created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    # running Last Trade
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    print(f"LastTrade created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    # running Last Barter
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    print(f"LastBarter created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     return active_pair_strat, executor_web_client
 
 
-def create_pre_order_test_requirements_for_log_book(leg1_symbol: str, leg2_symbol: str,
+def create_pre_chore_test_requirements_for_log_book(leg1_symbol: str, leg2_symbol: str,
                                                         pair_strat_: PairStratBaseModel,
                                                         expected_strat_limits_: StratLimits,
                                                         expected_start_status_: StratStatus,
                                                         symbol_overview_obj_list: List[SymbolOverviewBaseModel],
-                                                        last_trade_fixture_list: List[Dict],
+                                                        last_barter_fixture_list: List[Dict],
                                                         market_depth_basemodel_list: List[MarketDepthBaseModel],
                                                         top_of_book_json_list: List[Dict], strat_state: StratState,
                                                         leg1_side: Side | None = None,
@@ -3001,9 +2979,9 @@ def create_pre_order_test_requirements_for_log_book(leg1_symbol: str, leg2_symbo
         sell_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
     print(f"strat created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    # running Last Trade
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    print(f"LastTrade created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    # running Last Barter
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    print(f"LastBarter created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     return active_pair_strat, executor_web_client
 
@@ -3029,47 +3007,81 @@ def get_usd_to_local_px_or_notional(val: int | float):
     return val * fx_symbol_overview_obj().closing_px
 
 
-def update_tob_through_market_depth_to_place_buy_order(executor_web_client: StreetBookServiceHttpClient,
-                                                       buy_market_depth_obj, sell_market_depth_obj):
-    buy_market_depth_json = jsonable_encoder(buy_market_depth_obj, by_alias=True, exclude_none=True)
-    sell_market_depth_json = jsonable_encoder(sell_market_depth_obj, by_alias=True, exclude_none=True)
+def update_tob_through_market_depth_to_place_buy_chore(executor_web_client: StreetBookServiceHttpClient,
+                                                       bid_buy_market_depth_obj: MarketDepthBaseModel,
+                                                       ask_sell_market_depth_obj: MarketDepthBaseModel):
+    ask_sell_market_depth_obj.exch_time = get_utc_date_time()
+    ask_sell_market_depth_obj.arrival_time = get_utc_date_time()
+    bid_buy_market_depth_obj.exch_time = get_utc_date_time()
+    bid_buy_market_depth_obj.arrival_time = get_utc_date_time()
 
-    # update to not trigger place order
+    buy_market_depth_json = jsonable_encoder(bid_buy_market_depth_obj, by_alias=True, exclude_none=True)
+    sell_market_depth_json = jsonable_encoder(ask_sell_market_depth_obj, by_alias=True, exclude_none=True)
+
+    # update to not trigger place chore
     executor_web_client.patch_market_depth_client(sell_market_depth_json)
+    time.sleep(1)
     executor_web_client.patch_market_depth_client(buy_market_depth_json)
 
-    # update to trigger place order
-    buy_market_depth_json["px"] = 110
+    time.sleep(1)
+
+    ask_sell_market_depth_obj.exch_time = get_utc_date_time()
+    ask_sell_market_depth_obj.arrival_time = get_utc_date_time()
+    bid_buy_market_depth_obj.exch_time = get_utc_date_time()
+    bid_buy_market_depth_obj.arrival_time = get_utc_date_time()
+
+    buy_market_depth_json = jsonable_encoder(bid_buy_market_depth_obj, by_alias=True, exclude_none=True)
+    sell_market_depth_json = jsonable_encoder(ask_sell_market_depth_obj, by_alias=True, exclude_none=True)
+
+    # update to trigger place chore
+    buy_market_depth_json["px"] = 100
     executor_web_client.patch_market_depth_client(sell_market_depth_json)
+    time.sleep(1)
     executor_web_client.patch_market_depth_client(buy_market_depth_json)
 
 
-def update_tob_through_market_depth_to_place_sell_order(executor_web_client: StreetBookServiceHttpClient,
+def update_tob_through_market_depth_to_place_sell_chore(executor_web_client: StreetBookServiceHttpClient,
                                                         sell_market_depth_obj, buy_market_depth_obj):
+
+    buy_market_depth_obj.exch_time = get_utc_date_time()
+    buy_market_depth_obj.arrival_time = get_utc_date_time()
+    sell_market_depth_obj.exch_time = get_utc_date_time()
+    sell_market_depth_obj.arrival_time = get_utc_date_time()
+
     sell_market_depth_json = jsonable_encoder(sell_market_depth_obj, by_alias=True, exclude_none=True)
     buy_market_depth_json = jsonable_encoder(buy_market_depth_obj, by_alias=True, exclude_none=True)
 
-    # update to not trigger place order
+    # update to not trigger place chore
     executor_web_client.patch_market_depth_client(buy_market_depth_json)
+    time.sleep(1)
     executor_web_client.patch_market_depth_client(sell_market_depth_json)
 
-    # update to trigger place order
+    time.sleep(1)
+
+    # update to trigger place chore
+    buy_market_depth_obj.exch_time = get_utc_date_time()
+    buy_market_depth_obj.arrival_time = get_utc_date_time()
+    sell_market_depth_obj.exch_time = get_utc_date_time()
+    sell_market_depth_obj.arrival_time = get_utc_date_time()
+
+    sell_market_depth_json = jsonable_encoder(sell_market_depth_obj, by_alias=True, exclude_none=True)
+    buy_market_depth_json = jsonable_encoder(buy_market_depth_obj, by_alias=True, exclude_none=True)
     sell_market_depth_json["px"] = 120
     executor_web_client.patch_market_depth_client(buy_market_depth_json)
+    time.sleep(1)
     executor_web_client.patch_market_depth_client(sell_market_depth_json)
 
 
-def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: int,
-                               refresh_sec: int, buy_order_: OrderJournalBaseModel,
-                               sell_order_: OrderJournalBaseModel,
+def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_count: int,
+                               refresh_sec: int, buy_chore_: ChoreJournalBaseModel,
+                               sell_chore_: ChoreJournalBaseModel,
                                buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
-                               expected_buy_order_snapshot_: OrderSnapshotBaseModel,
-                               expected_sell_order_snapshot_: OrderSnapshotBaseModel,
+                               expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
+                               expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
                                pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
                                expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
-                               top_of_book_list_: List[Dict],
-                               last_trade_fixture_list: List[Dict],
+                               last_barter_fixture_list: List[Dict],
                                symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                market_depth_basemodel_list: List[MarketDepthBaseModel],
                                is_non_systematic_run: bool = False) -> Tuple[float, float, float, float]:
@@ -3077,271 +3089,271 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
     active_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
-                                           last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
+                                           last_barter_fixture_list, market_depth_basemodel_list))
     print(f"Created Strat: {active_pair_strat}")
 
     strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
-    order_id = None
-    cxl_order_id = None
+    chore_id = None
+    cxl_chore_id = None
 
     expected_buy_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[0])
     expected_buy_symbol_side_snapshot.security.sec_id = buy_symbol
     expected_sell_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[1])
     expected_sell_symbol_side_snapshot.security.sec_id = sell_symbol
     expected_strat_brief_obj = copy.deepcopy(expected_strat_brief_)
-    expected_strat_brief_obj.pair_buy_side_trading_brief.security.sec_id = buy_symbol
-    expected_strat_brief_obj.pair_sell_side_trading_brief.security.sec_id = sell_symbol
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
     expected_strat_status = copy.deepcopy(expected_start_status_)
 
-    buy_top_market_depth = None
-    sell_top_market_depth = None
-    for market_depth in market_depth_basemodel_list:
-        if market_depth.symbol == buy_symbol and market_depth.position == 0:
-            buy_top_market_depth = market_depth
-        if market_depth.symbol == sell_symbol and market_depth.position == 0:
-            sell_top_market_depth = market_depth
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_web_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
 
     for loop_count in range(1, total_loop_count + 1):
         start_time = DateTime.utcnow()
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Loop started at {start_time}")
-        expected_buy_order_snapshot = copy.deepcopy(expected_buy_order_snapshot_)
-        expected_buy_order_snapshot.order_brief.security.sec_id = buy_symbol
+        expected_buy_chore_snapshot = copy.deepcopy(expected_buy_chore_snapshot_)
+        expected_buy_chore_snapshot.chore_brief.security.sec_id = buy_symbol
 
-        # running last trade once more before sell side
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
-        # Running TopOfBook (this triggers expected buy order)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run)
-        # print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, created tob")
-
-        update_tob_through_market_depth_to_place_buy_order(executor_web_client, buy_top_market_depth,
-                                                           sell_top_market_depth)
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
-            # Waiting for tob to trigger place order
+            # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+            time.sleep(1)
+            update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                               ask_sell_top_market_depth)
+
+            # Waiting for tob to trigger place chore
             buy_tob_last_update_date_time_tracker = \
-                wait_for_get_new_order_placed_from_tob(110, buy_symbol,
+                wait_for_get_new_chore_placed_from_tob(100, buy_symbol,
                                                        buy_tob_last_update_date_time_tracker, Side.BUY,
                                                        executor_web_client)
             time_delta = DateTime.utcnow() - start_time
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received buy TOB of last_update_date_time "
                   f"{buy_tob_last_update_date_time_tracker}, time delta {time_delta.total_seconds()}")
         else:
-            # placing new non-systematic new_order
+            # placing new non-systematic new_chore
             qty = random.randint(85, 95)
             px = random.randint(90, 100)
-            place_new_order(buy_symbol, Side.BUY, px, qty, executor_web_client)
-            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_order obj")
+            place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client)
+            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_web_client,
-                                                                              last_order_id=order_id)
-        order_id = placed_order_journal.order.order_id
-        create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received order_journal with {order_id}")
+                                                                              last_chore_id=chore_id)
+        chore_id = placed_chore_journal.chore.chore_id
+        create_buy_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_journal with {chore_id}")
         time.sleep(2)
 
-        # Checking placed order computations
-        check_placed_buy_order_computes_before_all_sells(loop_count, order_id, buy_symbol,
-                                                         placed_order_journal, expected_buy_order_snapshot,
+        # Checking placed chore computations
+        check_placed_buy_chore_computes_before_all_sells(loop_count, chore_id, buy_symbol,
+                                                         placed_chore_journal, expected_buy_chore_snapshot,
                                                          expected_buy_symbol_side_snapshot,
                                                          expected_sell_symbol_side_snapshot,
                                                          active_pair_strat,
                                                          expected_strat_limits_, expected_strat_status,
                                                          expected_strat_brief_obj, executor_web_client)
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order of order_id {order_id}")
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
-        executor_web_client.trade_simulator_process_order_ack_query_client(
-            order_id, placed_order_journal.order.px,
-            placed_order_journal.order.qty,
-            placed_order_journal.order.side,
-            placed_order_journal.order.security.sec_id,
-            placed_order_journal.order.underlying_account
+        executor_web_client.barter_simulator_process_chore_ack_query_client(
+            chore_id, placed_chore_journal.chore.px,
+            placed_chore_journal.chore.qty,
+            placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id,
+            placed_chore_journal.chore.underlying_account
         )
 
-        placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
 
-        # Checking Ack response on placed order
-        placed_buy_order_ack_receive(placed_order_journal_obj_ack_response, expected_buy_order_snapshot,
+        # Checking Ack response on placed chore
+        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot,
                                      executor_web_client)
         print(
-            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order ACK of order_id {order_id}")
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore ACK of chore_id {chore_id}")
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
         buy_fill_journal_obj.fill_qty = random.randint(50, 55)
         buy_fill_journal_obj.fill_px = random.randint(90, 100)
-        executor_web_client.trade_simulator_process_fill_query_client(
-            order_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
+        executor_web_client.barter_simulator_process_fill_query_client(
+            chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
             Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_order_id(order_id, executor_web_client)
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
 
-        # Checking Fill receive on placed order
-        check_fill_receive_for_placed_buy_order_before_sells(buy_symbol, placed_fill_journal_obj,
-                                                             expected_buy_order_snapshot,
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_buy_chore_before_sells(buy_symbol, placed_fill_journal_obj,
+                                                             expected_buy_chore_snapshot,
                                                              expected_buy_symbol_side_snapshot,
                                                              expected_sell_symbol_side_snapshot,
                                                              active_pair_strat,
                                                              expected_strat_limits_, expected_strat_status,
                                                              expected_strat_brief_obj, executor_web_client)
         print(
-            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order FILL of order_id {order_id}")
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore FILL of chore_id {chore_id}")
 
-        # Sleeping to let the order get cxlled
+        # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK,
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            buy_symbol, executor_web_client,
-                                                                           last_order_id=cxl_order_id)
-        cxl_order_id = cxl_order_journal.order.order_id
+                                                                           last_chore_id=cxl_chore_id)
+        cxl_chore_id = cxl_chore_journal.chore.chore_id
 
-        # Checking CXL_ACK receive on placed order by cxl_req from residual removal
-        check_cxl_receive_for_placed_buy_order_before_sells(buy_symbol, cxl_order_journal,
-                                                            expected_buy_order_snapshot,
+        # Checking CXL_ACK receive on placed chore by cxl_req from residual removal
+        check_cxl_receive_for_placed_buy_chore_before_sells(buy_symbol, cxl_chore_journal,
+                                                            expected_buy_chore_snapshot,
                                                             expected_buy_symbol_side_snapshot,
                                                             expected_sell_symbol_side_snapshot,
                                                             active_pair_strat,
                                                             expected_strat_limits_, expected_strat_status,
                                                             expected_strat_brief_obj, executor_web_client)
 
-        strat_buy_notional += expected_buy_order_snapshot.fill_notional
-        strat_buy_fill_notional += expected_buy_order_snapshot.fill_notional
+        strat_buy_notional += expected_buy_chore_snapshot.fill_notional
+        strat_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
 
-    order_id = None
-    cxl_order_id = None
+    chore_id = None
+    cxl_chore_id = None
     for loop_count in range(1, total_loop_count + 1):
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Loop started")
-        expected_sell_order_snapshot = copy.deepcopy(expected_sell_order_snapshot_)
-        expected_sell_order_snapshot.order_brief.security.sec_id = sell_symbol
+        expected_sell_chore_snapshot = copy.deepcopy(expected_sell_chore_snapshot_)
+        expected_sell_chore_snapshot.chore_brief.security.sec_id = sell_symbol
 
-        # running last trade once more before sell side
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
-        # Running TopOfBook (this triggers expected buy order)
-        # run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1], is_non_systematic_run)
-        # print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, created tob")
-        update_tob_through_market_depth_to_place_sell_order(executor_web_client, sell_top_market_depth,
-                                                            buy_top_market_depth)
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
-            # Waiting for tob to trigger place order
+            # required to make buy side tob latest so that when top update reaches in test place chore function in
+            # executor both side are new last_update_date_time
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+            # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+            update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                                bid_buy_top_market_depth)
+
+            # Waiting for tob to trigger place chore
             sell_tob_last_update_date_time_tracker = \
-                wait_for_get_new_order_placed_from_tob(120, sell_symbol, sell_tob_last_update_date_time_tracker,
+                wait_for_get_new_chore_placed_from_tob(120, sell_symbol, sell_tob_last_update_date_time_tracker,
                                                        Side.SELL, executor_web_client)
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received buy TOB")
         else:
-            # placing new non-systematic new_order
+            # placing new non-systematic new_chore
             qty = random.randint(65, 75)
             px = random.randint(100, 110)
-            place_new_order(sell_symbol, Side.SELL, px, qty, executor_web_client)
-            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_order obj")
+            place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
+            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_web_client,
-                                                                              last_order_id=order_id)
-        create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        order_id = placed_order_journal.order.order_id
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
+                                                                              last_chore_id=chore_id)
+        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        chore_id = placed_chore_journal.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_journal with {chore_id}")
         time.sleep(2)
 
-        # Checking placed order computations
-        check_placed_sell_order_computes_after_all_buys(loop_count, order_id,
-                                                        sell_symbol, placed_order_journal, expected_sell_order_snapshot,
+        # Checking placed chore computations
+        check_placed_sell_chore_computes_after_all_buys(loop_count, chore_id,
+                                                        sell_symbol, placed_chore_journal, expected_sell_chore_snapshot,
                                                         expected_sell_symbol_side_snapshot,
                                                         expected_buy_symbol_side_snapshot,
                                                         active_pair_strat,
                                                         expected_strat_limits_, expected_strat_status,
                                                         expected_strat_brief_obj, executor_web_client)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order of order_id {order_id}")
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
-        executor_web_client.trade_simulator_process_order_ack_query_client(
-            order_id, placed_order_journal.order.px,
-            placed_order_journal.order.qty,
-            placed_order_journal.order.side,
-            placed_order_journal.order.security.sec_id,
-            placed_order_journal.order.underlying_account
+        executor_web_client.barter_simulator_process_chore_ack_query_client(
+            chore_id, placed_chore_journal.chore.px,
+            placed_chore_journal.chore.qty,
+            placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id,
+            placed_chore_journal.chore.underlying_account
         )
 
-        placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
 
-        # Checking Ack response on placed order
-        placed_sell_order_ack_receive(placed_order_journal_obj_ack_response,
-                                      expected_sell_order_snapshot, executor_web_client)
+        # Checking Ack response on placed chore
+        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+                                      expected_sell_chore_snapshot, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, "
-              f"Checked sell placed order ACK of order_id {order_id}")
+              f"Checked sell placed chore ACK of chore_id {chore_id}")
 
         sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
         sell_fill_journal_obj.fill_qty = random.randint(30, 35)
         sell_fill_journal_obj.fill_px = random.randint(100, 110)
-        executor_web_client.trade_simulator_process_fill_query_client(
-            order_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
+        executor_web_client.barter_simulator_process_fill_query_client(
+            chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
             Side.SELL, sell_symbol, sell_fill_journal_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_order_id(order_id, executor_web_client)
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
 
-        # Checking Fill receive on placed order
-        check_fill_receive_for_placed_sell_order_after_all_buys(loop_count, order_id,
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_sell_chore_after_all_buys(loop_count, chore_id,
                                                                 sell_symbol,
-                                                                placed_fill_journal_obj, expected_sell_order_snapshot,
+                                                                placed_fill_journal_obj, expected_sell_chore_snapshot,
                                                                 expected_sell_symbol_side_snapshot,
                                                                 expected_buy_symbol_side_snapshot,
                                                                 active_pair_strat, expected_strat_limits_,
                                                                 expected_strat_status, expected_strat_brief_obj,
                                                                 executor_web_client)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order FILL")
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore FILL")
 
-        # Sleeping to let the order get cxlled
+        # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK,
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            sell_symbol, executor_web_client,
-                                                                           last_order_id=cxl_order_id)
-        cxl_order_id = cxl_order_journal.order.order_id
+                                                                           last_chore_id=cxl_chore_id)
+        cxl_chore_id = cxl_chore_journal.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
-        check_cxl_receive_for_placed_sell_order_after_all_buys(sell_symbol,
-                                                               cxl_order_journal, expected_sell_order_snapshot,
+        check_cxl_receive_for_placed_sell_chore_after_all_buys(sell_symbol,
+                                                               cxl_chore_journal, expected_sell_chore_snapshot,
                                                                expected_sell_symbol_side_snapshot,
                                                                expected_buy_symbol_side_snapshot,
                                                                active_pair_strat, expected_strat_limits_,
                                                                expected_strat_status, expected_strat_brief_obj,
                                                                executor_web_client)
 
-        strat_sell_notional += expected_sell_order_snapshot.fill_notional
-        strat_sell_fill_notional += expected_sell_order_snapshot.fill_notional
+        strat_sell_notional += expected_sell_chore_snapshot.fill_notional
+        strat_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
     return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
 
 
-def handle_test_sell_buy_order(leg1_symbol: str, leg2_symbol: str, total_loop_count: int,
-                               refresh_sec: int, buy_order_: OrderJournalBaseModel,
-                               sell_order_: OrderJournalBaseModel,
+def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_count: int,
+                               refresh_sec: int, buy_chore_: ChoreJournalBaseModel,
+                               sell_chore_: ChoreJournalBaseModel,
                                buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
-                               expected_buy_order_snapshot_: OrderSnapshotBaseModel,
-                               expected_sell_order_snapshot_: OrderSnapshotBaseModel,
+                               expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
+                               expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
                                pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
                                expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
-                               expected_portfolio_status_: PortfolioStatusBaseModel, top_of_book_list_: List[Dict],
-                               last_trade_fixture_list: List[Dict],
+                               expected_portfolio_status_: PortfolioStatusBaseModel,
+                               last_barter_fixture_list: List[Dict],
                                symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                market_depth_basemodel_list: List[MarketDepthBaseModel],
                                is_non_systematic_run: bool = False):
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
     active_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
-                                           last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+                                           last_barter_fixture_list, market_depth_basemodel_list,
                                            leg1_side=Side.SELL, leg2_side=Side.BUY))
     print(f"Created Strat: {active_pair_strat}")
     buy_symbol = active_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
@@ -3350,216 +3362,228 @@ def handle_test_sell_buy_order(leg1_symbol: str, leg2_symbol: str, total_loop_co
     strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
-    order_id = None
-    cxl_order_id = None
+    chore_id = None
+    cxl_chore_id = None
     expected_sell_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[1])
     expected_sell_symbol_side_snapshot.security.sec_id = sell_symbol
     expected_strat_brief_obj = copy.deepcopy(expected_strat_brief_)
-    expected_strat_brief_obj.pair_buy_side_trading_brief.security.sec_id = buy_symbol
-    expected_strat_brief_obj.pair_sell_side_trading_brief.security.sec_id = sell_symbol
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
     expected_buy_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[0])
     expected_buy_symbol_side_snapshot.security.sec_id = buy_symbol
     expected_strat_status = copy.deepcopy(expected_start_status_)
 
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_web_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
+
     for loop_count in range(1, total_loop_count + 1):
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Loop started")
-        expected_sell_order_snapshot = copy.deepcopy(expected_sell_order_snapshot_)
-        expected_sell_order_snapshot.order_brief.security.sec_id = sell_symbol
+        expected_sell_chore_snapshot = copy.deepcopy(expected_sell_chore_snapshot_)
+        expected_sell_chore_snapshot.chore_brief.security.sec_id = sell_symbol
 
-        # running last trade once more before sell side
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-        # Running TopOfBook (this triggers expected buy order)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, created tob")
+        # required to make buy side tob latest so that when top update reaches both side are new last_update_date_time
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+        # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                            bid_buy_top_market_depth)
 
         if not is_non_systematic_run:
-            # Waiting for tob to trigger place order
+            # Waiting for tob to trigger place chore
             sell_tob_last_update_date_time_tracker = \
-                wait_for_get_new_order_placed_from_tob(120, sell_symbol,
+                wait_for_get_new_chore_placed_from_tob(120, sell_symbol,
                                                        sell_tob_last_update_date_time_tracker,
                                                        Side.SELL, executor_web_client)
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received buy TOB")
         else:
-            # placing new non-systematic new_order
+            # placing new non-systematic new_chore
             qty = random.randint(65, 75)
             px = random.randint(100, 110)
-            place_new_order(sell_symbol, Side.SELL, px, qty, executor_web_client)
-            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_order obj")
+            place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
+            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_web_client,
-                                                                              last_order_id=order_id)
-        create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        order_id = placed_order_journal.order.order_id
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
+                                                                              last_chore_id=chore_id)
+        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        chore_id = placed_chore_journal.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_journal with {chore_id}")
         time.sleep(2)
 
-        # Checking placed order computations
-        check_placed_sell_order_computes_before_buys(loop_count, order_id,
-                                                     sell_symbol, placed_order_journal, expected_sell_order_snapshot,
+        # Checking placed chore computations
+        check_placed_sell_chore_computes_before_buys(loop_count, chore_id,
+                                                     sell_symbol, placed_chore_journal, expected_sell_chore_snapshot,
                                                      expected_sell_symbol_side_snapshot,
                                                      expected_buy_symbol_side_snapshot,
                                                      active_pair_strat,
                                                      expected_strat_limits_, expected_strat_status,
                                                      expected_strat_brief_obj, executor_web_client)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order of order_id {order_id}")
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
-        executor_web_client.trade_simulator_process_order_ack_query_client(
-            order_id, placed_order_journal.order.px, placed_order_journal.order.qty, placed_order_journal.order.side,
-            placed_order_journal.order.security.sec_id, placed_order_journal.order.underlying_account)
+        executor_web_client.barter_simulator_process_chore_ack_query_client(
+            chore_id, placed_chore_journal.chore.px, placed_chore_journal.chore.qty, placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id, placed_chore_journal.chore.underlying_account)
 
-        placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
 
-        # Checking Ack response on placed order
-        placed_sell_order_ack_receive(placed_order_journal_obj_ack_response,
-                                      expected_sell_order_snapshot, executor_web_client)
+        # Checking Ack response on placed chore
+        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+                                      expected_sell_chore_snapshot, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, "
-              f"Checked sell placed order ACK of order_id {order_id}")
+              f"Checked sell placed chore ACK of chore_id {chore_id}")
 
         sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
         sell_fill_journal_obj.fill_qty = random.randint(30, 35)
         sell_fill_journal_obj.fill_px = random.randint(100, 110)
-        executor_web_client.trade_simulator_process_fill_query_client(
-            order_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
+        executor_web_client.barter_simulator_process_fill_query_client(
+            chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
             Side.SELL, sell_symbol, sell_fill_journal_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_order_id(order_id, executor_web_client)
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
 
-        # Checking Fill receive on placed order
-        check_fill_receive_for_placed_sell_order_before_buys(
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_sell_chore_before_buys(
             sell_symbol, placed_fill_journal_obj,
-            expected_sell_order_snapshot, expected_sell_symbol_side_snapshot,
+            expected_sell_chore_snapshot, expected_sell_symbol_side_snapshot,
             expected_buy_symbol_side_snapshot, active_pair_strat,
             expected_strat_limits_, expected_strat_status, expected_strat_brief_obj, executor_web_client)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order FILL")
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore FILL")
 
-        # Sleeping to let the order get cxlled
+        # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK,
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            sell_symbol, executor_web_client,
-                                                                           last_order_id=cxl_order_id)
-        cxl_order_id = cxl_order_journal.order.order_id
+                                                                           last_chore_id=cxl_chore_id)
+        cxl_chore_id = cxl_chore_journal.chore.chore_id
 
-        # Checking CXL_ACK receive on placed order by cxl_req from residual removal
-        check_cxl_receive_for_placed_sell_order_before_buy(sell_symbol, cxl_order_journal,
-                                                           expected_sell_order_snapshot,
+        # Checking CXL_ACK receive on placed chore by cxl_req from residual removal
+        check_cxl_receive_for_placed_sell_chore_before_buy(sell_symbol, cxl_chore_journal,
+                                                           expected_sell_chore_snapshot,
                                                            expected_sell_symbol_side_snapshot,
                                                            expected_buy_symbol_side_snapshot,
                                                            active_pair_strat,
                                                            expected_strat_limits_, expected_strat_status,
                                                            expected_strat_brief_obj, executor_web_client)
 
-        strat_sell_notional += expected_sell_order_snapshot.fill_notional
-        strat_sell_fill_notional += expected_sell_order_snapshot.fill_notional
+        strat_sell_notional += expected_sell_chore_snapshot.fill_notional
+        strat_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
 
-    order_id = None
-    cxl_order_id = None
+    chore_id = None
+    cxl_chore_id = None
     for loop_count in range(1, total_loop_count + 1):
         start_time = DateTime.utcnow()
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Loop started at {start_time}")
-        expected_buy_order_snapshot = copy.deepcopy(expected_buy_order_snapshot_)
-        expected_buy_order_snapshot.order_brief.security.sec_id = buy_symbol
+        expected_buy_chore_snapshot = copy.deepcopy(expected_buy_chore_snapshot_)
+        expected_buy_chore_snapshot.chore_brief.security.sec_id = buy_symbol
 
-        # running last trade once more before sell side
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        print(f"LastTrades created: buy_symbol: {leg1_symbol}, sell_symbol: {sell_symbol}")
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        print(f"LastBarters created: buy_symbol: {leg1_symbol}, sell_symbol: {sell_symbol}")
 
-        # Running TopOfBook (this triggers expected buy order)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1], is_non_systematic_run)
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, created tob")
+        # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                           ask_sell_top_market_depth)
 
         if not is_non_systematic_run:
-            # Waiting for tob to trigger place order
+            # Waiting for tob to trigger place chore
             buy_tob_last_update_date_time_tracker = \
-                wait_for_get_new_order_placed_from_tob(110, buy_symbol,
+                wait_for_get_new_chore_placed_from_tob(100, buy_symbol,
                                                        buy_tob_last_update_date_time_tracker, Side.BUY,
                                                        executor_web_client)
             time_delta = DateTime.utcnow() - start_time
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received buy TOB of last_update_date_time "
                   f"{buy_tob_last_update_date_time_tracker}, time delta {time_delta.total_seconds()}")
         else:
-            # placing new non-systematic new_order
+            # placing new non-systematic new_chore
             qty = random.randint(85, 95)
             px = random.randint(90, 100)
-            place_new_order(buy_symbol, Side.BUY, px, qty, executor_web_client)
-            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_order obj")
+            place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client)
+            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_web_client,
-                                                                              last_order_id=order_id)
-        order_id = placed_order_journal.order.order_id
-        create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received order_journal with {order_id}")
+                                                                              last_chore_id=chore_id)
+        chore_id = placed_chore_journal.chore.chore_id
+        create_buy_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_journal with {chore_id}")
         time.sleep(2)
 
-        # Checking placed order computations
-        check_placed_buy_order_computes_after_sells(loop_count, order_id, buy_symbol,
-                                                    placed_order_journal, expected_buy_order_snapshot,
+        # Checking placed chore computations
+        check_placed_buy_chore_computes_after_sells(loop_count, chore_id, buy_symbol,
+                                                    placed_chore_journal, expected_buy_chore_snapshot,
                                                     expected_buy_symbol_side_snapshot,
                                                     expected_sell_symbol_side_snapshot, active_pair_strat,
                                                     expected_strat_limits_, expected_strat_status,
                                                     expected_strat_brief_obj, executor_web_client)
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order of order_id {order_id}")
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
-        executor_web_client.trade_simulator_process_order_ack_query_client(
-            order_id, placed_order_journal.order.px, placed_order_journal.order.qty, placed_order_journal.order.side,
-            placed_order_journal.order.security.sec_id, placed_order_journal.order.underlying_account)
+        executor_web_client.barter_simulator_process_chore_ack_query_client(
+            chore_id, placed_chore_journal.chore.px, placed_chore_journal.chore.qty, placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id, placed_chore_journal.chore.underlying_account)
 
-        placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
 
-        # Checking Ack response on placed order
-        placed_buy_order_ack_receive(placed_order_journal_obj_ack_response, expected_buy_order_snapshot,
+        # Checking Ack response on placed chore
+        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot,
                                      executor_web_client)
         print(
-            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order ACK of order_id {order_id}")
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore ACK of chore_id {chore_id}")
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
         buy_fill_journal_obj.fill_qty = random.randint(50, 55)
         buy_fill_journal_obj.fill_px = random.randint(90, 100)
-        executor_web_client.trade_simulator_process_fill_query_client(
-            order_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
+        executor_web_client.barter_simulator_process_fill_query_client(
+            chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
             Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_order_id(order_id, executor_web_client)
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
 
-        # Checking Fill receive on placed order
-        check_fill_receive_for_placed_buy_order_after_all_sells(loop_count, order_id, buy_symbol,
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count, chore_id, buy_symbol,
                                                                 placed_fill_journal_obj,
-                                                                expected_buy_order_snapshot,
+                                                                expected_buy_chore_snapshot,
                                                                 expected_buy_symbol_side_snapshot,
                                                                 expected_sell_symbol_side_snapshot,
                                                                 active_pair_strat, expected_strat_limits_,
                                                                 expected_strat_status, expected_strat_brief_obj,
                                                                 executor_web_client)
         print(
-            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order FILL of order_id {order_id}")
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore FILL of chore_id {chore_id}")
 
-        # Sleeping to let the order get cxlled
+        # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK,
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            buy_symbol, executor_web_client,
-                                                                           last_order_id=cxl_order_id)
-        cxl_order_id = cxl_order_journal.order.order_id
+                                                                           last_chore_id=cxl_chore_id)
+        cxl_chore_id = cxl_chore_journal.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
-        check_cxl_receive_for_placed_buy_order_after_all_sells(buy_symbol,
-                                                               cxl_order_journal, expected_buy_order_snapshot,
+        check_cxl_receive_for_placed_buy_chore_after_all_sells(buy_symbol,
+                                                               cxl_chore_journal, expected_buy_chore_snapshot,
                                                                expected_buy_symbol_side_snapshot,
                                                                expected_sell_symbol_side_snapshot,
                                                                active_pair_strat, expected_strat_limits_,
                                                                expected_strat_status, expected_strat_brief_obj,
                                                                executor_web_client)
 
-        strat_buy_notional += expected_buy_order_snapshot.fill_notional
-        strat_buy_fill_notional += expected_buy_order_snapshot.fill_notional
+        strat_buy_notional += expected_buy_chore_snapshot.fill_notional
+        strat_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
     return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
 
 
@@ -3571,16 +3595,16 @@ def get_pair_strat_from_symbol(symbol: str):
             return pair_strat_obj
 
 
-def get_order_snapshot_from_order_id(order_id, executor_web_client: StreetBookServiceHttpClient
-                                     ) -> OrderSnapshotBaseModel | None:
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
-    expected_order_snapshot: OrderSnapshotBaseModel | None = None
-    for order_snapshot in order_snapshot_list:
-        if order_snapshot.order_brief.order_id == order_id:
-            expected_order_snapshot = order_snapshot
+def get_chore_snapshot_from_chore_id(chore_id, executor_web_client: StreetBookServiceHttpClient
+                                     ) -> ChoreSnapshotBaseModel | None:
+    chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
+    expected_chore_snapshot: ChoreSnapshotBaseModel | None = None
+    for chore_snapshot in chore_snapshot_list:
+        if chore_snapshot.chore_brief.chore_id == chore_id:
+            expected_chore_snapshot = chore_snapshot
             break
-    assert expected_order_snapshot is not None, "Expected order_snapshot as not None but received as None"
-    return expected_order_snapshot
+    assert expected_chore_snapshot is not None, "Expected chore_snapshot as not None but received as None"
+    return expected_chore_snapshot
 
 
 def create_fx_symbol_overview():
@@ -3592,170 +3616,194 @@ def create_fx_symbol_overview():
         f"Mismatch symbol_overview: expected {fx_symbol_overview}, received {created_fx_symbol_overview}"
 
 
-def verify_rej_orders(check_ack_to_reject_orders: bool, last_order_id: int | None,
-                      check_order_event: OrderEventType, symbol: str,
+def verify_rej_chores(check_ack_to_reject_chores: bool, last_chore_id: int | None,
+                      check_chore_event: ChoreEventType, symbol: str,
                       executor_web_client: StreetBookServiceHttpClient) -> str:
-    # internally checks order_journal is not None else raises assert exception internally
-    latest_order_journal = get_latest_order_journal_with_event_and_symbol(check_order_event, symbol,
+    # internally checks chore_journal is not None else raises assert exception internally
+    latest_chore_journal = get_latest_chore_journal_with_event_and_symbol(check_chore_event, symbol,
                                                                           executor_web_client,
-                                                                          last_order_id=last_order_id)
-    last_order_id = latest_order_journal.order.order_id
+                                                                          last_chore_id=last_chore_id)
+    last_chore_id = latest_chore_journal.chore.chore_id
 
-    if check_ack_to_reject_orders:
-        if check_order_event not in [OrderEventType.OE_INT_REJ, OrderEventType.OE_BRK_REJ, OrderEventType.OE_EXH_REJ]:
+    if check_ack_to_reject_chores:
+        if check_chore_event not in [ChoreEventType.OE_INT_REJ, ChoreEventType.OE_BRK_REJ, ChoreEventType.OE_EXH_REJ]:
             # internally checks fills_journal is not None else raises assert exception
-            latest_fill_journal = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id,
+            latest_fill_journal = get_latest_fill_journal_from_chore_id(latest_chore_journal.chore.chore_id,
                                                                         executor_web_client)
 
-    order_snapshot = get_order_snapshot_from_order_id(last_order_id,
+    chore_snapshot = get_chore_snapshot_from_chore_id(last_chore_id,
                                                       executor_web_client)
-    assert order_snapshot.order_status == OrderStatusType.OE_DOD, \
-        "Unexpected order_snapshot.order_status: expected OrderStatusType.OE_DOD, " \
-        f"received {order_snapshot.order_status}"
+    assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
+        "Unexpected chore_snapshot.chore_status: expected ChoreStatusType.OE_DOD, " \
+        f"received {chore_snapshot.chore_status}"
 
-    return last_order_id
+    return last_chore_id
 
 
-def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
-                          last_trade_fixture_list, top_of_book_list_, max_loop_count_per_side,
-                          check_ack_to_reject_orders: bool, executor_web_client: StreetBookServiceHttpClient,
+def handle_rej_chore_test(buy_symbol, sell_symbol, expected_strat_limits_,
+                          last_barter_fixture_list, max_loop_count_per_side,
+                          check_ack_to_reject_chores: bool, executor_web_client: StreetBookServiceHttpClient,
                           config_dict, residual_wait_secs):
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 10
+    # explicitly setting waived_min_chores to 10 for this test case
+    expected_strat_limits_.cancel_rate.waived_min_chores = 10
+
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_web_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
 
     # buy fills check
-    continues_order_count, continues_special_order_count = get_continuous_order_configs(buy_symbol, config_dict)
-    buy_order_count = 0
-    buy_special_order_count = 0
+    continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(buy_symbol, config_dict)
+    buy_chore_count = 0
+    buy_special_chore_count = 0
     special_case_counter = 0
     last_id = None
     buy_rej_last_id = None
     for loop_count in range(1, max_loop_count_per_side + 1):
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
-        time.sleep(2)  # delay for order to get placed
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                           ask_sell_top_market_depth)
+        time.sleep(2)  # delay for chore to get placed
 
-        if buy_order_count < continues_order_count:
-            check_order_event = OrderEventType.OE_CXL_ACK
-            buy_order_count += 1
+        if buy_chore_count < continues_chore_count:
+            check_chore_event = ChoreEventType.OE_CXL_ACK
+            buy_chore_count += 1
         else:
-            if buy_special_order_count < continues_special_order_count:
+            if buy_special_chore_count < continues_special_chore_count:
                 special_case_counter += 1
                 if special_case_counter % 2 == 0:
-                    check_order_event = OrderEventType.OE_BRK_REJ
+                    check_chore_event = ChoreEventType.OE_BRK_REJ
                 else:
-                    check_order_event = OrderEventType.OE_EXH_REJ
-                buy_special_order_count += 1
+                    check_chore_event = ChoreEventType.OE_EXH_REJ
+                buy_special_chore_count += 1
             else:
-                check_order_event = OrderEventType.OE_CXL_ACK
-                buy_order_count = 1
-                buy_special_order_count = 0
+                check_chore_event = ChoreEventType.OE_CXL_ACK
+                buy_chore_count = 1
+                buy_special_chore_count = 0
 
         # internally contains assert checks
-        last_id = verify_rej_orders(check_ack_to_reject_orders, last_id, check_order_event,
+        last_id = verify_rej_chores(check_ack_to_reject_chores, last_id, check_chore_event,
                                     buy_symbol, executor_web_client)
 
-        if check_order_event in [OrderEventType.OE_BRK_REJ, OrderEventType.OE_EXH_REJ]:
+        if check_chore_event in [ChoreEventType.OE_BRK_REJ, ChoreEventType.OE_EXH_REJ]:
             buy_rej_last_id = last_id
 
-    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+    if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
         time.sleep(residual_wait_secs)  # to start sell after buy is completely done
 
     # sell fills check
-    continues_order_count, continues_special_order_count = get_continuous_order_configs(sell_symbol, config_dict)
+    continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(sell_symbol, config_dict)
     last_id = None
     sell_rej_last_id = None
-    sell_order_count = 0
-    sell_special_order_count = 0
+    sell_chore_count = 0
+    sell_special_chore_count = 0
     for loop_count in range(1, max_loop_count_per_side + 1):
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
-        time.sleep(2)  # delay for order to get placed
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        # required to make buy side tob latest
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                            bid_buy_top_market_depth)
+        time.sleep(2)  # delay for chore to get placed
 
-        if sell_order_count < continues_order_count:
-            check_order_event = OrderEventType.OE_CXL_ACK
-            sell_order_count += 1
+        if sell_chore_count < continues_chore_count:
+            check_chore_event = ChoreEventType.OE_CXL_ACK
+            sell_chore_count += 1
         else:
-            if sell_special_order_count < continues_special_order_count:
+            if sell_special_chore_count < continues_special_chore_count:
                 special_case_counter += 1
                 if special_case_counter % 2 == 0:
-                    check_order_event = OrderEventType.OE_BRK_REJ
+                    check_chore_event = ChoreEventType.OE_BRK_REJ
                 else:
-                    check_order_event = OrderEventType.OE_EXH_REJ
-                sell_special_order_count += 1
+                    check_chore_event = ChoreEventType.OE_EXH_REJ
+                sell_special_chore_count += 1
             else:
-                check_order_event = OrderEventType.OE_CXL_ACK
-                sell_order_count = 1
-                sell_special_order_count = 0
+                check_chore_event = ChoreEventType.OE_CXL_ACK
+                sell_chore_count = 1
+                sell_special_chore_count = 0
 
         # internally contains assert checks
-        last_id = verify_rej_orders(check_ack_to_reject_orders, last_id, check_order_event,
+        last_id = verify_rej_chores(check_ack_to_reject_chores, last_id, check_chore_event,
                                     sell_symbol, executor_web_client)
 
-        if check_order_event in [OrderEventType.OE_BRK_REJ, OrderEventType.OE_EXH_REJ]:
+        if check_chore_event in [ChoreEventType.OE_BRK_REJ, ChoreEventType.OE_EXH_REJ]:
             sell_rej_last_id = last_id
     return buy_rej_last_id, sell_rej_last_id
 
 
-def verify_cxl_rej(last_cxl_order_id: str | None, last_cxl_rej_order_id: str | None,
-                   check_order_event: OrderEventType, symbol: str,
+def verify_cxl_rej(last_cxl_chore_id: str | None, last_cxl_rej_chore_id: str | None,
+                   check_chore_event: ChoreEventType, symbol: str,
                    executor_web_client: StreetBookServiceHttpClient,
-                   expected_reverted_order_status: OrderStatusType) -> Tuple[str, str]:
-    if check_order_event == "REJ":
-        # internally checks order_journal is not None else raises assert exception internally
-        latest_cxl_rej_order_journal = \
-            get_latest_order_journal_with_events_and_symbol([OrderEventType.OE_CXL_INT_REJ,
-                                                             OrderEventType.OE_CXL_BRK_REJ,
-                                                             OrderEventType.OE_CXL_EXH_REJ], symbol,
+                   expected_reverted_chore_status: ChoreStatusType) -> Tuple[str, str]:
+    if check_chore_event == "REJ":
+        # internally checks chore_journal is not None else raises assert exception internally
+        latest_cxl_rej_chore_journal = \
+            get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_INT_REJ,
+                                                             ChoreEventType.OE_CXL_BRK_REJ,
+                                                             ChoreEventType.OE_CXL_EXH_REJ], symbol,
                                                             executor_web_client,
-                                                            last_order_id=last_cxl_rej_order_id)
-        last_cxl_rej_order_id = latest_cxl_rej_order_journal.order.order_id
+                                                            last_chore_id=last_cxl_rej_chore_id)
+        last_cxl_rej_chore_id = latest_cxl_rej_chore_journal.chore.chore_id
 
-        order_snapshot = get_order_snapshot_from_order_id(latest_cxl_rej_order_journal.order.order_id,
+        chore_snapshot = get_chore_snapshot_from_chore_id(latest_cxl_rej_chore_journal.chore.chore_id,
                                                           executor_web_client)
-        assert order_snapshot.order_status == expected_reverted_order_status, \
-            f"Unexpected order_snapshot.order_status: expected {expected_reverted_order_status}, " \
-            f"received {order_snapshot.order_status}"
+        assert chore_snapshot.chore_status == expected_reverted_chore_status, \
+            f"Unexpected chore_snapshot.chore_status: expected {expected_reverted_chore_status}, " \
+            f"received {chore_snapshot.chore_status}"
 
-    # checks order_journal is not None else raises assert exception internally
-    latest_cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK, symbol,
+    # checks chore_journal is not None else raises assert exception internally
+    latest_cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK, symbol,
                                                                               executor_web_client,
-                                                                              last_order_id=last_cxl_order_id)
-    last_cxl_order_id = latest_cxl_order_journal.order.order_id
+                                                                              last_chore_id=last_cxl_chore_id)
+    last_cxl_chore_id = latest_cxl_chore_journal.chore.chore_id
 
-    return last_cxl_order_id, last_cxl_rej_order_id
+    return last_cxl_chore_id, last_cxl_rej_chore_id
 
 
-def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, top_of_book_list_: List[Dict],
+def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str,
                                              tob_last_update_date_time_tracker: DateTime | None,
-                                             order_id: str | None, underlying_account_prefix: str, side: Side,
-                                             executor_web_client: StreetBookServiceHttpClient):
+                                             chore_id: str | None, underlying_account_prefix: str, side: Side,
+                                             executor_web_client: StreetBookServiceHttpClient,
+                                             bid_buy_top_market_depth: MarketDepthBaseModel,
+                                             ask_sell_top_market_depth: MarketDepthBaseModel,
+                                             last_barter_fixture_list: List[Dict]):
     loop_count = 1
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
     if side == Side.BUY:
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                           ask_sell_top_market_depth)
         symbol = buy_symbol
-        wait_stop_px = 110
+        wait_stop_px = 100
     else:
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
+        # required to make buy side tob latest
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+
+        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                            bid_buy_top_market_depth)
         symbol = sell_symbol
         wait_stop_px = 120
 
-    # Waiting for tob to trigger place order
+    # Waiting for tob to trigger place chore
     tob_last_update_date_time_tracker = \
-        wait_for_get_new_order_placed_from_tob(wait_stop_px, symbol, tob_last_update_date_time_tracker,
+        wait_for_get_new_chore_placed_from_tob(wait_stop_px, symbol, tob_last_update_date_time_tracker,
                                                side, executor_web_client)
 
-    placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+    placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                           symbol, executor_web_client,
-                                                                          last_order_id=order_id)
-    order_id = placed_order_journal.order.order_id
+                                                                          last_chore_id=chore_id)
+    chore_id = placed_chore_journal.chore.chore_id
 
-    executor_web_client.trade_simulator_process_order_ack_query_client(
-        order_id, placed_order_journal.order.px,
-        placed_order_journal.order.qty,
-        placed_order_journal.order.side,
-        placed_order_journal.order.security.sec_id,
-        placed_order_journal.order.underlying_account)
+    executor_web_client.barter_simulator_process_chore_ack_query_client(
+        chore_id, placed_chore_journal.chore.px,
+        placed_chore_journal.chore.qty,
+        placed_chore_journal.chore.side,
+        placed_chore_journal.chore.security.sec_id,
+        placed_chore_journal.chore.underlying_account)
 
     fills_count = 6
     fill_px = 100
@@ -3765,97 +3813,112 @@ def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, 
             underlying_account = f"{underlying_account_prefix}_1"
         else:
             underlying_account = f"{underlying_account_prefix}_2"
-        executor_web_client.trade_simulator_process_fill_query_client(
-            order_id, fill_px, fill_qty,
-            placed_order_journal.order.side,
-            placed_order_journal.order.security.sec_id, underlying_account)
-    return tob_last_update_date_time_tracker, order_id
+        executor_web_client.barter_simulator_process_fill_query_client(
+            chore_id, fill_px, fill_qty,
+            placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id, underlying_account)
+    return tob_last_update_date_time_tracker, chore_id
 
 
-def verify_unsolicited_cxl_orders(last_id: str | None,
-                                  check_order_event: OrderEventType, symbol: str,
+def verify_unsolicited_cxl_chores(last_id: str | None,
+                                  check_chore_event: ChoreEventType, symbol: str,
                                   executor_web_client: StreetBookServiceHttpClient) -> str:
-    # internally checks order_journal is not None else raises assert exception internally
-    if check_order_event == OrderEventType.OE_CXL:
-        latest_order_journal = get_latest_order_journal_with_event_and_symbol(check_order_event, symbol,
+    # internally checks chore_journal is not None else raises assert exception internally
+    if check_chore_event == ChoreEventType.OE_CXL:
+        latest_chore_journal = get_latest_chore_journal_with_event_and_symbol(check_chore_event, symbol,
                                                                               executor_web_client,
-                                                                              last_order_id=last_id)
+                                                                              last_chore_id=last_id)
     else:
-        # checking no latest order with OE_CXL
-        latest_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL, symbol,
+        # checking no latest chore with OE_CXL
+        latest_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL, symbol,
                                                                               executor_web_client,
-                                                                              expect_no_order=True,
-                                                                              last_order_id=last_id)
+                                                                              expect_no_chore=True,
+                                                                              last_chore_id=last_id)
 
-    return latest_order_journal.order.order_id
+    return latest_chore_journal.chore.chore_id
 
 
-def handle_unsolicited_cxl_for_sides(symbol: str, last_id: str, last_cxl_ack_id: str, order_count: int,
-                                     continues_order_count: int, cxl_count: int, continues_unsolicited_cxl_count: int,
+def handle_unsolicited_cxl_for_sides(symbol: str, last_id: str, last_cxl_ack_id: str, chore_count: int,
+                                     continues_chore_count: int, cxl_count: int, continues_unsolicited_cxl_count: int,
                                      executor_web_client: StreetBookServiceHttpClient):
-    if order_count < continues_order_count:
-        check_order_event = OrderEventType.OE_CXL
-        order_count += 1
+    if chore_count < continues_chore_count:
+        check_chore_event = ChoreEventType.OE_CXL
+        chore_count += 1
         time.sleep(10)
     else:
         if cxl_count < continues_unsolicited_cxl_count:
-            check_order_event = OrderEventType.OE_UNSOL_CXL
+            check_chore_event = ChoreEventType.OE_UNSOL_CXL
             cxl_count += 1
         else:
-            check_order_event = OrderEventType.OE_CXL
-            order_count = 1
+            check_chore_event = ChoreEventType.OE_CXL
+            chore_count = 1
             cxl_count = 0
             time.sleep(10)
 
     # internally contains assert checks
-    last_id = verify_unsolicited_cxl_orders(last_id, check_order_event, symbol, executor_web_client)
-    if check_order_event != OrderEventType.OE_UNSOL_CXL:
-        latest_cxl_ack_obj = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK,
+    last_id = verify_unsolicited_cxl_chores(last_id, check_chore_event, symbol, executor_web_client)
+    if check_chore_event != ChoreEventType.OE_UNSOL_CXL:
+        latest_cxl_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                             symbol, executor_web_client,
-                                                                            last_order_id=last_cxl_ack_id)
-        last_cxl_ack_id = latest_cxl_ack_obj.order.order_id
+                                                                            last_chore_id=last_cxl_ack_id)
+        last_cxl_ack_id = latest_cxl_ack_obj.chore.chore_id
 
-    return last_id, last_cxl_ack_id, order_count, cxl_count
+    return last_id, last_cxl_ack_id, chore_count, cxl_count
 
 
-def handle_unsolicited_cxl(buy_symbol, sell_symbol, last_trade_fixture_list, max_loop_count_per_side, top_of_book_list_,
+def handle_unsolicited_cxl(buy_symbol, sell_symbol, last_barter_fixture_list, max_loop_count_per_side,
                            executor_web_client: StreetBookServiceHttpClient, config_dict, residual_wait_sec):
-        # buy fills check
-        continues_order_count, continues_special_order_count = get_continuous_order_configs(buy_symbol, config_dict)
-        buy_order_count = 0
-        buy_cxl_order_count = 0
-        last_id = None
-        last_cxl_ack_id = None
-        for loop_count in range(1, max_loop_count_per_side + 1):
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
-            time.sleep(2)  # delay for order to get placed
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_web_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
 
-            last_id, last_cxl_ack_id, buy_order_count, buy_cxl_order_count = \
-                handle_unsolicited_cxl_for_sides(buy_symbol, last_id, last_cxl_ack_id,
-                                                 buy_order_count, continues_order_count,
-                                                 buy_cxl_order_count, continues_special_order_count,
-                                                 executor_web_client)
+    # buy fills check
+    continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(buy_symbol, config_dict)
+    buy_chore_count = 0
+    buy_cxl_chore_count = 0
+    last_id = None
+    last_cxl_ack_id = None
+    for loop_count in range(1, max_loop_count_per_side + 1):
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                           ask_sell_top_market_depth)
+        time.sleep(2)  # delay for chore to get placed
 
-        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
-            time.sleep(residual_wait_sec)   # to start sell after buy is completely done
+        last_id, last_cxl_ack_id, buy_chore_count, buy_cxl_chore_count = \
+            handle_unsolicited_cxl_for_sides(buy_symbol, last_id, last_cxl_ack_id,
+                                             buy_chore_count, continues_chore_count,
+                                             buy_cxl_chore_count, continues_special_chore_count,
+                                             executor_web_client)
 
-        # sell fills check
-        continues_order_count, continues_special_order_count = get_continuous_order_configs(sell_symbol, config_dict)
-        sell_order_count = 0
-        sell_cxl_order_count = 0
-        last_id = None
-        last_cxl_ack_id = None
-        for loop_count in range(1, max_loop_count_per_side + 1):
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
-            time.sleep(2)  # delay for order to get placed
+    if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+        time.sleep(residual_wait_sec)   # to start sell after buy is completely done
 
-            last_id, last_cxl_ack_id, sell_order_count, sell_cxl_order_count = \
-                handle_unsolicited_cxl_for_sides(sell_symbol, last_id, last_cxl_ack_id,
-                                                 sell_order_count, continues_order_count,
-                                                 sell_cxl_order_count, continues_special_order_count,
-                                                 executor_web_client)
+    # sell fills check
+    continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(sell_symbol, config_dict)
+    sell_chore_count = 0
+    sell_cxl_chore_count = 0
+    last_id = None
+    last_cxl_ack_id = None
+    for loop_count in range(1, max_loop_count_per_side + 1):
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        # required to make buy side tob latest
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+
+        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                            bid_buy_top_market_depth)
+        time.sleep(2)  # delay for chore to get placed
+
+        last_id, last_cxl_ack_id, sell_chore_count, sell_cxl_chore_count = \
+            handle_unsolicited_cxl_for_sides(sell_symbol, last_id, last_cxl_ack_id,
+                                             sell_chore_count, continues_chore_count,
+                                             sell_cxl_chore_count, continues_special_chore_count,
+                                             executor_web_client)
 
 
 def get_partial_allowed_ack_qty(symbol: str, qty: int, config_dict: Dict):
@@ -3867,40 +3930,38 @@ def get_partial_allowed_ack_qty(symbol: str, qty: int, config_dict: Dict):
     return qty
 
 
-def handle_partial_ack_checks(symbol: str, new_order_id: str, acked_order_id: str,
+def handle_partial_ack_checks(symbol: str, new_chore_id: str, acked_chore_id: str,
                               executor_web_client: StreetBookServiceHttpClient, config_dict):
-    new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+    new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                        symbol, executor_web_client,
-                                                                       last_order_id=new_order_id)
-    new_order_id = new_order_journal.order.order_id
-    partial_ack_qty = get_partial_allowed_ack_qty(symbol, new_order_journal.order.qty, config_dict)
+                                                                       last_chore_id=new_chore_id)
+    new_chore_id = new_chore_journal.chore.chore_id
+    partial_ack_qty = get_partial_allowed_ack_qty(symbol, new_chore_journal.chore.qty, config_dict)
 
-    ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+    ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                        symbol, executor_web_client,
-                                                                       last_order_id=acked_order_id)
-    acked_order_id = ack_order_journal.order.order_id
-    assert ack_order_journal.order.qty == partial_ack_qty, f"Mismatch partial_ack_qty: expected {partial_ack_qty}, " \
-                                                           f"received {ack_order_journal.order.qty}"
+                                                                       last_chore_id=acked_chore_id)
+    acked_chore_id = ack_chore_journal.chore.chore_id
+    assert ack_chore_journal.chore.qty == partial_ack_qty, f"Mismatch partial_ack_qty: expected {partial_ack_qty}, " \
+                                                           f"received {ack_chore_journal.chore.qty}"
 
-    return new_order_id, acked_order_id, partial_ack_qty
+    return new_chore_id, acked_chore_id, partial_ack_qty
 
 
 def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                              expected_start_status_, symbol_overview_obj_list,
-                                             last_trade_fixture_list, market_depth_basemodel_list,
-                                             top_of_book_list_, strat_mode: StratMode | None = None):
+                                             last_barter_fixture_list, market_depth_basemodel_list,
+                                             strat_mode: StratMode | None = None):
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
 
     activated_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_, strat_mode=strat_mode))
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list, strat_mode=strat_mode))
 
     # buy test
-    run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-    loop_count = 1
-    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], avoid_order_trigger=True)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
     return buy_symbol, sell_symbol, activated_strat, executor_http_client
 
 
@@ -3921,25 +3982,24 @@ def check_alert_str_in_strat_alerts_n_portfolio_alerts(activated_pair_strat_id: 
             assert False, assert_fail_msg
 
 
-def handle_place_order_and_check_str_in_alert_for_executor_limits(symbol: str, side: Side, px: float, qty: int,
+def handle_place_chore_and_check_str_in_alert_for_executor_limits(symbol: str, side: Side, px: float, qty: int,
                                                                   check_str: str, assert_fail_msg: str,
                                                                   activated_pair_strat_id: int,
                                                                   executor_web_client: StreetBookServiceHttpClient,
-                                                                  last_order_id: str | None = None):
-    # placing new non-systematic new_order
-    place_new_order(symbol, side, px, qty, executor_web_client)
-    print(f"symbol: {symbol}, Created new_order obj")
+                                                                  last_chore_id: str | None = None):
+    # placing new non-systematic new_chore
+    place_new_chore(symbol, side, px, qty, executor_web_client)
+    print(f"symbol: {symbol}, Created new_chore obj")
 
-    new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW, symbol,
+    new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, symbol,
                                                                        executor_web_client,
-                                                                       expect_no_order=True,
-                                                                       last_order_id=last_order_id)
+                                                                       expect_no_chore=True,
+                                                                       last_chore_id=last_chore_id)
     return check_alert_str_in_strat_alerts_n_portfolio_alerts(activated_pair_strat_id, check_str, assert_fail_msg)
 
 
 def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(leg1_symbol, leg2_symbol, active_pair_strat_id,
-                                                                        last_trade_fixture_list,
-                                                                        top_of_book_list_, side: Side,
+                                                                        last_barter_fixture_list, side: Side,
                                                                         executor_web_client:
                                                                         StreetBookServiceHttpClient,
                                                                         leg1_side=Side.BUY, leg2_side=Side.SELL):
@@ -3947,30 +4007,26 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(leg1_sym
     if leg1_side == Side.BUY:
         buy_symbol = leg1_symbol
         sell_symbol = leg2_symbol
-        tob = top_of_book_list_[0]
     else:
         buy_symbol = leg2_symbol
         sell_symbol = leg1_symbol
-        tob = top_of_book_list_[1]
 
     # buy test
-    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    loop_count = 1
-    run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, tob, avoid_order_trigger=True)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
 
     check_symbol = buy_symbol if side == Side.BUY else sell_symbol
 
     px = 100
     qty = 90
     check_str = f"Consumable cxl qty can't be < 0, current .* for symbol {check_symbol}"
-    assert_fail_message = "Could not find any alert containing message to block orders due to less buy consumable " \
+    assert_fail_message = "Could not find any alert containing message to block chores due to less buy consumable " \
                           "cxl qty"
-    # placing new non-systematic new_order
-    place_new_order(check_symbol, side, px, qty, executor_web_client)
-    print(f"symbol: {check_symbol}, Created new_order obj")
+    # placing new non-systematic new_chore
+    place_new_chore(check_symbol, side, px, qty, executor_web_client)
+    print(f"symbol: {check_symbol}, Created new_chore obj")
 
-    new_order_journal = get_latest_order_journal_with_events_and_symbol([OrderEventType.OE_CXL_ACK,
-                                                                         OrderEventType.OE_UNSOL_CXL], check_symbol,
+    new_chore_journal = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
+                                                                         ChoreEventType.OE_UNSOL_CXL], check_symbol,
                                                                          executor_web_client)
     time.sleep(2)
     strat_alert = log_book_web_client.get_strat_alert_client(active_pair_strat_id)
@@ -3990,23 +4046,19 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(leg1_sym
 
 
 def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
-        leg1_symbol, leg2_symbol, active_pair_strat_id, last_trade_fixture_list,
-        top_of_book_list_, side, executor_web_client: StreetBookServiceHttpClient,
+        leg1_symbol, leg2_symbol, active_pair_strat_id, last_barter_fixture_list,
+        side, executor_web_client: StreetBookServiceHttpClient,
         leg1_side=Side.BUY, leg2_side=Side.SELL):
 
     if leg1_side == Side.BUY:
         buy_symbol = leg1_symbol
         sell_symbol = leg2_symbol
-        tob = top_of_book_list_[0]
     else:
         buy_symbol = leg2_symbol
         sell_symbol = leg1_symbol
-        tob = top_of_book_list_[1]
 
     # buy test
-    run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-    loop_count = 1
-    run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, tob, avoid_order_trigger=True)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
 
     check_symbol = buy_symbol if side == Side.BUY else sell_symbol
 
@@ -4014,13 +4066,13 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
     qty = 90
     check_str = f"Consumable cxl qty can't be < 0, current .* for symbol {check_symbol}"
     assert_fail_message = f"Could not find any alert containing: {check_str}"
-    # placing new non-systematic new_order
-    place_new_order(check_symbol, side, px, qty, executor_web_client)
-    print(f"symbol: {check_symbol}, Created new_order obj")
+    # placing new non-systematic new_chore
+    place_new_chore(check_symbol, side, px, qty, executor_web_client)
+    print(f"symbol: {check_symbol}, Created new_chore obj")
 
-    ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, check_symbol,
+    ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, check_symbol,
                                                                        executor_web_client)
-    cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK, check_symbol,
+    cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK, check_symbol,
                                                                        executor_web_client)
 
     time.sleep(2)
@@ -4041,7 +4093,7 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
 
 def get_symbol_configs(symbol: str, config_dict: Dict) -> Dict | None:
     """
-    WARNING : This Function is duplicate test function of what we have in trade simulator to keep test
+    WARNING : This Function is duplicate test function of what we have in barter simulator to keep test
     disconnected from main code, keep it sync with original
     """
     symbol_configs: Dict | None = config_dict.get("symbol_configs") \
@@ -4066,7 +4118,7 @@ def get_symbol_configs(symbol: str, config_dict: Dict) -> Dict | None:
 
 def get_partial_allowed_fill_qty(check_symbol: str, config_dict: Dict, qty: int):
     """
-    ATTENTION: This Function is dummy of original impl present in trade_executor, keep it sync with original
+    ATTENTION: This Function is dummy of original impl present in barter_executor, keep it sync with original
     """
     symbol_configs = get_symbol_configs(check_symbol, config_dict)
     partial_filled_qty: int | None = None
@@ -4077,82 +4129,91 @@ def get_partial_allowed_fill_qty(check_symbol: str, config_dict: Dict, qty: int)
 
 
 def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy_symbol,
-                                                   sell_symbol, last_trade_fixture_list,
-                                                   top_of_book_list_, last_order_id, config_dict,
+                                                   sell_symbol, last_barter_fixture_list,
+                                                   last_chore_id, config_dict,
                                                    executor_web_client: StreetBookServiceHttpClient):
-    run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-    if check_symbol == buy_symbol:
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
-    else:
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_web_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
 
-    order_ack_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+    if check_symbol == buy_symbol:
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                           ask_sell_top_market_depth)
+    else:
+        # required to make buy side tob latest
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+
+        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                            bid_buy_top_market_depth)
+
+    chore_ack_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                        check_symbol, executor_web_client,
-                                                                       last_order_id=last_order_id)
-    last_order_id = order_ack_journal.order.order_id
+                                                                       last_chore_id=last_chore_id)
+    last_chore_id = chore_ack_journal.chore.chore_id
     time.sleep(5)
 
-    # ATTENTION: Below code is dummy of original impl present in trade_executor, keep it sync with original
-    partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, order_ack_journal.order.qty)
+    # ATTENTION: Below code is dummy of original impl present in barter_executor, keep it sync with original
+    partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, chore_ack_journal.chore.qty)
 
-    latest_fill_journal = get_latest_fill_journal_from_order_id(last_order_id, executor_web_client)
+    latest_fill_journal = get_latest_fill_journal_from_chore_id(last_chore_id, executor_web_client)
     assert latest_fill_journal.fill_qty == partial_filled_qty, f"fill_qty mismatch: expected {partial_filled_qty}, " \
                                                                f"received {latest_fill_journal.fill_qty}"
-    return last_order_id, partial_filled_qty
+    return last_chore_id, partial_filled_qty
 
 
 def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbol, buy_symbol,
-                                                         sell_symbol, last_trade_fixture_list,
-                                                         top_of_book_list_, last_order_id,
+                                                         sell_symbol, last_barter_fixture_list, last_chore_id,
                                                          executor_web_client: StreetBookServiceHttpClient,
                                                          config_dict, fill_id: str | None = None):
-    run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
     if check_symbol == buy_symbol:
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0],
-                            avoid_order_trigger=True)
         px = 100
         qty = 90
-        place_new_order(buy_symbol, Side.BUY, px, qty, executor_web_client)
+        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client)
     else:
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1],
-                             avoid_order_trigger=True)
         px = 110
         qty = 70
-        place_new_order(sell_symbol, Side.SELL, px, qty, executor_web_client)
+        place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
 
-    new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+    new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                        check_symbol, executor_web_client,
-                                                                       last_order_id=last_order_id)
-    last_order_id = new_order_journal.order.order_id
+                                                                       last_chore_id=last_chore_id)
+    last_chore_id = new_chore_journal.chore.chore_id
 
-    # ATTENTION: Below code is dummy of original impl present in trade_executor, keep it sync with original
-    partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, new_order_journal.order.qty)
+    # ATTENTION: Below code is dummy of original impl present in barter_executor, keep it sync with original
+    partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, new_chore_journal.chore.qty)
 
     fills_count = get_symbol_configs(check_symbol, config_dict).get("total_fill_count")
     time.sleep(5)
     time_out_loop_count = 5
     latest_fill_journals = []
     for _ in range(time_out_loop_count):
-        latest_fill_journals = get_fill_journals_for_order_id(last_order_id, executor_web_client)
+        latest_fill_journals = get_fill_journals_for_chore_id(last_chore_id, executor_web_client)
         if loop_count == fills_count:
             break
         time.sleep(2)
 
-    assert fills_count == len(latest_fill_journals), f"Mismatch numbers of fill for order_id {last_order_id}, " \
+    assert fills_count == len(latest_fill_journals), f"Mismatch numbers of fill for chore_id {last_chore_id}, " \
                                                      f"expected {fills_count} received {len(latest_fill_journals)}"
 
     for latest_fill_journal in latest_fill_journals:
         assert latest_fill_journal.fill_qty == partial_filled_qty, f"Mismatch partial_filled_qty: " \
                                                                    f"expected {partial_filled_qty}, received " \
                                                                    f"{latest_fill_journal.fill_px}"
-    return last_order_id, partial_filled_qty
+    return last_chore_id, partial_filled_qty
 
 
 def strat_done_after_exhausted_consumable_notional(
         leg_1_symbol, leg_2_symbol, pair_strat_, expected_strat_limits_,
-        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, refresh_sec, side_to_check: Side, leg_1_side: Side | None = None,
-        leg_2_side: Side | None = None):
+        expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+        refresh_sec, side_to_check: Side, leg_1_side: Side | None = None, leg_2_side: Side | None = None):
 
     if leg_1_side is None or leg_2_side is None:
         leg_1_side = Side.BUY
@@ -4161,9 +4222,9 @@ def strat_done_after_exhausted_consumable_notional(
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_wait_sec = 4 * refresh_sec
     created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(leg_1_symbol, leg_2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_, leg1_side=leg_1_side,
+        create_pre_chore_test_requirements(leg_1_symbol, leg_2_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list, leg1_side=leg_1_side,
                                            leg2_side=leg_2_side))
 
     if leg_1_side == Side.BUY:
@@ -4185,57 +4246,49 @@ def strat_done_after_exhausted_consumable_notional(
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
+        executor_http_client.barter_simulator_reload_config_query_client()
 
         # Positive Check
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
         if side_to_check == Side.BUY:
-            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0],
-                                avoid_order_trigger=True)
             px = 100
             qty = 90
-            place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
+            place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client)
             check_symbol = buy_symbol
         else:
-            run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1],
-                                 avoid_order_trigger=True)
             px = 110
             qty = 70
-            place_new_order(sell_symbol, Side.SELL, px, qty, executor_http_client)
+            place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client)
             check_symbol = sell_symbol
-        time.sleep(2)  # delay for order to get placed
+        time.sleep(2)  # delay for chore to get placed
 
-        ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, check_symbol,
+        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, check_symbol,
                                                                            executor_http_client, assert_code=1)
-        order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
-        assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
-                                                                        f"OrderStatusType.OE_ACKED received " \
-                                                                        f"{order_snapshot.order_status}"
-        time.sleep(residual_wait_sec)  # wait to get buy order residual
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client)
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_ACKED, "ChoreStatus mismatched: expected status " \
+                                                                        f"ChoreStatusType.OE_ACKED received " \
+                                                                        f"{chore_snapshot.chore_status}"
+        time.sleep(residual_wait_sec)  # wait to get buy chore residual
 
         # Negative Check
-        # Next placed order must not get placed, instead it should find consumable_notional as exhausted for further
-        # orders and should come out of executor run and must set strat_state to StratState_DONE
+        # Next placed chore must not get placed, instead it should find consumable_notional as exhausted for further
+        # chores and should come out of executor run and must set strat_state to StratState_DONE
 
         # buy fills check
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
         if side_to_check == Side.BUY:
-            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0],
-                                avoid_order_trigger=True)
             px = 100
             qty = 90
-            place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
+            place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client)
         else:
-            run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1],
-                                 avoid_order_trigger=True)
             px = 110
             qty = 70
-            place_new_order(sell_symbol, Side.SELL, px, qty, executor_http_client)
-        time.sleep(2)  # delay for order to get placed
-        ack_order_journal = (
-            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW, check_symbol, executor_http_client,
-                                                           last_order_id=ack_order_journal.order.order_id,
-                                                           expect_no_order=True, assert_code=3))
+            place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client)
+        time.sleep(2)  # delay for chore to get placed
+        ack_chore_journal = (
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, check_symbol, executor_http_client,
+                                                           last_chore_id=ack_chore_journal.chore.chore_id,
+                                                           expect_no_chore=True, assert_code=3))
         pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
         assert pair_strat.strat_state == StratState.StratState_DONE, (
             f"Mismatched strat_state, expected {StratState.StratState_DONE}, received {pair_strat.strat_state}")
@@ -4280,271 +4333,282 @@ def append_csv_file(file_name: str, records: List[List[any]]):
             list_writer.writerow(record)
 
 
-def handle_test_buy_sell_pair_order(buy_symbol: str, sell_symbol: str, total_loop_count: int,
-                                    refresh_sec: int, buy_order_: OrderJournalBaseModel,
-                                    sell_order_: OrderJournalBaseModel,
+def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loop_count: int,
+                                    refresh_sec: int, buy_chore_: ChoreJournalBaseModel,
+                                    sell_chore_: ChoreJournalBaseModel,
                                     buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
-                                    expected_buy_order_snapshot_: OrderSnapshotBaseModel,
-                                    expected_sell_order_snapshot_: OrderSnapshotBaseModel,
+                                    expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
+                                    expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                     expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
                                     pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
                                     expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
-                                    top_of_book_list_: List[Dict],
-                                    last_trade_fixture_list: List[Dict],
+                                    last_barter_fixture_list: List[Dict],
                                     symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                     market_depth_basemodel_list: List[MarketDepthBaseModel],
                                     is_non_systematic_run: bool = False):
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
     active_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
-                                           last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
+                                           last_barter_fixture_list, market_depth_basemodel_list))
     print(f"Created Strat: {active_pair_strat}")
 
     strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
-    order_id = None
-    cxl_order_id = None
+    chore_id = None
+    cxl_chore_id = None
     expected_buy_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[0])
     expected_buy_symbol_side_snapshot.security.sec_id = buy_symbol
     expected_sell_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[1])
     expected_sell_symbol_side_snapshot.security.sec_id = sell_symbol
     expected_strat_status = copy.deepcopy(expected_start_status_)
     expected_strat_brief_obj = copy.deepcopy(expected_strat_brief_)
-    expected_strat_brief_obj.pair_buy_side_trading_brief.security.sec_id = buy_symbol
-    expected_strat_brief_obj.pair_sell_side_trading_brief.security.sec_id = sell_symbol
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
+
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_web_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
 
     for loop_count in range(1, total_loop_count + 1):
         start_time = DateTime.utcnow()
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Loop started at {start_time}")
-        expected_buy_order_snapshot = copy.deepcopy(expected_buy_order_snapshot_)
-        expected_buy_order_snapshot.order_brief.security.sec_id = buy_symbol
+        expected_buy_chore_snapshot = copy.deepcopy(expected_buy_chore_snapshot_)
+        expected_buy_chore_snapshot.chore_brief.security.sec_id = buy_symbol
 
-        # running last trade once more before sell side
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
-        # Running TopOfBook (this triggers expected buy order)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run)
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, created tob")
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
-            # Waiting for tob to trigger place order
+            # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+            time.sleep(1)
+            update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                               ask_sell_top_market_depth)
+
+            # Waiting for tob to trigger place chore
             buy_tob_last_update_date_time_tracker = \
-                wait_for_get_new_order_placed_from_tob(110, buy_symbol,
+                wait_for_get_new_chore_placed_from_tob(100, buy_symbol,
                                                        buy_tob_last_update_date_time_tracker, Side.BUY,
                                                        executor_web_client)
             time_delta = DateTime.utcnow() - start_time
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received buy TOB of last_update_date_time "
                   f"{buy_tob_last_update_date_time_tracker}, time delta {time_delta.total_seconds()}")
         else:
-            # placing new non-systematic new_order
+            # placing new non-systematic new_chore
             qty = random.randint(85, 95)
             px = random.randint(90, 100)
-            place_new_order(buy_symbol, Side.BUY, px, qty, executor_web_client)
-            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_order obj")
+            place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client)
+            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_web_client,
-                                                                              last_order_id=order_id)
-        order_id = placed_order_journal.order.order_id
-        create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received order_journal with {order_id}")
+                                                                              last_chore_id=chore_id)
+        chore_id = placed_chore_journal.chore.chore_id
+        create_buy_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_journal with {chore_id}")
         time.sleep(2)
 
-        # Checking placed order computations
-        check_placed_buy_order_computes_before_all_sells(
-            loop_count, order_id, buy_symbol,
-            placed_order_journal, expected_buy_order_snapshot,
+        # Checking placed chore computations
+        check_placed_buy_chore_computes_before_all_sells(
+            loop_count, chore_id, buy_symbol,
+            placed_chore_journal, expected_buy_chore_snapshot,
             expected_buy_symbol_side_snapshot,
             expected_sell_symbol_side_snapshot,
             active_pair_strat,
             expected_strat_limits_, expected_strat_status,
             expected_strat_brief_obj, executor_web_client)
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order of order_id {order_id}")
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
-        executor_web_client.trade_simulator_process_order_ack_query_client(
-            order_id, placed_order_journal.order.px,
-            placed_order_journal.order.qty,
-            placed_order_journal.order.side,
-            placed_order_journal.order.security.sec_id,
-            placed_order_journal.order.underlying_account
+        executor_web_client.barter_simulator_process_chore_ack_query_client(
+            chore_id, placed_chore_journal.chore.px,
+            placed_chore_journal.chore.qty,
+            placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id,
+            placed_chore_journal.chore.underlying_account
         )
 
-        placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
 
-        # Checking Ack response on placed order
-        placed_buy_order_ack_receive(placed_order_journal_obj_ack_response, expected_buy_order_snapshot,
+        # Checking Ack response on placed chore
+        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot,
                                      executor_web_client)
         print(
-            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order ACK of order_id {order_id}")
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore ACK of chore_id {chore_id}")
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
         buy_fill_journal_obj.fill_qty = random.randint(50, 55)
         buy_fill_journal_obj.fill_px = random.randint(90, 100)
-        executor_web_client.trade_simulator_process_fill_query_client(
-            order_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
+        executor_web_client.barter_simulator_process_fill_query_client(
+            chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
             Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_order_id(order_id, executor_web_client)
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
 
-        # Checking Fill receive on placed order
-        check_fill_receive_for_placed_buy_order_before_sells(
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_buy_chore_before_sells(
             buy_symbol, placed_fill_journal_obj,
-            expected_buy_order_snapshot, expected_buy_symbol_side_snapshot,
+            expected_buy_chore_snapshot, expected_buy_symbol_side_snapshot,
             expected_sell_symbol_side_snapshot,
             active_pair_strat,
             expected_strat_limits_, expected_strat_status,
             expected_strat_brief_obj,
             executor_web_client)
         print(
-            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order FILL of order_id {order_id}")
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore FILL of chore_id {chore_id}")
 
-        # Sleeping to let the order get cxlled
+        # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK,
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            buy_symbol, executor_web_client,
-                                                                           last_order_id=cxl_order_id)
-        cxl_order_id = cxl_order_journal.order.order_id
+                                                                           last_chore_id=cxl_chore_id)
+        cxl_chore_id = cxl_chore_journal.chore.chore_id
 
-        # Checking CXL_ACK receive on placed order by cxl_req from residual removal
-        check_cxl_receive_for_placed_buy_order_before_sells(buy_symbol, cxl_order_journal,
-                                                            expected_buy_order_snapshot,
+        # Checking CXL_ACK receive on placed chore by cxl_req from residual removal
+        check_cxl_receive_for_placed_buy_chore_before_sells(buy_symbol, cxl_chore_journal,
+                                                            expected_buy_chore_snapshot,
                                                             expected_buy_symbol_side_snapshot,
                                                             expected_sell_symbol_side_snapshot,
                                                             active_pair_strat,
                                                             expected_strat_limits_, expected_strat_status,
                                                             expected_strat_brief_obj, executor_web_client)
 
-        strat_buy_notional += expected_buy_order_snapshot.fill_notional
-        strat_buy_fill_notional += expected_buy_order_snapshot.fill_notional
+        strat_buy_notional += expected_buy_chore_snapshot.fill_notional
+        strat_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
 
-        # handle sell order
-        order_id = None
-        cxl_order_id = None
+        # handle sell chore
+        chore_id = None
+        cxl_chore_id = None
 
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Loop started")
-        expected_sell_order_snapshot = copy.deepcopy(expected_sell_order_snapshot_)
-        expected_sell_order_snapshot.order_brief.security.sec_id = sell_symbol
+        expected_sell_chore_snapshot = copy.deepcopy(expected_sell_chore_snapshot_)
+        expected_sell_chore_snapshot.chore_brief.security.sec_id = sell_symbol
 
-        # running last trade once more before sell side
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
-        # Running TopOfBook (this triggers expected buy order)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1], is_non_systematic_run)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, created tob")
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
-            # Waiting for tob to trigger place order
+            # required to make buy side tob latest so that when top update reaches in test place chore function in
+            # executor both side are new last_update_date_time
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+            # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+            update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                                bid_buy_top_market_depth)
+
+            # Waiting for tob to trigger place chore
             sell_tob_last_update_date_time_tracker = \
-                wait_for_get_new_order_placed_from_tob(120, sell_symbol, sell_tob_last_update_date_time_tracker,
+                wait_for_get_new_chore_placed_from_tob(120, sell_symbol, sell_tob_last_update_date_time_tracker,
                                                        Side.SELL, executor_web_client)
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received buy TOB")
         else:
-            # placing new non-systematic new_order
+            # placing new non-systematic new_chore
             qty = random.randint(65, 75)
             px = random.randint(100, 110)
-            place_new_order(sell_symbol, Side.SELL, px, qty, executor_web_client)
-            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_order obj")
+            place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
+            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_web_client,
-                                                                              last_order_id=order_id)
-        create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        order_id = placed_order_journal.order.order_id
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
+                                                                              last_chore_id=chore_id)
+        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        chore_id = placed_chore_journal.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_journal with {chore_id}")
         time.sleep(2)
 
-        # Checking placed order computations
-        check_placed_sell_order_computes_after_all_buys(
-            loop_count, order_id, sell_symbol, placed_order_journal, expected_sell_order_snapshot,
+        # Checking placed chore computations
+        check_placed_sell_chore_computes_after_all_buys(
+            loop_count, chore_id, sell_symbol, placed_chore_journal, expected_sell_chore_snapshot,
             expected_sell_symbol_side_snapshot, expected_buy_symbol_side_snapshot, active_pair_strat,
             expected_strat_limits_, expected_strat_status,
             expected_strat_brief_obj, executor_web_client)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order of order_id {order_id}")
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
-        executor_web_client.trade_simulator_process_order_ack_query_client(
-            order_id, placed_order_journal.order.px,
-            placed_order_journal.order.qty,
-            placed_order_journal.order.side,
-            placed_order_journal.order.security.sec_id,
-            placed_order_journal.order.underlying_account)
+        executor_web_client.barter_simulator_process_chore_ack_query_client(
+            chore_id, placed_chore_journal.chore.px,
+            placed_chore_journal.chore.qty,
+            placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id,
+            placed_chore_journal.chore.underlying_account)
 
-        placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
 
-        # Checking Ack response on placed order
-        placed_sell_order_ack_receive(placed_order_journal_obj_ack_response,
-                                      expected_sell_order_snapshot, executor_web_client)
+        # Checking Ack response on placed chore
+        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+                                      expected_sell_chore_snapshot, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, "
-              f"Checked sell placed order ACK of order_id {order_id}")
+              f"Checked sell placed chore ACK of chore_id {chore_id}")
 
         sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
         sell_fill_journal_obj.fill_qty = random.randint(30, 35)
         sell_fill_journal_obj.fill_px = random.randint(100, 110)
-        executor_web_client.trade_simulator_process_fill_query_client(
-            order_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
+        executor_web_client.barter_simulator_process_fill_query_client(
+            chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
             Side.SELL, sell_symbol, sell_fill_journal_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_order_id(order_id, executor_web_client)
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
 
-        # Checking Fill receive on placed order
-        check_fill_receive_for_placed_sell_order_after_all_buys(
-            loop_count, order_id, sell_symbol, placed_fill_journal_obj,
-            expected_sell_order_snapshot, expected_sell_symbol_side_snapshot,
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_sell_chore_after_all_buys(
+            loop_count, chore_id, sell_symbol, placed_fill_journal_obj,
+            expected_sell_chore_snapshot, expected_sell_symbol_side_snapshot,
             expected_buy_symbol_side_snapshot, active_pair_strat, expected_strat_limits_,
             expected_strat_status, expected_strat_brief_obj, executor_web_client)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order FILL")
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore FILL")
 
-        # Sleeping to let the order get cxlled
+        # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK,
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            sell_symbol, executor_web_client,
-                                                                           last_order_id=cxl_order_id)
-        cxl_order_id = cxl_order_journal.order.order_id
+                                                                           last_chore_id=cxl_chore_id)
+        cxl_chore_id = cxl_chore_journal.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
-        check_cxl_receive_for_placed_sell_order_after_all_buys(sell_symbol,
-                                                               cxl_order_journal, expected_sell_order_snapshot,
+        check_cxl_receive_for_placed_sell_chore_after_all_buys(sell_symbol,
+                                                               cxl_chore_journal, expected_sell_chore_snapshot,
                                                                expected_sell_symbol_side_snapshot,
                                                                expected_buy_symbol_side_snapshot,
                                                                active_pair_strat, expected_strat_limits_,
                                                                expected_strat_status, expected_strat_brief_obj,
                                                                executor_web_client)
 
-        strat_sell_notional += expected_sell_order_snapshot.fill_notional
-        strat_sell_fill_notional += expected_sell_order_snapshot.fill_notional
+        strat_sell_notional += expected_sell_chore_snapshot.fill_notional
+        strat_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
     return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
 
 
-def handle_test_sell_buy_pair_order(leg1_symbol: str, leg2_symbol: str, total_loop_count: int,
-                                    refresh_sec: int, buy_order_: OrderJournalBaseModel,
-                                    sell_order_: OrderJournalBaseModel,
+def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_loop_count: int,
+                                    refresh_sec: int, buy_chore_: ChoreJournalBaseModel,
+                                    sell_chore_: ChoreJournalBaseModel,
                                     buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
-                                    expected_buy_order_snapshot_: OrderSnapshotBaseModel,
-                                    expected_sell_order_snapshot_: OrderSnapshotBaseModel,
+                                    expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
+                                    expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                     expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
                                     pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
                                     expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
-                                    top_of_book_list_: List[Dict],
-                                    last_trade_fixture_list: List[Dict],
+                                    last_barter_fixture_list: List[Dict],
                                     symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                     market_depth_basemodel_list: List[MarketDepthBaseModel],
                                     is_non_systematic_run: bool = False):
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
     active_pair_strat, executor_web_client = (
-        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
-                                           last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+                                           last_barter_fixture_list, market_depth_basemodel_list,
                                            leg1_side=Side.SELL, leg2_side=Side.BUY))
     print(f"Created Strat: {active_pair_strat}")
     buy_symbol = active_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
@@ -4553,264 +4617,292 @@ def handle_test_sell_buy_pair_order(leg1_symbol: str, leg2_symbol: str, total_lo
     strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
-    order_id = None
-    sell_cxl_order_id = None
+    chore_id = None
+    sell_cxl_chore_id = None
     expected_sell_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[1])
     expected_sell_symbol_side_snapshot.security.sec_id = sell_symbol
     expected_strat_status = copy.deepcopy(expected_start_status_)
     expected_strat_brief_obj = copy.deepcopy(expected_strat_brief_)
-    expected_strat_brief_obj.pair_buy_side_trading_brief.security.sec_id = buy_symbol
-    expected_strat_brief_obj.pair_sell_side_trading_brief.security.sec_id = sell_symbol
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
     expected_buy_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[0])
     expected_buy_symbol_side_snapshot.security.sec_id = buy_symbol
 
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_web_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
+
     for loop_count in range(1, total_loop_count + 1):
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Loop started")
-        expected_sell_order_snapshot = copy.deepcopy(expected_sell_order_snapshot_)
-        expected_sell_order_snapshot.order_brief.security.sec_id = sell_symbol
+        expected_sell_chore_snapshot = copy.deepcopy(expected_sell_chore_snapshot_)
+        expected_sell_chore_snapshot.chore_brief.security.sec_id = sell_symbol
 
-        # running last trade once more before sell side
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
-        # Running TopOfBook (this triggers expected buy order)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, created tob")
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
-            # Waiting for tob to trigger place order
+            # required to make buy side tob latest so that when top update reaches in test place chore function in
+            # executor both side are new last_update_date_time
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+            # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+            update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                                bid_buy_top_market_depth)
+
+            # Waiting for tob to trigger place chore
             sell_tob_last_update_date_time_tracker = \
-                wait_for_get_new_order_placed_from_tob(120, sell_symbol, sell_tob_last_update_date_time_tracker,
+                wait_for_get_new_chore_placed_from_tob(120, sell_symbol, sell_tob_last_update_date_time_tracker,
                                                        Side.SELL, executor_web_client)
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received buy TOB")
         else:
-            # placing new non-systematic new_order
+            # placing new non-systematic new_chore
             qty = random.randint(65, 75)
             px = random.randint(100, 110)
-            place_new_order(sell_symbol, Side.SELL, px, qty, executor_web_client)
-            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_order obj")
+            place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
+            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_web_client,
-                                                                              last_order_id=order_id)
-        create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        order_id = placed_order_journal.order.order_id
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
+                                                                              last_chore_id=chore_id)
+        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        chore_id = placed_chore_journal.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_journal with {chore_id}")
         time.sleep(2)
 
-        # Checking placed order computations
-        check_placed_sell_order_computes_before_buys(loop_count, order_id, sell_symbol,
-                                                     placed_order_journal, expected_sell_order_snapshot,
+        # Checking placed chore computations
+        check_placed_sell_chore_computes_before_buys(loop_count, chore_id, sell_symbol,
+                                                     placed_chore_journal, expected_sell_chore_snapshot,
                                                      expected_sell_symbol_side_snapshot,
                                                      expected_buy_symbol_side_snapshot, active_pair_strat,
                                                      expected_strat_limits_, expected_strat_status,
                                                      expected_strat_brief_obj, executor_web_client)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order of order_id {order_id}")
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
-        executor_web_client.trade_simulator_process_order_ack_query_client(
-            order_id, placed_order_journal.order.px, placed_order_journal.order.qty, placed_order_journal.order.side,
-            placed_order_journal.order.security.sec_id, placed_order_journal.order.underlying_account)
+        executor_web_client.barter_simulator_process_chore_ack_query_client(
+            chore_id, placed_chore_journal.chore.px, placed_chore_journal.chore.qty, placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id, placed_chore_journal.chore.underlying_account)
 
-        placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
 
-        # Checking Ack response on placed order
-        placed_sell_order_ack_receive(placed_order_journal_obj_ack_response,
-                                      expected_sell_order_snapshot, executor_web_client)
+        # Checking Ack response on placed chore
+        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+                                      expected_sell_chore_snapshot, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, "
-              f"Checked sell placed order ACK of order_id {order_id}")
+              f"Checked sell placed chore ACK of chore_id {chore_id}")
 
         sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
         sell_fill_journal_obj.fill_qty = random.randint(30, 35)
         sell_fill_journal_obj.fill_px = random.randint(100, 110)
-        executor_web_client.trade_simulator_process_fill_query_client(
-            order_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
+        executor_web_client.barter_simulator_process_fill_query_client(
+            chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
             Side.SELL, sell_symbol, sell_fill_journal_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_order_id(order_id, executor_web_client)
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
 
-        # Checking Fill receive on placed order
-        check_fill_receive_for_placed_sell_order_before_buys(
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_sell_chore_before_buys(
             sell_symbol, placed_fill_journal_obj,
-            expected_sell_order_snapshot, expected_sell_symbol_side_snapshot,
+            expected_sell_chore_snapshot, expected_sell_symbol_side_snapshot,
             expected_buy_symbol_side_snapshot, active_pair_strat,
             expected_strat_limits_, expected_strat_status, expected_strat_brief_obj,
             executor_web_client)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order FILL")
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore FILL")
 
-        # Sleeping to let the order get cxlled
+        # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK,
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            sell_symbol, executor_web_client,
-                                                                           last_order_id=sell_cxl_order_id)
-        sell_cxl_order_id = cxl_order_journal.order.order_id
+                                                                           last_chore_id=sell_cxl_chore_id)
+        sell_cxl_chore_id = cxl_chore_journal.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
-        check_cxl_receive_for_placed_sell_order_before_buy(sell_symbol,
-                                                           cxl_order_journal, expected_sell_order_snapshot,
+        check_cxl_receive_for_placed_sell_chore_before_buy(sell_symbol,
+                                                           cxl_chore_journal, expected_sell_chore_snapshot,
                                                            expected_sell_symbol_side_snapshot,
                                                            expected_buy_symbol_side_snapshot,
                                                            active_pair_strat, expected_strat_limits_,
                                                            expected_strat_status, expected_strat_brief_obj,
                                                            executor_web_client)
 
-        strat_sell_notional += expected_sell_order_snapshot.fill_notional
-        strat_sell_fill_notional += expected_sell_order_snapshot.fill_notional
+        strat_sell_notional += expected_sell_chore_snapshot.fill_notional
+        strat_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
 
-        order_id = None
-        buy_cxl_order_id = None
+        chore_id = None
+        buy_cxl_chore_id = None
         start_time = DateTime.utcnow()
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Loop started at {start_time}")
-        expected_buy_order_snapshot = copy.deepcopy(expected_buy_order_snapshot_)
-        expected_buy_order_snapshot.order_brief.security.sec_id = buy_symbol
+        expected_buy_chore_snapshot = copy.deepcopy(expected_buy_chore_snapshot_)
+        expected_buy_chore_snapshot.chore_brief.security.sec_id = buy_symbol
 
-        # placing order
-        current_itr_expected_buy_order_journal_ = copy.deepcopy(buy_order_)
-        current_itr_expected_buy_order_journal_.order.security.sec_id = buy_symbol
+        # placing chore
+        current_itr_expected_buy_chore_journal_ = copy.deepcopy(buy_chore_)
+        current_itr_expected_buy_chore_journal_.chore.security.sec_id = buy_symbol
 
-        # running last trade once more before sell side
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        print(f"LastTrades created: buy_symbol: {leg1_symbol}, sell_symbol: {sell_symbol}")
-
-        # Running TopOfBook (this triggers expected buy order)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1], is_non_systematic_run)
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, created tob")
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        print(f"LastBarters created: buy_symbol: {leg1_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
-            # Waiting for tob to trigger place order
+            # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+            time.sleep(1)
+            update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                               ask_sell_top_market_depth)
+
+            # Waiting for tob to trigger place chore
             buy_tob_last_update_date_time_tracker = \
-                wait_for_get_new_order_placed_from_tob(110, buy_symbol,
+                wait_for_get_new_chore_placed_from_tob(100, buy_symbol,
                                                        buy_tob_last_update_date_time_tracker, Side.BUY,
                                                        executor_web_client)
             time_delta = DateTime.utcnow() - start_time
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received buy TOB of last_update_date_time "
                   f"{buy_tob_last_update_date_time_tracker}, time delta {time_delta.total_seconds()}")
         else:
-            # placing new non-systematic new_order
+            # placing new non-systematic new_chore
             qty = random.randint(85, 95)
             px = random.randint(90, 100)
-            place_new_order(buy_symbol, Side.BUY, px, qty, executor_web_client)
-            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_order obj")
+            place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client)
+            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_web_client,
-                                                                              last_order_id=order_id)
-        order_id = placed_order_journal.order.order_id
-        create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received order_journal with {order_id}")
+                                                                              last_chore_id=chore_id)
+        chore_id = placed_chore_journal.chore.chore_id
+        create_buy_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_journal with {chore_id}")
         time.sleep(2)
 
-        # Checking placed order computations
-        check_placed_buy_order_computes_after_sells(loop_count, order_id, buy_symbol,
-                                                    placed_order_journal, expected_buy_order_snapshot,
+        # Checking placed chore computations
+        check_placed_buy_chore_computes_after_sells(loop_count, chore_id, buy_symbol,
+                                                    placed_chore_journal, expected_buy_chore_snapshot,
                                                     expected_buy_symbol_side_snapshot,
                                                     expected_sell_symbol_side_snapshot, active_pair_strat,
                                                     expected_strat_limits_, expected_strat_status,
                                                     expected_strat_brief_obj, executor_web_client)
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order of order_id {order_id}")
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
-        executor_web_client.trade_simulator_process_order_ack_query_client(
-            order_id, current_itr_expected_buy_order_journal_.order.px,
-            current_itr_expected_buy_order_journal_.order.qty,
-            current_itr_expected_buy_order_journal_.order.side,
-            current_itr_expected_buy_order_journal_.order.security.sec_id,
-            current_itr_expected_buy_order_journal_.order.underlying_account
+        executor_web_client.barter_simulator_process_chore_ack_query_client(
+            chore_id, current_itr_expected_buy_chore_journal_.chore.px,
+            current_itr_expected_buy_chore_journal_.chore.qty,
+            current_itr_expected_buy_chore_journal_.chore.side,
+            current_itr_expected_buy_chore_journal_.chore.security.sec_id,
+            current_itr_expected_buy_chore_journal_.chore.underlying_account
         )
 
-        placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
 
-        # Checking Ack response on placed order
-        placed_buy_order_ack_receive(placed_order_journal_obj_ack_response, expected_buy_order_snapshot,
+        # Checking Ack response on placed chore
+        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot,
                                      executor_web_client)
         print(
-            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order ACK of order_id {order_id}")
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore ACK of chore_id {chore_id}")
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
         buy_fill_journal_obj.fill_qty = random.randint(50, 55)
         buy_fill_journal_obj.fill_px = random.randint(90, 100)
-        executor_web_client.trade_simulator_process_fill_query_client(
-            order_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
+        executor_web_client.barter_simulator_process_fill_query_client(
+            chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
             Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_order_id(order_id, executor_web_client)
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
 
-        # Checking Fill receive on placed order
-        check_fill_receive_for_placed_buy_order_after_all_sells(loop_count, order_id,
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count, chore_id,
                                                                 buy_symbol, placed_fill_journal_obj,
-                                                                expected_buy_order_snapshot,
+                                                                expected_buy_chore_snapshot,
                                                                 expected_buy_symbol_side_snapshot,
                                                                 expected_sell_symbol_side_snapshot, active_pair_strat,
                                                                 expected_strat_limits_, expected_strat_status,
                                                                 expected_strat_brief_obj, executor_web_client)
         print(
-            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order FILL of order_id {order_id}")
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore FILL of chore_id {chore_id}")
 
-        # Sleeping to let the order get cxlled
+        # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK,
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            buy_symbol, executor_web_client,
-                                                                           last_order_id=buy_cxl_order_id)
-        buy_cxl_order_id = cxl_order_journal.order.order_id
+                                                                           last_chore_id=buy_cxl_chore_id)
+        buy_cxl_chore_id = cxl_chore_journal.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
-        check_cxl_receive_for_placed_buy_order_after_all_sells(buy_symbol,
-                                                               cxl_order_journal, expected_buy_order_snapshot,
+        check_cxl_receive_for_placed_buy_chore_after_all_sells(buy_symbol,
+                                                               cxl_chore_journal, expected_buy_chore_snapshot,
                                                                expected_buy_symbol_side_snapshot,
                                                                expected_sell_symbol_side_snapshot,
                                                                active_pair_strat, expected_strat_limits_,
                                                                expected_strat_status, expected_strat_brief_obj,
                                                                executor_web_client)
 
-        strat_buy_notional += expected_buy_order_snapshot.fill_notional
-        strat_buy_fill_notional += expected_buy_order_snapshot.fill_notional
+        strat_buy_notional += expected_buy_chore_snapshot.fill_notional
+        strat_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
     return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
 
 
-def place_sanity_orders_for_executor(
-        buy_symbol: str, sell_symbol: str, total_order_count_for_each_side, last_trade_fixture_list,
-        top_of_book_list_, residual_wait_sec, executor_web_client, place_after_recovery: bool = False,
-        expect_no_order: bool = False):
+def place_sanity_chores_for_executor(
+        buy_symbol: str, sell_symbol: str, total_chore_count_for_each_side, last_barter_fixture_list,
+        residual_wait_sec, executor_web_client, place_after_recovery: bool = False,
+        expect_no_chore: bool = False):
 
-    # Placing buy orders
-    buy_ack_order_id = None
+    # Placing buy chores
+    buy_ack_chore_id = None
 
     if place_after_recovery:
-        order_journals = executor_web_client.get_all_order_journal_client(-100)
+        chore_journals = executor_web_client.get_all_chore_journal_client(-100)
         max_id = 0
-        for order_journal in order_journals:
-            if order_journal.order.security.sec_id == buy_symbol and order_journal.order_event == OrderEventType.OE_ACK:
-                if max_id < order_journal.id:
-                    buy_ack_order_id = order_journal.order.order_id
+        for chore_journal in chore_journals:
+            if chore_journal.chore.security.sec_id == buy_symbol and chore_journal.chore_event == ChoreEventType.OE_ACK:
+                if max_id < chore_journal.id:
+                    buy_ack_chore_id = chore_journal.chore.chore_id
 
-    for loop_count in range(total_order_count_for_each_side):
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = executor_web_client.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
 
-        ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+    for loop_count in range(total_chore_count_for_each_side):
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+                                                           ask_sell_top_market_depth)
+
+        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                            buy_symbol, executor_web_client,
-                                                                           last_order_id=buy_ack_order_id,
-                                                                           expect_no_order=expect_no_order)
-        buy_ack_order_id = ack_order_journal.order.order_id
+                                                                           last_chore_id=buy_ack_chore_id,
+                                                                           expect_no_chore=expect_no_chore)
+        buy_ack_chore_id = ack_chore_journal.chore.chore_id
 
-        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
-            time.sleep(residual_wait_sec)  # wait to make this open order residual
+        if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+            time.sleep(residual_wait_sec)  # wait to make this open chore residual
 
-    # Placing sell orders
-    sell_ack_order_id = None
-    for loop_count in range(total_order_count_for_each_side):
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
+    # Placing sell chores
+    sell_ack_chore_id = None
+    for loop_count in range(total_chore_count_for_each_side):
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        # required to make buy side tob latest
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
 
-        ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+                                                            bid_buy_top_market_depth)
+
+        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                            sell_symbol, executor_web_client,
-                                                                           last_order_id=sell_ack_order_id,
-                                                                           expect_no_order=expect_no_order)
-        sell_ack_order_id = ack_order_journal.order.order_id
+                                                                           last_chore_id=sell_ack_chore_id,
+                                                                           expect_no_chore=expect_no_chore)
+        sell_ack_chore_id = ack_chore_journal.chore.chore_id
 
-        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
-            time.sleep(residual_wait_sec)  # wait to make this open order residual
+        if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+            time.sleep(residual_wait_sec)  # wait to make this open chore residual

@@ -1,7 +1,7 @@
 import os
 
 os.environ["DBType"] = "beanie"
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 cum_price_size_aggregate_json = {"aggregate": [
@@ -56,6 +56,106 @@ sample_cum_aggregate_pipeline = {"aggregate": [
         }
     }
 ]}
+
+
+def get_ongoing_or_all_pair_strats_by_sec_id(sec_id: str, side: str):
+    """
+    pipeline to return all pair_strats that are ongoing or if no ongoing is found then return all pair_strats with
+    sec_id of any leg as passed value
+    """
+    agg_pipeline = {
+        "aggregate": [
+            {
+                '$match': {
+                    '$or': [
+                        {
+                            '$and': [
+                                {
+                                    'pair_strat_params.strat_leg1.sec.sec_id': {
+                                        '$eq': sec_id
+                                    }
+                                }, {
+                                    'pair_strat_params.strat_leg1.side': {
+                                        '$eq': side
+                                    }
+                                }
+                            ]
+                        }, {
+                            '$and': [
+                                {
+                                    'pair_strat_params.strat_leg2.sec.sec_id': {
+                                        '$eq': sec_id
+                                    }
+                                }, {
+                                    'pair_strat_params.strat_leg2.side': {
+                                        '$eq': side
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }, {
+                '$facet': {
+                    'matchedDocs': [
+                        {
+                            '$match': {
+                                '$or': [
+                                    {
+                                        'strat_state': {
+                                            '$eq': 'StratState_ACTIVE'
+                                        }
+                                    }, {
+                                        'strat_state': {
+                                            '$eq': 'StratState_PAUSED'
+                                        }
+                                    }, {
+                                        'strat_state': {
+                                            '$eq': 'StratState_ERROR'
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    'allDocs': [
+                        {
+                            '$match': {}
+                        }
+                    ]
+                }
+            }, {
+                '$addFields': {
+                    'finalDocs': {
+                        '$cond': {
+                            'if': {
+                                '$gt': [
+                                    {
+                                        '$size': '$matchedDocs'
+                                    }, 0
+                                ]
+                            },
+                            'then': '$matchedDocs',
+                            'else': '$allDocs'
+                        }
+                    }
+                }
+            }, {
+                '$unwind': {
+                    'path': '$finalDocs'
+                }
+            }, {
+                '$group': {
+                    '_id': '$finalDocs'
+                }
+            }, {
+                '$replaceRoot': {
+                    'newRoot': '$_id'
+                }
+            }
+        ]
+    }
+    return agg_pipeline
 
 
 def get_ongoing_pair_strat_filter(security_id: str | None = None):
@@ -148,9 +248,9 @@ def get_all_pair_strat_from_symbol_n_side(sec_id: str, side: Side):
 
 
 # if __name__ == '__main__':
-    # with_symbol_agg_query = get_last_n_sec_orders_by_event("sym-1", 5, "OE_NEW")
+    # with_symbol_agg_query = get_last_n_sec_chores_by_event("sym-1", 5, "OE_NEW")
     # print(with_symbol_agg_query)
-    # without_symbol_agg_query = get_last_n_sec_orders_by_event(None, 5, "OE_NEW")
+    # without_symbol_agg_query = get_last_n_sec_chores_by_event(None, 5, "OE_NEW")
     # print(without_symbol_agg_query)
 
     # print(get_limited_portfolio_alerts_obj(5))

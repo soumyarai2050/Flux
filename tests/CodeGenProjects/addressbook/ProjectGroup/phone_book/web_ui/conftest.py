@@ -4,14 +4,14 @@ import pytest
 
 from selenium.webdriver.support import expected_conditions as EC  # noqa
 
-from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.web_ui.utility_test_functions import *
-from CodeGenProjects.addressbook.ProjectGroup.phone_book.web_ui.web_ui_models import *
-from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.web_ui.utility_test_functions import get_driver, wait, \
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import *
+from CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import get_driver, wait, \
     get_web_project_url, test_config_file_path, create_pair_strat, override_default_limits
-from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
     FxSymbolOverviewBaseModel, EmailBookServiceHttpClient)
-from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import fx_symbol_overview_obj
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import fx_symbol_overview_obj
 
 
 @pytest.fixture()
@@ -47,7 +47,7 @@ def market_depth_basemodel_list():
 
 
 @pytest.fixture()
-def last_trade_fixture_list():
+def last_barter_fixture_list():
     input_data = []
     id: int = 0
     for index, symbol in enumerate(["CB_Sec_1", "EQT_Sec_1"]):
@@ -63,15 +63,15 @@ def last_trade_fixture_list():
                 "arrival_time": "2023-03-10T09:19:12.019Z",
                 "px": 116,
                 "qty": 150,
-                "market_trade_volume": {
-                    "participation_period_last_trade_qty_sum": 0,
+                "market_barter_volume": {
+                    "participation_period_last_barter_qty_sum": 0,
                     "applicable_period_seconds": 0
                 }
             }
         ])
 
-    last_trade_list = [LastTradeBaseModel(**last_trade_json) for last_trade_json in input_data]
-    yield last_trade_list
+    last_barter_list = [LastBarterBaseModel(**last_barter_json) for last_barter_json in input_data]
+    yield last_barter_list
 
 
 @pytest.fixture()
@@ -85,7 +85,7 @@ def fills_journal_fixture_list():
             input_data.append(
                 FillsJournalBaseModel(
                     id=id_counter,
-                    order_id=f"Order_{id_counter}",
+                    chore_id=f"Chore_{id_counter}",
                     fill_px=120.5 + id_counter,
                     fill_qty=100 + id_counter,
                     fill_notional=12050 + id_counter,
@@ -102,7 +102,7 @@ def fills_journal_fixture_list():
 
 
 @pytest.fixture()
-def order_snapshot_fixture_list():
+def chore_snapshot_fixture_list():
     input_data = []
     id_counter: int = 0
 
@@ -110,11 +110,11 @@ def order_snapshot_fixture_list():
         for _ in range(5):  # Adjust the range as needed
             id_counter += 1
             input_data.append(
-                OrderSnapshotBaseModel(
+                ChoreSnapshotBaseModel(
                     id=id_counter,
-                    order_status=OrderStatusType.OE_ACKED,
-                    order_brief={
-                        "order_id": f"Order_{id_counter}",
+                    chore_status=ChoreStatusType.OE_ACKED,
+                    chore_brief={
+                        "chore_id": f"Chore_{id_counter}",
                         "security": {
                             "sec_id": symbol,
                             "sec_type": SecurityType.RIC
@@ -122,7 +122,7 @@ def order_snapshot_fixture_list():
                         "side": Side.BUY,
                         "px": 120.5,
                         "qty": 100,
-                        "order_notional": 12050,
+                        "chore_notional": 12050,
                         "underlying_account": f"Account_{id_counter}",
                         "exchange": "Exchange123",
                         "text": ["Text1", "Text2"]
@@ -145,7 +145,7 @@ def order_snapshot_fixture_list():
 
 
 @pytest.fixture()
-def order_journal_fixture_list():
+def chore_journal_fixture_list():
     input_data = []
     id_counter: int = 0
 
@@ -153,22 +153,22 @@ def order_journal_fixture_list():
         for _ in range(5):  # Adjust the range as needed
             id_counter += 1
             input_data.append(
-                OrderJournalBaseModel(
+                ChoreJournalBaseModel(
                     id=id_counter,
-                    order=OrderBrief(
-                        order_id=f"Order_{id_counter}",
+                    chore=ChoreBrief(
+                        chore_id=f"Chore_{id_counter}",
                         security=Security(sec_id=symbol, sec_type=SecurityType.RIC),
                         side=Side.BUY,
                         px=120.5 + id_counter,
                         qty=100 + id_counter,
-                        order_notional=12050 + id_counter,
+                        chore_notional=12050 + id_counter,
                         underlying_account=f"Account_{id_counter}",
                         exchange="Exchange123",
                         text=["Text1", "Text2"]
                     ),
-                    order_event_date_time="2023-03-10T09:30:00.000Z",
-                    order_event=OrderEventType.OE_ACK,
-                    current_period_order_count=10
+                    chore_event_date_time="2023-03-10T09:30:00.000Z",
+                    chore_event=ChoreEventType.OE_ACK,
+                    current_period_chore_count=10
                 )
             )
 
@@ -195,15 +195,15 @@ def top_of_book_list_():
                     "qty": 40,
                     "last_update_date_time": "2023-02-13T20:30:31.165Z"
                 },
-                "last_trade": {
+                "last_barter": {
                     "px": 116,
                     "qty": 150,
                     "last_update_date_time": "2023-02-13T20:30:35.165Z"
                 },
-                "total_trading_security_size": 100,
-                "market_trade_volume": [
+                "total_bartering_security_size": 100,
+                "market_barter_volume": [
                     {
-                        "participation_period_last_trade_qty_sum": 90,
+                        "participation_period_last_barter_qty_sum": 90,
                         "applicable_period_seconds": 180
                     }
                 ],
@@ -216,19 +216,19 @@ def top_of_book_list_():
 
 
 @pytest.fixture()
-def expected_order_limits_():
-    yield OrderLimitsBaseModel(id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                               max_order_qty=500, min_order_notional=100, max_order_notional=90_000)
+def expected_chore_limits_():
+    yield ChoreLimitsBaseModel(id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
+                               max_chore_qty=500, min_chore_notional=100, max_chore_notional=90_000)
 
 
 @pytest.fixture()
 def expected_portfolio_limits_(expected_brokers_):
-    rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
-    rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
+    rolling_max_chore_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
+    rolling_max_reject_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
 
     portfolio_limits_obj = PortfolioLimitsBaseModel(id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
                                                     max_gross_n_open_notional=2_400_000,
-                                                    rolling_max_order_count=rolling_max_order_count,
+                                                    rolling_max_chore_count=rolling_max_chore_count,
                                                     rolling_max_reject_count=rolling_max_reject_count,
                                                     eligible_brokers=expected_brokers_)
     yield portfolio_limits_obj
@@ -299,7 +299,7 @@ def buy_sell_symbol_list():
 
 
 @pytest.fixture
-def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, expected_portfolio_status_,
+def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, expected_portfolio_status_,
                          db_names_list):
 
     # # deleting existing data available in existing executor client
@@ -313,10 +313,10 @@ def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, exp
     clear_cache_in_model()
 
     # updating portfolio_alert
-    renew_portfolio_alert()
+    clean_portfolio_alert()
 
     # setting limits
-    set_n_verify_limits(expected_order_limits_, expected_portfolio_limits_)
+    set_n_verify_limits(expected_chore_limits_, expected_portfolio_limits_)
 
     # creating portfolio_status
     create_n_verify_portfolio_status(copy.deepcopy(expected_portfolio_status_))
@@ -359,9 +359,9 @@ def driver(driver_type, config_dict) -> WebDriver:
 
 
 @pytest.fixture()
-def web_project(driver, pair_strat, expected_order_limits_, expected_portfolio_limits_, top_of_book_list_,
-                market_depth_basemodel_list, last_trade_fixture_list, fills_journal_fixture_list,
-                order_snapshot_fixture_list, order_journal_fixture_list):
+def web_project(driver, pair_strat, expected_chore_limits_, expected_portfolio_limits_, top_of_book_list_,
+                market_depth_basemodel_list, last_barter_fixture_list, fills_journal_fixture_list,
+                chore_snapshot_fixture_list, chore_journal_fixture_list):
     # TODO: create fx symbol overview
     host: str = "127.0.0.1"
     port: int = 8020
@@ -369,7 +369,7 @@ def web_project(driver, pair_strat, expected_order_limits_, expected_portfolio_l
     fx_symbol_overview = fx_symbol_overview_obj()
     email_book_service_http_client.create_fx_symbol_overview_client(fx_symbol_overview)
 
-    override_default_limits(expected_order_limits_, expected_portfolio_limits_)
+    override_default_limits(expected_chore_limits_, expected_portfolio_limits_)
     driver.maximize_window()
     time.sleep(Delay.SHORT.value)
     driver.get(get_web_project_url())
@@ -392,10 +392,10 @@ def web_project(driver, pair_strat, expected_order_limits_, expected_portfolio_l
     assert kill_switch_btn.is_displayed(), "failed to load web project, kill switch button not found"
     create_pair_strat(driver=driver, pair_strat=pair_strat)
     create_tob_md_ld_fj_os_oj(driver=driver, top_of_book_list=top_of_book_list_,
-                              market_depth_list=market_depth_basemodel_list, last_trade_list=last_trade_fixture_list,
+                              market_depth_list=market_depth_basemodel_list, last_barter_list=last_barter_fixture_list,
                               fills_journal_list=fills_journal_fixture_list,
-                              order_snapshot_list=order_snapshot_fixture_list,
-                              order_journal_list=order_journal_fixture_list)
+                              chore_snapshot_list=chore_snapshot_fixture_list,
+                              chore_journal_list=chore_journal_fixture_list)
 
 
 @pytest.fixture()
@@ -435,7 +435,7 @@ def pair_strat_edit() -> Dict[str, any]:
 @pytest.fixture()
 def strat_limits() -> Dict[str, any]:
     strat_limits = {
-        "max_open_orders_per_side": 4,
+        "max_open_chores_per_side": 4,
         "max_single_leg_notional": 500,
         "max_open_single_leg_notional": 600,
         "max_net_filled_notional": 700,
@@ -444,9 +444,9 @@ def strat_limits() -> Dict[str, any]:
         "cancel_rate": {
             "max_cancel_rate": 10,
             "applicable_period_seconds": 9,
-            "waived_min_orders": 2
+            "waived_min_chores": 2
         },
-        "market_trade_volume_participation": {
+        "market_barter_volume_participation": {
             "max_participation_rate": 15,
             "applicable_period_seconds": 25
         },
@@ -469,7 +469,7 @@ def set_micro_seperator_and_clean(schema_dict: Dict[str, any]):
                        extend_field_name="micro_separator", value="=")
     yield
 
-    schema_path: PurePath = (code_gen_projects_dir_path / "addressbook" / "ProjectGroup" /
+    schema_path: PurePath = (code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" /
                              "phone_book" / "web-ui" / "public" / "schema.json")
     with open(str(schema_path), "w") as file:
         json.dump(schema_dict, file, indent=2)

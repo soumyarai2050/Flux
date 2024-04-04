@@ -6,13 +6,13 @@ from pathlib import PurePath
 home_dir_path = PurePath(__file__).parent.parent.parent.parent.parent
 sys.path.append(str(home_dir_path))
 from Flux.PyCodeGenEngine.FluxCodeGenCore.plugin_execute_script import PluginExecuteScript
-from Flux.CodeGenProjects.addressbook.trading_gen_engine_env import TradingGenEngineEnv
+from Flux.CodeGenProjects.AddressBook.bartering_gen_engine_env import BarteringGenEngineEnv
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
 
 if __name__ == "__main__":
-    code_gen_engine_env_manager = TradingGenEngineEnv.get_instance()
-    env_var_dict = TradingGenEngineEnv.default_gen_env_var_dict
+    code_gen_engine_env_manager = BarteringGenEngineEnv.get_instance()
+    env_var_dict = BarteringGenEngineEnv.default_gen_env_var_dict
     env_var_dict["PLUGIN_FILE_NAME"] = "beanie_model_plugin.py"
     env_var_dict["DBType"] = "beanie"
 

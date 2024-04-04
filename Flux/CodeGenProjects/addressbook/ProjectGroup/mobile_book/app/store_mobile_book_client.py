@@ -10,7 +10,7 @@ from ibapi.common import TickerId, TickAttrib
 from ibapi.ticktype import TickTypeEnum, TickType
 
 # Local project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
 
 os.environ["DBType"] = "beanie"
@@ -51,7 +51,7 @@ class StoreMobileBookClient(IbApiClient):
             self.reqMktData(idx, contract, self.generic_tick_list, self.snapshot,
                             self.regulatory_snapshot, [])
 
-    def error(self, ticker_id: TickerId, error_code: int, error_string: str, advanced_order_reject_json=""):
+    def error(self, ticker_id: TickerId, error_code: int, error_string: str, advanced_chore_reject_json=""):
         logging.debug(f"Error: , {ticker_id}, {error_code}, {error_string}")
 
     def _add_to_db(self, ticker_id: int, tick_type: str, px: float | None = None, qty: float | None = None):

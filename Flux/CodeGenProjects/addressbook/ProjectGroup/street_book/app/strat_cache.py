@@ -8,16 +8,16 @@ import pytz
 from pendulum import DateTime
 
 # project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_service_helper import get_fills_journal_log_key
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_base_strat_cache import \
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import get_fills_journal_log_key
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_base_strat_cache import \
     EmailBookServiceBaseStratCache
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.StreetBook.street_book_service_base_strat_cache import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_base_strat_cache import (
     StreetBookServiceBaseStratCache)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import (
     StreetBookServiceKeyHandler)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 
 
 # deprecated - replaced by market_depth cython cache impl
@@ -65,7 +65,7 @@ class MarketDepthsCont:
 class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache):
     strat_cache_dict: Dict[str, 'StratCache'] = dict()  # symbol_side is the key
     add_to_strat_cache_rlock: RLock = RLock()
-    order_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
+    chore_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
     # fx_symbol_overview_dict must be preloaded with supported fx pairs for system to work
     fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | FxSymbolOverview | None] = {"USD|SGD": None}
 
@@ -75,8 +75,8 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         self.re_ent_lock: RLock = RLock()
         self.notify_semaphore = Semaphore()
         self.stopped = True  # used by consumer thread to stop processing
-        self.leg1_trading_symbol: str | None = None
-        self.leg2_trading_symbol: str | None = None
+        self.leg1_bartering_symbol: str | None = None
+        self.leg2_bartering_symbol: str | None = None
         self.unack_leg1: bool = False
         self.unack_leg2: bool = False
 
@@ -100,46 +100,46 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         self._market_depths_conts: List[MarketDepthsCont] | None = None
         self._market_depths_update_date_time: DateTime = DateTime.utcnow()
 
-        # order-snapshot is also stored in here iff order snapshot is open [and removed from here if otherwise]
-        self._order_id_to_open_order_snapshot_dict: Dict[Any, OrderSnapshotBaseModel | OrderSnapshot] = {}  # no open
-        self._open_order_snapshots_update_date_time: DateTime = DateTime.utcnow()
+        # chore-snapshot is also stored in here iff chore snapshot is open [and removed from here if otherwise]
+        self._chore_id_to_open_chore_snapshot_dict: Dict[Any, ChoreSnapshotBaseModel | ChoreSnapshot] = {}  # no open
+        self._open_chore_snapshots_update_date_time: DateTime = DateTime.utcnow()
 
-    def set_order_snapshot(self, order_snapshot: OrderSnapshotBaseModel | OrderSnapshot) -> DateTime:
+    def set_chore_snapshot(self, chore_snapshot: ChoreSnapshotBaseModel | ChoreSnapshot) -> DateTime:
         """
-        override to enrich _order_id_to_open_order_snapshot_dict [invoke base first and then act here]
+        override to enrich _chore_id_to_open_chore_snapshot_dict [invoke base first and then act here]
         """
-        _order_snapshots_update_date_time = super().set_order_snapshot(order_snapshot)
-        if order_snapshot.order_status not in [OrderStatusType.OE_DOD, OrderStatusType.OE_FILLED,
-                                               OrderStatusType.OE_OVER_FILLED]:
-            self._order_id_to_open_order_snapshot_dict[order_snapshot.order_brief.order_id] = order_snapshot
-        elif order_snapshot.order_status == OrderStatusType.OE_OVER_FILLED:
+        _chore_snapshots_update_date_time = super().set_chore_snapshot(chore_snapshot)
+        if chore_snapshot.chore_status not in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED,
+                                               ChoreStatusType.OE_OVER_FILLED]:
+            self._chore_id_to_open_chore_snapshot_dict[chore_snapshot.chore_brief.chore_id] = chore_snapshot
+        elif chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
             # ideally code would move the strat to pause state when it sees overfill - this only handles corner cases
-            logging.error("Unexpected: Order found overfilled - strat will block [has open order will force fail]")
+            logging.error("Unexpected: Chore found overfilled - strat will block [has open chore will force fail]")
         else:
             # Providing the second argument None prevents the KeyError exception
-            self._order_id_to_open_order_snapshot_dict.pop(order_snapshot.order_brief.order_id, None)
-        return _order_snapshots_update_date_time    # ignore - helps with debug
+            self._chore_id_to_open_chore_snapshot_dict.pop(chore_snapshot.chore_brief.chore_id, None)
+        return _chore_snapshots_update_date_time    # ignore - helps with debug
 
-    def get_open_order_snapshots(self) -> List[OrderSnapshot]:
+    def get_open_chore_snapshots(self) -> List[ChoreSnapshot]:
         """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
-        return list(self._order_id_to_open_order_snapshot_dict.values())
+        return list(self._chore_id_to_open_chore_snapshot_dict.values())
 
-    def get_open_order_count_from_cache(self) -> int:
+    def get_open_chore_count_from_cache(self) -> int:
         """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
-        return len(self._order_id_to_open_order_snapshot_dict)
+        return len(self._chore_id_to_open_chore_snapshot_dict)
 
-    # not working with partially filled orders - check why
-    def get_open_order_count(self) -> int:
+    # not working with partially filled chores - check why
+    def get_open_chore_count(self) -> int:
         """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
-        assert (self._strat_limits, self._strat_limits.max_open_orders_per_side, self._strat_brief,
-               self._strat_brief.pair_sell_side_trading_brief,
-               self._strat_brief.pair_sell_side_trading_brief.consumable_open_orders,
-               self._strat_brief.pair_buy_side_trading_brief.consumable_open_orders)
-        max_open_orders_per_side = self._strat_limits.max_open_orders_per_side
-        open_order_count: int = int(
-            max_open_orders_per_side - self._strat_brief.pair_sell_side_trading_brief.consumable_open_orders +
-            max_open_orders_per_side - self._strat_brief.pair_buy_side_trading_brief.consumable_open_orders)
-        return open_order_count
+        assert (self._strat_limits, self._strat_limits.max_open_chores_per_side, self._strat_brief,
+               self._strat_brief.pair_sell_side_bartering_brief,
+               self._strat_brief.pair_sell_side_bartering_brief.consumable_open_chores,
+               self._strat_brief.pair_buy_side_bartering_brief.consumable_open_chores)
+        max_open_chores_per_side = self._strat_limits.max_open_chores_per_side
+        open_chore_count: int = int(
+            max_open_chores_per_side - self._strat_brief.pair_sell_side_bartering_brief.consumable_open_chores +
+            max_open_chores_per_side - self._strat_brief.pair_buy_side_bartering_brief.consumable_open_chores)
+        return open_chore_count
 
     @property
     def get_symbol_side_snapshots(self) -> List[SymbolOverviewBaseModel | SymbolOverview | None]:
@@ -153,9 +153,9 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
     def get_key_n_symbol_from_fills_journal(
             fills_journal: FillsJournalBaseModel | FillsJournal) -> Tuple[str | None, str | None]:
         symbol: str
-        symbol_side_tuple = StratCache.order_id_to_symbol_side_tuple_dict.get(fills_journal.order_id)
+        symbol_side_tuple = StratCache.chore_id_to_symbol_side_tuple_dict.get(fills_journal.chore_id)
         if not symbol_side_tuple:
-            logging.error(f"Unknown {fills_journal.order_id = } found for fill "
+            logging.error(f"Unknown {fills_journal.chore_id = } found for fill "
                           f"{get_fills_journal_log_key(fills_journal)};;; {fills_journal = }")
             return None, None
         symbol, side = symbol_side_tuple
@@ -163,13 +163,13 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         return key, symbol
 
     def get_metadata(self, system_symbol: str) -> Tuple[str, str, str]:
-        """function to check system symbol's corresponding trading_symbol, account, exchange (maybe fx in future ?)"""
-        trading_symbol: str = system_symbol
-        account = "trading_account"
-        exchange = "trading_exchange"
-        return trading_symbol, account, exchange
+        """function to check system symbol's corresponding bartering_symbol, account, exchange (maybe fx in future ?)"""
+        bartering_symbol: str = system_symbol
+        account = "bartering_account"
+        exchange = "bartering_exchange"
+        return bartering_symbol, account, exchange
 
-    def get_trading_symbols(self):
+    def get_bartering_symbols(self):
         primary_ticker = self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id
         secondary_ticker = self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id
         return primary_ticker, secondary_ticker
@@ -179,7 +179,7 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         self._pair_strat = pair_strat
         self._pair_strat_update_date_time = DateTime.utcnow()
         if self._pair_strat is not None:
-            self.leg1_trading_symbol, self.leg2_trading_symbol = self.get_trading_symbols()
+            self.leg1_bartering_symbol, self.leg2_bartering_symbol = self.get_bartering_symbols()
         # else not required: passing None to clear pair_strat form cache is valid
         return self._pair_strat_update_date_time
 
@@ -269,10 +269,10 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
                 self._top_of_books[0] = top_of_book
                 self._tob_leg1_update_date_time = top_of_book.last_update_date_time
                 return top_of_book.last_update_date_time
-            elif top_of_book.last_trade and (self._top_of_books[0].last_trade is None or (
-                    top_of_book.last_trade.last_update_date_time >
-                    self._top_of_books[0].last_trade.last_update_date_time)):
-                self._top_of_books[0].last_trade = top_of_book.last_trade
+            elif top_of_book.last_barter and (self._top_of_books[0].last_barter is None or (
+                    top_of_book.last_barter.last_update_date_time >
+                    self._top_of_books[0].last_barter.last_update_date_time)):
+                self._top_of_books[0].last_barter = top_of_book.last_barter
                 # artificially update TOB datetime for next pickup by app
                 self._tob_leg1_update_date_time += timedelta(milliseconds=1)
                 return self._tob_leg1_update_date_time
@@ -288,10 +288,10 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
                 self._top_of_books[1] = top_of_book
                 self._tob_leg2_update_date_time = top_of_book.last_update_date_time
                 return top_of_book.last_update_date_time
-            elif top_of_book.last_trade and (self._top_of_books[1].last_trade is None or (
-                    top_of_book.last_trade.last_update_date_time >
-                    self._top_of_books[1].last_trade.last_update_date_time)):
-                self._top_of_books[1].last_trade = top_of_book.last_trade
+            elif top_of_book.last_barter and (self._top_of_books[1].last_barter is None or (
+                    top_of_book.last_barter.last_update_date_time >
+                    self._top_of_books[1].last_barter.last_update_date_time)):
+                self._top_of_books[1].last_barter = top_of_book.last_barter
                 # artificially update TOB datetime for next pickup by app
                 self._tob_leg2_update_date_time += timedelta(milliseconds=1)
                 return self._tob_leg2_update_date_time
@@ -388,12 +388,12 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         return f"{get_pair_strat_log_key(self._pair_strat)}-{self.stopped}"
 
     def __str__(self):
-        return f"stopped: {self.stopped}, primary_leg_trading_symbol: {self.leg1_trading_symbol},  " \
-               f"secondary_leg_trading_symbol: {self.leg2_trading_symbol}, pair_strat: {self._pair_strat}, " \
+        return f"stopped: {self.stopped}, primary_leg_bartering_symbol: {self.leg1_bartering_symbol},  " \
+               f"secondary_leg_bartering_symbol: {self.leg2_bartering_symbol}, pair_strat: {self._pair_strat}, " \
                f"unack_leg1 {self.unack_leg1}, unack_leg2 {self.unack_leg2}, " \
-               f"strat_brief: {self._strat_brief}, cancel_orders: {self._order_id_to_cancel_order_dict}, " \
-               f"new_orders: [{self._new_orders}], order_snapshots: {self._order_id_to_order_snapshot_dict}, " \
-               f"order_journals: {self._order_journals}, fills_journals: {self._fills_journals}, " \
+               f"strat_brief: {self._strat_brief}, cancel_chores: {self._chore_id_to_cancel_chore_dict}, " \
+               f"new_chores: [{self._new_chores}], chore_snapshots: {self._chore_id_to_chore_snapshot_dict}, " \
+               f"chore_journals: {self._chore_journals}, fills_journals: {self._fills_journals}, " \
                f"_symbol_overview: {[str(symbol_overview) for symbol_overview in self._symbol_overviews] if self._symbol_overviews else str(None)}, " \
                f"top of books: {[str(top_of_book) for top_of_book in self._top_of_books] if self._top_of_books else str(None)}, " \
                f"market_depth: {[str(market_depth) for market_depth in self._market_depths_conts] if self._market_depths_conts else str(None)}"

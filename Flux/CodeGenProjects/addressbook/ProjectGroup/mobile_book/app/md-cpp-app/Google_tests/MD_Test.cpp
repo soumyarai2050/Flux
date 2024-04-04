@@ -3,7 +3,7 @@
 #include "gtest/gtest.h"
 
 #include "../../cpp_app/replay/market_depth_handler.h"
-#include "../../cpp_app/replay/last_trade_handler.h"
+#include "../../cpp_app/replay/last_barter_handler.h"
 #include "mobile_book_mongo_db_handler.h"
 #include "mongo_db_codec.h"
 
@@ -11,7 +11,7 @@ namespace md_test{
     static const std::string symbol = "RY";
     std::shared_ptr<mobile_book_handler::MobileBook_MongoDBHandler> sp_mongo_db =
             std::make_shared<mobile_book_handler::MobileBook_MongoDBHandler>();
-    FluxCppCore::MongoDBCodec<mobile_book::LastTrade, mobile_book::LastTradeList> lastTradeCodec(sp_mongo_db);
+    FluxCppCore::MongoDBCodec<mobile_book::LastBarter, mobile_book::LastBarterList> lastBarterCodec(sp_mongo_db);
     FluxCppCore::MongoDBCodec<mobile_book::MarketDepth, mobile_book::MarketDepthList> marketDepthCodec(sp_mongo_db);
     FluxCppCore::MongoDBCodec<mobile_book::TopOfBook, mobile_book::TopOfBookList> topOfBookHandler(sp_mongo_db);
 }
@@ -43,11 +43,11 @@ TEST(MobileBookHandlerTestSuite, DeleteManyMarketDepthTest) {
     ASSERT_EQ(market_depth_all_docs_count, 0);
 }
 
-TEST(MobileBookHandlerTestSuite, DeleteManyLastTradeTest) {
+TEST(MobileBookHandlerTestSuite, DeleteManyLastBarterTest) {
     // delete all specific symbol and side (defined in bid_query / ask_query ) documents and validate
-    lastTradeCodec.delete_all_data_from_collection();
-    auto last_trade_docs_count = lastTradeCodec.count_data_from_collection();
-    ASSERT_EQ(last_trade_docs_count, 0);
+    lastBarterCodec.delete_all_data_from_collection();
+    auto last_barter_docs_count = lastBarterCodec.count_data_from_collection();
+    ASSERT_EQ(last_barter_docs_count, 0);
 }
 
 TEST(MobileBookHandlerTestSuite, DeleteManyTopOfBookTest) {
@@ -85,23 +85,23 @@ TEST(MobileBookHandlerTestSuite, AggregateMarketDepthTest){ // 12/2/2020 -> 7377
 
 TEST(MobileBookHandlerTestSuite, AggregateTickByTickAllLastTest){ // 12/2/2020 -> 737761
 
-    mobile_book_handler::LastTradeHandler lastTradeHandler(sp_mongo_db);
-    mobile_book::LastTradeList last_trade_list;
-    mobile_book::LastTrade last_trade;
+    mobile_book_handler::LastBarterHandler lastBarterHandler(sp_mongo_db);
+    mobile_book::LastBarterList last_barter_list;
+    mobile_book::LastBarter last_barter;
 
     for (int i = 1; i <= 5; ++i) {
-        mobile_book_handler::MobileBookPopulateRandomValues::last_trade(last_trade);
-        last_trade.set_id(i);
-        last_trade_list.add_last_trade()->CopyFrom(last_trade);
+        mobile_book_handler::MobileBookPopulateRandomValues::last_barter(last_barter);
+        last_barter.set_id(i);
+        last_barter_list.add_last_barter()->CopyFrom(last_barter);
     }
 
-    for (int i = 0; i < last_trade_list.last_trade_size(); ++i) {
-        mobile_book::LastTrade test_data = last_trade_list.last_trade(i);
-        lastTradeHandler.handle_last_trade_update(test_data);
+    for (int i = 0; i < last_barter_list.last_barter_size(); ++i) {
+        mobile_book::LastBarter test_data = last_barter_list.last_barter(i);
+        lastBarterHandler.handle_last_barter_update(test_data);
     }
 
-    mobile_book::LastTradeList db_data;
-    lastTradeCodec.get_all_data_from_collection(db_data);
+    mobile_book::LastBarterList db_data;
+    lastBarterCodec.get_all_data_from_collection(db_data);
 
-    ASSERT_EQ(last_trade_list.DebugString(), db_data.DebugString());
+    ASSERT_EQ(last_barter_list.DebugString(), db_data.DebugString());
 }

@@ -220,10 +220,18 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
         for message in self.root_message_list:
             message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
             output_str += (f'\tdef {message_name_snake_cased}_ws_get_all_client(self, notify: bool, '
-                           f'need_initial_snapshot: bool | None = True) -> WSReader:\n')
+                           f'need_initial_snapshot: bool | None = True, '
+                           f'limit_obj_count: int | None = None) -> WSReader:\n')
             output_str += f'\t\tif need_initial_snapshot is not None:\n'
             output_str += (f'\t\t\tself.{message_name_snake_cased}_ws_get_all_uri += '
                            f'"?need_initial_snapshot=" + str(need_initial_snapshot).lower()\n')
+            output_str += f'\t\tif limit_obj_count is not None:\n'
+            output_str += f'\t\t\tif need_initial_snapshot is not None:\n'
+            output_str += (f'\t\t\t\tself.{message_name_snake_cased}_ws_get_all_uri += '
+                           f'"&limit_obj_count=" + '+'str(limit_obj_count)\n')
+            output_str += f'\t\t\telse:\n'
+            output_str += (f'\t\t\t\tself.{message_name_snake_cased}_ws_get_all_uri += '
+                           f'"?limit_obj_count=" + ' + 'str(limit_obj_count)\n')
             output_str += (f'\t\tws_reader_obj = WSReader(self.{message_name_snake_cased}_ws_get_all_uri, '
                            f'{message.proto.name}BaseModel, {message.proto.name}BaseModelList, '
                            f'self.handle_{message_name_snake_cased}_get_all_ws, notify=notify)\n')
