@@ -1,10 +1,11 @@
 import logging
 import os
-import time
-import re
-from threading import Thread
+import threading
 from queue import Queue
 from typing import Set
+from datetime import timedelta
+
+import pendulum
 
 os.environ["DBType"] = "beanie"
 # Project imports
@@ -20,6 +21,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import (
     performance_benchmark_service_http_client, RawPerformanceDataBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.aggregate import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
+    photo_book_service_http_client)
 
 LOG_ANALYZER_DATA_DIR = (
         PurePath(__file__).parent.parent / "data"
@@ -61,9 +64,9 @@ class PhoneBookBaseLogBook(AppLogBook):
         cls.underlying_read_portfolio_alert_http = underlying_read_portfolio_alert_http
         cls.underlying_read_strat_alert_http = underlying_read_strat_alert_http
 
-    def __init__(self, regex_file: str, log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
+    def __init__(self, regex_file_dir_path: str, log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
                  simulation_mode: bool = False):
-        super().__init__(regex_file, config_yaml_dict, log_prefix_regex_pattern_to_callable_name_dict,
+        super().__init__(regex_file_dir_path, config_yaml_dict, log_prefix_regex_pattern_to_callable_name_dict,
                          debug_mode=debug_mode)
         PhoneBookBaseLogBook.initialize_underlying_http_callables()
         self.simulation_mode = simulation_mode
@@ -90,12 +93,9 @@ class PhoneBookBaseLogBook(AppLogBook):
             self.max_fetch_from_queue = 10  # setting default value
         self.pattern_for_log_simulator = get_pattern_for_log_simulator()
 
-    def _handle_put_portfolio_alert_queue_err_handler(self, *args):
-        err_str_ = f"_handle_put_portfolio_alert_queue_err_handler failed, passed args: {args}"
-        log_book_service_http_client.portfolio_alert_fail_logger_query_client(err_str_)
-
-    def _handle_create_portfolio_alert_queue_err_handler(self, *args):
-        err_str_ = f"_handle_create_portfolio_alert_queue_err_handler failed, passed args: {args}"
+    def _handle_portfolio_alert_queue_err_handler(self, *args):
+        err_str_ = (f"_handle_portfolio_alert_queue_err_handler failed in tail executor of process: "
+                    f", passed args: {args}")
         log_book_service_http_client.portfolio_alert_fail_logger_query_client(err_str_)
 
     def _handle_portfolio_alert_query_call_from_alert_queue_handler(
@@ -116,7 +116,7 @@ class PhoneBookBaseLogBook(AppLogBook):
             self.is_running, self.portfolio_alert_queue, portfolio_alert_bulk_update_counts_per_call,
             portfolio_alert_bulk_update_timeout,
             self._handle_portfolio_alert_query_call_from_alert_queue_handler,
-            self._handle_create_portfolio_alert_queue_err_handler)
+            self._handle_portfolio_alert_queue_err_handler)
 
     def handle_raw_performance_data_queue_err_handler(self, pydantic_obj_list):
         pass
@@ -167,6 +167,12 @@ class PhoneBookBaseLogBook(AppLogBook):
     def _pair_strat_api_ops_queue_handler(self):
         while 1:
             pair_strat_api_ops_data: PairStratDbUpdateDataContainer = self.pair_strat_api_ops_queue.get()
+
+            # handling graceful exit of this thread
+            if pair_strat_api_ops_data == "EXIT":
+                logging.info(f">> Exiting {threading.current_thread().name}")
+                return
+
             try:
                 method_name = pair_strat_api_ops_data.method_name
                 pydantic_basemodel_type = pair_strat_api_ops_data.pydantic_basemodel_type
@@ -236,6 +242,10 @@ class PhoneBookBaseLogBook(AppLogBook):
             pydantic_basemodel_class_type, update_type, method_name, patch_queue,
             max_fetch_from_queue, parse_to_pydantic)
 
+        # handling interrupt
+        if update_json_list == "EXIT":
+            return "EXIT"
+
         container_json = {"update_json_list": update_json_list, "update_type": update_type,
                           "pydantic_basemodel_type_name": pydantic_basemodel_class_type.__name__,
                           "method_name": method_name}
@@ -249,6 +259,10 @@ class PhoneBookBaseLogBook(AppLogBook):
         update_json_list = get_update_obj_for_snapshot_type_update(
             pydantic_basemodel_class_type, update_type, method_name, patch_queue,
             max_fetch_from_queue, err_handler_callable, parse_to_pydantic)
+
+        # handling interrupt
+        if update_json_list == "EXIT":
+            return "EXIT"
 
         container_json = {"update_json_list": update_json_list, "update_type": update_type,
                           "pydantic_basemodel_type_name": pydantic_basemodel_class_type.__name__,
@@ -274,10 +288,9 @@ class PhoneBookBaseLogBook(AppLogBook):
                                           pydantic_basemodel_type_name, method_name, kwargs,
                                           self.get_update_obj_list_for_journal_type_update,
                                           self.get_update_obj_for_snapshot_type_update,
-                                          log_book_service_http_client.process_pair_strat_api_ops_query_client,
+                                          photo_book_service_http_client.process_strat_view_updates_query_client,
                                           self.dynamic_queue_handler_err_handler, self.max_fetch_from_queue,
                                           self._snapshot_type_callable_err_handler)
-
         except Exception as e:
             alert_brief: str = f"_process_pair_strat_db_updates failed in log analyzer"
             alert_details: str = f"{message = }, exception: {e}"
@@ -323,29 +336,14 @@ class PhoneBookBaseLogBook(AppLogBook):
         return None
 
     def notify_no_activity(self, log_detail: LogDetail):
-        last_line_date_time_str = get_last_log_line_date_time(log_detail.log_file_path)
+        modified_timestamp = os.path.getmtime(log_detail.log_file_path)
+        last_line_date_time = pendulum.from_timestamp(modified_timestamp, tz="UTC")
 
-        if last_line_date_time_str is not None:
-            try:
-                last_line_date_time = pendulum.parse(last_line_date_time_str)
-            except Exception as e:
-                alert_brief: str = ("Failed to parse last_line_date_time_str received from get_last_log_line_date_time"
-                                    "callable in notify_no_activity - can't find no activity delta")
-                alert_details: str = f"{last_line_date_time_str = }, {log_detail = }"
-                self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
-                                           alert_details=alert_details)
-            else:
-                non_activity_secs = (DateTime.utcnow() - last_line_date_time).total_seconds()
-                if non_activity_secs >= log_detail.poll_timeout:
-                    alert_brief: str = f"No new logs found for {log_detail.service} for last " \
-                                       f"{non_activity_secs} seconds"
-                    alert_details: str = f"{log_detail.service} log file path: {log_detail.log_file_path}"
-                    self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
-                                               alert_details=alert_details)
-        else:
-            alert_brief: str = ("Received last_line_date_time_str as None from get_last_log_line_date_time"
-                                "callable in notify_no_activity - can't find no activity delta")
-            alert_details: str = f"{log_detail = }"
+        non_activity_secs = (DateTime.utcnow() - last_line_date_time).total_seconds()
+        if non_activity_secs >= log_detail.poll_timeout:
+            alert_brief: str = f"No new logs found for {log_detail.service} for last " \
+                               f"{non_activity_secs} seconds"
+            alert_details: str = f"{log_detail.service} log file path: {log_detail.log_file_path}"
             self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
                                        alert_details=alert_details)
 
@@ -436,3 +434,14 @@ class PhoneBookBaseLogBook(AppLogBook):
                                 f"seperated by '~'"
                 logging.exception(err_str_)
         # else not required: if no pattern is matched ignoring this log_message
+
+    def handle_tail_restart(self, log_detail: LogDetail):
+        system_datetime: pendulum.DateTime = (
+            log_detail.last_processed_utc_datetime.in_timezone(tz=pendulum.local_timezone()))
+        system_datetime += timedelta(milliseconds=1)
+        last_update_datetime = system_datetime.format("YYYY-MM-DD HH:mm:ss,SSS")
+        print(f"last_update_datetime: {last_update_datetime}")
+
+        log_book_service_http_client.log_book_restart_tail_query_client(log_detail.log_file_path,
+                                                                                last_update_datetime)
+

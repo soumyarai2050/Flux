@@ -54,14 +54,14 @@ class LogBarterSimulator(BarteringLinkBase):
         exchange_str: str = f"{cls.fld_sep}exchange{cls.val_sep}{exchange}" if exchange else ""
         if text:
             logging.error(f"logit_simulator does not support list arguments, found: {text} for chore: "
-                          f"px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}{cls.fld_sep}side{cls.val_sep}{side}"
-                          f"{cls.fld_sep}bartering_sec_id{cls.val_sep}{bartering_sec_id}{cls.fld_sep}system_sec_id: "
-                          f"{system_sec_id}{cls.fld_sep}account{cls.val_sep}{account}{exchange_str}")
+                          f"px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}{cls.fld_sep}side{cls.val_sep}"
+                          f"{side.value}{cls.fld_sep}bartering_sec_id{cls.val_sep}{bartering_sec_id}{cls.fld_sep}"
+                          f"system_sec_id: {system_sec_id}{cls.fld_sep}account{cls.val_sep}{account}{exchange_str}")
         log_simulate_logger.info(
             f"{LogBarterSimulator.log_simulator_pattern}barter_simulator_place_new_chore_query_client{cls.fld_sep}"
             f"{cls.executor_host}{cls.fld_sep}"
             f"{cls.executor_port}{cls.fld_sep}px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}"
-            f"{cls.fld_sep}side{cls.val_sep}{side}{cls.fld_sep}bartering_sec_id{cls.val_sep}{bartering_sec_id}"
+            f"{cls.fld_sep}side{cls.val_sep}{side.value}{cls.fld_sep}bartering_sec_id{cls.val_sep}{bartering_sec_id}"
             f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}{cls.fld_sep}underlying_account"
             f"{cls.val_sep}{account}{exchange_str}")
         return True
@@ -69,7 +69,7 @@ class LogBarterSimulator(BarteringLinkBase):
     @classmethod
     async def place_cxl_chore(cls, chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
                               system_sec_id: str | None = None, underlying_account: str | None = None):
-        side_str: str = f"{cls.fld_sep}side{cls.val_sep}{side}" if side else ""
+        side_str: str = f"{cls.fld_sep}side{cls.val_sep}{side.value}" if side else ""
         bartering_sec_id_str: str = f"{cls.fld_sep}bartering_sec_id{cls.val_sep}{bartering_sec_id}" if bartering_sec_id else ""
         system_sec_id_str: str = f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}" if system_sec_id else ""
         underlying_account_str: str = \

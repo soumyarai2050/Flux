@@ -32,7 +32,7 @@ from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_te
     double_click, hover_over_on_element, set_val_max_input_fld,
     set_val_min_input_fld, get_server_populate_fld, set_input_value_for_comma_seperated,
     get_val_max_from_input_fld, input_n_validate_progress_bar, is_table_cell_enabled, get_number_format_from_input_fld)
-from CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
+from FluxCodeGenEngine.tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
                                                                                              SearchType)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import TopOfBookBaseModel, QuoteOptional
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_routes import (
@@ -321,7 +321,7 @@ def test_nested_pair_strat_n_strats_limits(clean_and_set_limits, driver_type, we
 def test_widget_type(driver_type, schema_dict: Dict[str, any]):
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict),
                                           widget_type=WidgetType.DEPENDENT,
-                                          flux_property="number_format")
+                                          flux_property="FluxFldButton")
     print(result)
     assert result[0]
     # # print(result)

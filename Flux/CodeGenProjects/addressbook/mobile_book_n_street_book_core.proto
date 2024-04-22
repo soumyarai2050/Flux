@@ -42,12 +42,6 @@ message TopOfBook {
     QueryParamsDataType: "str"
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "filtered_notify_tob_update",
-      QueryParams: "symbols",
-      QueryParamsDataType: "List[str]",
-      QueryType: WS
-  };
-  option (FluxMsgJsonQuery) = {
       QueryName: "get_tob_of_book_from_cache"
   };
   option (FluxMsgExecutorOptions) = {
@@ -120,14 +114,14 @@ message MarketDepth {
 
 message LastBarter {
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 5.0,
+    MongoVersion: 7.0,
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,
-    ExpireAfterSeconds: 5
+    ExpireAfterSeconds: 3600
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -157,14 +151,14 @@ message LastBarter {
 
 message RawLastBarterHistory {
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 5.0,
+    MongoVersion: 7.0,
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,
-    ExpireAfterSeconds: 5
+    ExpireAfterSeconds: 3600
   };
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];

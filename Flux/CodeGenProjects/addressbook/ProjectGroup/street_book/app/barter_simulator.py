@@ -238,12 +238,15 @@ class BarterSimulator(BarteringLinkBase):
 
     @classmethod
     async def process_fill(cls, chore_id, px: float, qty: int, side: Side, sec_id: str,
-                           underlying_account: str) -> bool:
+                           underlying_account: str, use_exact_passed_qty: bool | None = None) -> bool:
         """Simulates Chore's fills - returns True if fully fills chore else returns False"""
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_create_fills_journal_http)
 
-        fill_qty, total_fill_count = cls._process_fill(sec_id, qty)
+        if use_exact_passed_qty:
+            fill_qty, total_fill_count = qty, 1
+        else:
+            fill_qty, total_fill_count = cls._process_fill(sec_id, qty)
 
         total_fill_qty = 0
         for fill_count in range(total_fill_count):
@@ -315,8 +318,8 @@ class BarterSimulator(BarteringLinkBase):
         await underlying_create_chore_journal_http(chore_journal)
 
     @classmethod
-    async def place_cxl_chore(cls, chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
-                              system_sec_id: str | None = None, underlying_account: str | None = "bartering-account",
+    async def place_cxl_chore(cls, chore_id: str, side: Side, bartering_sec_id: str,
+                              system_sec_id: str, underlying_account: str | None = "bartering-account",
                               px: int | None = None, qty: int | None = None):
         """
         cls.simulate_reverse_path or not - always simulate cancel chore's Ack/Rejects (unless configured for unack)
@@ -348,6 +351,57 @@ class BarterSimulator(BarteringLinkBase):
             symbol_configs = cls.get_symbol_configs(system_sec_id)
             if not symbol_configs.get("avoid_cxl_ack_after_cxl_req"):
                 await cls.process_cxl_ack(chore_brief)
+
+    @classmethod
+    async def place_amend_req_chore(cls, chore_id: str, side: Side, bartering_sec_id: str,
+                                    system_sec_id: str, underlying_account: str | None = "bartering-account",
+                                    px: float | None = None, qty: int | None = None):
+        if px is None and qty is None:
+            logging.error("Both Px and Qty can't be None while placing amend chore - ignoring this "
+                          "amend chore creation")
+            return
+
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+            underlying_create_chore_journal_http)
+        security = Security(sec_id=system_sec_id, sec_type=SecurityType.TICKER)
+        # query chore
+        chore_brief = ChoreBrief(chore_id=chore_id, security=security, side=side,
+                                 underlying_account=underlying_account, px=px, qty=qty)
+        msg = f"SIM:Amend Request for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}"
+        add_to_texts(chore_brief, msg)
+        chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+                                     chore_event=ChoreEventType.OE_AMD_UNACK)
+        await underlying_create_chore_journal_http(chore_journal)
+
+    @classmethod
+    async def place_amend_ack_chore(cls, chore_id: str, side: Side, bartering_sec_id: str,
+                                    system_sec_id: str, underlying_account: str | None = "bartering-account"):
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+            underlying_create_chore_journal_http)
+        security = Security(sec_id=system_sec_id, sec_type=SecurityType.TICKER)
+        # query chore
+        chore_brief = ChoreBrief(chore_id=chore_id, security=security, side=side,
+                                 underlying_account=underlying_account)
+        msg = f"SIM:Amend ACK for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}"
+        add_to_texts(chore_brief, msg)
+        chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+                                     chore_event=ChoreEventType.OE_AMD_ACK)
+        await underlying_create_chore_journal_http(chore_journal)
+
+    @classmethod
+    async def place_amend_rej_chore(cls, chore_id: str, side: Side, bartering_sec_id: str,
+                                    system_sec_id: str, underlying_account: str | None = "bartering-account"):
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+            underlying_create_chore_journal_http)
+        security = Security(sec_id=system_sec_id, sec_type=SecurityType.TICKER)
+        # query chore
+        chore_brief = ChoreBrief(chore_id=chore_id, security=security, side=side,
+                                 underlying_account=underlying_account)
+        msg = f"SIM:Amend REJ for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}"
+        add_to_texts(chore_brief, msg)
+        chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+                                     chore_event=ChoreEventType.OE_AMD_REJ)
+        await underlying_create_chore_journal_http(chore_journal)
 
     @classmethod
     async def is_kill_switch_enabled(cls) -> bool:

@@ -162,12 +162,6 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 if message.proto.name in self.repeated_layout_msg_name_list:
                     # Repeated case
                     output_str += ("import { getErrorDetails, applyWebSocketUpdate, clearxpath, addxpath")
-                    if BaseJSLayoutPlugin.is_option_enabled(message,
-                                                            BaseJSLayoutPlugin.flux_msg_widget_ui_data_element):
-                        option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
-                            message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-                        if option_dict.get("is_model_alert_type"):
-                            output_str += ", sortAlertArray"
                     output_str += " } from '../utils';\n\n"
                 else:
                     # Independent case
@@ -798,18 +792,6 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         else:
             output_str += f"        set{message_name}ArrayWs: (state, action) => "+"{\n"
             output_str += "            const { data } = action.payload;\n"
-            # output_str += f"            let updated{message_name}Array = state.{message_name_camel_cased}Array;\n"
-            # output_str += "            Object.values(dict).forEach(v => {\n"
-            # output_str += (f"                updated{message_name}Array = applyWebSocketUpdate("
-            #                f"updated{message_name}Array, v, uiLimit, true);\n")
-            # output_str += "            })\n"
-            # if BaseJSLayoutPlugin.is_option_enabled(message,
-            #                                         BaseJSLayoutPlugin.flux_msg_widget_ui_data_element):
-            #     option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
-            #         message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-            #     if option_dict.get("is_model_alert_type"):
-            #         output_str += f"            sortAlertArray(updated{message_name}Array);\n"
-            # output_str += f"            state.{message_name_camel_cased}Array = updated{message_name}Array;\n"
             output_str += f"            state.{message_name_camel_cased}Array = data;\n"
             output_str += "        },\n"
             output_str += f"        set{message_name}: (state, action) => " + "{\n"
@@ -821,14 +803,20 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        setSelected{message_name}Id: (state, action) => " + "{\n"
             output_str += f"            state.selected{message_name}Id = action.payload;\n"
             output_str += "        },\n"
-            if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
-                output_str += (f"        reset{message_name}: (state, action) => "
-                               "{\n")
-                output_str += (f"            state.{message_name_camel_cased} = "
-                               f"initialState.{message_name_camel_cased};\n")
-                if self._get_ui_msg_dependent_msg_name_from_another_proto(message):
-                    output_str += "            state.url = null;\n"
-                output_str += "        },\n"
+            # if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
+            output_str += (f"        reset{message_name}: (state, action) => "
+                           "{\n")
+            output_str += (f"            state.{message_name_camel_cased}Array = "
+                           f"initialState.{message_name_camel_cased}Array;\n")
+            output_str += (f"            state.{message_name_camel_cased} = "
+                           f"initialState.{message_name_camel_cased};\n")
+            output_str += (f"            state.modified{message_name} = "
+                           f"initialState.modified{message_name};\n")
+            output_str += (f"            state.selected{message_name}Id = "
+                           f"initialState.selected{message_name}Id;\n")
+            if self._get_ui_msg_dependent_msg_name_from_another_proto(message):
+                output_str += "            state.url = null;\n"
+            output_str += "        },\n"
         output_str += "        resetError: (state) => {\n"
         output_str += "            state.error = initialState.error;\n"
         output_str += "        },\n"
@@ -916,8 +904,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    resetError, setUserChanges, setDiscardedChanges, setActiveChanges, setOpenWsPopup\n"
             if (message_name in self.repeated_layout_msg_name_list and
                     self._get_ui_msg_dependent_msg_name_from_another_proto(message)):
-                output_str += f", setUrl, reset{message_name}"
-            output_str += "}" + f" = {message_name_camel_cased}Slice.actions;\n"
+                output_str += f", setUrl"
+            output_str += f", reset{message_name}"+"}" + f" = {message_name_camel_cased}Slice.actions;\n"
 
         return output_str
 
@@ -935,6 +923,11 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         self.load_root_message_to_data_member(file)
 
         output_dict = {}
+
+        # sorting created message lists
+        self.root_msg_list.sort(key=lambda message_: message_.proto.name)
+        self.independent_message_list.sort(key=lambda message_: message_.proto.name)
+        self.dependent_message_list.sort(key=lambda message_: message_.proto.name)
 
         for message in self.root_msg_list:
             if message in self.independent_message_list:

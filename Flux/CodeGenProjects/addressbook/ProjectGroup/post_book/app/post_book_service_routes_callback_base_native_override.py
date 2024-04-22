@@ -85,7 +85,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         while True:
             if should_sleep:
                 time.sleep(self.min_refresh_interval)
-            service_up_flag_env_var = os.environ.get(f"post_book_{pm_port}")
+            service_up_flag_env_var = os.environ.get(f"post_book_{pt_port}")
 
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
@@ -120,7 +120,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         PostBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_routes()
 
         logging.debug("Triggered server launch pre override")
-        self.port = pm_port
+        self.port = pt_port
         app_launch_pre_thread = Thread(target=self._app_launch_pre_thread_func, daemon=True)
         app_launch_pre_thread.start()
 

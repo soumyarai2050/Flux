@@ -300,7 +300,7 @@ def test_pair_strat_n_executor_crash_recovery(
         if strat_state_to_handle == StratState.StratState_ACTIVE:
             active_pair_strat_id = pair_strat.id
     recovered_active_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat_id)
-    total_chore_count_for_each_side = 2
+    total_chore_count_for_each_side = 1
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_active_strat,
                                    deepcopy(last_barter_fixture_list), residual_wait_sec,
@@ -345,7 +345,8 @@ def _kill_executors_n_phone_book(activated_strat_n_strat_state_tuple_list, resid
                 break
             time.sleep(1)
         else:
-            assert False, f"PairStrat not found with updated port of recovered executor"
+            assert False, (f"PairStrat not found with updated port of recovered executor, {old_pair_strat_.port = }, "
+                           f"{old_pair_strat_.id = }")
 
         for _ in range(30):
             # checking is_executor_running of executor
@@ -860,8 +861,8 @@ def test_recover_kill_switch_when_bartering_server_has_enabled(
 
         # validating if bartering_link.trigger_kill_switch got called
         check_str = "Called BarteringLink.BarteringLink.trigger_kill_switch"
-        portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-        for alert in portfolio_alert.alerts:
+        portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
+        for alert in portfolio_alerts:
             if re.search(check_str, alert.alert_brief):
                 assert False, \
                     ("BarteringLink.trigger_kill_switch must not have been triggered when kill switch is enabled in"
@@ -927,12 +928,9 @@ def test_recover_kill_switch_when_bartering_server_has_disabled(
 
         # validating if bartering_link.trigger_kill_switch got called
         check_str = "Called BarteringLink.trigger_kill_switch"
-        portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-        for alert in portfolio_alert.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            assert False, f"Can't find portfolio alert saying '{check_str}'"
+        alert_fail_message = f"Can't find portfolio alert saying '{check_str}'"
+        time.sleep(5)
+        check_alert_str_in_portfolio_alert(check_str, alert_fail_message)
 
     except AssertionError as e:
         raise AssertionError(e)

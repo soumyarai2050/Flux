@@ -7,6 +7,7 @@ file_paths=(
     "ProjectGroup/post_book/scripts/"
     "ProjectGroup/log_book/scripts/"
     "ProjectGroup/street_book/scripts/"
+    "ProjectGroup/photo_book/scripts/"
     "ProjectGroup/phone_book/scripts/"
 )
 

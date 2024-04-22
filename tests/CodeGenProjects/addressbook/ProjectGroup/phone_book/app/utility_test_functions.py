@@ -85,7 +85,7 @@ def get_utc_date_time() -> pendulum.DateTime:
     return pendulum.parse(formatted_dt_utc)
 
 
-def clean_all_collections_ignoring_ui_layout(db_names_list: List[str]) -> None:
+def clean_all_collections_ignoring_ui_layout() -> None:
     mongo_server_uri: str = get_mongo_server_uri()
     for db_name in get_mongo_db_list(mongo_server_uri):
         if "log_book" == db_name:
@@ -284,7 +284,7 @@ def broker_fixture():
 #
 # def get_sell_chore_related_values():
 #     single_sell_chore_px = 110
-#     single_sell_chore_qty = 70
+#     single_sell_chore_qty = 95
 #     single_sell_filled_px = 120
 #     single_sell_filled_qty = 30
 #     single_sell_unfilled_qty = single_sell_chore_qty - single_sell_filled_qty
@@ -317,8 +317,15 @@ def update_expected_strat_brief_for_buy(expected_chore_snapshot_obj: ChoreSnapsh
                                         expected_strat_limits: StratLimits,
                                         expected_strat_brief_obj: StratBriefBaseModel,
                                         date_time_for_cmp: DateTime, buy_last_barter_px, sell_last_barter_px,
+                                        executor_http_client: StreetBookServiceHttpClient,
                                         fill_update_after_dod: bool = False):
     max_net_filled_notional = expected_strat_limits.max_net_filled_notional
+
+    symbol_side_snapshot_list = executor_http_client.get_all_symbol_side_snapshot_client()
+    all_brk_cxled_qty = 0
+    for symbol_side_snapshot in symbol_side_snapshot_list:
+        if symbol_side_snapshot.side == Side.BUY:
+            all_brk_cxled_qty += symbol_side_snapshot.total_cxled_qty
 
     if expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_UNACK:
         expected_strat_brief_obj.pair_buy_side_bartering_brief.open_qty += expected_chore_snapshot_obj.chore_brief.qty
@@ -347,8 +354,7 @@ def update_expected_strat_brief_for_buy(expected_chore_snapshot_obj: ChoreSnapsh
 
     open_qty = expected_strat_brief_obj.pair_buy_side_bartering_brief.open_qty
     open_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.open_notional
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.all_bkr_cxlled_qty = \
-        expected_symbol_side_snapshot.total_cxled_qty
+    expected_strat_brief_obj.pair_buy_side_bartering_brief.all_bkr_cxlled_qty = all_brk_cxled_qty
     expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_notional = \
         expected_strat_limits.max_single_leg_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
     expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_notional = \
@@ -383,8 +389,15 @@ def update_expected_strat_brief_for_sell(expected_chore_snapshot_obj: ChoreSnaps
                                          expected_strat_limits: StratLimits,
                                          expected_strat_brief_obj: StratBriefBaseModel,
                                          date_time_for_cmp: DateTime, buy_last_barter_px, sell_last_barter_px,
+                                         executor_http_client: StreetBookServiceHttpClient,
                                          fill_update_after_dod: bool = False):
     max_net_filled_notional = expected_strat_limits.max_net_filled_notional
+
+    symbol_side_snapshot_list = executor_http_client.get_all_symbol_side_snapshot_client()
+    all_brk_cxled_qty = 0
+    for symbol_side_snapshot in symbol_side_snapshot_list:
+        if symbol_side_snapshot.side == Side.SELL:
+            all_brk_cxled_qty += symbol_side_snapshot.total_cxled_qty
 
     if expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_UNACK:
         expected_strat_brief_obj.pair_sell_side_bartering_brief.open_qty += expected_chore_snapshot_obj.chore_brief.qty
@@ -413,8 +426,7 @@ def update_expected_strat_brief_for_sell(expected_chore_snapshot_obj: ChoreSnaps
             expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 5
     open_qty = expected_strat_brief_obj.pair_sell_side_bartering_brief.open_qty
     open_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.open_notional
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.all_bkr_cxlled_qty = \
-        expected_symbol_side_snapshot.total_cxled_qty
+    expected_strat_brief_obj.pair_sell_side_bartering_brief.all_bkr_cxlled_qty = all_brk_cxled_qty
     expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_notional = \
         expected_strat_limits.max_single_leg_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
     expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_open_notional = \
@@ -519,7 +531,7 @@ def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
                                         buy_placed_chore_journal.chore_event_date_time,
-                                        buy_last_barter_px, sell_last_barter_px)
+                                        buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     print(f"@@@ fetching strat_brief for symbol: {symbol} at {DateTime.utcnow()}")
     strat_brief = executor_web_client.get_strat_brief_client(pair_strat_.id)
@@ -654,7 +666,7 @@ def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
                                         buy_placed_chore_journal.chore_event_date_time,
-                                        buy_last_barter_px, sell_last_barter_px)
+                                        buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
@@ -738,6 +750,7 @@ def placed_buy_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
+    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_UNACK
     expected_chore_snapshot_obj.last_update_date_time = expected_chore_journal.chore_event_date_time
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
@@ -807,7 +820,7 @@ def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
                                         buy_fill_journal.fill_date_time,
-                                        buy_last_barter_px, sell_last_barter_px)
+                                        buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
@@ -894,6 +907,7 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
+    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_CXL_UNACK
     expected_chore_snapshot_obj.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
@@ -933,7 +947,7 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
                                         buy_cxl_chore_journal.chore_event_date_time,
-                                        buy_last_barter_px, sell_last_barter_px)
+                                        buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
@@ -1010,6 +1024,7 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
     # checking strat_view
     check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
 
+
 def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
                                                        sell_cxl_chore_journal: ChoreJournalBaseModel,
                                                        expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
@@ -1033,6 +1048,7 @@ def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
+    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_CXL_UNACK
     expected_chore_snapshot_obj.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
@@ -1072,7 +1088,7 @@ def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_cxl_chore_journal.chore_event_date_time,
-                                         buy_last_barter_px, sell_last_barter_px)
+                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
@@ -1211,7 +1227,7 @@ def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, exp
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
                                         buy_fill_journal.fill_date_time,
-                                        buy_last_barter_px, sell_last_barter_px)
+                                        buy_last_barter_px, sell_last_barter_px, executor_web_client)
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
     for strat_brief in strat_brief_list:
@@ -1333,7 +1349,7 @@ def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_placed_chore_journal.chore_event_date_time,
-                                         buy_last_barter_px, sell_last_barter_px)
+                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     print(f"@@@ fetching strat_brief for symbol: {symbol} at {DateTime.utcnow()}")
     strat_brief = executor_web_client.get_strat_brief_client(pair_strat_.id)
@@ -1458,7 +1474,7 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_placed_chore_journal.chore_event_date_time,
-                                         buy_last_barter_px, sell_last_barter_px)
+                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
@@ -1541,6 +1557,7 @@ def placed_sell_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
+    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_UNACK
     expected_chore_snapshot_obj.last_update_date_time = expected_chore_journal.chore_event_date_time
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
@@ -1604,7 +1621,7 @@ def check_fill_receive_for_placed_sell_chore_before_buys(
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_fill_journal.fill_date_time,
-                                         buy_last_barter_px, sell_last_barter_px)
+                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
@@ -1737,7 +1754,7 @@ def check_fill_receive_for_placed_sell_chore_after_all_buys(
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_fill_journal.fill_date_time,
-                                         buy_last_barter_px, sell_last_barter_px)
+                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
@@ -1810,6 +1827,7 @@ def check_cxl_receive_for_placed_sell_chore_after_all_buys(
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
+    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_CXL_UNACK
     expected_chore_snapshot_obj.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
@@ -1862,7 +1880,7 @@ def check_cxl_receive_for_placed_sell_chore_after_all_buys(
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_cxl_chore_journal.chore_event_date_time,
-                                         buy_last_barter_px, sell_last_barter_px)
+                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
@@ -1910,7 +1928,7 @@ def check_cxl_receive_for_placed_sell_chore_after_all_buys(
         buy_residual_notional > sell_residual_notional else \
         expected_strat_brief_obj.pair_sell_side_bartering_brief.security
     expected_strat_status.residual = ResidualOptional(security=security,
-                                              residual_notional=residual_notional)
+                                                      residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
             expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
@@ -1944,13 +1962,14 @@ def check_cxl_receive_for_placed_buy_chore_after_all_sells(
         expected_strat_brief_obj: StratBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
     chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
     assert buy_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {buy_cxl_chore_journal} in list " \
-                                                             f"{chore_journal_obj_list}"
+                                                            f"{chore_journal_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
+    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_CXL_UNACK
     expected_chore_snapshot_obj.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
@@ -2003,7 +2022,7 @@ def check_cxl_receive_for_placed_buy_chore_after_all_sells(
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_strat_limits, expected_strat_brief_obj,
                                         buy_cxl_chore_journal.chore_event_date_time,
-                                        buy_last_barter_px, sell_last_barter_px)
+                                        buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
     expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
@@ -2401,19 +2420,22 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
         if is_strat_status_present and is_strat_limits_present:
             break
     else:
+        strat_status_list = executor_web_client.get_all_strat_status_client()
+        strat_limits_list = executor_web_client.get_all_strat_limits_client()
         assert False, ("Could not find created strat_status or strat_limits in newly started executor, took "
                        f"{executor_check_loop_counts} loops of {wait_time} sec each, "
-                       f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+                       f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}, {strat_status_list = }, "
+                       f"{strat_limits_list = }")
 
     # checking strat_view values
     time.sleep(1)
     strat_view = email_book_service_native_web_client.get_strat_view_client(updated_pair_strat.id)
-    assert strat_view.balance_notional == strat_status.balance_notional, \
-        (f"Mismatched balance_notional in strat_view: expected: {strat_status.balance_notional}, "
-         f"received: {strat_view.balance_notional}")
     assert strat_view.max_single_leg_notional == updated_strat_limits.max_single_leg_notional, \
         (f"Mismatched max_single_leg_notional in strat_view: expected: {updated_strat_limits.max_single_leg_notional}, "
          f"received: {strat_view.max_single_leg_notional}")
+    assert strat_view.balance_notional == strat_status.balance_notional, \
+        (f"Mismatched balance_notional in strat_view: expected: {strat_status.balance_notional}, "
+         f"received: {strat_view.balance_notional}")
 
     # checking is_running_state of executor
     updated_pair_strat = email_book_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id)
@@ -2704,10 +2726,11 @@ def wait_for_get_new_chore_placed_from_tob(wait_stop_px: int | float, symbol_to_
                           f"symbol - {symbol_to_check} and wait_stop_px - {wait_stop_px}"
 
 
-def clean_portfolio_alert():
-    portfolio_alert_list = log_book_web_client.get_all_portfolio_alert_client()
+def clean_log_book_alerts():
+    # deleting strat view
+    strat_alerts = log_book_web_client.delete_all_strat_alert_client()
 
-    retaining_alerts = []
+    portfolio_alert_list = log_book_web_client.get_all_portfolio_alert_client()
     for alert in portfolio_alert_list:
         if "Log analyzer running in simulation mode" not in alert.alert_brief:
             log_book_web_client.delete_portfolio_alert_client(alert.id)
@@ -2787,7 +2810,7 @@ def get_latest_chore_journal_with_event_and_symbol(expected_chore_event, expecte
                                                    expect_no_chore: bool | None = None,
                                                    last_chore_id: str | None = None,
                                                    max_loop_count: int | None = None,
-                                                   loop_wait_secs: int | None = None,
+                                                   loop_wait_secs: int | float | None = None,
                                                    assert_code: int = 0):
     start_time = DateTime.utcnow()
     placed_chore_journal = None
@@ -3088,11 +3111,12 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
+
     active_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list,
-                                           last_barter_fixture_list, market_depth_basemodel_list))
-    print(f"Created Strat: {active_pair_strat}")
+        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_strat_limits_,
+                                                       expected_start_status_))
+    print(f"Activated Strat: {active_pair_strat}")
 
     strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker: DateTime | None = None
@@ -3251,7 +3275,7 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received buy TOB")
         else:
             # placing new non-systematic new_chore
-            qty = random.randint(65, 75)
+            qty = random.randint(95, 105)
             px = random.randint(100, 110)
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
@@ -3293,7 +3317,7 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
               f"Checked sell placed chore ACK of chore_id {chore_id}")
 
         sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
-        sell_fill_journal_obj.fill_qty = random.randint(30, 35)
+        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
         sell_fill_journal_obj.fill_px = random.randint(100, 110)
         executor_web_client.barter_simulator_process_fill_query_client(
             chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
@@ -3351,11 +3375,10 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
     active_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list,
-                                           last_barter_fixture_list, market_depth_basemodel_list,
-                                           leg1_side=Side.SELL, leg2_side=Side.BUY))
-    print(f"Created Strat: {active_pair_strat}")
+        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_strat_limits_,
+                                                       expected_start_status_))
+    print(f"Activated Strat: {active_pair_strat}")
     buy_symbol = active_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
     sell_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
 
@@ -3406,7 +3429,7 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received buy TOB")
         else:
             # placing new non-systematic new_chore
-            qty = random.randint(65, 75)
+            qty = random.randint(95, 105)
             px = random.randint(100, 110)
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
@@ -3444,7 +3467,7 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
               f"Checked sell placed chore ACK of chore_id {chore_id}")
 
         sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
-        sell_fill_journal_obj.fill_qty = random.randint(30, 35)
+        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
         sell_fill_journal_obj.fill_px = random.randint(100, 110)
         executor_web_client.barter_simulator_process_fill_query_client(
             chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
@@ -3965,21 +3988,25 @@ def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, 
     return buy_symbol, sell_symbol, activated_strat, executor_http_client
 
 
+def check_alert_str_in_portfolio_alert(check_str: str, assert_fail_msg: str):
+    portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
+    for alert in portfolio_alerts:
+        if re.search(check_str, alert.alert_brief):
+            return alert
+    else:
+        assert False, assert_fail_msg
+
+
 def check_alert_str_in_strat_alerts_n_portfolio_alerts(activated_pair_strat_id: int, check_str: str,
                                                        assert_fail_msg: str):
     # Checking alert in strat_alert
-    strat_alert = log_book_web_client.get_strat_alert_client(activated_pair_strat_id)
-    for alert in strat_alert.alerts:
+    strat_alerts = log_book_web_client.filtered_strat_alert_by_strat_id_query_client(activated_pair_strat_id)
+    for alert in strat_alerts:
         if re.search(check_str, alert.alert_brief):
             return alert
     else:
         # Checking alert in portfolio_alert if reason failed to add in strat_alert
-        portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-        for alert in portfolio_alert.alerts:
-            if re.search(check_str, alert.alert_brief):
-                return alert
-        else:
-            assert False, assert_fail_msg
+        check_alert_str_in_portfolio_alert(check_str, assert_fail_msg)
 
 
 def handle_place_chore_and_check_str_in_alert_for_executor_limits(symbol: str, side: Side, px: float, qty: int,
@@ -3995,6 +4022,7 @@ def handle_place_chore_and_check_str_in_alert_for_executor_limits(symbol: str, s
                                                                        executor_web_client,
                                                                        expect_no_chore=True,
                                                                        last_chore_id=last_chore_id)
+    time.sleep(5)
     return check_alert_str_in_strat_alerts_n_portfolio_alerts(activated_pair_strat_id, check_str, assert_fail_msg)
 
 
@@ -4028,21 +4056,8 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(leg1_sym
     new_chore_journal = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
                                                                          ChoreEventType.OE_UNSOL_CXL], check_symbol,
                                                                          executor_web_client)
-    time.sleep(2)
-    strat_alert = log_book_web_client.get_strat_alert_client(active_pair_strat_id)
-
-    for alert in strat_alert.alerts:
-        if re.search(check_str, alert.alert_brief):
-            break
-    else:
-        # Checking alert in portfolio_alert if reason failed to add in strat_alert
-        portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-        for alert in portfolio_alert.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            assert False, assert_fail_message
-    assert True
+    time.sleep(5)
+    check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat_id, check_str, assert_fail_message)
 
 
 def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
@@ -4075,20 +4090,8 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
     cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK, check_symbol,
                                                                        executor_web_client)
 
-    time.sleep(2)
-    strat_alert = log_book_web_client.get_strat_alert_client(active_pair_strat_id)
-    for alert in strat_alert.alerts:
-        if re.search(check_str, alert.alert_brief):
-            break
-    else:
-        # Checking alert in portfolio_alert if reason failed to add in strat_alert
-        portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-        for alert in portfolio_alert.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            assert False, assert_fail_message
-    assert True
+    time.sleep(5)
+    check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat_id, check_str, assert_fail_message)
 
 
 def get_symbol_configs(symbol: str, config_dict: Dict) -> Dict | None:
@@ -4179,7 +4182,7 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client)
     else:
         px = 110
-        qty = 70
+        qty = 95
         place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
 
     new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -4257,7 +4260,7 @@ def strat_done_after_exhausted_consumable_notional(
             check_symbol = buy_symbol
         else:
             px = 110
-            qty = 70
+            qty = 95
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client)
             check_symbol = sell_symbol
         time.sleep(2)  # delay for chore to get placed
@@ -4282,7 +4285,7 @@ def strat_done_after_exhausted_consumable_notional(
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client)
         else:
             px = 110
-            qty = 70
+            qty = 95
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client)
         time.sleep(2)  # delay for chore to get placed
         ack_chore_journal = (
@@ -4349,9 +4352,9 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
     active_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list,
-                                           last_barter_fixture_list, market_depth_basemodel_list))
+        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_strat_limits_,
+                                                       expected_start_status_))
     print(f"Created Strat: {active_pair_strat}")
 
     strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
@@ -4513,7 +4516,7 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received buy TOB")
         else:
             # placing new non-systematic new_chore
-            qty = random.randint(65, 75)
+            qty = random.randint(95, 105)
             px = random.randint(100, 110)
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
@@ -4552,7 +4555,7 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
               f"Checked sell placed chore ACK of chore_id {chore_id}")
 
         sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
-        sell_fill_journal_obj.fill_qty = random.randint(30, 35)
+        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
         sell_fill_journal_obj.fill_px = random.randint(100, 110)
         executor_web_client.barter_simulator_process_fill_query_client(
             chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
@@ -4606,10 +4609,9 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
     active_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list,
-                                           last_barter_fixture_list, market_depth_basemodel_list,
-                                           leg1_side=Side.SELL, leg2_side=Side.BUY))
+        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_strat_limits_,
+                                                       expected_start_status_))
     print(f"Created Strat: {active_pair_strat}")
     buy_symbol = active_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
     sell_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
@@ -4661,7 +4663,7 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received buy TOB")
         else:
             # placing new non-systematic new_chore
-            qty = random.randint(65, 75)
+            qty = random.randint(95, 105)
             px = random.randint(100, 110)
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client)
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
@@ -4698,7 +4700,7 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
               f"Checked sell placed chore ACK of chore_id {chore_id}")
 
         sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
-        sell_fill_journal_obj.fill_qty = random.randint(30, 35)
+        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
         sell_fill_journal_obj.fill_px = random.randint(100, 110)
         executor_web_client.barter_simulator_process_fill_query_client(
             chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,

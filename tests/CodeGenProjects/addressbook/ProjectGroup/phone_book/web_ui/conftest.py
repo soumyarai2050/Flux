@@ -5,7 +5,7 @@ import pytest
 from selenium.webdriver.support import expected_conditions as EC  # noqa
 
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import *
-from CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
+from FluxCodeGenEngine.tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import get_driver, wait, \
     get_web_project_url, test_config_file_path, create_pair_strat, override_default_limits
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
@@ -313,7 +313,7 @@ def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, exp
     clear_cache_in_model()
 
     # updating portfolio_alert
-    clean_portfolio_alert()
+    clean_log_book_alerts()
 
     # setting limits
     set_n_verify_limits(expected_chore_limits_, expected_portfolio_limits_)

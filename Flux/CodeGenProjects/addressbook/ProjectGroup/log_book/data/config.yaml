@@ -24,11 +24,11 @@ cache_override_type: "bare"
 portfolio_alert_configs:
   transaction_counts_per_call_for_server: 200
   transaction_counts_per_call_for_tail_ex: 100
-  transaction_timeout_secs: 5  # secs
+  transaction_timeout_secs: 2  # secs
 strat_alert_config:
   transaction_counts_per_call_for_server: 200
   transaction_counts_per_call_for_tail_ex: 100
-  transaction_timeout_secs: 5  # secs
+  transaction_timeout_secs: 2  # secs
 raw_perf_data_config:
   transaction_counts_per_call_for_server: 500
   transaction_counts_per_call_for_tail_ex: 200
@@ -54,3 +54,6 @@ pattern_to_restart_tail_process: "---"
 pattern_to_force_kill_tail_process: "-@-"
 pattern_to_remove_file_from_created_cache: "-*-"
 
+# suppress_alert_regex configs
+regex_file_name: "suppress_alert_regex.txt"
+regex_lock_file_name: "suppress_alert_regex.txt.lock"

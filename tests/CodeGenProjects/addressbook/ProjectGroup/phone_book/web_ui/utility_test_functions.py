@@ -11,7 +11,8 @@ from selenium.common import NoSuchElementException, ElementNotInteractableExcept
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-from CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
+# from CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
+from FluxCodeGenEngine.tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import test_config_file_path, \
     email_book_service_native_web_client, create_tob

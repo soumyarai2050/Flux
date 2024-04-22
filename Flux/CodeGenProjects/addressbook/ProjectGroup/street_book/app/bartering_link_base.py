@@ -83,8 +83,8 @@ class BarteringLinkBase(ABC):
 
     @classmethod
     @abstractmethod
-    async def place_cxl_chore(cls, chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
-                              system_sec_id: str | None = None, underlying_account: str | None = None) -> bool:
+    async def place_cxl_chore(cls, chore_id: str, side: Side, bartering_sec_id: str,
+                              system_sec_id: str, underlying_account: str | None = None) -> bool:
         """
         derived to implement connector to underlying link provider
         """

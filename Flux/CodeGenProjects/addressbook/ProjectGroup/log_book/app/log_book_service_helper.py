@@ -2,7 +2,7 @@
 import datetime
 import time
 import queue
-from threading import Thread
+from threading import Thread, current_thread
 import re
 
 # project imports
@@ -176,12 +176,17 @@ def should_retry_due_to_server_down(exception: Exception) -> bool:
 
 def get_update_obj_list_for_journal_type_update(
         pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
-        max_fetch_from_queue: int, parse_to_pydantic: bool | None = None) -> List[Dict]:  # blocking function
+        max_fetch_from_queue: int, parse_to_pydantic: bool | None = None) -> List[Dict] | str:  # blocking function
     update_dict_list: List[Dict] = []
     fetch_counts: int = 0
 
     kwargs: Dict = patch_queue.get()
     fetch_counts += 1
+
+    # handling thread exit
+    if kwargs == "EXIT":
+        logging.info(f"Exiting get_update_obj_list_for_journal_type_update")
+        return "EXIT"
 
     if parse_to_pydantic:
         pydantic_object = pydantic_basemodel_class_type(**kwargs)
@@ -192,6 +197,12 @@ def get_update_obj_list_for_journal_type_update(
     while not patch_queue.empty():
         kwargs: Dict = patch_queue.get()
         fetch_counts += 1
+
+        # handling thread exit
+        if kwargs == "EXIT":
+            logging.info(f"Exiting get_update_obj_list_for_journal_type_update")
+            return "EXIT"
+
         if parse_to_pydantic:
             pydantic_object = pydantic_basemodel_class_type(**kwargs)
             update_dict_list.append(jsonable_encoder(pydantic_object, by_alias=True, exclude_none=True))
@@ -206,12 +217,18 @@ def get_update_obj_list_for_journal_type_update(
 def get_update_obj_for_snapshot_type_update(
         pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
         max_fetch_from_queue: int, err_handler_callable: Callable,
-        parse_to_pydantic: bool | None = None) -> List[Dict]:  # blocking function
+        parse_to_pydantic: bool | None = None) -> List[Dict] | str:  # blocking function
     id_to_obj_dict = {}
     fetch_counts: int = 0
 
     kwargs: Dict = patch_queue.get()
     fetch_counts += 1
+
+    # handling thread exit
+    if kwargs == "EXIT":
+        logging.info(f"Exiting get_update_obj_for_snapshot_type_update")
+        return "EXIT"
+
     # _id from the kwargs dict is of string type which may or may not be same as datatype of pydantic_object.id
     # use obj_id to store/fetch item from dict for consistency
     obj_id = kwargs.get("_id")
@@ -224,6 +241,11 @@ def get_update_obj_for_snapshot_type_update(
     while not patch_queue.empty():
         kwargs: Dict = patch_queue.get()
         fetch_counts += 1
+
+        # handling thread exit
+        if kwargs == "EXIT":
+            logging.info(f"Exiting get_update_obj_for_snapshot_type_update")
+            return "EXIT"
 
         obj_id = kwargs.get("_id")
 
@@ -279,7 +301,9 @@ def handle_patch_db_queue_updater(
                    args=(pydantic_basemodel_type_name, method_name, update_type,
                          patch_queue, journal_type_handler_callable, snapshot_type_handler_callable,
                          update_handler_callable, error_handler_callable, max_fetch_from_queue,
-                         snapshot_type_callable_err_handler, parse_to_pydantic, )).start()
+                         snapshot_type_callable_err_handler, parse_to_pydantic, ),
+                   name=f"{pydantic_basemodel_type_name}_handler").start()
+            logging.info(f"Thread Started: {pydantic_basemodel_type_name}_handler")
 
             update_cache_dict[pydantic_basemodel_type_name] = patch_queue
 
@@ -312,6 +336,9 @@ def handle_dynamic_queue_for_patch_n_patch_all(pydantic_basemodel_type: str, met
                     snapshot_type_handler_callable(pydantic_basemodel_class_type, update_type, method_name, patch_queue,
                                                    max_fetch_from_queue, snapshot_type_callable_err_handler,
                                                    parse_to_pydantic))
+
+            if update_res == "EXIT":
+                return
 
             while 1:
                 try:
@@ -378,6 +405,10 @@ def alert_queue_handler(run_state: bool, queue_obj: queue.Queue, bulk_transactio
             try:
                 pydantic_obj = queue_obj.get(timeout=remaining_timeout_secs)  # timeout based blocking call
 
+                if pydantic_obj == "EXIT":
+                    logging.info(f"Exiting alert_queue_handler")
+                    return
+
                 if created_alert_id_dict is not None:
                     # if created_alert_id_dict is passed then using both update and create mechanism
                     if created_alert_id_dict.get(pydantic_obj.id) is not None:
@@ -441,6 +472,8 @@ def clean_alert_str(alert_str: str) -> str:
     cleaned_alert_str: str = re.sub(r"0x[a-f0-9]*", "", alert_str)
     # remove all numeric digits
     cleaned_alert_str = re.sub(r"-?[0-9]*", "", cleaned_alert_str)
+    # remove any pydantic_object_id (str type id)
+    cleaned_alert_str = re.sub(r"\'[a-fA-F0-9]{24}\' ", "", cleaned_alert_str)
     cleaned_alert_str = cleaned_alert_str.split("...check the file:")[0]
     return cleaned_alert_str
 

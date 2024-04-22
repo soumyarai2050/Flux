@@ -178,8 +178,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     def __load_json_layout_and_non_layout_messages_in_dicts(self, file: protogen.File):
         message_list: List[protogen.Message] = file.messages
 
-        message_list.sort(key=lambda message_: message_.proto.name)     # sorting by name
-
         # Adding messages from core proto files having json_root option
         project_dir = os.getenv("PROJECT_DIR")
         if project_dir is None or not project_dir:
@@ -792,9 +790,12 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 json_msg_str += ' ' * (init_space_count + 2) + '},\n'
         json_msg_str += ' ' * init_space_count + '},\n'
 
-        json_msg_str += ' ' * init_space_count + '"required": [\n'
-        json_msg_str += self.__handle_required_json_schema(init_space_count, required_field_names)
-        json_msg_str += ' ' * init_space_count + ']\n'
+        if required_field_names:
+            json_msg_str += ' ' * init_space_count + '"required": [\n'
+            json_msg_str += self.__handle_required_json_schema(init_space_count, required_field_names)
+            json_msg_str += ' ' * init_space_count + ']\n'
+        else:
+            json_msg_str += ' ' * init_space_count + '"required": []\n'
         return json_msg_str
 
     def __handle_msg_leading_comment_as_attribute(self, message: protogen.Message, init_space_count: int) -> str:
@@ -1109,6 +1110,11 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             err_str = f"{self.__response_field_case_style} is not supported case style"
             logging.exception(err_str)
             raise Exception(err_str)
+
+        # sorting created message lists
+        self.__json_layout_message_list.sort(key=lambda message_: message_.proto.name)
+        self.__json_non_layout_message_list.sort(key=lambda message_: message_.proto.name)
+        self.__enum_list.sort(key=lambda message_: message_.proto.name)
 
         json_msg_str = '{\n'
         # Handling json layout message schema

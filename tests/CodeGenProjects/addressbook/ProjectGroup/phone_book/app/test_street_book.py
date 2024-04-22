@@ -501,6 +501,7 @@ def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits,
                                                                               by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_chore
+        time.sleep(5)
         px = 100
         qty = 90
         check_str = f"blocked generated chore, system_symbol = '{buy_symbol}', side = <Side.BUY: 'BUY'>, " \
@@ -937,19 +938,8 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
             ChoreEventType.OE_NEW, buy_symbol, executor_http_client, expect_no_chore=True,
             last_chore_id=placed_chore_journal.chore.chore_id)
 
-        time.sleep(2)
-        strat_alert = log_book_web_client.get_strat_alert_client(active_pair_strat.id)
-        for alert in strat_alert.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            # Checking alert in portfolio_alert if reason failed to add in strat_alert
-            portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-            for alert in portfolio_alert.alerts:
-                if re.search(check_str, alert.alert_brief):
-                    break
-            else:
-                assert False, assert_fail_message
+        time.sleep(5)
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_message)
         assert True
     except AssertionError as e:
         raise AssertionError(e)
@@ -1833,8 +1823,6 @@ def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_an
 
         # Positive Check
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
-        # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_http_client)
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
@@ -2157,7 +2145,7 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
 @pytest.mark.nightly
 def handle_place_both_side_chores_for_portfolio_limits_test(buy_symbol: str, sell_symbol: str,
                                                             pair_strat_,
-                                                            expected_strat_limits_, expected_start_status_,
+                                                            expected_strat_limits_, expected_strat_status_,
                                                             symbol_overview_obj_list,
                                                             last_barter_fixture_list, market_depth_basemodel_list,
                                                             refresh_sec,
@@ -2168,9 +2156,9 @@ def handle_place_both_side_chores_for_portfolio_limits_test(buy_symbol: str, sel
     residual_wait_sec = 4 * refresh_sec
 
     created_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list))
+        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_strat_limits_,
+                                                       expected_strat_status_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2233,7 +2221,7 @@ def handle_place_both_side_chores_for_portfolio_limits_test(buy_symbol: str, sel
 @pytest.mark.nightly
 def handle_place_single_side_chores_for_portfolio_limits_test(leg_1_symbol: str, leg_2_symbol: str,
                                                               pair_strat_,
-                                                              expected_strat_limits_, expected_start_status_,
+                                                              expected_strat_limits_, expected_strat_status_,
                                                               symbol_overview_obj_list,
                                                               last_barter_fixture_list, market_depth_basemodel_list,
                                                               refresh_sec, chore_side: Side,
@@ -2244,9 +2232,9 @@ def handle_place_single_side_chores_for_portfolio_limits_test(leg_1_symbol: str,
     residual_wait_sec = 4 * refresh_sec
 
     created_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(leg_1_symbol, leg_2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list, leg1_side=leg1_side, leg2_side=leg2_side))
+        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_strat_limits_,
+                                                       expected_strat_status_))
     if created_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
         buy_symbol = leg_1_symbol
         sell_symbol = leg_2_symbol
@@ -2466,7 +2454,6 @@ def test_strat_pause_on_chore_fulfill_post_dod_if_config_is_true(
                                                    last_barter_fixture_list, market_depth_basemodel_list,
                                                    refresh_sec_update_fixture,
                                                    pause_fulfill_post_chore_dod=True))
-
         # check strat must not get paused
         pair_strat_obj = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
         assert pair_strat_obj.strat_state == StratState.StratState_PAUSED, \
@@ -2475,19 +2462,9 @@ def test_strat_pause_on_chore_fulfill_post_dod_if_config_is_true(
 
         check_str = "Unexpected: Received fill that makes chore_snapshot OE_FILLED which is already of state OE_DOD"
         assert_fail_message = f"Can't find any alert with string '{check_str}'"
+
         time.sleep(5)
-        strat_alert = log_book_web_client.get_strat_alert_client(created_pair_strat.id)
-        for alert in strat_alert.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            # Checking alert in portfolio_alert if reason failed to add in strat_alert
-            portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-            for alert in portfolio_alert.alerts:
-                if re.search(check_str, alert.alert_brief):
-                    break
-            else:
-                assert False, assert_fail_message
+        check_alert_str_in_strat_alerts_n_portfolio_alerts(created_pair_strat.id, check_str, assert_fail_message)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -2527,15 +2504,23 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:8]
     else:
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:2]
+
+    # starting strats one by one
+    pair_strat_list = []
+    for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list:
+        stored_pair_strat_basemodel = create_strat(buy_symbol, sell_symbol, pair_strat_)
+        pair_strat_list.append(stored_pair_strat_basemodel)
+        time.sleep(2)
+
     executor_http_clients_n_last_chore_id_tuple_list = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_buy_sell_symbol_list)) as executor:
-        results = [executor.submit(handle_place_both_side_chores_for_portfolio_limits_test, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_),
+        results = [executor.submit(handle_place_both_side_chores_for_portfolio_limits_test,
+                                   buy_sell_symbol[0], buy_sell_symbol[1], pair_strat_list[idx],
                                    deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    refresh_sec_update_fixture, False)
-                   for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list]
+                   for idx, buy_sell_symbol in enumerate(sliced_buy_sell_symbol_list)]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -2551,21 +2536,17 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
     new_buy_sell_symbol_list = leg1_leg2_symbol_list[8]
     buy_symbol = new_buy_sell_symbol_list[0]
     sell_symbol = new_buy_sell_symbol_list[1]
+    created_pair_strat = create_strat(buy_symbol, sell_symbol, pair_strat_)
     handle_place_both_side_chores_for_portfolio_limits_test(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+        buy_symbol, sell_symbol, created_pair_strat, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list, 
         refresh_sec_update_fixture, expect_no_chore=True)
 
     # Checking alert in portfolio_alert
     check_str = "max_open_baskets breached"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
-
-    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-    for alert in portfolio_alert.alerts:
-        if re.search(check_str, alert.alert_brief):
-            break
-    else:
-        assert False, assert_fail_message
+    time.sleep(5)
+    check_alert_str_in_portfolio_alert(check_str, assert_fail_message)
 
     # Checking all strat pause
     pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
@@ -2601,16 +2582,23 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:4]
     else:
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:2]
+
+    # starting strats one by one
+    pair_strat_list = []
+    for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list:
+        stored_pair_strat_basemodel = create_strat(buy_symbol, sell_symbol, pair_strat_)
+        pair_strat_list.append(stored_pair_strat_basemodel)
+        time.sleep(2)
     executor_http_clients_n_last_chore_id_tuple_list = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_buy_sell_symbol_list)) as executor:
-        results = [executor.submit(handle_place_single_side_chores_for_portfolio_limits_test, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_),
+        results = [executor.submit(handle_place_single_side_chores_for_portfolio_limits_test,
+                                   buy_sell_symbol[0], buy_sell_symbol[1], pair_strat_list[idx],
                                    deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    refresh_sec_update_fixture, Side.BUY,
                                    leg1_side=Side.BUY, leg2_side=Side.SELL)
-                   for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list]
+                   for idx, buy_sell_symbol in enumerate(sliced_buy_sell_symbol_list)]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -2620,18 +2608,11 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
             executor_http_clients_n_last_chore_id_tuple_list.append(
                 (executor_http_client, buy_symbol, sell_symbol, last_buy_chore_id))
 
-    time.sleep(2)
-
     # Checking alert in portfolio_alert
     check_str = "max_open_notional_per_side breached for BUY side"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
-
-    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-    for alert in portfolio_alert.alerts:
-        if re.search(check_str, alert.alert_brief):
-            break
-    else:
-        assert False, assert_fail_message
+    time.sleep(5)
+    check_alert_str_in_portfolio_alert(check_str, assert_fail_message)
 
     # Checking all strat pause
     pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
@@ -2668,16 +2649,24 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:4]
     else:
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:2]
+
+    # starting strats one by one
+    pair_strat_list = []
+    for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list:
+        stored_pair_strat_basemodel = create_strat(buy_symbol, sell_symbol, pair_strat_)
+        pair_strat_list.append(stored_pair_strat_basemodel)
+        time.sleep(2)
+
     executor_http_clients_n_last_chore_id_tuple_list = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(handle_place_single_side_chores_for_portfolio_limits_test, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_),
+        results = [executor.submit(handle_place_single_side_chores_for_portfolio_limits_test,
+                                   buy_sell_symbol[0], buy_sell_symbol[1], pair_strat_list[idx],
                                    deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    refresh_sec_update_fixture, Side.SELL,
                                    leg1_side=Side.SELL, leg2_side=Side.BUY)
-                   for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list]
+                   for idx, buy_sell_symbol in enumerate(sliced_buy_sell_symbol_list)]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -2687,17 +2676,11 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
             executor_http_clients_n_last_chore_id_tuple_list.append(
                 (executor_http_client, buy_symbol, sell_symbol, last_sell_chore_id))
 
-    time.sleep(2)
     # Checking alert in portfolio_alert
     check_str = "max_open_notional_per_side breached for SELL side"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
-
-    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-    for alert in portfolio_alert.alerts:
-        if re.search(check_str, alert.alert_brief):
-            break
-    else:
-        assert False, assert_fail_message
+    time.sleep(5)
+    check_alert_str_in_portfolio_alert(check_str, assert_fail_message)
 
     # Checking all strat pause
     pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
@@ -2731,15 +2714,23 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
 
     if executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:2]
+
+        # starting strats one by one
+        pair_strat_list = []
+        for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list:
+            stored_pair_strat_basemodel = create_strat(buy_symbol, sell_symbol, pair_strat_)
+            pair_strat_list.append(stored_pair_strat_basemodel)
+            time.sleep(2)
+
         executor_http_clients_n_last_chore_id_tuple_list = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_buy_sell_symbol_list)) as executor:
-            results = [executor.submit(handle_place_both_side_chores_for_portfolio_limits_test, buy_symbol, sell_symbol,
-                                       deepcopy(pair_strat_),
+            results = [executor.submit(handle_place_both_side_chores_for_portfolio_limits_test,
+                                       buy_sell_symbol[0], buy_sell_symbol[1], pair_strat_list[idx],
                                        deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
                                        deepcopy(symbol_overview_obj_list),
                                        deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                        refresh_sec_update_fixture, False)
-                       for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list]
+                       for idx, buy_sell_symbol in enumerate(sliced_buy_sell_symbol_list)]
 
             for future in concurrent.futures.as_completed(results):
                 if future.exception() is not None:
@@ -2750,32 +2741,46 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
                     (executor_http_client, buy_symbol, last_buy_chore_id, sell_symbol, last_sell_chore_id))
     else:
         sliced_buy_symbol_list = leg1_leg2_symbol_list[:4]
+        # starting strats one by one
+        pair_strat_list = []
+        for buy_symbol, sell_symbol in sliced_buy_symbol_list:
+            stored_pair_strat_basemodel = create_strat(buy_symbol, sell_symbol, pair_strat_)
+            pair_strat_list.append(stored_pair_strat_basemodel)
+            time.sleep(2)
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_buy_symbol_list)) as executor:
             results = [
-                executor.submit(handle_place_single_side_chores_for_portfolio_limits_test, buy_symbol, sell_symbol,
-                                deepcopy(pair_strat_),
+                executor.submit(handle_place_single_side_chores_for_portfolio_limits_test,
+                                buy_sell_symbol[0], buy_sell_symbol[1], pair_strat_list[idx],
                                 deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
                                 deepcopy(symbol_overview_obj_list),
                                 deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                 refresh_sec_update_fixture, Side.BUY,
                                 leg1_side=Side.BUY, leg2_side=Side.SELL)
-                for buy_symbol, sell_symbol in sliced_buy_symbol_list]
+                for idx, buy_sell_symbol in enumerate(sliced_buy_symbol_list)]
 
             for future in concurrent.futures.as_completed(results):
                 if future.exception() is not None:
                     raise Exception(future.exception())
 
         sliced_sell_symbol_list = leg1_leg2_symbol_list[4:8]
+        # starting strats one by one
+        pair_strat_list = []
+        for buy_symbol, sell_symbol in sliced_sell_symbol_list:
+            stored_pair_strat_basemodel = create_strat(buy_symbol, sell_symbol, pair_strat_)
+            pair_strat_list.append(stored_pair_strat_basemodel)
+            time.sleep(2)
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_sell_symbol_list)) as executor:
             results = [
-                executor.submit(handle_place_single_side_chores_for_portfolio_limits_test, buy_symbol, sell_symbol,
-                                deepcopy(pair_strat_),
+                executor.submit(handle_place_single_side_chores_for_portfolio_limits_test,
+                                buy_sell_symbol[0], buy_sell_symbol[1], pair_strat_list[idx],
                                 deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
                                 deepcopy(symbol_overview_obj_list),
                                 deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                 refresh_sec_update_fixture, Side.SELL,
                                 leg1_side=Side.BUY, leg2_side=Side.SELL)
-                for buy_symbol, sell_symbol in sliced_sell_symbol_list]
+                for idx, buy_sell_symbol in enumerate(sliced_sell_symbol_list)]
 
             for future in concurrent.futures.as_completed(results):
                 if future.exception() is not None:
@@ -2787,21 +2792,17 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
     new_buy_sell_symbol_list = leg1_leg2_symbol_list[8]
     buy_symbol = new_buy_sell_symbol_list[0]
     sell_symbol = new_buy_sell_symbol_list[1]
+    limit_breaching_pair_strat = create_strat(buy_symbol, sell_symbol, pair_strat_)
     handle_place_both_side_chores_for_portfolio_limits_test(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+        buy_symbol, sell_symbol, limit_breaching_pair_strat, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list, 
         refresh_sec_update_fixture, expect_no_chore=True)
 
     # Checking alert in portfolio_alert
     check_str = "max_gross_n_open_notional breached,"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
-    time.sleep(2)
-    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-    for alert in portfolio_alert.alerts:
-        if re.search(check_str, alert.alert_brief):
-            break
-    else:
-        assert False, assert_fail_message
+    time.sleep(5)
+    check_alert_str_in_portfolio_alert(check_str, assert_fail_message)
 
     # Checking all strat pause
     pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
@@ -2821,9 +2822,9 @@ def all_strat_pause_test_for_max_reject_limit_breach(
     residual_wait_sec = 4 * refresh_sec
 
     created_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list,
-                                           last_barter_fixture_list, market_depth_basemodel_list))
+        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_strat_limits_,
+                                                       expected_start_status_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -2876,14 +2877,21 @@ def test_last_n_sec_chore_counts(static_data_, clean_and_set_limits, leg1_leg2_s
     else:
         leg1_leg2_symbol_list = leg1_leg2_symbol_list[:8]
     executor_http_clients_n_last_chore_id_tuple_list = []
+
+    # starting strats one by one
+    pair_strat_list = []
+    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
+        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        pair_strat_list.append(stored_pair_strat_basemodel)
+        time.sleep(2)
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(handle_place_both_side_chores_for_portfolio_limits_test, leg1_symbol, leg2_symbol,
-                                   deepcopy(pair_strat_),
+        results = [executor.submit(handle_place_both_side_chores_for_portfolio_limits_test,
+                                   leg1_leg2_symbol[0], leg1_leg2_symbol[1], pair_strat_list[idx],
                                    deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    refresh_sec_update_fixture, False)
-                   for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
+                   for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -2951,15 +2959,22 @@ def test_portfolio_limits_rolling_new_chore_breach(static_data_, clean_and_set_l
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:2]
     else:
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:8]
+
+    # starting strats one by one
+    pair_strat_list = []
+    for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list:
+        stored_pair_strat_basemodel = create_strat(buy_symbol, sell_symbol, pair_strat_)
+        pair_strat_list.append(stored_pair_strat_basemodel)
+        time.sleep(2)
     executor_http_clients_n_last_chore_id_tuple_list = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_buy_sell_symbol_list)) as executor:
-        results = [executor.submit(handle_place_both_side_chores_for_portfolio_limits_test, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_),
+        results = [executor.submit(handle_place_both_side_chores_for_portfolio_limits_test,
+                                   buy_sell_symbol[0], buy_sell_symbol[1], pair_strat_list[idx],
                                    deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    refresh_sec_update_fixture, False)
-                   for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list]
+                   for idx, buy_sell_symbol in enumerate(sliced_buy_sell_symbol_list)]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -2982,13 +2997,8 @@ def test_portfolio_limits_rolling_new_chore_breach(static_data_, clean_and_set_l
     # Checking alert in portfolio_alert
     check_str = "max_allowed_chores_within_period breached"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
-
-    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-    for alert in portfolio_alert.alerts:
-        if re.search(check_str, alert.alert_brief):
-            break
-    else:
-        assert False, assert_fail_message
+    time.sleep(5)
+    check_alert_str_in_portfolio_alert(check_str, assert_fail_message)
 
     # Checking all strat pause
     pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
@@ -3018,14 +3028,21 @@ def test_all_strat_pause_for_max_reject_limit_breach(
     # updating fixture values for this test-case
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
     executor_http_clients_n_last_chore_id_tuple_list = []
+
+    # starting strats one by one
+    pair_strat_list = []
+    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
+        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        pair_strat_list.append(stored_pair_strat_basemodel)
+        time.sleep(2)
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(all_strat_pause_test_for_max_reject_limit_breach, leg1_symbol, leg2_symbol,
-                                   deepcopy(pair_strat_),
+        results = [executor.submit(all_strat_pause_test_for_max_reject_limit_breach,
+                                   leg1_leg2_symbol[0], leg1_leg2_symbol[1], pair_strat_list[idx],
                                    deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    refresh_sec_update_fixture)
-                   for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
+                   for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -3052,17 +3069,11 @@ def test_all_strat_pause_for_max_reject_limit_breach(
         [ChoreEventType.OE_BRK_REJ, ChoreEventType.OE_EXH_REJ], buy_symbol,
         executor_http_client, last_chore_id=last_buy_rej_id)
 
-    time.sleep(10)
     # Checking alert in portfolio_alert
     check_str: str = "max_allowed_rejection_within_period breached"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
-
-    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
-    for alert in portfolio_alert.alerts:
-        if re.search(check_str, alert.alert_brief):
-            break
-    else:
-        assert False, assert_fail_message
+    time.sleep(5)
+    check_alert_str_in_portfolio_alert(check_str, assert_fail_message)
 
     # Checking all strat pause
     pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()

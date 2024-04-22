@@ -11,6 +11,7 @@
 * [Pydantic FastAPI - why we need alias=_id](https://www.mongodb.com/community/forums/t/why-do-we-need-alias-id-in-pydantic-model-of-fastapi/170728/3)
 * [Python Shared Memory](https://docs.python.org/3/library/multiprocessing.shared_memory.html)
 * [Python Shared Structures Module](https://github.com/fuzziqersoftware/sharedstructures)
+* [Python Debugger (Pdb)](https://pypi.org/project/pdb-attach/#:~:text=pdb_attach%20must%20be%20imported%20and,attach%20to%20the%20running%20program.&text=When%20the%20program%20is%20running,listen()%20.)
 
 ## Tutorials
 * [how to implement protobuf in python](https://www.javatpoint.com/how-to-implement-protobuf-in-python)

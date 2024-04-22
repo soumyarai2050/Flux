@@ -61,6 +61,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
 
+        # sorting created message lists
+        self.root_msg_list.sort(key=lambda message_: message_.proto.name)
+
         output_str = self.handle_import_output()
         output_str += self.handle_body()
 

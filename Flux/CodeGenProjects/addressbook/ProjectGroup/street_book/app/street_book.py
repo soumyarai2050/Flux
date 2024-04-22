@@ -1080,7 +1080,7 @@ class StreetBook:
 
         chore_placed: int = ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
-        leg_1_top_of_book = (
+        leg_1_top_of_book: TopOfBook = (
             self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book(
                 self._top_of_books_update_date_time))
         leg_2_top_of_book = (
@@ -1088,13 +1088,6 @@ class StreetBook:
                 self._top_of_books_update_date_time))
 
         if leg_1_top_of_book and leg_2_top_of_book:
-            # leg_1_last_update_date_time = self._get_tob_last_update_date_time(leg_1_top_of_book)
-            # leg_2_last_update_date_time = self._get_tob_last_update_date_time(leg_2_top_of_book)
-            # if leg_1_last_update_date_time < leg_2_last_update_date_time:
-            #     self._top_of_books_update_date_time = leg_1_last_update_date_time
-            # else:
-            #     self._top_of_books_update_date_time = leg_2_last_update_date_time
-
             top_of_books = [leg_1_top_of_book, leg_2_top_of_book]
 
             latest_update_date_time: DateTime | None = None
@@ -1150,7 +1143,7 @@ class StreetBook:
                     sell_tob_ask_px = self._get_tob_ask_quote_px(sell_top_of_book)
                     if sell_tob_ask_px == 120:
                         px = random.randint(100, 110)
-                        qty = random.randint(65, 75)
+                        qty = random.randint(95, 105)
                         usd_px: float = self.get_usd_px(px, sell_symbol)
                         chore_placed = self.place_new_chore(sell_top_of_book, strat_brief, chore_limits,
                                                             pair_strat, px, usd_px, qty,

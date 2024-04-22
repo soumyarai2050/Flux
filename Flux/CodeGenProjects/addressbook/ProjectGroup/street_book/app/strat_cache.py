@@ -112,10 +112,12 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         if chore_snapshot.chore_status not in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED,
                                                ChoreStatusType.OE_OVER_FILLED]:
             self._chore_id_to_open_chore_snapshot_dict[chore_snapshot.chore_brief.chore_id] = chore_snapshot
-        elif chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
-            # ideally code would move the strat to pause state when it sees overfill - this only handles corner cases
-            logging.error("Unexpected: Chore found overfilled - strat will block [has open chore will force fail]")
         else:
+            if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
+                # ideally code would move the strat to pause state when it sees
+                # overfill - this only handles corner cases
+                logging.error("Unexpected: Chore found overfilled - strat will block [has open chore will force fail]")
+
             # Providing the second argument None prevents the KeyError exception
             self._chore_id_to_open_chore_snapshot_dict.pop(chore_snapshot.chore_brief.chore_id, None)
         return _chore_snapshots_update_date_time    # ignore - helps with debug

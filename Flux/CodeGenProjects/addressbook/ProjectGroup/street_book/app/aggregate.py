@@ -276,6 +276,7 @@ def get_last_barter_with_symbol_n_start_n_end_time(symbol: str, start_datetime: 
     ]}
     return agg_pipline
 
+
 def get_chore_snapshot_chore_id_filter_json(chore_id: str):
     return {"aggregate": [
         {
@@ -387,6 +388,26 @@ def get_open_chore_snapshots_for_symbol(symbol: str):
                             },
                             {
                                 "chore_status": "OE_ACKED"
+                            }
+                        ]
+                    },
+                    {
+                        "$and": [
+                            {
+                                "chore_brief.security.sec_id": symbol
+                            },
+                            {
+                                "chore_status": "OE_CXL_UNACK"
+                            }
+                        ]
+                    },
+                    {
+                        "$and": [
+                            {
+                                "chore_brief.security.sec_id": symbol
+                            },
+                            {
+                                "chore_status": "OE_AMD"
                             }
                         ]
                     }

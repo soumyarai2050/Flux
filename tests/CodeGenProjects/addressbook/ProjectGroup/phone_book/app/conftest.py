@@ -44,7 +44,7 @@ def refresh_sec_update_fixture() -> int:
     executor_config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(executor_config_file_path)
     executor_config_dict_str = YAMLConfigurationManager.load_yaml_configurations(executor_config_file_path,
                                                                                  load_as_str=True)
-    min_refresh_interval = 10
+    min_refresh_interval = 5
     executor_config_dict["min_refresh_interval"] = min_refresh_interval
     YAMLConfigurationManager.update_yaml_configurations(executor_config_dict, str(executor_config_file_path))
 
@@ -53,29 +53,17 @@ def refresh_sec_update_fixture() -> int:
 
 
 @pytest.fixture
-def db_names_list(leg1_leg2_symbol_list):
-    db_names_list = [
-        f"phone_book_{PAIR_STRAT_BEANIE_PORT}",
-        f"log_book_{LOG_ANALYZER_BEANIE_PORT}",
-    ]
-
-    for i in range(len(leg1_leg2_symbol_list)):
-        db_names_list.append(f"street_book_{8040 + i + 1}")
-    return db_names_list
-
-
-@pytest.fixture
 def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, expected_portfolio_status_,
-                         expected_system_control_, db_names_list):
+                         expected_system_control_):
     # deleting existing executors
     clean_executors_and_today_activated_symbol_side_lock_file()
 
     # cleaning all collections
-    clean_all_collections_ignoring_ui_layout(db_names_list)
+    clean_all_collections_ignoring_ui_layout()
     clear_cache_in_model()
 
     # updating portfolio_alert
-    clean_portfolio_alert()
+    clean_log_book_alerts()
 
     # updating strat_collection
     renew_strat_collection()
@@ -335,7 +323,7 @@ def expected_strat_limits_():
         "depth_levels": 3
       },
       "residual_restriction": {
-        "max_residual": 100_000,
+        "max_residual": 150_000,
         "residual_mark_seconds": 10
       },
       "eligible_brokers": [],
@@ -384,7 +372,6 @@ def expected_portfolio_limits_(expected_brokers_):
     rolling_max_chore_count = RollingMaxChoreCountOptional(max_rolling_tx_count=15, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxChoreCountOptional(max_rolling_tx_count=15, rolling_tx_count_period_seconds=2)
 
-    print(expected_brokers_, type(expected_brokers_))
     portfolio_limits_obj = PortfolioLimitsBaseModel(_id=1, max_open_baskets=20, max_open_notional_per_side=2_000_000,
                                                     max_gross_n_open_notional=2_400_000,
                                                     rolling_max_chore_count=rolling_max_chore_count,
@@ -554,6 +541,8 @@ def expected_buy_chore_snapshot_(pair_securities_with_sides_):
         "fill_notional": 0,
         "last_update_fill_qty": 0,
         "last_update_fill_px": 0,
+        "total_amend_up_qty": 0,
+        "total_amend_dn_qty": 0,
         "cxled_qty": 0,
         "avg_cxled_px": 0,
         "cxled_notional": 0,
@@ -628,6 +617,8 @@ def expected_sell_chore_snapshot_(pair_securities_with_sides_):
         "fill_notional": 0,
         "last_update_fill_qty": 0,
         "last_update_fill_px": 0,
+        "total_amend_up_qty": 0,
+        "total_amend_dn_qty": 0,
         "cxled_qty": 0,
         "avg_cxled_px": 0,
         "cxled_notional": 0,

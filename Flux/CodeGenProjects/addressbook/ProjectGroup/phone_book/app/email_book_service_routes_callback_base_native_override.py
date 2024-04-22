@@ -33,7 +33,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate impo
     get_ongoing_pair_strat_filter, get_all_pair_strat_from_symbol_n_side, get_ongoing_or_all_pair_strats_by_sec_id)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
-from FluxPythonUtils.scripts.utility_functions import get_pid_from_port, except_n_log_alert
+from FluxPythonUtils.scripts.utility_functions import get_pid_from_port, except_n_log_alert, is_process_running
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import get_bartering_link
 
 
@@ -273,7 +273,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
 
     async def get_crashed_pair_strats(self, pair_strat_id, executor_process_id) -> PairStrat:
         pair_strat: PairStrat | None = None
-        if not psutil.pid_exists(executor_process_id):
+        if not is_process_running(executor_process_id):
             logging.info(f"process for {pair_strat_id = } and {executor_process_id = } found killed, "
                          f"restarting again ...")
 
@@ -448,12 +448,16 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                                                   f"server is down, recovering executor for "
                                                   f"{pair_strat.id = };;; {pair_strat = }")
                                     crashed_strats.append(pair_strat)
+                                    await (EmailBookServiceRoutesCallbackBaseNativeOverride.
+                                           underlying_update_pair_strat_to_non_running_state_query_http(pair_strat.id))
                                 elif ("The Web Server may be down, too busy, or experiencing other problems preventing "
                                       "it from responding to requests" in str(e) and "status_code: 503" in str(e)):
                                     pid = get_pid_from_port(pair_strat.port)
                                     if pid is not None:
                                         os.kill(pid, signal.SIGKILL)
                                     crashed_strats.append(pair_strat)
+                                    await (EmailBookServiceRoutesCallbackBaseNativeOverride.
+                                           underlying_update_pair_strat_to_non_running_state_query_http(pair_strat.id))
                                 else:
                                     logging.exception("Something went wrong while checking is_service_up of executor "
                                                       f"with port: {pair_strat.port} in pair_strat strat_up recovery "
@@ -781,7 +785,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         if not res:
             logging.debug(f"Alerts updated by _update_strat_status_pre, symbol_side_key: "
                           f"{get_symbol_side_key([(stored_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id, stored_pair_strat_obj.pair_strat_params.strat_leg1.side)])};;; "
-                          f"{updated_pair_strat_obj = }")
+                          f"{updated_pair_strat_obj=}")
 
         # updating port_to_executor_http_client_dict with this port if not present
         self._update_port_to_executor_http_client_dict_from_updated_pair_strat(updated_pair_strat_obj)
@@ -1084,12 +1088,14 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                         raise Exception(err_str_)
 
                     pair_strat = PairStratOptional(_id=pair_strat.id, strat_state=StratState.StratState_SNOOZED)
-                    await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_pair_strat_http(
-                        jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
+                    updated_pair_strat = (
+                        await EmailBookServiceRoutesCallbackBaseNativeOverride.
+                        underlying_partial_update_pair_strat_http(
+                            jsonable_encoder(pair_strat, by_alias=True, exclude_none=True)))
 
                     logging.warning(f"ResetLogBookCache;;;pair_strat_log_key: "
                                     f"{get_reset_log_book_cache_wrapper_pattern()}"
-                                    f"{get_pair_strat_log_key(pair_strat)}"
+                                    f"{get_pair_strat_log_key(updated_pair_strat)}"
                                     f"{get_reset_log_book_cache_wrapper_pattern()}")
                 # else: deleted not unloaded - nothing to do , DB will remove entry
 

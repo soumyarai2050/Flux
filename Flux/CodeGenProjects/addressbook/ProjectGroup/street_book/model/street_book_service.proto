@@ -32,12 +32,6 @@ message SymbolSideSnapshot{
   option (FluxMsgJsonQuery) = {
       QueryName: "get_symbol_side_snapshots_from_cache"
   };
-  option (FluxMsgJsonQuery) = {
-      QueryName: "filtered_notify_symbol_side_snapshot_update",
-      QueryParams: "symbols",
-      QueryParamsDataType: "List[str]",
-      QueryType: WS
-  };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
     EnableNotifyAll: false,
@@ -107,12 +101,6 @@ message FillsJournal{
       QueryParams: "side",
       QueryParamsDataType: "str",
       QueryParamsDataType: "str"
-  };
-  option (FluxMsgJsonQuery) = {
-      QueryName: "filtered_notify_fills_journal_update",
-      QueryParams: "symbols",
-      QueryParamsDataType: "List[str]",
-      QueryType: WS
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_fills_journal_from_cache"
@@ -425,6 +413,57 @@ message BarterSimulatorProcessFill{
     QueryParamsDataType: "float",
     QueryParams: "qty",
     QueryParamsDataType: "int",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str",
+    QueryParams: "use_exact_passed_qty",
+    QueryParamsDataType: "bool | None = None"
+  };
+  required bool resp = 1;
+}
+
+message BarterSimulatorProcessAmendReq{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_process_amend_req",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str",
+    QueryParams: "px",
+    QueryParamsDataType: "float | None = None",
+    QueryParams: "qty",
+    QueryParamsDataType: "int | None = None",
+  };
+  required bool resp = 1;
+}
+
+message BarterSimulatorProcessAmendAck{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_process_amend_ack",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str"
+  };
+  required bool resp = 1;
+}
+
+message BarterSimulatorProcessAmendREJ{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_process_amend_rej",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
     QueryParams: "side",
     QueryParamsDataType: "Side",
     QueryParams: "sec_id",

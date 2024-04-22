@@ -16,6 +16,7 @@ message StratAlert{
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
@@ -139,6 +140,15 @@ message PortfolioAlert{
   optional int64 last_update_date_time = 7 [(FluxFldValIsDateTime) = true];
 }
 
+message RemoveStratAlertsForStratId{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "remove_strat_alerts_for_strat_id"
+      QueryParams: "strat_id"
+      QueryParamsDataType: "int"
+  };
+  optional bool temp = 1;
+}
+
 message LogBookRestartTail{
   option (FluxMsgJsonQuery) = {
       QueryName: "log_book_restart_tail"
@@ -164,16 +174,6 @@ message LogBookRemoveFileFromCreatedCache{
       QueryName: "log_book_remove_file_from_created_cache"
       QueryParams: "log_file_path_list"
       QueryParamsDataType: "List[str]"
-  };
-  optional bool temp = 1;
-}
-
-message ProcessPairStratAPIOps{
-    option (FluxMsgJsonQuery) = {
-      QueryName: "process_pair_strat_api_ops"
-      QueryParams: "kwargs"
-      QueryParamsDataType: "List[Dict]"
-      QueryRouteType: PATCH
   };
   optional bool temp = 1;
 }

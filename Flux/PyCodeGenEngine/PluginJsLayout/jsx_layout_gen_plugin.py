@@ -165,6 +165,11 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             logging.exception(err_str)
             raise Exception(err_str)
         self.output_file_name_to_template_file_path_dict[output_file_name] = str(template_file_path)
+
+        # sorting created message lists
+        self.layout_msg_list.sort(key=lambda message_: message_.proto.name)
+        self.simple_abbreviated_filter_layout_msg_list.sort(key=lambda message_: message_.proto.name)
+
         return {
             output_file_name: {
                 "add_imports": self.handle_imports(file),

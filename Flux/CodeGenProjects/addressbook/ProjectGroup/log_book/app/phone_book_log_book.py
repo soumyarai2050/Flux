@@ -1,6 +1,8 @@
 import multiprocessing
 import os
 from typing import Set
+import signal
+import sys
 
 os.environ["DBType"] = "beanie"
 # Project imports
@@ -30,7 +32,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
     underlying_read_portfolio_alert_by_id_http: Callable[..., Any] | None = None
     underlying_read_strat_alert_by_id_http: Callable[..., Any] | None = None
 
-    def __init__(self, regex_file: str, log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
+    def __init__(self, regex_file_dir_path: str, log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
                  simulation_mode: bool = False):
         process_name = multiprocessing.current_process().name
         datetime_str: str = datetime.datetime.now().strftime("%Y%m%d")
@@ -40,7 +42,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
                          log_file_name=log_file_name)
 
         logging.info(f"Logging for {process_name}")
-        super().__init__(regex_file, log_prefix_regex_pattern_to_callable_name_dict, simulation_mode)
+        super().__init__(regex_file_dir_path, log_prefix_regex_pattern_to_callable_name_dict, simulation_mode)
         self.pattern_for_pair_strat_db_updates: str = get_pattern_for_pair_strat_db_updates()
         self.symbol_side_pattern: str = get_symbol_side_pattern()
         self.reset_log_book_cache_pattern: str = get_reset_log_book_cache_wrapper_pattern()
@@ -51,17 +53,42 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             self.send_portfolio_alerts(severity=self.get_severity("critical"), alert_brief=alert_brief)
 
         # running queue handling for pair_start_api_ops
-        Thread(target=self._pair_strat_api_ops_queue_handler, daemon=True).start()
+        Thread(target=self._pair_strat_api_ops_queue_handler, daemon=True, name="db_queue_handler").start()
+        logging.info(f"Thread Started: db_queue_handler")
+
         # running queue handling for portfolio and strat alerts
         self.run_queue_handler()
         # running raw_performance thread
-        raw_performance_handler_thread = Thread(target=self._handle_raw_performance_data_queue, daemon=True)
+        raw_performance_handler_thread = Thread(target=self._handle_raw_performance_data_queue, daemon=True,
+                                                name="raw_performance_handler")
+        logging.info(f"Thread Started: raw_performance_handler")
+
         raw_performance_handler_thread.start()
+
+        self.terminate_triggered: bool = False
+        signal.set_wakeup_fd(-1)
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+
+    def _signal_handler(self, signal_type: int, *args) -> None:
+        if not self.terminate_triggered:
+            super()._signal_handler(signal_type, *args)
+
+            # exiting all threads
+            self.pair_strat_api_ops_queue.put("EXIT")
+            self.strat_alert_queue.put("EXIT")
+            self.portfolio_alert_queue.put("EXIT")
+            self.raw_performance_data_queue.put("EXIT")
+
+            for _, queue_ in self.pydantic_type_name_to_patch_queue_cache_dict.items():
+                queue_.put("EXIT")
+        # else not required: avoiding multiple terminate calls
 
     def _handle_strat_alert_queue_err_handler(self, *args):
         try:
-            pydantic_obj: StratAlertBaseModel = args[0]     # single unprocessed pydantic object is passed
-            self.send_portfolio_alerts(pydantic_obj.severity, pydantic_obj.alert_brief, pydantic_obj.alert_details)
+            pydantic_obj_list: List[StratAlertBaseModel] = args[0]     # single unprocessed pydantic object is passed
+            for pydantic_obj in pydantic_obj_list:
+                self.send_portfolio_alerts(pydantic_obj.severity, pydantic_obj.alert_brief, pydantic_obj.alert_details)
         except Exception as e:
             err_str_ = f"_handle_strat_alert_queue_err_handler failed, passed args: {args};;; exception: {e}"
             log_book_service_http_client.portfolio_alert_fail_logger_query_client(err_str_)
@@ -86,8 +113,14 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             self._handle_strat_alert_queue_err_handler)
 
     def run_queue_handler(self):
-        portfolio_alert_handler_thread = Thread(target=self._handle_portfolio_alert_queue, daemon=True)
-        strat_alert_handler_thread = Thread(target=self._handle_strat_alert_queue, daemon=True)
+        portfolio_alert_handler_thread = Thread(target=self._handle_portfolio_alert_queue, daemon=True,
+                                                name="Portfolio_alert_handler")
+        logging.info(f"Thread Started: Portfolio_alert_handler")
+
+        strat_alert_handler_thread = Thread(target=self._handle_strat_alert_queue, daemon=True,
+                                            name="strat_alert_handler")
+        logging.info(f"Thread Started: strat_alert_handler")
+
         portfolio_alert_handler_thread.start()
         strat_alert_handler_thread.start()
 

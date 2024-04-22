@@ -108,7 +108,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     underlying_get_last_n_sec_total_barter_qty_query_http: Callable[..., Any] | None = None
     get_underlying_account_cumulative_fill_qty_query_http: Callable[..., Any] | None = None
     underlying_create_chore_snapshot_http: Callable[..., Any] | None = None
-    underlying_partial_update_chore_snapshot_http: Callable[..., Any] | None = None
+    underlying_update_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_partial_update_symbol_side_snapshot_http: Callable[..., Any] | None = None
     underlying_partial_update_cancel_chore_http: Callable[..., Any] | None = None
     underlying_partial_update_strat_status_http: Callable[..., Any] | None = None
@@ -144,7 +144,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             underlying_read_chore_snapshot_http, underlying_read_chore_journal_http,
             underlying_get_last_n_sec_total_barter_qty_query_http, underlying_partial_update_cancel_chore_http,
             get_underlying_account_cumulative_fill_qty_query_http, underlying_create_chore_snapshot_http,
-            underlying_partial_update_chore_snapshot_http, underlying_partial_update_symbol_side_snapshot_http,
+            underlying_update_chore_snapshot_http, underlying_partial_update_symbol_side_snapshot_http,
             underlying_partial_update_strat_status_http, underlying_get_open_chore_count_query_http,
             underlying_partial_update_strat_brief_http, underlying_delete_symbol_side_snapshot_http,
             get_symbol_side_underlying_account_cumulative_fill_qty_query_http, underlying_read_fills_journal_http,
@@ -176,7 +176,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         cls.get_underlying_account_cumulative_fill_qty_query_http = (
             get_underlying_account_cumulative_fill_qty_query_http)
         cls.underlying_create_chore_snapshot_http = underlying_create_chore_snapshot_http
-        cls.underlying_partial_update_chore_snapshot_http = underlying_partial_update_chore_snapshot_http
+        cls.underlying_update_chore_snapshot_http = underlying_update_chore_snapshot_http
         cls.underlying_partial_update_symbol_side_snapshot_http = underlying_partial_update_symbol_side_snapshot_http
         cls.underlying_partial_update_cancel_chore_http = underlying_partial_update_cancel_chore_http
         cls.underlying_partial_update_strat_status_http = underlying_partial_update_strat_status_http
@@ -877,24 +877,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 jsonable_encoder(updated_symbol_overview, by_alias=True, exclude_none=True)))
                     # else not required: happens in some crash recovery
 
-    def _check_n_create_strat_alert(self, strat_id: int) -> bool:
-        try:
-            strat_alert = log_book_service_http_client.get_strat_alert_client(strat_id)
-        except Exception as e:
-            if "Id not Found: " in str(e):
-                logging.info(f"get_strat_alert_client can't find strat_alert with id: {strat_id}, "
-                             f"creating one, caught exception: {e}")
-
-                # creating strat_alert for this strat in log_book server
-                strat_alert: StratAlertBaseModel = StratAlertBaseModel(_id=strat_id, alerts=[], alert_update_seq_num=0)
-                log_book_service_http_client.create_strat_alert_client(strat_alert)
-            else:
-                err_str_ = (f"Some Error Occurred while creating strat_alert for id: {strat_id}, "
-                            f"exception: {e}")
-                logging.error(err_str_)
-                return False
-        return True
-
     def _check_n_create_related_models_for_strat(self) -> bool:
         strat_limits = self._check_n_create_default_strat_limits()
         if strat_limits is not None:
@@ -1054,7 +1036,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 # become 0 in that case too, so ignoring this case if sell side all_bkr_cxlled_qty is 0
             # else not required: if chore count is less than waived_min_chores
         if pause_strat:
-            self.set_strat_state_to_pause()
+            self.pause_strat()
 
     ####################################
     # Get specific Data handling Methods
@@ -1373,6 +1355,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                cxled_notional=0,
                                                last_update_fill_qty=0,
                                                last_update_fill_px=0,
+                                               total_amend_dn_qty=0,
+                                               total_amend_up_qty=0,
                                                create_date_time=chore_journal_obj.chore_event_date_time,
                                                last_update_date_time=chore_journal_obj.chore_event_date_time,
                                                chore_status=ChoreStatusType.OE_UNACK)
@@ -1405,13 +1389,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         await self._check_state_and_get_chore_snapshot_obj(chore_journal_obj,
                                                                            [ChoreStatusType.OE_UNACK])
                     if chore_snapshot is not None:
-                        updated_chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                            underlying_partial_update_chore_snapshot_http(
-                                json.loads(ChoreSnapshotOptional(
-                                    _id=chore_snapshot.id,
-                                    last_update_date_time=chore_journal_obj.chore_event_date_time,
-                                    chore_status=ChoreStatusType.OE_ACKED).model_dump_json(by_alias=True,
-                                                                                           exclude_none=True))))
+                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                        chore_snapshot.last_chore_status = chore_snapshot.chore_status
+                        chore_snapshot.chore_status = ChoreStatusType.OE_ACKED
+                        updated_chore_snapshot = (
+                            await StreetBookServiceRoutesCallbackBaseNativeOverride.
+                            underlying_update_chore_snapshot_http(chore_snapshot))
 
                         return pair_strat.id, updated_chore_snapshot, None, None
 
@@ -1420,14 +1403,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             case ChoreEventType.OE_CXL:
                 async with ChoreSnapshot.reentrant_lock:
                     chore_snapshot = await self._check_state_and_get_chore_snapshot_obj(
-                        chore_journal_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED])
+                        chore_journal_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
+                                                            ChoreStatusType.OE_AMD])
                     if chore_snapshot is not None:
+                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                        chore_snapshot.last_chore_status = chore_snapshot.chore_status
+                        chore_snapshot.chore_status = ChoreStatusType.OE_CXL_UNACK
                         updated_chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                        underlying_partial_update_chore_snapshot_http(
-                            json.loads(ChoreSnapshotOptional(
-                                _id=chore_snapshot.id, last_update_date_time=chore_journal_obj.chore_event_date_time,
-                                chore_status=ChoreStatusType.OE_CXL_UNACK).model_dump_json(by_alias=True,
-                                                                                           exclude_none=True))))
+                                                        underlying_update_chore_snapshot_http(chore_snapshot))
 
                         return pair_strat.id, updated_chore_snapshot, None, None
 
@@ -1438,7 +1421,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     chore_snapshot = \
                         await self._check_state_and_get_chore_snapshot_obj(
                             chore_journal_obj, [ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_ACKED,
-                                                ChoreStatusType.OE_UNACK, ChoreStatusType.OE_FILLED])
+                                                ChoreStatusType.OE_UNACK, ChoreStatusType.OE_FILLED,
+                                                ChoreStatusType.OE_AMD])
                     if chore_snapshot is not None:
                         # When CXL_ACK arrived after chore got fully filled, since nothing is left to cxl - ignoring
                         # this chore_journal's chore_snapshot update
@@ -1460,24 +1444,23 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             # else not required: If no text is present in chore_journal then updating
                             # chore snapshot with same obj
 
-                            cxled_qty = int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
+                            cxled_qty = int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                            chore_snapshot.total_amend_dn_qty)
                             cxled_notional = cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                          chore_snapshot.chore_brief.security.sec_id)
-                            avg_cxled_px = \
-                                (self.get_local_px_or_notional(cxled_notional, chore_snapshot.chore_brief.security.sec_id) /
-                                 cxled_qty) if cxled_qty != 0 else 0
+                            chore_snapshot.cxled_qty += cxled_qty
+                            chore_snapshot.cxled_notional += cxled_notional
+                            chore_snapshot.avg_cxled_px = \
+                                (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
+                                                               chore_snapshot.chore_brief.security.sec_id) /
+                                 chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0
+
+                            chore_snapshot.chore_brief = chore_brief
+                            chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                            chore_snapshot.last_chore_status = chore_snapshot.chore_status
+                            chore_snapshot.chore_status = ChoreStatusType.OE_DOD
                             chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                underlying_partial_update_chore_snapshot_http(
-                                    json.loads(ChoreSnapshotOptional(_id=chore_snapshot.id,
-                                                                     chore_brief=chore_brief,
-                                                                     cxled_qty=cxled_qty,
-                                                                     cxled_notional=cxled_notional,
-                                                                     avg_cxled_px=avg_cxled_px,
-                                                                     last_update_date_time=
-                                                                     chore_journal_obj.chore_event_date_time,
-                                                                     chore_status=
-                                                                     ChoreStatusType.OE_DOD).model_dump_json(
-                                        by_alias=True, exclude_none=True))))
+                                underlying_update_chore_snapshot_http(chore_snapshot))
 
                         if chore_snapshot.chore_status != ChoreStatusType.OE_FILLED:
                             symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_chore_journal(
@@ -1556,13 +1539,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             chore_status = ChoreStatusType.OE_OVER_FILLED
                         else:
                             chore_status = ChoreStatusType.OE_FILLED
+
+                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                        chore_snapshot.last_chore_status = chore_snapshot.chore_status
+                        chore_snapshot.chore_status = chore_status
                         updated_chore_snapshot = \
                             await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                   underlying_partial_update_chore_snapshot_http(
-                                    json.loads(ChoreSnapshotOptional(
-                                        _id=chore_snapshot.id, last_update_date_time=
-                                        chore_journal_obj.chore_event_date_time,
-                                        chore_status=chore_status).model_dump_json(by_alias=True, exclude_none=True))))
+                                   underlying_update_chore_snapshot_http(chore_snapshot))
 
                         return pair_strat.id, updated_chore_snapshot, None, None
                     # else not required: none returned object signifies there was something wrong in
@@ -1586,19 +1569,17 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         avg_cxled_px = \
                             (self.get_local_px_or_notional(cxled_notional, chore_snapshot.chore_brief.security.sec_id) /
                              cxled_qty) if cxled_qty != 0 else 0
+
+                        chore_snapshot.chore_brief = chore_brief
+                        chore_snapshot.cxled_qty = cxled_qty
+                        chore_snapshot.cxled_notional = cxled_notional
+                        chore_snapshot.avg_cxled_px = avg_cxled_px
+                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                        chore_snapshot.last_chore_status = chore_snapshot.chore_status
+                        chore_snapshot.chore_status = ChoreStatusType.OE_DOD
                         chore_snapshot = \
                             await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                   underlying_partial_update_chore_snapshot_http(
-                                    json.loads(ChoreSnapshotOptional(
-                                        _id=chore_snapshot.id,
-                                        # chore_brief=ChoreBriefOptional(**chore_brief.model_dump()),
-                                        chore_brief=chore_brief,
-                                        cxled_qty=cxled_qty,
-                                        cxled_notional=cxled_notional,
-                                        avg_cxled_px=avg_cxled_px,
-                                        last_update_date_time=chore_journal_obj.chore_event_date_time,
-                                        chore_status=ChoreStatusType.OE_DOD).model_dump_json(by_alias=True,
-                                                                                             exclude_none=True))))
+                                   underlying_update_chore_snapshot_http(chore_snapshot))
                         symbol_side_snapshot = \
                             await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
                                                                                               chore_snapshot)
@@ -1620,13 +1601,602 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         # if symbol_side_snapshot is None then it means some error occurred in
                         # _create_update_symbol_side_snapshot_from_chore_journal which would have
                         # got added to alert already
-                # else not required: none returned object signifies there was something wrong in
-                # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
+                    # else not required: none returned object signifies there was something wrong in
+                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
+            case ChoreEventType.OE_AMD_UNACK:
 
+                async with ChoreSnapshot.reentrant_lock:
+                    chore_snapshot = \
+                        await self._check_state_and_get_chore_snapshot_obj(
+                            chore_journal_obj, [ChoreStatusType.OE_ACKED])
+
+                    if chore_snapshot is not None:
+                        # checking if case is for qty amend down then amend qty must be greater than filled qty
+                        if chore_snapshot.filled_qty is not None and chore_journal_obj.chore.qty is not None:
+                            if chore_snapshot.filled_qty > chore_journal_obj.chore.qty:
+                                logging.error("Unsupported: Amend qty is less than already filled qty - ignoring is "
+                                              f"amend request, amend_qty: {chore_journal_obj.chore.qty}, "
+                                              f"filled_qty: {chore_snapshot.filled_qty};;; "
+                                              f"amend_unack chore_journal: {chore_journal_obj}, "
+                                              f"chore_snapshot {chore_snapshot}")
+                                return
+
+                        # qty which is available to be used after amend downs
+                        leaves_qty = chore_snapshot.chore_brief.qty - chore_snapshot.total_amend_dn_qty
+
+                        # blocking same qty/px amends
+                        if (leaves_qty == chore_journal_obj.chore.qty or
+                                chore_snapshot.chore_brief.px == chore_journal_obj.chore.px):
+                            err_str_ = (f"Found amend request for chore_id: {chore_snapshot.chore_brief.chore_id}, "
+                                        f"with amend request for qty or px, same as existing qty or px - avoiding "
+                                        f"amend request;;; requested amend {chore_journal_obj = }, {chore_snapshot = }")
+                            logging.error(err_str_)
+                            return
+
+                        # we apply amend changes to chore if chore is risky
+                        # For BUY: chore is risky if chore qty pr px is increased to higher value else it is non-risky
+                        # For SELL: chore is risky if chore qty pr px is decreased to lower value else it is non-risky
+                        if self.is_amend_risky(chore_journal_obj, chore_snapshot, leaves_qty):
+                            last_original_px = chore_snapshot.chore_brief.px
+                            last_original_qty = chore_snapshot.chore_brief.qty
+
+                            # if amend px is requested
+                            if chore_journal_obj.chore.px:
+                                # applying px amend changes
+                                chore_snapshot.chore_brief.px = chore_journal_obj.chore.px
+
+                            # if amend qty is requested
+                            if chore_journal_obj.chore.qty:
+                                if chore_journal_obj.chore.qty < leaves_qty:
+                                    # AMD: when qty is amended down then, qty that is amended dn gets
+                                    # cxled - chore qty stays same and leaves qty is reduced for this chore
+                                    removed_qty = leaves_qty - chore_journal_obj.chore.qty
+                                    chore_snapshot.total_amend_dn_qty += removed_qty
+
+                                    if chore_journal_obj.chore.px:
+                                        # AMD: if px got amended then chore px is changed to amended value so
+                                        # using last px, with which chore get cxled
+                                        removed_notional = (removed_qty *
+                                                            self.get_usd_px(last_original_px,
+                                                                            chore_snapshot.chore_brief.security.sec_id))
+                                    else:
+                                        removed_notional = (removed_qty *
+                                                            self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                            chore_snapshot.chore_brief.security.sec_id))
+                                    chore_snapshot.cxled_qty += removed_qty
+                                    chore_snapshot.cxled_notional += removed_notional
+                                    chore_snapshot.avg_cxled_px = (
+                                        (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
+                                                                       chore_snapshot.chore_brief.security.sec_id) /
+                                         chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
+                                else:
+                                    # AMD: when qty is amended up then, chore qty is updated to amended qty
+                                    chore_snapshot.chore_brief.qty = chore_journal_obj.chore.qty
+                                    chore_snapshot.total_amend_up_qty += chore_journal_obj.chore.qty - leaves_qty
+
+                            chore_snapshot.chore_brief.chore_notional = (
+                                    chore_snapshot.chore_brief.qty *
+                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                    chore_snapshot.chore_brief.security.sec_id))
+                            last_chore_status = chore_snapshot.chore_status
+
+                            chore_status = self.get_chore_status_post_amend_applied(chore_journal_obj.chore_event,
+                                                                                    chore_snapshot, last_chore_status)
+                            self.log_warning_based_on_amended_chore_status(chore_journal_obj.chore_event,
+                                                                           chore_status, last_chore_status,
+                                                                           chore_snapshot, chore_journal_obj,
+                                                                           leaves_qty)
+                            chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                            chore_snapshot.last_amend_px = chore_journal_obj.chore.px
+                            chore_snapshot.last_amend_qty = chore_journal_obj.chore.qty
+                            chore_snapshot.last_leaves_qty = leaves_qty
+                            chore_snapshot.last_original_qty = last_original_qty
+                            chore_snapshot.last_original_px = last_original_px
+                            chore_snapshot.last_chore_status = last_chore_status
+                            chore_snapshot.chore_status = chore_status
+                            chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
+                                                    underlying_update_chore_snapshot_http(chore_snapshot))
+                            symbol_side_snapshot = \
+                                await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+                                                                                                  chore_snapshot)
+                            if symbol_side_snapshot is not None:
+                                updated_strat_brief = (
+                                    await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+                                                                                      symbol_side_snapshot))
+                                if updated_strat_brief is not None:
+                                    await self._update_strat_status_from_chore_journal(
+                                        chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
+                                # else not required: if updated_strat_brief is None then it means some error occurred in
+                                # _update_strat_brief_from_chore which would have got added to alert already
+                                portfolio_status_updates: PortfolioStatusUpdatesContainer = (
+                                    await self._update_portfolio_status_from_chore_journal(
+                                        chore_journal_obj, chore_snapshot))
+                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
+                            # else not require_create_update_symbol_side_snapshot_from_chore_journald:
+                            # if symbol_side_snapshot is None then it means some error occurred in
+                            # _create_update_symbol_side_snapshot_from_chore_journal which would have
+                            # got added to alert already
+                        else:
+                            chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                            chore_snapshot.last_amend_px = chore_journal_obj.chore.px
+                            chore_snapshot.last_amend_qty = chore_journal_obj.chore.qty
+                            chore_snapshot.last_chore_status = chore_snapshot.chore_status
+                            chore_snapshot.chore_status = ChoreStatusType.OE_AMD
+                            updated_chore_snapshot = (
+                                await StreetBookServiceRoutesCallbackBaseNativeOverride.
+                                underlying_update_chore_snapshot_http(chore_snapshot))
+                            return pair_strat.id, updated_chore_snapshot, None, None
+                    # else not required: Ignoring this update since none returned object signifies
+                    # there was something wrong in _check_state_and_get_chore_snapshot_obj and
+                    # hence would have been added to alert already
+            case ChoreEventType.OE_AMD_ACK:
+                async with ChoreSnapshot.reentrant_lock:
+                    chore_snapshot: ChoreSnapshot = \
+                        await self._check_state_and_get_chore_snapshot_obj(
+                            chore_journal_obj, [ChoreStatusType.OE_AMD, ChoreStatusType.OE_FILLED,
+                                                                ChoreStatusType.OE_OVER_FILLED,
+                                                                ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_DOD])
+
+                    if chore_snapshot is not None:
+                        leaves_qty = chore_snapshot.chore_brief.qty - chore_snapshot.total_amend_dn_qty
+
+                        # if not amended already that means it is non-risky amend - applying amend changes in AMD_ACK
+                        if not self.is_already_amended(chore_snapshot):
+                            last_original_px = chore_snapshot.chore_brief.px
+                            last_original_qty = chore_snapshot.chore_brief.qty
+                            if chore_snapshot.last_amend_px:
+                                chore_snapshot.chore_brief.px = chore_snapshot.last_amend_px
+
+                            if chore_snapshot.last_amend_qty:
+                                if chore_snapshot.last_amend_qty < leaves_qty:
+                                    chore_snapshot.total_amend_dn_qty += (
+                                            leaves_qty - chore_snapshot.last_amend_qty)
+                                    if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                        removed_qty = leaves_qty - chore_snapshot.last_amend_qty
+                                        if chore_snapshot.last_amend_px:
+                                            # if px got amended then chore px is changes to amended value so using last
+                                            # px, with which chore get cxled
+                                            removed_notional = (
+                                                    removed_qty *
+                                                    self.get_usd_px(last_original_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        else:
+                                            removed_notional = (
+                                                    removed_qty *
+                                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        chore_snapshot.cxled_qty += removed_qty
+                                        chore_snapshot.cxled_notional += removed_notional
+                                        chore_snapshot.avg_cxled_px = (
+                                            (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
+                                                                           chore_snapshot.chore_brief.security.sec_id) /
+                                             chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
+                                    else:
+                                        logging.warning("Amending dn qty on chore which is already DOD - requested "
+                                                        "qty will be shifted to amended dn qty from residual cxled_qty "
+                                                        f";;; {chore_journal_obj = }, {chore_snapshot = }")
+
+                                        removed_qty = leaves_qty - chore_snapshot.last_amend_qty
+                                        if chore_snapshot.last_amend_px:
+                                            # if px got amended then chore px is changed to amended value so removing
+                                            # cxl_notional with ol px and updating new notional with amended px
+                                            removed_old_notional = (
+                                                    removed_qty *
+                                                    self.get_usd_px(last_original_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                            removed_new_notional = (
+                                                    removed_qty *
+                                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+
+                                            chore_snapshot.cxled_notional -= (
+                                                                      removed_old_notional - removed_new_notional)
+                                            chore_snapshot.avg_cxled_px = (
+                                                (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
+                                                                               chore_snapshot.chore_brief.security.sec_id) /
+                                                 chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
+                                        # else not required: if chore is in DOD state and px is not amended in this
+                                        # amend then amend dn notional is already in cxled notional
+                                else:
+                                    # AMD: when qty is amended up then, chore qty is updated to amended qty
+                                    chore_snapshot.chore_brief.qty = chore_snapshot.last_amend_qty
+                                    chore_snapshot.total_amend_up_qty += (
+                                            chore_snapshot.last_amend_qty - leaves_qty)
+                                    if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
+                                        # AMD: if chore status is DOD that means amend is post DOD - adding amended up
+                                        # qty to cxled_qty
+                                        additional_qty = chore_snapshot.last_amend_qty - leaves_qty
+                                        if chore_snapshot.last_amend_px:
+                                            additional_new_notional = (
+                                                    additional_qty *
+                                                    self.get_usd_px(chore_snapshot.last_amend_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        else:
+                                            additional_new_notional = (
+                                                    additional_qty *
+                                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        chore_snapshot.cxled_qty += additional_qty
+                                        chore_snapshot.cxled_notional += additional_new_notional
+                                        chore_snapshot.avg_cxled_px = (
+                                            (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
+                                                                           chore_snapshot.chore_brief.security.sec_id) /
+                                             chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
+
+                            chore_snapshot.chore_brief.chore_notional = (
+                                    chore_snapshot.chore_brief.qty *
+                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                    chore_snapshot.chore_brief.security.sec_id))
+                            last_chore_status = chore_snapshot.chore_status
+
+                            chore_status = self.get_chore_status_post_amend_applied(chore_journal_obj.chore_event,
+                                                                                    chore_snapshot, last_chore_status)
+                            self.log_warning_based_on_amended_chore_status(chore_journal_obj.chore_event,
+                                                                           chore_status, last_chore_status,
+                                                                           chore_snapshot, chore_journal_obj,
+                                                                           leaves_qty)
+
+                            chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                            chore_snapshot.last_leaves_qty = leaves_qty
+                            chore_snapshot.last_original_qty = last_original_qty
+                            chore_snapshot.last_original_px = last_original_px
+                            chore_snapshot.last_chore_status = last_chore_status
+                            chore_snapshot.chore_status = chore_status
+                            chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
+                                                    underlying_update_chore_snapshot_http(chore_snapshot))
+                            symbol_side_snapshot = \
+                                await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+                                                                                                  chore_snapshot)
+                            if symbol_side_snapshot is not None:
+                                updated_strat_brief = (
+                                    await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+                                                                                      symbol_side_snapshot))
+                                if updated_strat_brief is not None:
+                                    await self._update_strat_status_from_chore_journal(
+                                        chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
+                                # else not required: if updated_strat_brief is None then it means some error occurred in
+                                # _update_strat_brief_from_chore which would have got added to alert already
+                                portfolio_status_updates: PortfolioStatusUpdatesContainer = (
+                                    await self._update_portfolio_status_from_chore_journal(
+                                        chore_journal_obj, chore_snapshot))
+                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
+                            # else not require_create_update_symbol_side_snapshot_from_chore_journald:
+                            # if symbol_side_snapshot is None then it means some error occurred in
+                            # _create_update_symbol_side_snapshot_from_chore_journal which would have
+                            # got added to alert already
+                        else:
+                            last_chore_status = chore_snapshot.chore_status
+                            chore_status = self.get_chore_status_post_amend_applied(chore_journal_obj.chore_event,
+                                                                                    chore_snapshot, last_chore_status)
+
+                            chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                            chore_snapshot.last_chore_status = chore_snapshot.chore_status
+                            chore_snapshot.chore_status = chore_status
+                            updated_chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
+                                                            underlying_update_chore_snapshot_http(chore_snapshot))
+                            return pair_strat.id, updated_chore_snapshot, None, None
+                    # else not required: Ignoring this update since none returned object signifies
+                    # there was something wrong in _check_state_and_get_chore_snapshot_obj and
+                    # hence would have been added to alert already
+            case ChoreEventType.OE_AMD_REJ:
+                async with ChoreSnapshot.reentrant_lock:
+                    chore_snapshot: ChoreSnapshot = \
+                        await self._check_state_and_get_chore_snapshot_obj(
+                            chore_journal_obj, [ChoreStatusType.OE_AMD, ChoreStatusType.OE_FILLED,
+                                                ChoreStatusType.OE_OVER_FILLED,
+                                                ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_DOD])
+                    if chore_snapshot is not None:
+                        if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
+                            logging.error(f"Received AMD_REJ post chore DOD on chore_id: "
+                                          f"{chore_snapshot.chore_brief.chore_id} - ignoring this chore_journal and "
+                                          f"chore will stay unchanged;;; amd_rej {chore_journal_obj = }, "
+                                          f"{chore_snapshot = }")
+                            return
+
+                        leaves_qty = chore_snapshot.last_leaves_qty
+
+                        if self.is_already_amended(chore_snapshot):
+                            last_original_px = chore_snapshot.last_original_px
+                            last_original_qty = chore_snapshot.last_original_qty
+                            if chore_snapshot.last_amend_px:
+                                # putting back last_original_px which got changed in risky AMD_UNACK
+                                chore_snapshot.chore_brief.px = chore_snapshot.last_original_px
+
+                            if chore_snapshot.last_amend_qty:
+                                if chore_snapshot.last_amend_qty < leaves_qty:
+                                    # reducing back amended_dn_qty which got increased in risky AMD_UNACK
+                                    chore_snapshot.total_amend_dn_qty -= (
+                                            leaves_qty - chore_snapshot.last_amend_qty)
+                                    if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                        removed_qty = leaves_qty - chore_snapshot.last_amend_qty
+                                        if chore_snapshot.last_amend_px:
+                                            # if px got amended then chore px is changes to amended value so using last
+                                            # px, with which chore get cxled
+                                            removed_notional = (
+                                                    removed_qty *
+                                                    self.get_usd_px(last_original_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        else:
+                                            removed_notional = (
+                                                    removed_qty *
+                                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+
+                                        # reducing back amended_dn_qty which got added up in cxled_qty risky AMD_UNACK
+                                        # also making corresponding cxled_notional and avg_cxled_px changes
+                                        chore_snapshot.cxled_qty -= removed_qty
+                                        chore_snapshot.cxled_notional -= removed_notional
+                                        chore_snapshot.avg_cxled_px = (
+                                            (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
+                                                                           chore_snapshot.chore_brief.security.sec_id) /
+                                             chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
+                                    else:
+                                        logging.warning("Amending dn qty on chore which is already DOD - requested "
+                                                        "qty will be shifted to amended dn qty from residual cxled_qty "
+                                                        f";;; {chore_journal_obj = }, {chore_snapshot = }")
+
+                                        removed_qty = leaves_qty - chore_snapshot.last_amend_qty
+                                        if chore_snapshot.last_amend_px:
+                                            # if px got amended then chore px is changed to amended value - removing
+                                            # cxl_notional with amended px and putting notional with last original px
+                                            removed_old_notional = (
+                                                    removed_qty *
+                                                    self.get_usd_px(last_original_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                            removed_new_notional = (
+                                                    removed_qty *
+                                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                            chore_snapshot.cxled_notional += (
+                                                    removed_old_notional - removed_new_notional)
+                                            chore_snapshot.avg_cxled_px = (
+                                                (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
+                                                                               chore_snapshot.chore_brief.security.sec_id) /
+                                                 chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
+                                        # else not required: if chore is in DOD state and px is not amended in this
+                                        # amend then amend dn notional is already in cxled notional so no change
+                                        # was made while amending
+                                else:
+                                    # AMD: when qty is amended up then, chore qty is updated to
+                                    #      amended qty - reverting qty
+                                    chore_snapshot.chore_brief.qty = chore_snapshot.last_original_qty
+                                    chore_snapshot.total_amend_up_qty -= (
+                                            chore_snapshot.last_amend_qty - last_original_qty)
+                                    if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
+                                        # AMD: if chore status is DOD that means amend is post DOD - adding amended up
+                                        # qty to cxled_qty
+                                        additional_qty = chore_snapshot.last_amend_qty - leaves_qty
+                                        if chore_snapshot.last_amend_px:
+                                            additional_new_notional = (
+                                                    additional_qty *
+                                                    self.get_usd_px(chore_snapshot.last_amend_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        else:
+                                            additional_new_notional = (
+                                                    additional_qty *
+                                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        chore_snapshot.cxled_qty -= additional_qty
+                                        chore_snapshot.cxled_notional -= additional_new_notional
+                                        chore_snapshot.avg_cxled_px = (
+                                            (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
+                                                                           chore_snapshot.chore_brief.security.sec_id) /
+                                             chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
+
+                            chore_snapshot.chore_brief.chore_notional = (
+                                    chore_snapshot.chore_brief.qty *
+                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                    chore_snapshot.chore_brief.security.sec_id))
+                            last_chore_status = chore_snapshot.chore_status
+
+                            chore_status = self.get_chore_status_post_amend_applied(chore_journal_obj.chore_event,
+                                                                                    chore_snapshot, last_chore_status)
+                            self.log_warning_amend_rej_reverted_chore_status(chore_status, last_chore_status,
+                                                                             chore_snapshot, chore_journal_obj,
+                                                                             leaves_qty)
+
+                            chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                            chore_snapshot.last_chore_status = last_chore_status
+                            chore_snapshot.chore_status = chore_status
+                            chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
+                                                    underlying_update_chore_snapshot_http(chore_snapshot))
+
+                            symbol_side_snapshot = \
+                                await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+                                                                                                  chore_snapshot)
+                            if symbol_side_snapshot is not None:
+                                updated_strat_brief = (
+                                    await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+                                                                                      symbol_side_snapshot))
+                                if updated_strat_brief is not None:
+                                    await self._update_strat_status_from_chore_journal(
+                                        chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
+                                # else not required: if updated_strat_brief is None then it means some error occurred in
+                                # _update_strat_brief_from_chore which would have got added to alert already
+                                portfolio_status_updates: PortfolioStatusUpdatesContainer = (
+                                    await self._update_portfolio_status_from_chore_journal(
+                                        chore_journal_obj, chore_snapshot))
+                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
+                            # else not require_create_update_symbol_side_snapshot_from_chore_journald:
+                            # if symbol_side_snapshot is None then it means some error occurred in
+                            # _create_update_symbol_side_snapshot_from_chore_journal which would have
+                            # got added to alert already
+                        else:
+                            last_chore_status = chore_snapshot.chore_status
+                            chore_status = self.get_chore_status_post_amend_applied(chore_journal_obj.chore_event,
+                                                                                    chore_snapshot, last_chore_status)
+
+                            chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                            chore_snapshot.last_chore_status = last_chore_status
+                            chore_snapshot.chore_status = chore_status
+                            updated_chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
+                                                            underlying_update_chore_snapshot_http(chore_snapshot))
+                            return pair_strat.id, updated_chore_snapshot, None, None
+                    # else not required: Ignoring this update since none returned object signifies
+                    # there was something wrong in _check_state_and_get_chore_snapshot_obj and
+                    # hence would have been added to alert already
             case other_:
                 err_str_ = f"Unsupported Chore event - {other_} in chore_journal_key: " \
                            f"{get_chore_journal_log_key(chore_journal_obj)}, {chore_journal_obj = }"
                 logging.error(err_str_)
+
+    def is_amend_risky(self, chore_journal_obj, chore_snapshot, leaves_qty):
+        if chore_journal_obj.chore.side == Side.BUY:
+            if chore_journal_obj.chore.px and chore_journal_obj.chore.px > chore_snapshot.chore_brief.px:
+                return True
+            elif chore_journal_obj.chore.qty and chore_journal_obj.chore.qty > leaves_qty:
+                return True
+            else:
+                return False
+        else:
+            if chore_journal_obj.chore.px and chore_journal_obj.chore.px < chore_snapshot.chore_brief.px:
+                return True
+            elif chore_journal_obj.chore.qty and chore_journal_obj.chore.qty < leaves_qty:
+                return True
+            else:
+                return False
+
+    def is_already_amended(self, chore_snapshot: ChoreSnapshot):
+        if chore_snapshot.chore_brief.side == Side.BUY:
+            if chore_snapshot.last_amend_px and chore_snapshot.last_amend_px == chore_snapshot.chore_brief.px:
+                return True
+            elif chore_snapshot.last_amend_qty and chore_snapshot.last_amend_qty == chore_snapshot.chore_brief.qty:
+                # amend_up is risky in buy so last_amend_qty has been applied to chore_snapshot chore qty
+                # if last_amend_qty != chore qty that means it was amend_dn which is non-risky in buy so needs to be
+                # handled now
+                return True
+            else:
+                return False
+        else:
+            if chore_snapshot.last_amend_px and chore_snapshot.last_amend_px == chore_snapshot.chore_brief.px:
+                return True
+            elif chore_snapshot.last_amend_qty and chore_snapshot.last_amend_qty < chore_snapshot.chore_brief.qty:
+                # in sell both risky and no-risky will have last_amend_qty != chore qty since chore doesn't get
+                # affected with amend_dn which is risky in sell, but if
+                # last_amend_qty > chore qty which is amend_up then it is non-risky and needs to be handled at AMD_ACK
+                # hence when last_amend_qty < chore qty, then amend is already applied
+                return True
+            else:
+                return False
+
+    @staticmethod
+    def get_chore_status_post_amend_applied(
+            chore_event: ChoreEventType, chore_snapshot: ChoreSnapshot,
+            last_chore_status: ChoreStatusType) -> ChoreStatusType:
+        leaves_qty = chore_snapshot.chore_brief.qty - chore_snapshot.total_amend_dn_qty
+        if leaves_qty == chore_snapshot.filled_qty:
+            chore_status = ChoreStatusType.OE_FILLED
+        elif leaves_qty < chore_snapshot.filled_qty:
+            chore_status = ChoreStatusType.OE_OVER_FILLED
+        else:
+            if last_chore_status == ChoreStatusType.OE_DOD:
+                chore_status = ChoreStatusType.OE_DOD
+            else:
+                if last_chore_status == ChoreStatusType.OE_CXL_UNACK:
+                    chore_status = ChoreStatusType.OE_CXL_UNACK
+                else:
+                    if chore_event == ChoreEventType.OE_AMD_UNACK:
+                        chore_status = ChoreStatusType.OE_AMD
+                    else:
+                        chore_status = ChoreStatusType.OE_ACKED
+        return chore_status
+
+    def log_warning_based_on_amended_chore_status(self, amend_event: ChoreEventType, amended_status: ChoreStatusType,
+                                                  last_chore_status: ChoreStatusType, chore_snapshot: ChoreSnapshot,
+                                                  chore_journal_obj: ChoreJournal, last_leaves_qty: int) -> None:
+        if amend_event not in [ChoreEventType.OE_AMD_ACK, ChoreEventType.OE_AMD_UNACK]:
+            logging.error("Unexpected: received amend_event param as non-amend chore event - ignoring logs related "
+                          f"to amend, {amend_event = }, {amended_status = }, {last_chore_status = }, "
+                          f"{last_leaves_qty = }, chore_journal_key: "
+                          f"{get_chore_journal_log_key(chore_journal_obj)};;; "
+                          f"{chore_snapshot = }, {chore_journal_obj = }")
+            return
+
+        if amended_status == ChoreStatusType.OE_OVER_FILLED:
+            if last_chore_status != ChoreStatusType.OE_OVER_FILLED:
+                logging.warning(f"Received {amend_event} for amend qty which makes chore OVER_FILLED, "
+                                f"filled_qty: {chore_snapshot.filled_qty}, "
+                                f"amend_qty: {chore_snapshot.last_amend_qty}, "
+                                f"{last_leaves_qty = } - putting strat to PAUSE and "
+                                f"applying amend, chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)};;; "
+                                f"{chore_journal_obj = }, {chore_snapshot = }")
+                self.pause_strat()
+            else:
+                logging.warning(f"Received {amend_event} for amend qty which makes chore OVER_FILLED to "
+                                "chore which is already OVER_FILLED, "
+                                f"filled_qty: {chore_snapshot.filled_qty}, "
+                                f"amend_qty: {chore_snapshot.last_amend_qty}, "
+                                f"{last_leaves_qty = } - strat must be at PAUSE and "
+                                f"applying amend, chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)};;; "
+                                f"{chore_journal_obj = }, {chore_snapshot = }")
+        elif amended_status == ChoreStatusType.OE_FILLED:
+            logging.warning(f"Received {amend_event} for amend qty which makes chore FILLED, "
+                            f"filled_qty: {chore_snapshot.filled_qty}, "
+                            f"amend_qty: {chore_snapshot.last_amend_qty}, "
+                            f"{last_leaves_qty = } - applying amend and putting "
+                            f"chore as FILLED, chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)};;; "
+                            f"{chore_journal_obj = }, {chore_snapshot = }")
+        elif amended_status == ChoreStatusType.OE_ACKED:
+            if last_chore_status == ChoreStatusType.OE_FILLED:
+                logging.warning(f"Received {amend_event} for amend qty which makes chore ACKED to "
+                                "chore which was FILLED before amend, "
+                                f"chore_id: {chore_snapshot.chore_brief.chore_id}, "
+                                f"filled_qty: {chore_snapshot.filled_qty}, "
+                                f"amend_qty: {chore_snapshot.last_amend_qty}, "
+                                f"{last_leaves_qty = }, chore_journal_key: "
+                                f"{get_chore_journal_log_key(chore_journal_obj)};;; {chore_journal_obj = }, "
+                                f"{chore_snapshot = }")
+            elif last_chore_status == ChoreStatusType.OE_OVER_FILLED:
+                logging.warning(f"Received {amend_event} for amend qty which makes chore ACKED to "
+                                "chore which was OVER_FILLED before amend, "
+                                f"chore_id: {chore_snapshot.chore_brief.chore_id}, "
+                                f"filled_qty: {chore_snapshot.filled_qty}, "
+                                f"amend_qty: {chore_snapshot.last_amend_qty}, "
+                                f"{last_leaves_qty = } - setting strat back to ACTIVE"
+                                f" and applying amend, also ignore OVERFILLED ALERT for this chore"
+                                f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)};;; "
+                                f"{chore_journal_obj = }, {chore_snapshot = }")
+                self.unpause_strat()
+
+    def log_warning_amend_rej_reverted_chore_status(self, reverted_status: ChoreStatusType,
+                                                    last_chore_status: ChoreStatusType, chore_snapshot: ChoreSnapshot,
+                                                    chore_journal_obj: ChoreJournal, last_leaves_qty: int) -> None:
+        if reverted_status == ChoreStatusType.OE_OVER_FILLED:
+            # chore status OVERFILLED is only possible if chore got risky amended before, chore status can't be
+            # OVERFILLED without amend since that means amend req came when chore was OVERFILLED which is not supported
+            log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
+                       f"{last_chore_status} before amend applied - reverted status: {reverted_status}, "
+                       f"filled_qty: {chore_snapshot.filled_qty}, "
+                       f"amend_qty: {chore_snapshot.last_amend_qty}, "
+                       f"{last_leaves_qty = }")
+            if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
+                log_str += (" - strat must be at PAUSE already and "
+                            f"applying amend rollback, chore_journal_key: "
+                            f"{get_chore_journal_log_key(chore_journal_obj)};;; "
+                            f"{chore_journal_obj = }, {chore_snapshot = }")
+                logging.warning(log_str)
+            else:
+                log_str += (" - putting strat to pause and applying amend rollback, chore_journal_key: "
+                            f"{get_chore_journal_log_key(chore_journal_obj)};;; "
+                            f"{chore_journal_obj = }, {chore_snapshot = }")
+                logging.warning(log_str)
+                self.pause_strat()
+        else:
+            log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
+                       f"{last_chore_status} before amend applied - reverted status: {reverted_status}, "
+                       f"filled_qty: {chore_snapshot.filled_qty}, amend_qty: {chore_snapshot.last_amend_qty}, "
+                       f"{last_leaves_qty = }")
+            if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
+                log_str += (" - UNPAUSING strat and applying amend rollback, "
+                            f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)};;; "
+                            f"{chore_journal_obj = }, {chore_snapshot = }")
+                logging.warning(log_str)
+                self.unpause_strat()
+            else:
+                # strat can't be paused if last_chore_status is not OVERFILLED
+                log_str += (f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)};;; "
+                            f"{chore_journal_obj = }, {chore_snapshot = }")
+                logging.warning(log_str)
 
     async def _create_symbol_side_snapshot_for_new_chore(self,
                                                          new_chore_journal_obj: ChoreJournal) -> SymbolSideSnapshot:
@@ -1647,10 +2217,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 symbol_side_snapshot_obj)
         return symbol_side_snapshot_obj
 
-    async def _create_update_symbol_side_snapshot_from_chore_journal(self, chore_journal: ChoreJournal,
-                                                                     chore_snapshot_obj: ChoreSnapshot
-                                                                     ) -> SymbolSideSnapshot | None:
-        async with SymbolSideSnapshot.reentrant_lock:
+    async def _create_update_symbol_side_snapshot_from_chore_journal(
+            self, chore_journal: ChoreJournal, chore_snapshot_obj: ChoreSnapshot) -> SymbolSideSnapshot | None:
+        async with (SymbolSideSnapshot.reentrant_lock):
             symbol_side_snapshot_objs = (
                 self.strat_cache.get_symbol_side_snapshot_from_symbol(chore_journal.chore.security.sec_id))
 
@@ -1676,22 +2245,242 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         updated_symbol_side_snapshot_obj.avg_px = \
                             avg_of_new_val_sum_to_avg(symbol_side_snapshot_obj.avg_px,
                                                       chore_journal.chore.px,
-                                                      updated_symbol_side_snapshot_obj.chore_count
-                                                      )
+                                                      updated_symbol_side_snapshot_obj.chore_count)
                         updated_symbol_side_snapshot_obj.total_qty = int(
                                 symbol_side_snapshot_obj.total_qty + chore_journal.chore.qty)
                         updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
                     case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                           ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
+                        unfilled_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                        chore_snapshot_obj.total_amend_dn_qty)
+                        unfilled_notional = (
+                                unfilled_qty *
+                                self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                chore_snapshot_obj.chore_brief.security.sec_id))
                         updated_symbol_side_snapshot_obj.total_cxled_qty = int(
-                                symbol_side_snapshot_obj.total_cxled_qty + chore_snapshot_obj.cxled_qty)
+                                symbol_side_snapshot_obj.total_cxled_qty + unfilled_qty)
                         updated_symbol_side_snapshot_obj.total_cxled_notional = (
-                                symbol_side_snapshot_obj.total_cxled_notional + chore_snapshot_obj.cxled_notional)
+                                symbol_side_snapshot_obj.total_cxled_notional + unfilled_notional)
                         updated_symbol_side_snapshot_obj.avg_cxled_px = (
                                 self.get_local_px_or_notional(updated_symbol_side_snapshot_obj.total_cxled_notional,
                                                               symbol_side_snapshot_obj.security.sec_id) /
                                 updated_symbol_side_snapshot_obj.total_cxled_qty) \
                             if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0
+                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
+                    case ChoreEventType.OE_AMD_UNACK | ChoreEventType.OE_AMD_ACK:
+                        if chore_snapshot_obj.last_amend_qty is None and chore_snapshot_obj.last_amend_px is None:
+                            logging.error("Unexpected: received both amended px and qty as None while applying "
+                                          "amend on symbol_side_snapshot - ignoring strat_brief update")
+                            return
+
+                        if chore_snapshot_obj.last_amend_qty:
+                            # handling amend dn
+                            if chore_snapshot_obj.last_leaves_qty > chore_snapshot_obj.last_amend_qty:
+                                if chore_snapshot_obj.chore_status != ChoreStatusType.OE_DOD:
+                                    # putting amended dn qty to cxled_qty and updating notional and avg_cxled_px
+                                    cxled_qty = chore_snapshot_obj.last_leaves_qty - chore_snapshot_obj.last_amend_qty
+                                    updated_symbol_side_snapshot_obj.total_cxled_qty = (
+                                        symbol_side_snapshot_obj.total_cxled_qty + cxled_qty)
+                                    updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                                            symbol_side_snapshot_obj.total_cxled_notional +
+                                            (cxled_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                         chore_snapshot_obj.chore_brief.security.sec_id)))
+                                    updated_symbol_side_snapshot_obj.avg_cxled_px = (
+                                        (self.get_local_px_or_notional(
+                                            updated_symbol_side_snapshot_obj.total_cxled_notional,
+                                            symbol_side_snapshot_obj.security.sec_id) /
+                                            updated_symbol_side_snapshot_obj.total_cxled_qty)
+                                        if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0)
+                                else:
+                                    removed_qty = (chore_snapshot_obj.last_leaves_qty -
+                                                   chore_snapshot_obj.last_amend_qty)
+                                    if chore_snapshot_obj.last_amend_px:
+                                        # if px got amended then chore px is changed to amended value so removing
+                                        # cxl_notional with old px and updating new notional with amended px
+                                        removed_old_notional = (
+                                                removed_qty *
+                                                self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                chore_snapshot_obj.chore_brief.security.sec_id))
+                                        removed_new_notional = (
+                                                removed_qty *
+                                                self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                chore_snapshot_obj.chore_brief.security.sec_id))
+
+                                        updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                                            (symbol_side_snapshot_obj.total_cxled_notional -
+                                             removed_old_notional + removed_new_notional))
+                                        updated_symbol_side_snapshot_obj.avg_cxled_px = (
+                                            (self.get_local_px_or_notional(updated_symbol_side_snapshot_obj.total_cxled_notional,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id) /
+                                             symbol_side_snapshot_obj.total_cxled_qty)
+                                            if symbol_side_snapshot_obj.total_cxled_qty != 0 else 0)
+                            else:
+                                # adding amended up qty to total_qty
+                                updated_symbol_side_snapshot_obj.total_qty = (
+                                        symbol_side_snapshot_obj.total_qty - chore_snapshot_obj.last_original_qty +
+                                        chore_snapshot_obj.last_amend_qty)
+                                if chore_snapshot_obj.chore_status == ChoreStatusType.OE_DOD:
+                                    # AMD: if chore status is DOD that means amend is post DOD - adding amended up
+                                    # qty to cxled_qty
+                                    additional_qty = (chore_snapshot_obj.last_amend_qty -
+                                                      chore_snapshot_obj.last_leaves_qty)
+                                    updated_symbol_side_snapshot_obj.total_cxled_qty = (
+                                            symbol_side_snapshot_obj.total_cxled_qty + additional_qty)
+                                    if chore_snapshot_obj.last_amend_px:
+                                        updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                                                symbol_side_snapshot_obj.total_cxled_notional +
+                                                (additional_qty * self.get_usd_px(chore_snapshot_obj.last_amend_px,
+                                                                                  chore_snapshot_obj.chore_brief.
+                                                                                  security.sec_id)))
+                                    else:
+                                        updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                                                symbol_side_snapshot_obj.total_cxled_notional +
+                                                (additional_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                                  chore_snapshot_obj.chore_brief.
+                                                                                  security.sec_id)))
+                                    updated_symbol_side_snapshot_obj.avg_cxled_px = (
+                                        (self.get_local_px_or_notional(
+                                            updated_symbol_side_snapshot_obj.total_cxled_notional,
+                                            symbol_side_snapshot_obj.security.sec_id) /
+                                         updated_symbol_side_snapshot_obj.total_cxled_qty)
+                                        if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0)
+                                # else not required: no cxl handling is required in amend up if chore is not DOD
+                        if chore_snapshot_obj.last_amend_px:
+                            current_cumulative_notional = (symbol_side_snapshot_obj.avg_px *
+                                                           symbol_side_snapshot_obj.total_qty)
+                            # not calculating notional with usd px since avg_px is in local px
+                            old_chore_notional = (chore_snapshot_obj.last_original_qty *
+                                                  chore_snapshot_obj.last_original_px)
+                            if chore_snapshot_obj.last_amend_qty:
+                                if chore_snapshot_obj.last_amend_qty > chore_snapshot_obj.last_leaves_qty:
+                                    # chore qty is increased to amended qty if qty is amended up
+                                    new_chore_notional = (chore_snapshot_obj.last_amend_qty *
+                                                          chore_snapshot_obj.last_amend_px)
+                                else:
+                                    # chore qty stays unchanged if qty is amended dn
+                                    new_chore_notional = (chore_snapshot_obj.last_original_qty *
+                                                          chore_snapshot_obj.last_amend_px)
+                            else:
+                                new_chore_notional = (chore_snapshot_obj.chore_brief.qty *
+                                                      chore_snapshot_obj.last_amend_px)
+                            new_cumulative_notional = (
+                                    current_cumulative_notional - old_chore_notional + new_chore_notional)
+                            if chore_snapshot_obj.last_amend_qty:
+                                if chore_snapshot_obj.last_leaves_qty < chore_snapshot_obj.last_amend_qty:
+                                    updated_symbol_side_snapshot_obj.avg_px = (
+                                            new_cumulative_notional / updated_symbol_side_snapshot_obj.total_qty)
+                                else:
+                                    updated_symbol_side_snapshot_obj.avg_px = (
+                                            new_cumulative_notional / symbol_side_snapshot_obj.total_qty)
+                            else:
+                                updated_symbol_side_snapshot_obj.avg_px = (
+                                        new_cumulative_notional / symbol_side_snapshot_obj.total_qty)
+                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
+                    case ChoreEventType.OE_AMD_REJ:
+                        if chore_snapshot_obj.last_amend_qty is None and chore_snapshot_obj.last_amend_px is None:
+                            logging.error("Unexpected: received both amended px and qty as None while applying "
+                                          "amend rej rollback on symbol_side_snapshot - ignoring strat_brief update")
+                            return
+
+                        if chore_snapshot_obj.last_amend_qty:
+                            if chore_snapshot_obj.last_leaves_qty > chore_snapshot_obj.last_amend_qty:
+                                if chore_snapshot_obj.chore_status != ChoreStatusType.OE_DOD:
+                                    # removing amended dn qty from cxled_qty and updating notional and avg_cxled_px
+                                    cxled_qty = chore_snapshot_obj.last_leaves_qty - chore_snapshot_obj.last_amend_qty
+                                    updated_symbol_side_snapshot_obj.total_cxled_qty = (
+                                            symbol_side_snapshot_obj.total_cxled_qty - cxled_qty)
+                                    updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                                            symbol_side_snapshot_obj.total_cxled_notional -
+                                            (cxled_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                         chore_snapshot_obj.chore_brief.security.sec_id)))
+                                    updated_symbol_side_snapshot_obj.avg_cxled_px = (
+                                        (self.get_local_px_or_notional(
+                                            updated_symbol_side_snapshot_obj.total_cxled_notional,
+                                            symbol_side_snapshot_obj.security.sec_id) /
+                                         updated_symbol_side_snapshot_obj.total_cxled_qty)
+                                        if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0)
+                                else:
+                                    removed_qty = (chore_snapshot_obj.last_leaves_qty -
+                                                   chore_snapshot_obj.last_amend_qty)
+                                    if chore_snapshot_obj.last_amend_px:
+                                        # if px got amended then chore px is changed to amended value so removing
+                                        # cxl_notional with amended px and updating new notional with original px
+                                        removed_old_notional = (
+                                                removed_qty *
+                                                self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                chore_snapshot_obj.chore_brief.security.sec_id))
+                                        removed_amended_notional = (
+                                                removed_qty *
+                                                self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                chore_snapshot_obj.chore_brief.security.sec_id))
+
+                                        updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                                            (symbol_side_snapshot_obj.total_cxled_notional +
+                                             removed_old_notional - removed_amended_notional))
+                                        updated_symbol_side_snapshot_obj.avg_cxled_px = (
+                                            (self.get_local_px_or_notional(
+                                                updated_symbol_side_snapshot_obj.total_cxled_notional,
+                                                chore_snapshot_obj.chore_brief.security.sec_id) /
+                                             symbol_side_snapshot_obj.total_cxled_qty)
+                                            if symbol_side_snapshot_obj.total_cxled_qty != 0 else 0)
+                            else:
+                                updated_symbol_side_snapshot_obj.total_qty = (
+                                        symbol_side_snapshot_obj.total_qty + chore_snapshot_obj.last_original_qty -
+                                        chore_snapshot_obj.last_amend_qty)
+                                if chore_snapshot_obj.chore_status == ChoreStatusType.OE_DOD:
+                                    # AMD: if chore status is DOD that means amend is post DOD - removing amended up
+                                    # qty to cxled_qty
+                                    additional_qty = (chore_snapshot_obj.last_amend_qty -
+                                                      chore_snapshot_obj.last_leaves_qty)
+                                    updated_symbol_side_snapshot_obj.total_cxled_qty = (
+                                            symbol_side_snapshot_obj.total_cxled_qty - additional_qty)
+                                    if chore_snapshot_obj.last_amend_px:
+                                        updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                                                symbol_side_snapshot_obj.total_cxled_notional -
+                                                (additional_qty * self.get_usd_px(chore_snapshot_obj.last_amend_px,
+                                                                                  chore_snapshot_obj.chore_brief.security.sec_id)))
+                                    else:
+                                        updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                                                symbol_side_snapshot_obj.total_cxled_notional -
+                                                (additional_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                                  chore_snapshot_obj.chore_brief.security.sec_id)))
+                                    updated_symbol_side_snapshot_obj.avg_cxled_px = (
+                                        (self.get_local_px_or_notional(
+                                            updated_symbol_side_snapshot_obj.total_cxled_notional,
+                                            symbol_side_snapshot_obj.security.sec_id) /
+                                         updated_symbol_side_snapshot_obj.total_cxled_qty)
+                                        if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0)
+                                # else not required: no cxl handling is required in amend up if chore is not DOD
+                        if chore_snapshot_obj.last_amend_px:
+                            current_cumulative_notional = (symbol_side_snapshot_obj.avg_px *
+                                                           symbol_side_snapshot_obj.total_qty)
+                            # not calculating notional with usd px since avg_px is in local px
+                            old_chore_notional = (chore_snapshot_obj.last_original_qty *
+                                                  chore_snapshot_obj.last_original_px)
+                            if chore_snapshot_obj.last_amend_qty:
+                                if chore_snapshot_obj.last_amend_qty > chore_snapshot_obj.last_leaves_qty:
+                                    # chore qty is increased to amended qty if qty is amended up
+                                    new_chore_notional = (chore_snapshot_obj.last_amend_qty *
+                                                          chore_snapshot_obj.last_amend_px)
+                                else:
+                                    # chore qty stays unchanged if qty is amended dn
+                                    new_chore_notional = (chore_snapshot_obj.last_original_qty *
+                                                          chore_snapshot_obj.last_amend_px)
+                            else:
+                                new_chore_notional = (chore_snapshot_obj.chore_brief.qty *
+                                                      chore_snapshot_obj.last_amend_px)
+                            new_cumulative_notional = (
+                                    current_cumulative_notional + old_chore_notional - new_chore_notional)
+                            if chore_snapshot_obj.last_amend_qty:
+                                if chore_snapshot_obj.last_leaves_qty < chore_snapshot_obj.last_amend_qty:
+                                    updated_symbol_side_snapshot_obj.avg_px = (
+                                            new_cumulative_notional / updated_symbol_side_snapshot_obj.total_qty)
+                                else:
+                                    updated_symbol_side_snapshot_obj.avg_px = (
+                                            new_cumulative_notional / symbol_side_snapshot_obj.total_qty)
+                            else:
+                                updated_symbol_side_snapshot_obj.avg_px = (
+                                        new_cumulative_notional / symbol_side_snapshot_obj.total_qty)
                         updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
                     case other_:
                         err_str_ = f"Unsupported StratEventType for symbol_side_snapshot update {other_} " \
@@ -1726,6 +2515,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                  f"{expected_status_list = }, {ord_journal_key = }, {ord_snapshot_key = };;; "
                                  f"{chore_journal_obj = }, {chore_snapshot_obj = }")
                 logging.error(err_str_)
+                return None
         # else not required: error occurred in _get_chore_snapshot_from_chore_journal_chore_id,
         # alert must have updated
 
@@ -1753,15 +2543,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                                   ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                                 total_buy_unfilled_qty = \
-                                    int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
+                                    int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                        chore_snapshot.total_amend_dn_qty)
                                 update_strat_status_obj.total_open_buy_qty -= total_buy_unfilled_qty
                                 update_strat_status_obj.total_open_buy_notional -= \
                                     (total_buy_unfilled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                               chore_snapshot.chore_brief.security.sec_id))
-                                update_strat_status_obj.total_cxl_buy_qty += int(chore_snapshot.cxled_qty)
+                                update_strat_status_obj.total_cxl_buy_qty += int(total_buy_unfilled_qty)
                                 update_strat_status_obj.total_cxl_buy_notional += \
-                                    chore_snapshot.cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                                               chore_snapshot.chore_brief.security.sec_id)
+                                    total_buy_unfilled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                             chore_snapshot.chore_brief.security.sec_id)
                                 update_strat_status_obj.avg_cxl_buy_px = (
                                     (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_buy_notional,
                                                                    chore_journal_obj.chore.security.sec_id) / update_strat_status_obj.total_cxl_buy_qty)
@@ -1769,6 +2560,304 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 update_strat_status_obj.total_cxl_exposure = \
                                     update_strat_status_obj.total_cxl_buy_notional - \
                                     update_strat_status_obj.total_cxl_sell_notional
+                            case ChoreEventType.OE_AMD_UNACK | ChoreEventType.OE_AMD_ACK:
+                                if chore_snapshot.last_amend_qty is None and chore_snapshot.last_amend_px is None:
+                                    logging.error("Unexpected: received both amended px and qty as None while applying "
+                                                  "amend on strat_brief - ignoring strat_brief update")
+                                    return
+
+                                if chore_snapshot.last_amend_qty:
+                                    update_strat_status_obj.total_buy_qty = (
+                                        update_strat_status_obj.total_buy_qty - chore_snapshot.last_original_qty +
+                                        chore_snapshot.chore_brief.qty)
+                                    if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                        if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                            amended_dn_qty = (chore_snapshot.last_leaves_qty -
+                                                              chore_snapshot.last_amend_qty)
+
+                                            # since chore qty doesn't get changed in amend dn on qty and cxled qty
+                                            # is increased - removing newly added amend_dn qty from old cxled qty
+                                            old_open_qty = (chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                            (chore_snapshot.cxled_qty - amended_dn_qty))
+                                            new_open_qty = (chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                                            chore_snapshot.cxled_qty)
+                                        else:
+                                            old_open_qty = (chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                            chore_snapshot.cxled_qty)
+                                            new_open_qty = (chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                                            chore_snapshot.cxled_qty)
+
+                                        if old_open_qty < 0:
+                                            # AMD: may happen when original qty < filled_qty, i.e., when some chore
+                                            # was OVER_FILLED pre amend - no open exists in this case
+                                            old_open_qty = 0
+                                        if new_open_qty < 0:
+                                            # AMD: may happen when amended qty < filled_qty, i.e., when some chore
+                                            # becomes OVER_FILLED post amend - no open exists in this case
+                                            new_open_qty = 0
+                                        update_strat_status_obj.total_open_buy_qty = (
+                                            update_strat_status_obj.total_open_buy_qty - old_open_qty + new_open_qty)
+
+                                        if chore_snapshot.last_amend_px:
+                                            old_open_notional = (
+                                                    old_open_qty * self.get_usd_px(chore_snapshot.last_original_px,
+                                                                                   chore_snapshot.chore_brief.security.sec_id))
+                                            new_open_notional = (
+                                                    new_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                                   chore_snapshot.chore_brief.security.sec_id))
+                                        else:
+                                            old_open_notional = (
+                                                    old_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                                   chore_snapshot.chore_brief.security.sec_id))
+                                            new_open_notional = (
+                                                    new_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                                   chore_snapshot.chore_brief.security.sec_id))
+                                        update_strat_status_obj.total_open_buy_notional = (
+                                            update_strat_status_obj.total_open_buy_notional - old_open_notional +
+                                            new_open_notional)
+                                    # AMD: else not required: if chore status is DOD with AMD_ACK event then it is the
+                                    # case of amend post DOD so open would already be removed while handling DOD
+
+                                    if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                        if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                            cxled_qty = chore_snapshot.last_leaves_qty - chore_snapshot.last_amend_qty
+                                            update_strat_status_obj.total_cxl_buy_qty += cxled_qty
+
+                                            update_strat_status_obj.total_cxl_buy_notional += \
+                                                cxled_qty * self.get_usd_px(chore_snapshot.last_original_px,
+                                                                            chore_snapshot.chore_brief.security.sec_id)
+                                            update_strat_status_obj.avg_cxl_buy_px = (
+                                                (self.get_local_px_or_notional(
+                                                    update_strat_status_obj.total_cxl_buy_notional,
+                                                    chore_journal_obj.chore.security.sec_id) /
+                                                 update_strat_status_obj.total_cxl_buy_qty)
+                                                if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
+                                        else:
+                                            removed_qty = (chore_snapshot.last_leaves_qty -
+                                                           chore_snapshot.last_amend_qty)
+                                            if chore_snapshot.last_amend_px:
+                                                # if px got amended then chore px is changed to amended value so
+                                                # removing cxl_notional with ol px and updating new notional
+                                                # with amended px
+                                                removed_old_notional = (
+                                                        removed_qty *
+                                                        self.get_usd_px(chore_snapshot.last_original_px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                                removed_new_notional = (
+                                                        removed_qty *
+                                                        self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+
+                                                update_strat_status_obj.total_cxl_buy_notional = (
+                                                        update_strat_status_obj.total_cxl_buy_notional -
+                                                        removed_old_notional + removed_new_notional)
+                                                update_strat_status_obj.avg_cxl_buy_px = (
+                                                    (self.get_local_px_or_notional(
+                                                        update_strat_status_obj.total_cxl_buy_notional,
+                                                        chore_journal_obj.chore.security.sec_id) /
+                                                     update_strat_status_obj.total_cxl_buy_qty)
+                                                    if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
+                                            # else not required: if chore is in DOD state and px is not amended in this
+                                            # amend then amend dn notional is already in cxled notional
+                                        update_strat_status_obj.total_cxl_exposure = \
+                                            update_strat_status_obj.total_cxl_buy_notional - \
+                                            update_strat_status_obj.total_cxl_sell_notional
+                                    else:
+                                        # if chore is amended post DOD then adding amended up qty to cxled qty
+                                        if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
+                                            additional_qty = (chore_snapshot.last_amend_qty -
+                                                              chore_snapshot.last_leaves_qty)
+                                            if chore_snapshot.last_amend_px:
+                                                additional_new_notional = (
+                                                        additional_qty *
+                                                        self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                            else:
+                                                additional_new_notional = (
+                                                        additional_qty *
+                                                        self.get_usd_px(chore_snapshot.last_original_px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                            update_strat_status_obj.total_cxl_buy_qty += additional_qty
+                                            update_strat_status_obj.total_cxl_buy_notional += additional_new_notional
+                                            update_strat_status_obj.avg_cxl_buy_px = (
+                                                (self.get_local_px_or_notional(
+                                                    update_strat_status_obj.total_cxl_buy_notional,
+                                                    chore_journal_obj.chore.security.sec_id) /
+                                                 update_strat_status_obj.total_cxl_buy_qty)
+                                                if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
+
+                                            update_strat_status_obj.total_cxl_exposure = \
+                                                update_strat_status_obj.total_cxl_buy_notional - \
+                                                update_strat_status_obj.total_cxl_sell_notional
+                                        # AMD: else not required: if chore is not DOD then amend up has no handling
+                                        # for cxled qty
+                                else:
+                                    old_open_notional = (
+                                            update_strat_status_obj.total_open_buy_qty *
+                                            self.get_usd_px(chore_snapshot.last_original_px,
+                                                            chore_snapshot.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            update_strat_status_obj.total_open_buy_qty *
+                                            self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                            chore_snapshot.chore_brief.security.sec_id))
+                                    update_strat_status_obj.total_open_buy_notional = (
+                                            update_strat_status_obj.total_open_buy_notional - old_open_notional +
+                                            new_open_notional)
+                            case ChoreEventType.OE_AMD_REJ:
+                                if chore_snapshot.last_amend_qty is None and chore_snapshot.last_amend_px is None:
+                                    logging.error("Unexpected: received both amended px and qty as None while applying "
+                                                  "amend on strat_brief - ignoring strat_brief update")
+                                    return
+
+                                if chore_snapshot.last_amend_qty:
+                                    if chore_snapshot.last_amend_qty > chore_snapshot.last_leaves_qty:
+                                        update_strat_status_obj.total_buy_qty = (
+                                            update_strat_status_obj.total_buy_qty + chore_snapshot.last_original_qty -
+                                            chore_snapshot.last_amend_qty)
+                                    # else not required: qty stays unchanged in amended dn - no revert required
+                                    if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                        if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                            amended_dn_qty = (chore_snapshot.last_leaves_qty -
+                                                              chore_snapshot.last_amend_qty)
+
+                                            # since chore qty doesn't get changed in amend dn on qty and
+                                            # cxled qty is increased - removing added amend_dn qty from new_open_qty
+                                            old_open_qty = (
+                                                        chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                        chore_snapshot.cxled_qty)
+                                            new_open_qty = (
+                                                        chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                        (chore_snapshot.cxled_qty + amended_dn_qty))
+                                        else:
+                                            old_open_qty = (
+                                                        chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                        chore_snapshot.cxled_qty)
+                                            new_open_qty = (chore_snapshot.last_amend_qty - chore_snapshot.filled_qty -
+                                                            chore_snapshot.cxled_qty)
+
+                                        if old_open_qty < 0:
+                                            # AMD: may happen when original qty < filled_qty, i.e., when some chore
+                                            # was OVER_FILLED pre amend - no open exists in this case
+                                            old_open_qty = 0
+                                        if new_open_qty < 0:
+                                            # AMD: may happen when amended qty < filled_qty, i.e., when some chore
+                                            # becomes OVER_FILLED post amend - no open exists in this case
+                                            new_open_qty = 0
+
+                                        # reverting open computes
+                                        update_strat_status_obj.total_open_buy_qty = (
+                                                update_strat_status_obj.total_open_buy_qty +
+                                                old_open_qty - new_open_qty)
+
+                                        if chore_snapshot.last_amend_px:
+                                            old_open_notional = (
+                                                    old_open_qty *
+                                                    self.get_usd_px(chore_snapshot.last_original_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                            new_open_notional = (
+                                                    new_open_qty *
+                                                    self.get_usd_px(chore_snapshot.last_amend_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        else:
+                                            old_open_notional = (
+                                                    old_open_qty *
+                                                    self.get_usd_px(chore_snapshot.last_original_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                            new_open_notional = (
+                                                    new_open_qty *
+                                                    self.get_usd_px(chore_snapshot.last_original_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        update_strat_status_obj.total_open_buy_notional = (
+                                                update_strat_status_obj.total_open_buy_notional + old_open_notional -
+                                                new_open_notional)
+                                    # AMD: else not required: if chore status is DOD with AMD_ACK event then it is the
+                                    # case of amend post DOD so open would already be removed while handling DOD
+
+                                    if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                        if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                            cxled_qty = chore_snapshot.last_leaves_qty - chore_snapshot.last_amend_qty
+                                            update_strat_status_obj.total_cxl_buy_qty -= cxled_qty
+
+                                            update_strat_status_obj.total_cxl_buy_notional -= \
+                                                cxled_qty * self.get_usd_px(chore_snapshot.last_original_px,
+                                                                            chore_snapshot.chore_brief.security.sec_id)
+                                            update_strat_status_obj.avg_cxl_buy_px = (
+                                                (self.get_local_px_or_notional(
+                                                    update_strat_status_obj.total_cxl_buy_notional,
+                                                    chore_journal_obj.chore.security.sec_id) /
+                                                 update_strat_status_obj.total_cxl_buy_qty)
+                                                if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
+                                        else:
+                                            removed_qty = (chore_snapshot.last_leaves_qty -
+                                                           chore_snapshot.last_amend_qty)
+                                            if chore_snapshot.last_amend_px:
+                                                # if px got amended then chore px is changed to amended value so
+                                                # removing cxl_notional with old px and updating new notional
+                                                # with amended px
+                                                removed_old_notional = (
+                                                        removed_qty *
+                                                        self.get_usd_px(chore_snapshot.last_original_px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                                removed_new_notional = (
+                                                        removed_qty *
+                                                        self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+
+                                                update_strat_status_obj.total_cxl_buy_notional = (
+                                                        update_strat_status_obj.total_cxl_buy_notional +
+                                                        removed_old_notional - removed_new_notional)
+                                                update_strat_status_obj.avg_cxl_buy_px = (
+                                                    (self.get_local_px_or_notional(
+                                                        update_strat_status_obj.total_cxl_buy_notional,
+                                                        chore_journal_obj.chore.security.sec_id) /
+                                                     update_strat_status_obj.total_cxl_buy_qty)
+                                                    if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
+                                            # else not required: if chore is in DOD state and px is not amended in this
+                                            # amend then amend dn notional is already in cxled notional
+                                        update_strat_status_obj.total_cxl_exposure = \
+                                            update_strat_status_obj.total_cxl_buy_notional - \
+                                            update_strat_status_obj.total_cxl_sell_notional
+                                    else:
+                                        # if chore is amended post DOD then adding amended up qty to cxled qty
+                                        if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
+                                            additional_qty = (chore_snapshot.last_amend_qty -
+                                                              chore_snapshot.last_leaves_qty)
+                                            if chore_snapshot.last_amend_px:
+                                                additional_new_notional = (
+                                                        additional_qty *
+                                                        self.get_usd_px(chore_snapshot.last_amend_px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                            else:
+                                                additional_new_notional = (
+                                                        additional_qty *
+                                                        self.get_usd_px(chore_snapshot.last_original_px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                            update_strat_status_obj.total_cxl_buy_qty -= additional_qty
+                                            update_strat_status_obj.total_cxl_buy_notional -= additional_new_notional
+                                            update_strat_status_obj.avg_cxl_buy_px = (
+                                                (self.get_local_px_or_notional(
+                                                    update_strat_status_obj.total_cxl_buy_notional,
+                                                    chore_journal_obj.chore.security.sec_id) /
+                                                 update_strat_status_obj.total_cxl_buy_qty)
+                                                if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
+
+                                            update_strat_status_obj.total_cxl_exposure = \
+                                                update_strat_status_obj.total_cxl_buy_notional - \
+                                                update_strat_status_obj.total_cxl_sell_notional
+                                        # AMD: else not required: if chore is not DOD then amend up has no handling
+                                        # for cxled qty
+                                else:
+                                    old_open_notional = (
+                                            update_strat_status_obj.total_open_buy_qty *
+                                            self.get_usd_px(chore_snapshot.last_original_px,
+                                                            chore_snapshot.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            update_strat_status_obj.total_open_buy_qty *
+                                            self.get_usd_px(chore_snapshot.last_amend_px,
+                                                            chore_snapshot.chore_brief.security.sec_id))
+                                    update_strat_status_obj.total_open_buy_notional = (
+                                            update_strat_status_obj.total_open_buy_notional + old_open_notional -
+                                            new_open_notional)
                             case other_:
                                 err_str_ = f"Unsupported Chore Event type {other_}, " \
                                            f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
@@ -1792,15 +2881,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                                   ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                                 total_sell_unfilled_qty = \
-                                    int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
+                                    int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                        chore_snapshot.total_amend_dn_qty)
                                 update_strat_status_obj.total_open_sell_qty -= total_sell_unfilled_qty
                                 update_strat_status_obj.total_open_sell_notional -= \
                                     (total_sell_unfilled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                                chore_snapshot.chore_brief.security.sec_id))
-                                update_strat_status_obj.total_cxl_sell_qty += int(chore_snapshot.cxled_qty)
+                                update_strat_status_obj.total_cxl_sell_qty += int(total_sell_unfilled_qty)
                                 update_strat_status_obj.total_cxl_sell_notional += \
-                                    chore_snapshot.cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                                               chore_snapshot.chore_brief.security.sec_id)
+                                    total_sell_unfilled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                              chore_snapshot.chore_brief.security.sec_id)
                                 update_strat_status_obj.avg_cxl_sell_px = (
                                     (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_sell_notional,
                                                                    chore_journal_obj.chore.security.sec_id) / update_strat_status_obj.total_cxl_sell_qty)
@@ -1808,6 +2898,298 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 update_strat_status_obj.total_cxl_exposure = \
                                     update_strat_status_obj.total_cxl_buy_notional - \
                                     update_strat_status_obj.total_cxl_sell_notional
+                            case ChoreEventType.OE_AMD_UNACK | ChoreEventType.OE_AMD_ACK:
+                                if chore_snapshot.last_amend_qty is None and chore_snapshot.last_amend_px is None:
+                                    logging.error("Unexpected: received both amended px and qty as None while applying "
+                                                  "amend on strat_brief - ignoring strat_brief update")
+                                    return
+
+                                if chore_snapshot.last_amend_qty:
+                                    update_strat_status_obj.total_sell_qty = (
+                                        update_strat_status_obj.total_sell_qty - chore_snapshot.last_original_qty +
+                                        chore_snapshot.chore_brief.qty)
+                                    if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                        if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                            amended_dn_qty = (chore_snapshot.last_leaves_qty -
+                                                              chore_snapshot.last_amend_qty)
+
+                                            # since chore qty doesn't get changed in amend dn on qty and
+                                            # cxled qty is increased - removing newly added amend_dn qty from old open qty
+                                            old_open_qty = (chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                            (chore_snapshot.cxled_qty - amended_dn_qty))
+                                            new_open_qty = (chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                                            chore_snapshot.cxled_qty)
+                                        else:
+                                            old_open_qty = (chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                            chore_snapshot.cxled_qty)
+                                            new_open_qty = (chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                                            chore_snapshot.cxled_qty)
+                                        if old_open_qty < 0:
+                                            # may happen when original qty < filled_qty, i.e., when some chore
+                                            # was OVER_FILLED pre amend - no open exists in this case
+                                            old_open_qty = 0
+                                        if new_open_qty < 0:
+                                            # may happen when amended qty < filled_qty, i.e., when some chore
+                                            # becomes OVER_FILLED post amend - no open exists in this case
+                                            new_open_qty = 0
+                                        update_strat_status_obj.total_open_sell_qty = (
+                                            update_strat_status_obj.total_open_sell_qty - old_open_qty + new_open_qty)
+
+                                        if chore_snapshot.last_amend_px:
+                                            old_open_notional = (
+                                                    old_open_qty * self.get_usd_px(chore_snapshot.last_original_px,
+                                                                                   chore_snapshot.chore_brief.security.sec_id))
+                                            new_open_notional = (
+                                                    new_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                                   chore_snapshot.chore_brief.security.sec_id))
+                                        else:
+                                            old_open_notional = (
+                                                    old_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                                   chore_snapshot.chore_brief.security.sec_id))
+                                            new_open_notional = (
+                                                    new_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                                   chore_snapshot.chore_brief.security.sec_id))
+                                        update_strat_status_obj.total_open_sell_notional = (
+                                            update_strat_status_obj.total_open_sell_notional - old_open_notional +
+                                            new_open_notional)
+                                    else:
+                                        # if chore is amended post DOD then adding amended up qty to cxled qty
+                                        if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
+                                            additional_qty = (chore_snapshot.last_amend_qty -
+                                                              chore_snapshot.last_leaves_qty)
+                                            if chore_snapshot.last_amend_px:
+                                                additional_new_notional = (
+                                                        additional_qty *
+                                                        self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                            else:
+                                                additional_new_notional = (
+                                                        additional_qty *
+                                                        self.get_usd_px(chore_snapshot.last_original_px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                            update_strat_status_obj.total_cxl_sell_qty += additional_qty
+                                            update_strat_status_obj.total_cxl_sell_notional += additional_new_notional
+                                            update_strat_status_obj.avg_cxl_sell_px = (
+                                                (self.get_local_px_or_notional(
+                                                    update_strat_status_obj.total_cxl_sell_notional,
+                                                    chore_journal_obj.chore.security.sec_id) /
+                                                 update_strat_status_obj.total_cxl_sell_qty)
+                                                if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
+
+                                            update_strat_status_obj.total_cxl_exposure = \
+                                                update_strat_status_obj.total_cxl_buy_notional - \
+                                                update_strat_status_obj.total_cxl_sell_notional
+                                        # AMD: else not required: if chore is not DOD then amend up has no handling
+                                        # for cxled qty
+
+                                    if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                        if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                            cxled_qty = chore_snapshot.last_leaves_qty - chore_snapshot.last_amend_qty
+                                            update_strat_status_obj.total_cxl_sell_qty += cxled_qty
+
+                                            update_strat_status_obj.total_cxl_sell_notional += \
+                                                cxled_qty * self.get_usd_px(chore_snapshot.last_original_px,
+                                                                            chore_snapshot.chore_brief.security.sec_id)
+                                            update_strat_status_obj.avg_cxl_sell_px = (
+                                                (self.get_local_px_or_notional(
+                                                    update_strat_status_obj.total_cxl_sell_notional,
+                                                    chore_journal_obj.chore.security.sec_id) /
+                                                 update_strat_status_obj.total_cxl_sell_qty)
+                                                if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
+                                            update_strat_status_obj.total_cxl_exposure = \
+                                                update_strat_status_obj.total_cxl_buy_notional - \
+                                                update_strat_status_obj.total_cxl_sell_notional
+                                        else:
+                                            removed_qty = chore_snapshot.last_leaves_qty - chore_snapshot.last_amend_qty
+                                            if chore_snapshot.last_amend_px:
+                                                # if px got amended then chore px is changed to amended value so
+                                                # removing cxl_notional with ol px and updating new notional
+                                                # with amended px
+                                                removed_old_notional = (
+                                                        removed_qty *
+                                                        self.get_usd_px(chore_snapshot.last_original_px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                                removed_new_notional = (
+                                                        removed_qty *
+                                                        self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+
+                                                update_strat_status_obj.total_cxl_sell_notional = (
+                                                        update_strat_status_obj.total_cxl_sell_notional -
+                                                        removed_old_notional + removed_new_notional)
+                                                update_strat_status_obj.avg_cxl_sell_px = (
+                                                    (self.get_local_px_or_notional(
+                                                        update_strat_status_obj.total_cxl_sell_notional,
+                                                        chore_journal_obj.chore.security.sec_id) /
+                                                     update_strat_status_obj.total_cxl_sell_qty)
+                                                    if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
+                                            # else not required: if chore is in DOD state and px is not amended in this
+                                            # amend then amend dn notional is already in cxled notional
+                                else:
+                                    old_open_notional = (
+                                            update_strat_status_obj.total_open_sell_qty *
+                                            self.get_usd_px(chore_snapshot.last_original_px,
+                                                            chore_snapshot.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            update_strat_status_obj.total_open_sell_qty *
+                                            self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                            chore_snapshot.chore_brief.security.sec_id))
+                                    update_strat_status_obj.total_open_sell_notional = (
+                                            update_strat_status_obj.total_open_sell_notional - old_open_notional +
+                                            new_open_notional)
+                            case ChoreEventType.OE_AMD_REJ:
+                                if chore_snapshot.last_amend_qty is None and chore_snapshot.last_amend_px is None:
+                                    logging.error("Unexpected: received both amended px and qty as None while applying "
+                                                  "amend on strat_brief - ignoring strat_brief update")
+                                    return
+
+                                if chore_snapshot.last_amend_qty:
+                                    if chore_snapshot.last_amend_qty > chore_snapshot.last_leaves_qty:
+                                        update_strat_status_obj.total_sell_qty = (
+                                                update_strat_status_obj.total_sell_qty +
+                                                chore_snapshot.last_original_qty -
+                                                chore_snapshot.last_amend_qty)
+                                    # else not required: qty stays unchanged in amended dn - no revert required
+                                    if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                        if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                            amended_dn_qty = (chore_snapshot.last_leaves_qty -
+                                                              chore_snapshot.last_amend_qty)
+
+                                            # since chore qty doesn't get changed in amend dn on qty and
+                                            # cxled qty is increased - removing added amend_dn qty from new_open_qty
+                                            old_open_qty = (
+                                                        chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                        chore_snapshot.cxled_qty)
+                                            new_open_qty = (
+                                                        chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                        (chore_snapshot.cxled_qty + amended_dn_qty))
+                                        else:
+                                            old_open_qty = (
+                                                    chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                    chore_snapshot.cxled_qty)
+                                            new_open_qty = (chore_snapshot.last_amend_qty - chore_snapshot.filled_qty -
+                                                            chore_snapshot.cxled_qty)
+                                        if old_open_qty < 0:
+                                            # AMD: may happen when original qty < filled_qty, i.e., when some chore
+                                            # was OVER_FILLED pre amend - no open exists in this case
+                                            old_open_qty = 0
+                                        if new_open_qty < 0:
+                                            # AMD: may happen when amended qty < filled_qty, i.e., when some chore
+                                            # becomes OVER_FILLED post amend - no open exists in this case
+                                            new_open_qty = 0
+                                        update_strat_status_obj.total_open_sell_qty = (
+                                                update_strat_status_obj.total_open_sell_qty +
+                                                old_open_qty - new_open_qty)
+
+                                        if chore_snapshot.last_amend_px:
+                                            old_open_notional = (
+                                                    old_open_qty *
+                                                    self.get_usd_px(chore_snapshot.last_original_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                            new_open_notional = (
+                                                    new_open_qty *
+                                                    self.get_usd_px(chore_snapshot.last_amend_px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        else:
+                                            old_open_notional = (
+                                                    old_open_qty *
+                                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                            new_open_notional = (
+                                                    new_open_qty *
+                                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
+                                        update_strat_status_obj.total_open_sell_notional = (
+                                                update_strat_status_obj.total_open_sell_notional + old_open_notional -
+                                                new_open_notional)
+                                    # AMD: else not required: if chore status is DOD with AMD_ACK event then it is the
+                                    # case of amend post DOD so open would already be removed while handling DOD
+
+                                    if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                        if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                            cxled_qty = chore_snapshot.last_leaves_qty - chore_snapshot.last_amend_qty
+                                            update_strat_status_obj.total_cxl_sell_qty -= cxled_qty
+
+                                            update_strat_status_obj.total_cxl_sell_notional -= \
+                                                cxled_qty * self.get_usd_px(chore_snapshot.last_original_px,
+                                                                            chore_snapshot.chore_brief.security.sec_id)
+                                            update_strat_status_obj.avg_cxl_sell_px = (
+                                                (self.get_local_px_or_notional(
+                                                    update_strat_status_obj.total_cxl_sell_notional,
+                                                    chore_journal_obj.chore.security.sec_id) /
+                                                 update_strat_status_obj.total_cxl_sell_qty)
+                                                if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
+                                        else:
+                                            removed_qty = (chore_snapshot.last_leaves_qty -
+                                                           chore_snapshot.last_amend_qty)
+                                            if chore_snapshot.last_amend_px:
+                                                # if px got amended then chore px is changed to amended value so
+                                                # removing cxl_notional with old px and updating new notional
+                                                # with amended px
+                                                removed_old_notional = (
+                                                        removed_qty *
+                                                        self.get_usd_px(chore_snapshot.last_original_px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                                removed_new_notional = (
+                                                        removed_qty *
+                                                        self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+
+                                                update_strat_status_obj.total_cxl_sell_notional = (
+                                                        update_strat_status_obj.total_cxl_sell_notional +
+                                                        removed_old_notional - removed_new_notional)
+                                                update_strat_status_obj.avg_cxl_sell_px = (
+                                                    (self.get_local_px_or_notional(
+                                                        update_strat_status_obj.total_cxl_sell_notional,
+                                                        chore_journal_obj.chore.security.sec_id) /
+                                                     update_strat_status_obj.total_cxl_sell_qty)
+                                                    if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
+                                            # else not required: if chore is in DOD state and px is not amended in this
+                                            # amend then amend dn notional is already in cxled notional
+                                        update_strat_status_obj.total_cxl_exposure = \
+                                            update_strat_status_obj.total_cxl_buy_notional - \
+                                            update_strat_status_obj.total_cxl_sell_notional
+                                    else:
+                                        # if chore is amended post DOD then adding amended up qty to cxled qty
+                                        if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
+                                            additional_qty = (chore_snapshot.last_amend_qty -
+                                                              chore_snapshot.last_leaves_qty)
+                                            if chore_snapshot.last_amend_px:
+                                                additional_new_notional = (
+                                                        additional_qty *
+                                                        self.get_usd_px(chore_snapshot.last_amend_px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                            else:
+                                                additional_new_notional = (
+                                                        additional_qty *
+                                                        self.get_usd_px(chore_snapshot.last_original_px,
+                                                                        chore_snapshot.chore_brief.security.sec_id))
+                                            update_strat_status_obj.total_cxl_sell_qty -= additional_qty
+                                            update_strat_status_obj.total_cxl_sell_notional -= additional_new_notional
+                                            update_strat_status_obj.avg_cxl_sell_px = (
+                                                (self.get_local_px_or_notional(
+                                                    update_strat_status_obj.total_cxl_sell_notional,
+                                                    chore_journal_obj.chore.security.sec_id) /
+                                                 update_strat_status_obj.total_cxl_sell_qty)
+                                                if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
+
+                                            update_strat_status_obj.total_cxl_exposure = \
+                                                update_strat_status_obj.total_cxl_sell_notional - \
+                                                update_strat_status_obj.total_cxl_sell_notional
+                                        # AMD: else not required: if chore is not DOD then amend up has no handling
+                                        # for cxled qty
+                                else:
+                                    old_open_notional = (
+                                            update_strat_status_obj.total_open_sell_qty *
+                                            self.get_usd_px(chore_snapshot.last_original_px,
+                                                            chore_snapshot.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            update_strat_status_obj.total_open_sell_qty *
+                                            self.get_usd_px(chore_snapshot.last_amend_px,
+                                                            chore_snapshot.chore_brief.security.sec_id))
+                                    update_strat_status_obj.total_open_sell_notional = (
+                                            update_strat_status_obj.total_open_sell_notional + old_open_notional -
+                                            new_open_notional)
                             case other_:
                                 err_str_ = f"Unsupported Chore Event type {other_} " \
                                            f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
@@ -1871,12 +3253,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 if strat_limits_tuple is not None:
                     strat_limits, _ = strat_limits_tuple
 
+                    all_bkr_cxlled_qty = None
                     if side == Side.BUY:
                         fetched_open_qty = strat_brief_obj.pair_buy_side_bartering_brief.open_qty
                         fetched_open_notional = strat_brief_obj.pair_buy_side_bartering_brief.open_notional
+                        fetched_all_bkr_cxlled_qty = strat_brief_obj.pair_buy_side_bartering_brief.all_bkr_cxlled_qty
                     else:
                         fetched_open_qty = strat_brief_obj.pair_sell_side_bartering_brief.open_qty
                         fetched_open_notional = strat_brief_obj.pair_sell_side_bartering_brief.open_notional
+                        fetched_all_bkr_cxlled_qty = strat_brief_obj.pair_sell_side_bartering_brief.all_bkr_cxlled_qty
 
                     if isinstance(chore_journal_or_fills_journal, ChoreJournal):
                         chore_journal: ChoreJournal = chore_journal_or_fills_journal
@@ -1908,12 +3293,169 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             # When chore_event is OE_CXL_ACK or OE_UNSOL_CXL then removing current chore's
                             # unfilled qty from existing open_qty + unfilled notional
                             # (unfilled chore Qty * chore px) from existing open_notional
-                            unfilled_qty = int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
+                            unfilled_qty = int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                               chore_snapshot.total_amend_dn_qty)
                             open_qty = int(fetched_open_qty - unfilled_qty)
                             open_notional = (
                                     fetched_open_notional - (
                                         unfilled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                        chore_snapshot.chore_brief.security.sec_id)))
+                            if fetched_all_bkr_cxlled_qty is None:
+                                all_bkr_cxlled_qty = int(unfilled_qty)
+                            else:
+                                all_bkr_cxlled_qty = int(fetched_all_bkr_cxlled_qty + unfilled_qty)
+                        elif chore_journal.chore_event in [ChoreEventType.OE_AMD_UNACK, ChoreEventType.OE_AMD_ACK]:
+                            if chore_snapshot.last_amend_qty is None and chore_snapshot.last_amend_px is None:
+                                logging.error("Unexpected: received both amended px and qty as None while applying "
+                                              "amend on strat_brief - ignoring strat_brief update")
+                                return
+
+                            if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                if chore_snapshot.last_amend_qty is not None:
+                                    if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                        amended_dn_qty = (chore_snapshot.last_leaves_qty -
+                                                          chore_snapshot.last_amend_qty)
+
+                                        # since chore qty doesn't get changed in amend dn on qty and
+                                        # cxled qty is increased - removing newly added amend_dn qty from old cxl qty
+                                        old_open_qty = (chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                        (chore_snapshot.cxled_qty - amended_dn_qty))
+                                        new_open_qty = (chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                                        chore_snapshot.cxled_qty)
+                                    else:
+                                        old_open_qty = (chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                        chore_snapshot.cxled_qty)
+                                        new_open_qty = (chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                                        chore_snapshot.cxled_qty)
+                                    if old_open_qty < 0:
+                                        # AMD: may happen when original qty < filled_qty, i.e., when some chore
+                                        # was OVER_FILLED pre amend - no open exists in this case
+                                        old_open_qty = 0
+                                    if new_open_qty < 0:
+                                        # AMD: may happen when amended qty < filled_qty, i.e., when some chore
+                                        # becomes OVER_FILLED post amend - no open exists in this case
+                                        new_open_qty = 0
+                                    open_qty = fetched_open_qty - old_open_qty + new_open_qty
+
+                                    if chore_snapshot.last_amend_px is not None:
+                                        old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot.last_original_px,
+                                                                           chore_snapshot.chore_brief.security.sec_id))
+                                        new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                           chore_snapshot.chore_brief.security.sec_id))
+                                    else:
+                                        old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                           chore_snapshot.chore_brief.security.sec_id))
+                                        new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                           chore_snapshot.chore_brief.security.sec_id))
+                                    open_notional = fetched_open_notional - old_open_notional + new_open_notional
+
+                                    if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                        cxled_qty = chore_snapshot.last_leaves_qty - chore_snapshot.last_amend_qty
+                                        all_bkr_cxlled_qty = fetched_all_bkr_cxlled_qty + cxled_qty
+                                    # else not required: no cxl qty related values get updated when qty amends up
+                                else:
+                                    open_qty = fetched_open_qty
+                                    old_open_notional = (
+                                            open_qty * self.get_usd_px(chore_snapshot.last_original_px,
+                                                                       chore_snapshot.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                       chore_snapshot.chore_brief.security.sec_id))
+                                    open_notional = fetched_open_notional - old_open_notional + new_open_notional
+                            else:
+                                # if chore is in DOD state then whole qty is already in
+                                # cxled qty and no open chore exists to be updated
+                                open_qty = fetched_open_qty
+                                open_notional = fetched_open_notional
+
+                                if chore_snapshot.last_leaves_qty < chore_snapshot.last_amend_qty:
+                                    # AMD: if chore status is DOD that means amend is post DOD - adding amended up
+                                    # qty to cxled_qty
+                                    additional_qty = chore_snapshot.last_amend_qty - chore_snapshot.last_leaves_qty
+                                    all_bkr_cxlled_qty = fetched_all_bkr_cxlled_qty + additional_qty
+                                else:
+                                    # AMD: if chore is in DOD state then whole qty is already in cxled qty
+                                    all_bkr_cxlled_qty = fetched_all_bkr_cxlled_qty
+                        elif chore_journal.chore_event == ChoreEventType.OE_AMD_REJ:
+                            if chore_snapshot.last_amend_qty is None and chore_snapshot.last_amend_px is None:
+                                logging.error("Unexpected: received both amended px and qty as None while applying "
+                                              "amend on strat_brief - ignoring strat_brief update")
+                                return
+
+                            if chore_snapshot.chore_status != ChoreStatusType.OE_DOD:
+                                if chore_snapshot.last_amend_qty is not None:
+                                    if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                        amended_dn_qty = (chore_snapshot.last_leaves_qty -
+                                                          chore_snapshot.last_amend_qty)
+
+                                        # since chore qty doesn't get changed in amend dn on qty and
+                                        # cxled qty is increased - removing added amend_dn qty from new_open_qty
+                                        old_open_qty = (chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                        chore_snapshot.cxled_qty)
+                                        new_open_qty = (chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                        (chore_snapshot.cxled_qty + amended_dn_qty))
+                                    else:
+                                        old_open_qty = (chore_snapshot.last_original_qty - chore_snapshot.filled_qty -
+                                                        chore_snapshot.cxled_qty)
+                                        new_open_qty = (chore_snapshot.last_amend_qty - chore_snapshot.filled_qty -
+                                                        chore_snapshot.cxled_qty)
+                                    if old_open_qty < 0:
+                                        # AMD: may happen when original qty < filled_qty, i.e., when some chore
+                                        # was OVER_FILLED pre amend - no open exists in this case
+                                        old_open_qty = 0
+                                    if new_open_qty < 0:
+                                        # AMD: may happen when amended qty < filled_qty, i.e., when some chore
+                                        # becomes OVER_FILLED post amend - no open exists in this case
+                                        new_open_qty = 0
+                                    open_qty = fetched_open_qty + old_open_qty - new_open_qty
+
+                                    if chore_snapshot.last_amend_px is not None:
+                                        old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot.last_original_px,
+                                                                           chore_snapshot.chore_brief.security.sec_id))
+                                        new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot.last_amend_px,
+                                                                           chore_snapshot.chore_brief.security.sec_id))
+                                    else:
+                                        old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                           chore_snapshot.chore_brief.security.sec_id))
+                                        new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                           chore_snapshot.chore_brief.security.sec_id))
+                                    open_notional = fetched_open_notional + old_open_notional - new_open_notional
+
+                                    if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                        cxled_qty = chore_snapshot.last_leaves_qty - chore_snapshot.last_amend_qty
+                                        all_bkr_cxlled_qty = fetched_all_bkr_cxlled_qty - cxled_qty
+                                    # else not required: no cxl qty related values get updated when qty amends up
+                                else:
+                                    open_qty = fetched_open_qty
+                                    old_open_notional = (
+                                            open_qty * self.get_usd_px(chore_snapshot.last_original_px,
+                                                                       chore_snapshot.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            open_qty * self.get_usd_px(chore_snapshot.last_amend_px,
+                                                                       chore_snapshot.chore_brief.security.sec_id))
+                                    open_notional = fetched_open_notional + old_open_notional - new_open_notional
+                            else:
+                                # if chore is in DOD state then whole qty is already in
+                                # cxled qty and no open chore exists to be updated
+                                open_qty = fetched_open_qty
+                                open_notional = fetched_open_notional
+
+                                if chore_snapshot.last_leaves_qty < chore_snapshot.last_amend_qty:
+                                    # AMD: if chore status is DOD that means amend is post DOD - removing added
+                                    # amended up qty to cxled_qty
+                                    additional_qty = chore_snapshot.last_amend_qty - chore_snapshot.last_leaves_qty
+                                    all_bkr_cxlled_qty = fetched_all_bkr_cxlled_qty - additional_qty
+                                else:
+                                    # AMD: if chore is in DOD state then whole qty is already in cxled qty
+                                    all_bkr_cxlled_qty = fetched_all_bkr_cxlled_qty
                         else:
                             err_str_: str = (f"Unsupported ChoreEventType: Must be either of "
                                              f"[{ChoreEventType.OE_NEW}, {ChoreEventType.OE_INT_REJ}, "
@@ -1926,20 +3468,41 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     elif isinstance(chore_journal_or_fills_journal, FillsJournal):
                         # For fills, removing current fill's qty from existing
                         # open_qty + current fill's notional (fill_qty * chore_px) from existing open_notional
+                        fills_journal: FillsJournal = chore_journal_or_fills_journal
                         if not received_fill_after_dod:
-                            fills_journal: FillsJournal = chore_journal_or_fills_journal
-                            open_qty = fetched_open_qty - fills_journal.fill_qty
-                            open_notional = (
-                                    fetched_open_notional - (
-                                        fills_journal.fill_qty *
-                                        self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                        chore_snapshot.chore_brief.security.sec_id)))
+                            if not chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
+                                open_qty = fetched_open_qty - fills_journal.fill_qty
+                                open_notional = (
+                                        fetched_open_notional - (
+                                            fills_journal.fill_qty *
+                                            self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                            chore_snapshot.chore_brief.security.sec_id)))
+                            else:
+                                # if fill made chore OVER_FILLED, then extra fill can't be removed from current open
+                                # removing only what was open originally
+                                available_qty = chore_snapshot.chore_brief.qty - chore_snapshot.total_amend_dn_qty
+                                extra_fill_qty = chore_snapshot.filled_qty - available_qty
+                                acceptable_remaining_fill_qty = fills_journal.fill_qty - extra_fill_qty
+
+                                open_qty = fetched_open_qty - acceptable_remaining_fill_qty
+                                open_notional = fetched_open_notional - (
+                                                    acceptable_remaining_fill_qty *
+                                                    self.get_usd_px(chore_snapshot.chore_brief.px,
+                                                                    chore_snapshot.chore_brief.security.sec_id))
                         else:
                             # if fills come after DOD, this chore's open calculation must
                             # have already removed from overall open qty and notional - no need to remove fill qty from
                             # existing open
                             open_qty = fetched_open_qty
                             open_notional = fetched_open_notional
+
+                            if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
+                                available_qty = chore_snapshot.chore_brief.qty - chore_snapshot.total_amend_dn_qty
+                                extra_fill_qty = chore_snapshot.filled_qty - available_qty
+                                acceptable_remaining_fill_qty = fills_journal.fill_qty - extra_fill_qty
+                                all_bkr_cxlled_qty = int(fetched_all_bkr_cxlled_qty - acceptable_remaining_fill_qty)
+                            else:
+                                all_bkr_cxlled_qty = int(fetched_all_bkr_cxlled_qty - chore_snapshot.last_update_fill_qty)
                     else:
                         err_str_: str = ("Unsupported Journal type: Must be either ChoreJournal or FillsJournal, "
                                          f"Found type: {type(chore_journal_or_fills_journal)} - ignoring "
@@ -1996,7 +3559,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             consumable_cxl_qty=consumable_cxl_qty,
                             indicative_consumable_participation_qty=
                             indicative_consumable_participation_qty,
-                            all_bkr_cxlled_qty=int(symbol_side_snapshot.total_cxled_qty),
+                            all_bkr_cxlled_qty=all_bkr_cxlled_qty,
                             open_notional=open_notional,
                             open_qty=open_qty)
 
@@ -2016,12 +3579,44 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 residual_qty = int((stored_pair_strat_bartering_brief.residual_qty -
                                                     chore_snapshot.last_update_fill_qty))
                             else:
-                                residual_qty = int(stored_pair_strat_bartering_brief.residual_qty +
-                                                   (chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty))
+                                if chore_journal.chore_event == ChoreEventType.OE_AMD_ACK:
+                                    # AMD post dod case: when OE_AMD_ACK comes with chore status DOD
+                                    if chore_snapshot.last_amend_qty:
+                                        if chore_snapshot.last_leaves_qty > chore_snapshot.last_amend_qty:
+                                            # AMD: if chore qty is amended dn post DOD then whatever qty is put in
+                                            # residual while handling DOD, removing amended dn qty from residual
+                                            # which must already be added to total_amend_dn_qty
+                                            residual_qty = int(stored_pair_strat_bartering_brief.residual_qty -
+                                                               (chore_snapshot.last_leaves_qty -
+                                                                chore_snapshot.last_amend_qty))
+                                        else:
+                                            # AMD: if chore qty is amended up post DOD then whatever qty is put in
+                                            # residual while handling DOD, adding amended up qty to residual
+                                            residual_qty = int(stored_pair_strat_bartering_brief.residual_qty +
+                                                               (chore_snapshot.last_amend_qty -
+                                                                chore_snapshot.last_leaves_qty))
+                                    else:
+                                        residual_qty = stored_pair_strat_bartering_brief.residual_qty
+                                else:
+                                    residual_qty = int(stored_pair_strat_bartering_brief.residual_qty +
+                                                       (chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty -
+                                                        chore_snapshot.total_amend_dn_qty))
+                                # else not required: If chore
                             # Updating residual_qty
                             updated_pair_side_brief_obj.residual_qty = residual_qty
                         else:
-                            residual_qty = stored_pair_strat_bartering_brief.residual_qty
+                            if received_fill_after_dod:
+                                if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
+                                    available_qty = chore_snapshot.chore_brief.qty - chore_snapshot.total_amend_dn_qty
+                                    extra_fill_qty = chore_snapshot.filled_qty - available_qty
+                                    acceptable_remaining_fill_qty = fills_journal.fill_qty - extra_fill_qty
+                                    residual_qty = int((stored_pair_strat_bartering_brief.residual_qty -
+                                                        acceptable_remaining_fill_qty))
+                                else:
+                                    residual_qty = int(stored_pair_strat_bartering_brief.residual_qty -
+                                                       chore_snapshot.filled_qty)
+                            else:
+                                residual_qty = stored_pair_strat_bartering_brief.residual_qty
                             updated_pair_side_brief_obj.residual_qty = residual_qty
 
                         current_leg_tob_data, other_leg_tob_data = (
@@ -2107,10 +3702,120 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             chore_journal_obj.chore.qty
                     case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                           ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
-                        total_buy_unfilled_qty = int(chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty)
+                        total_buy_unfilled_qty = int(chore_snapshot_obj.chore_brief.qty -
+                                                     chore_snapshot_obj.filled_qty -
+                                                     chore_snapshot_obj.total_amend_dn_qty)
                         update_overall_buy_notional = \
                             -(self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                               chore_snapshot_obj.chore_brief.security.sec_id) * total_buy_unfilled_qty)
+                    case ChoreEventType.OE_AMD_UNACK | ChoreEventType.OE_AMD_ACK:
+                        if chore_snapshot_obj.chore_status != ChoreStatusType.OE_DOD:
+                            if chore_snapshot_obj.last_amend_qty is not None:
+                                if chore_snapshot_obj.last_leaves_qty > chore_snapshot_obj.last_amend_qty:
+                                    amended_dn_qty = (chore_snapshot_obj.last_leaves_qty -
+                                                      chore_snapshot_obj.last_amend_qty)
+
+                                    # since chore qty doesn't get changed in amend dn on qty and
+                                    # cxled qty is increased - removing newly added amend_dn qty from old open qty
+                                    old_open_qty = (chore_snapshot_obj.last_original_qty - chore_snapshot_obj.filled_qty -
+                                                    (chore_snapshot_obj.cxled_qty - amended_dn_qty))
+                                    new_open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                                    chore_snapshot_obj.cxled_qty)
+                                else:
+                                    old_open_qty = (chore_snapshot_obj.last_original_qty - chore_snapshot_obj.filled_qty -
+                                                    chore_snapshot_obj.cxled_qty)
+                                    new_open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                                    chore_snapshot_obj.cxled_qty)
+                                if old_open_qty < 0:
+                                    # may happen when original qty < filled_qty, i.e., when some chore
+                                    # was OVER_FILLED pre amend - no open exists in this case
+                                    old_open_qty = 0
+                                if new_open_qty < 0:
+                                    # may happen when amended qty < filled_qty, i.e., when some chore
+                                    # becomes OVER_FILLED post amend - no open exists in this case
+                                    new_open_qty = 0
+                                if chore_snapshot_obj.last_amend_px is not None:
+                                    old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                else:
+                                    old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                            else:
+                                open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                            chore_snapshot_obj.cxled_qty)
+                                old_open_notional = (
+                                        open_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
+                                new_open_notional = (
+                                        open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
+
+                            update_overall_buy_notional = new_open_notional - old_open_notional
+                        # AMD: else not required: if chore status is DOD with AMD_ACK event then it is the
+                        # case of amend post DOD so open would already be removed while handling DOD
+                    case ChoreEventType.OE_AMD_REJ:
+                        if chore_snapshot_obj.chore_status != ChoreStatusType.OE_DOD:
+                            if chore_snapshot_obj.last_amend_qty is not None:
+                                if chore_snapshot_obj.last_leaves_qty > chore_snapshot_obj.last_amend_qty:
+                                    amended_dn_qty = (chore_snapshot_obj.last_leaves_qty -
+                                                      chore_snapshot_obj.last_amend_qty)
+
+                                    # since chore qty doesn't get changed in amend dn on qty and
+                                    # cxled qty is increased - removing added amend_dn qty from new_open_qty
+                                    old_open_qty = (chore_snapshot_obj.last_original_qty -
+                                                    chore_snapshot_obj.filled_qty - chore_snapshot_obj.cxled_qty)
+                                    new_open_qty = (chore_snapshot_obj.last_original_qty -
+                                                    chore_snapshot_obj.filled_qty -
+                                                    (chore_snapshot_obj.cxled_qty + amended_dn_qty))
+                                else:
+                                    old_open_qty = (
+                                                chore_snapshot_obj.last_original_qty - chore_snapshot_obj.filled_qty -
+                                                chore_snapshot_obj.cxled_qty)
+                                    new_open_qty = (chore_snapshot_obj.last_amend_qty - chore_snapshot_obj.filled_qty -
+                                                    chore_snapshot_obj.cxled_qty)
+                                if old_open_qty < 0:
+                                    # may happen when original qty < filled_qty, i.e., when some chore
+                                    # was OVER_FILLED pre amend - no open exists in this case
+                                    old_open_qty = 0
+                                if new_open_qty < 0:
+                                    # may happen when amended qty < filled_qty, i.e., when some chore
+                                    # becomes OVER_FILLED post amend - no open exists in this case
+                                    new_open_qty = 0
+                                if chore_snapshot_obj.last_amend_px is not None:
+                                    old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot_obj.last_amend_px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                else:
+                                    old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                            else:
+                                open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                            chore_snapshot_obj.cxled_qty)
+                                old_open_notional = (
+                                        open_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
+                                new_open_notional = (
+                                        open_qty * self.get_usd_px(chore_snapshot_obj.last_amend_px,
+                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
+
+                            update_overall_buy_notional = - new_open_notional + old_open_notional
+                        # AMD: else not required: if chore status is DOD with AMD_ACK event then it is the
+                        # case of amend post DOD so open would already be removed while handling DOD
                 return PortfolioStatusUpdatesContainer(buy_notional_update=update_overall_buy_notional)
             case Side.SELL:
                 update_overall_sell_notional = 0
@@ -2121,10 +3826,173 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             chore_journal_obj.chore.qty
                     case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                           ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
-                        total_sell_unfilled_qty = int(chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty)
+                        total_sell_unfilled_qty = int(chore_snapshot_obj.chore_brief.qty -
+                                                     chore_snapshot_obj.filled_qty -
+                                                     chore_snapshot_obj.total_amend_dn_qty)
                         update_overall_sell_notional = \
                             -(self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                               chore_snapshot_obj.chore_brief.security.sec_id) * total_sell_unfilled_qty)
+                    case ChoreEventType.OE_AMD_UNACK | ChoreEventType.OE_AMD_ACK:
+                        if chore_snapshot_obj.chore_status != ChoreStatusType.OE_DOD:
+                            if chore_snapshot_obj.last_amend_qty is not None:
+                                if chore_snapshot_obj.last_leaves_qty > chore_snapshot_obj.last_amend_qty:
+                                    amended_dn_qty = (chore_snapshot_obj.last_leaves_qty -
+                                                      chore_snapshot_obj.last_amend_qty)
+
+                                    # since chore qty doesn't get changed in amend dn on qty and
+                                    # cxled qty is increased - removing newly added amend_dn qty from old open qty
+                                    old_open_qty = (chore_snapshot_obj.last_original_qty - chore_snapshot_obj.filled_qty -
+                                                    (chore_snapshot_obj.cxled_qty - amended_dn_qty))
+                                    new_open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                                    chore_snapshot_obj.cxled_qty)
+                                else:
+                                    old_open_qty = (chore_snapshot_obj.last_original_qty - chore_snapshot_obj.filled_qty -
+                                                    chore_snapshot_obj.cxled_qty)
+                                    new_open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                                    chore_snapshot_obj.cxled_qty)
+                                if old_open_qty < 0:
+                                    # may happen when original qty < filled_qty, i.e., when some chore
+                                    # was OVER_FILLED pre amend - no open exists in this case
+                                    old_open_qty = 0
+                                if new_open_qty < 0:
+                                    # may happen when amended qty < filled_qty, i.e., when some chore
+                                    # becomes OVER_FILLED post amend - no open exists in this case
+                                    new_open_qty = 0
+                                if chore_snapshot_obj.last_amend_px is not None:
+                                    old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                else:
+                                    old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                            else:
+                                open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                            chore_snapshot_obj.cxled_qty)
+                                old_open_notional = (
+                                        open_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
+                                new_open_notional = (
+                                        open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
+                            update_overall_sell_notional = new_open_notional - old_open_notional
+                        # AMD: else not required: if chore status is DOD with AMD_ACK event then it is the
+                        # case of amend post DOD so open would already be removed while handling DOD
+                    case ChoreEventType.OE_AMD_UNACK | ChoreEventType.OE_AMD_ACK:
+                        if chore_snapshot_obj.chore_status != ChoreStatusType.OE_DOD:
+                            if chore_snapshot_obj.last_amend_qty is not None:
+                                if chore_snapshot_obj.last_leaves_qty > chore_snapshot_obj.last_amend_qty:
+                                    amended_dn_qty = (chore_snapshot_obj.last_leaves_qty -
+                                                      chore_snapshot_obj.last_amend_qty)
+
+                                    # since chore qty doesn't get changed in amend dn on qty and
+                                    # cxled qty is increased - removing newly added amend_dn qty from old open qty
+                                    old_open_qty = (
+                                                chore_snapshot_obj.last_original_qty - chore_snapshot_obj.filled_qty -
+                                                (chore_snapshot_obj.cxled_qty - amended_dn_qty))
+                                    new_open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                                    chore_snapshot_obj.cxled_qty)
+                                else:
+                                    old_open_qty = (
+                                                chore_snapshot_obj.last_original_qty - chore_snapshot_obj.filled_qty -
+                                                chore_snapshot_obj.cxled_qty)
+                                    new_open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                                    chore_snapshot_obj.cxled_qty)
+                                if old_open_qty < 0:
+                                    # may happen when original qty < filled_qty, i.e., when some chore
+                                    # was OVER_FILLED pre amend - no open exists in this case
+                                    old_open_qty = 0
+                                if new_open_qty < 0:
+                                    # may happen when amended qty < filled_qty, i.e., when some chore
+                                    # becomes OVER_FILLED post amend - no open exists in this case
+                                    new_open_qty = 0
+                                if chore_snapshot_obj.last_amend_px is not None:
+                                    old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                else:
+                                    old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                            else:
+                                open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                            chore_snapshot_obj.cxled_qty)
+                                old_open_notional = (
+                                        open_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
+                                new_open_notional = (
+                                        open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
+                            update_overall_sell_notional = - new_open_notional + old_open_notional
+                        # AMD: else not required: if chore status is DOD with AMD_ACK event then it is the
+                        # case of amend post DOD so open would already be removed while handling DOD
+                    case ChoreEventType.OE_AMD_REJ:
+                        if chore_snapshot_obj.chore_status != ChoreStatusType.OE_DOD:
+                            if chore_snapshot_obj.last_amend_qty is not None:
+                                if chore_snapshot_obj.last_leaves_qty > chore_snapshot_obj.last_amend_qty:
+                                    amended_dn_qty = (chore_snapshot_obj.last_leaves_qty -
+                                                      chore_snapshot_obj.last_amend_qty)
+
+                                    # since chore qty doesn't get changed in amend dn on qty and
+                                    # cxled qty is increased - removing added amend_dn qty from new_open_qty
+                                    old_open_qty = (chore_snapshot_obj.last_original_qty -
+                                                    chore_snapshot_obj.filled_qty - chore_snapshot_obj.cxled_qty)
+                                    new_open_qty = (chore_snapshot_obj.last_original_qty -
+                                                    chore_snapshot_obj.filled_qty -
+                                                    (chore_snapshot_obj.cxled_qty + amended_dn_qty))
+                                else:
+                                    old_open_qty = (
+                                            chore_snapshot_obj.last_original_qty - chore_snapshot_obj.filled_qty -
+                                            chore_snapshot_obj.cxled_qty)
+                                    new_open_qty = (chore_snapshot_obj.last_amend_qty - chore_snapshot_obj.filled_qty -
+                                                    chore_snapshot_obj.cxled_qty)
+                                if old_open_qty < 0:
+                                    # may happen when original qty < filled_qty, i.e., when some chore
+                                    # was OVER_FILLED pre amend - no open exists in this case
+                                    old_open_qty = 0
+                                if new_open_qty < 0:
+                                    # may happen when amended qty < filled_qty, i.e., when some chore
+                                    # becomes OVER_FILLED post amend - no open exists in this case
+                                    new_open_qty = 0
+                                if chore_snapshot_obj.last_amend_px is not None:
+                                    old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot_obj.last_amend_px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                else:
+                                    old_open_notional = (
+                                            old_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                                    new_open_notional = (
+                                            new_open_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                           chore_snapshot_obj.chore_brief.security.sec_id))
+                            else:
+                                open_qty = (chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty -
+                                            chore_snapshot_obj.cxled_qty)
+                                old_open_notional = (
+                                        open_qty * self.get_usd_px(chore_snapshot_obj.last_original_px,
+                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
+                                new_open_notional = (
+                                        open_qty * self.get_usd_px(chore_snapshot_obj.last_amend_px,
+                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
+
+                            update_overall_sell_notional = - new_open_notional + old_open_notional
+                        # AMD: else not required: if chore status is DOD with AMD_ACK event then it is the
+                        # case of amend post DOD so open would already be removed while handling DOD
                 return PortfolioStatusUpdatesContainer(sell_notional_update=update_overall_sell_notional)
             case other_:
                 err_str_ = f"Unsupported Side Type {other_} received in chore_journal of key: " \
@@ -2178,13 +4046,29 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                          self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
                                          chore_snapshot_obj.chore_brief.security.sec_id))
                 else:
-                    update_overall_buy_notional = \
-                        (chore_snapshot_obj.last_update_fill_qty *
-                         self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
-                                         chore_snapshot_obj.chore_brief.security.sec_id)) - \
-                        (chore_snapshot_obj.last_update_fill_qty *
-                         self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                         chore_snapshot_obj.chore_brief.security.sec_id))
+                    if not chore_snapshot_obj.chore_status == ChoreStatusType.OE_OVER_FILLED:
+                        update_overall_buy_notional = \
+                            (chore_snapshot_obj.last_update_fill_qty *
+                             self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                             chore_snapshot_obj.chore_brief.security.sec_id)) - \
+                            (chore_snapshot_obj.last_update_fill_qty *
+                             self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                             chore_snapshot_obj.chore_brief.security.sec_id))
+                    else:
+                        # if fill made chore OVER_FILLED, then extra fill can't be removed from current open
+                        # removing only what was open originally
+                        available_qty = chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.total_amend_dn_qty
+                        extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
+                        acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
+
+                        update_overall_buy_notional = \
+                            (chore_snapshot_obj.last_update_fill_qty *
+                             self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                             chore_snapshot_obj.chore_brief.security.sec_id)) - \
+                            (acceptable_remaining_fill_qty *
+                             self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                             chore_snapshot_obj.chore_brief.security.sec_id))
+
                 update_overall_buy_fill_notional = \
                     (self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
                                      chore_snapshot_obj.chore_brief.security.sec_id) *
@@ -2198,13 +4082,28 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                          self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
                                          chore_snapshot_obj.chore_brief.security.sec_id))
                 else:
-                    update_overall_sell_notional = \
-                        (chore_snapshot_obj.last_update_fill_qty *
-                         self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
-                                         chore_snapshot_obj.chore_brief.security.sec_id)) - \
-                        (chore_snapshot_obj.last_update_fill_qty *
-                         self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                         chore_snapshot_obj.chore_brief.security.sec_id))
+                    if not chore_snapshot_obj.chore_status == ChoreStatusType.OE_OVER_FILLED:
+                        update_overall_sell_notional = \
+                            (chore_snapshot_obj.last_update_fill_qty *
+                             self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                             chore_snapshot_obj.chore_brief.security.sec_id)) - \
+                            (chore_snapshot_obj.last_update_fill_qty *
+                             self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                             chore_snapshot_obj.chore_brief.security.sec_id))
+                    else:
+                        # if fill made chore OVER_FILLED, then extra fill can't be removed from current open
+                        # removing only what was open originally
+                        available_qty = chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.total_amend_dn_qty
+                        extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
+                        acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
+
+                        update_overall_sell_notional = \
+                            (chore_snapshot_obj.last_update_fill_qty *
+                             self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
+                                             chore_snapshot_obj.chore_brief.security.sec_id)) - \
+                            (acceptable_remaining_fill_qty *
+                             self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                             chore_snapshot_obj.chore_brief.security.sec_id))
                 update_overall_sell_fill_notional = \
                     self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
                                     chore_snapshot_obj.chore_brief.security.sec_id) * \
@@ -2235,19 +4134,38 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                      chore_snapshot_obj.chore_brief.security.sec_id) *
                      chore_snapshot_obj.last_update_fill_qty)
                 updated_symbol_side_snapshot_obj.avg_fill_px = \
-                    self.get_local_px_or_notional(updated_symbol_side_snapshot_obj.total_fill_notional,
-                                                  symbol_side_snapshot_obj.security.sec_id) / \
-                    updated_symbol_side_snapshot_obj.total_filled_qty
+                    (self.get_local_px_or_notional(updated_symbol_side_snapshot_obj.total_fill_notional,
+                                                   symbol_side_snapshot_obj.security.sec_id) /
+                     updated_symbol_side_snapshot_obj.total_filled_qty
+                     if updated_symbol_side_snapshot_obj.total_filled_qty != 0 else 0)
                 updated_symbol_side_snapshot_obj.last_update_fill_px = chore_snapshot_obj.last_update_fill_px
                 updated_symbol_side_snapshot_obj.last_update_fill_qty = int(chore_snapshot_obj.last_update_fill_qty)
                 updated_symbol_side_snapshot_obj.last_update_date_time = chore_snapshot_obj.last_update_date_time
                 if received_fill_after_dod:
-                    updated_symbol_side_snapshot_obj.total_cxled_qty = int(
-                        symbol_side_snapshot_obj.total_cxled_qty - chore_snapshot_obj.last_update_fill_qty)
-                    updated_symbol_side_snapshot_obj.total_cxled_notional = (
-                        symbol_side_snapshot_obj.total_cxled_notional -
-                        (chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                                                     chore_snapshot_obj.chore_brief.security.sec_id)))
+                    if chore_snapshot_obj.chore_status == ChoreStatusType.OE_OVER_FILLED:
+                        available_qty = chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.total_amend_dn_qty
+                        extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
+                        acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
+
+                        updated_symbol_side_snapshot_obj.total_cxled_qty = int(
+                            symbol_side_snapshot_obj.total_cxled_qty - acceptable_remaining_fill_qty)
+                        updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                                (symbol_side_snapshot_obj.total_cxled_notional - acceptable_remaining_fill_qty *
+                                 self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                 chore_snapshot_obj.chore_brief.security.sec_id)))
+                    else:
+                        updated_symbol_side_snapshot_obj.total_cxled_qty = int(
+                            symbol_side_snapshot_obj.total_cxled_qty - chore_snapshot_obj.last_update_fill_qty)
+                        updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                            symbol_side_snapshot_obj.total_cxled_notional -
+                            (chore_snapshot_obj.last_update_fill_qty *
+                             self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                             chore_snapshot_obj.chore_brief.security.sec_id)))
+                    updated_symbol_side_snapshot_obj.avg_cxled_px = (
+                            self.get_local_px_or_notional(updated_symbol_side_snapshot_obj.total_cxled_notional,
+                                                          symbol_side_snapshot_obj.security.sec_id) /
+                            updated_symbol_side_snapshot_obj.total_cxled_qty) \
+                        if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0
 
                 updated_symbol_side_snapshot_obj = \
                     await (StreetBookServiceRoutesCallbackBaseNativeOverride.
@@ -2262,14 +4180,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             f"ignoring this symbol_side_snapshot update from fills")
                 logging.error(err_str_)
 
-    def set_strat_state_to_pause(self):
-        pair_strat = PairStratBaseModel(_id=self.pair_strat_id,
-                                        strat_state=StratState.StratState_PAUSED)
-        # email_book_service_http_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True,
-        #                                                                            exclude_none=True))
+    def pause_strat(self):
         guaranteed_call_pair_strat_client(
             PairStratBaseModel, email_book_service_http_client.patch_pair_strat_client,
             _id=self.pair_strat_id, strat_state=StratState.StratState_PAUSED)
+
+    def unpause_strat(self):
+        guaranteed_call_pair_strat_client(
+            PairStratBaseModel, email_book_service_http_client.patch_pair_strat_client,
+            _id=self.pair_strat_id, strat_state=StratState.StratState_ACTIVE)
 
     async def _apply_fill_update_in_chore_snapshot(
             self, fills_journal_obj: FillsJournal) -> Tuple[int, ChoreSnapshot, StratBrief,
@@ -2285,6 +4204,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
             if chore_snapshot_obj is not None:
                 if chore_snapshot_obj.chore_status in [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
+                                                       ChoreStatusType.OE_AMD,
                                                        ChoreStatusType.OE_DOD, ChoreStatusType.OE_CXL_UNACK]:
                     received_fill_after_dod = False
                     if chore_snapshot_obj.chore_status == ChoreStatusType.OE_DOD:
@@ -2296,19 +4216,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     else:
                         updated_total_filled_qty = int(fills_journal_obj.fill_qty)
                     received_fill_notional = fills_journal_obj.fill_notional
-                    last_update_fill_qty = int(fills_journal_obj.fill_qty)
-                    last_update_fill_px = fills_journal_obj.fill_px
-                    updated_cxl_qty: int | None = None
-                    updated_cxl_notional = None
-                    chore_status = None
                     fills_before_ack = False
                     if chore_snapshot_obj.chore_status == ChoreStatusType.OE_UNACK:
-                        chore_status = ChoreStatusType.OE_ACKED
                         fills_before_ack = True
 
-                    pause_strat: bool = False
-
-                    if chore_snapshot_obj.chore_brief.qty == updated_total_filled_qty:
+                    available_qty = chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.total_amend_dn_qty
+                    if available_qty == updated_total_filled_qty:
                         pause_fulfill_post_chore_dod: bool = (
                             executor_config_yaml_dict.get("pause_fulfill_post_chore_dod"))
                         if received_fill_after_dod and pause_fulfill_post_chore_dod:
@@ -2318,7 +4231,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                              "already of state OE_DOD, ignoring this fill and putting this strat to "
                                              f"PAUSE, symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
                                              f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
-                            pause_strat = True
+                            self.pause_strat()
+                            return None
+                            # pause_strat = True
                         else:
                             if received_fill_after_dod:
                                 # @@@ below error log is used in specific test case for string matching - if changed
@@ -2328,72 +4243,117 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                     "already of state OE_DOD, symbol_side_key: "
                                     f"{get_chore_snapshot_log_key(chore_snapshot_obj)}"
                                     f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
-                            chore_status = ChoreStatusType.OE_FILLED
-                            updated_cxl_qty = int(chore_snapshot_obj.cxled_qty - fills_journal_obj.fill_qty)
-                            updated_cxl_notional = (
-                                    updated_cxl_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                                                      chore_snapshot_obj.chore_brief.security.sec_id))
-                    elif chore_snapshot_obj.chore_brief.qty < updated_total_filled_qty:     # OVER_FILLED
-                        vacant_fill_qty = int(chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.filled_qty)
+                                chore_snapshot_obj.cxled_qty -= int(fills_journal_obj.fill_qty)
+                                chore_snapshot_obj.cxled_notional = (
+                                        chore_snapshot_obj.cxled_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                                          chore_snapshot_obj.chore_brief.security.sec_id))
+                                if chore_snapshot_obj.cxled_qty == 0:
+                                    chore_snapshot_obj.avg_cxled_px = 0
+                                else:
+                                    logging.error("Unexpected: Received fill that makes chore FULFILL after DOD but "
+                                                  "when fill_qty removed from cxl_qty, cxl_qty is not turning 0 ;;; "
+                                                  f"fill_journal: {fills_journal_obj}, "
+                                                  f"chore_journal: {chore_snapshot_obj}")
+
+                            chore_snapshot_obj.last_chore_status = chore_snapshot_obj.chore_status
+                            chore_snapshot_obj.chore_status = ChoreStatusType.OE_FILLED
+                            if fills_before_ack:
+                                logging.warning(f"Received fill for chore that has status: {ChoreStatusType.OE_UNACK} "
+                                                f"that makes chore fulfilled, putting chore to "
+                                                f"{chore_snapshot_obj.chore_status} status and applying fill")
+                    elif available_qty < updated_total_filled_qty:     # OVER_FILLED
+                        vacant_fill_qty = int(available_qty - chore_snapshot_obj.filled_qty)
                         non_required_received_fill_qty = fills_journal_obj.fill_qty - vacant_fill_qty
 
                         if received_fill_after_dod:
+                            # @@@ below error log is used in specific test case for string matching - if changed
+                            # here needs to be changed in test also
                             logging.critical(
                                 f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED which "
                                 f"is already OE_DOD, {vacant_fill_qty = }, received "
                                 f"{fills_journal_obj.fill_qty = }, {non_required_received_fill_qty = } "
-                                f"from fills_journal_key {get_fills_journal_log_key(fills_journal_obj)} - "
-                                f"ignoring chore_snapshot updates for this fill and putting strat to PAUSE"
+                                f"from fills_journal_key of {fills_journal_obj.chore_id = } and "
+                                f"{fills_journal_obj.id = } - putting strat to PAUSE and applying fill, "
+                                f"symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
+                                f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
+                            chore_snapshot_obj.cxled_qty -= int(fills_journal_obj.fill_qty -
+                                                                non_required_received_fill_qty)
+                            chore_snapshot_obj.cxled_notional = (
+                                    chore_snapshot_obj.cxled_qty *
+                                    self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                    chore_snapshot_obj.chore_brief.security.sec_id))
+                            if chore_snapshot_obj.cxled_qty == 0:
+                                chore_snapshot_obj.avg_cxled_px = 0
+                            else:
+                                logging.error("Unexpected: Received fill that makes chore OVERFILL after DOD but "
+                                              "when valid fill_qty (excluding extra fill) is removed from cxl_qty, "
+                                              "cxl_qty is not turning 0 ;;; "
+                                              f"fill_journal: {fills_journal_obj}, "
+                                              f"chore_journal: {chore_snapshot_obj}")
+
+                        elif fills_before_ack:
+                            # @@@ below error log is used in specific test case for string matching - if changed
+                            # here needs to be changed in test also
+                            logging.critical(
+                                f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED to chore "
+                                f"which is still OE_UNACK, "
+                                f"{vacant_fill_qty = }, received {fills_journal_obj.fill_qty = }, "
+                                f"{non_required_received_fill_qty = } "
+                                f"from fills_journal_key of {fills_journal_obj.chore_id = } and "
+                                f"{fills_journal_obj.id = } - putting strat to PAUSE and applying fill, "
                                 f"symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
                                 f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
                         else:
+                            # @@@ below error log is used in specific test case for string matching - if changed
+                            # here needs to be changed in test also
                             logging.critical(
                                 f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED, "
                                 f"{vacant_fill_qty = }, received {fills_journal_obj.fill_qty = }, "
                                 f"{non_required_received_fill_qty = } "
-                                f"from fills_journal_key {get_fills_journal_log_key(fills_journal_obj)} - "
-                                f"ignoring chore_snapshot updates for this fill and putting strat to PAUSE"
+                                f"from fills_journal_key of {fills_journal_obj.chore_id = } and "
+                                f"{fills_journal_obj.id = } - putting strat to PAUSE and applying fill, "
                                 f"symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
                                 f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
-                        pause_strat = True
+                        chore_snapshot_obj.last_chore_status = chore_snapshot_obj.chore_status
+                        chore_snapshot_obj.chore_status = ChoreStatusType.OE_OVER_FILLED
+                        self.pause_strat()
+                        # pause_strat = True
                     else:
                         if received_fill_after_dod:
-                            updated_cxl_qty = int(chore_snapshot_obj.cxled_qty - fills_journal_obj.fill_qty)
-                            updated_cxl_notional = (
-                                updated_cxl_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                            chore_snapshot_obj.cxled_qty = int(chore_snapshot_obj.cxled_qty -
+                                                               fills_journal_obj.fill_qty)
+                            chore_snapshot_obj.cxled_notional = (
+                                chore_snapshot_obj.cxled_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
-
-                    if pause_strat:
-                        self.set_strat_state_to_pause()
-                        return None
-                    # else not required: If pause is not triggered, updating chore_snapshot and other models
+                            chore_snapshot_obj.avg_cxled_px = \
+                                (self.get_local_px_or_notional(chore_snapshot_obj.cxled_notional,
+                                                               chore_snapshot_obj.chore_brief.security.sec_id) /
+                                 chore_snapshot_obj.cxled_qty) if chore_snapshot_obj.cxled_qty != 0 else 0
+                        elif fills_before_ack:
+                            chore_snapshot_obj.last_chore_status = chore_snapshot_obj.chore_status
+                            chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
+                            logging.warning(f"Received fill for chore that has status: {ChoreStatusType.OE_UNACK}, "
+                                            f"putting chore to {chore_snapshot_obj.chore_status} "
+                                            f"status and applying fill")
 
                     if (last_filled_notional := chore_snapshot_obj.fill_notional) is not None:
                         updated_fill_notional = last_filled_notional + received_fill_notional
                     else:
                         updated_fill_notional = received_fill_notional
                     updated_avg_fill_px = \
-                        self.get_local_px_or_notional(updated_fill_notional,
-                                                      fills_journal_obj.fill_symbol) / updated_total_filled_qty
+                        (self.get_local_px_or_notional(updated_fill_notional,
+                                                       fills_journal_obj.fill_symbol) / updated_total_filled_qty
+                         if updated_total_filled_qty != 0 else 0)
 
-                    if fills_before_ack:
-                        if chore_status == ChoreStatusType.OE_FILLED:
-                            logging.warning(f"Received fill for chore that has status: {ChoreStatusType.OE_UNACK} "
-                                            f"that makes chore fulfilled, "
-                                            f"putting chore to {chore_status} status and applying fill")
-                        else:
-                            logging.warning(f"Received fill for chore that has status: {ChoreStatusType.OE_UNACK}, "
-                                            f"putting chore to {chore_status} status and applying fill")
-
+                    chore_snapshot_obj.filled_qty = updated_total_filled_qty
+                    chore_snapshot_obj.avg_fill_px = updated_avg_fill_px
+                    chore_snapshot_obj.fill_notional = updated_fill_notional
+                    chore_snapshot_obj.last_update_fill_qty = int(fills_journal_obj.fill_qty)
+                    chore_snapshot_obj.last_update_fill_px = fills_journal_obj.fill_px
+                    chore_snapshot_obj.last_update_date_time = fills_journal_obj.fill_date_time
                     chore_snapshot_obj = \
                         await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                               underlying_partial_update_chore_snapshot_http(json.loads(ChoreSnapshotOptional(
-                                _id=chore_snapshot_obj.id, filled_qty=updated_total_filled_qty,
-                                avg_fill_px=updated_avg_fill_px, fill_notional=updated_fill_notional,
-                                last_update_fill_qty=last_update_fill_qty, last_update_fill_px=last_update_fill_px,
-                                cxled_qty=updated_cxl_qty, cxled_notional=updated_cxl_notional,
-                                last_update_date_time=fills_journal_obj.fill_date_time,
-                                chore_status=chore_status).model_dump_json(by_alias=True, exclude_none=True))))
+                               underlying_update_chore_snapshot_http(chore_snapshot_obj))
                     symbol_side_snapshot = \
                         await self._update_symbol_side_snapshot_from_fill_applied_chore_snapshot(
                             chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod)
@@ -2422,7 +4382,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 f"ignoring this fill journal - putting strat to PAUSE;;; "
                                 f"{fills_journal_obj = }, {chore_snapshot_obj = }")
                     logging.critical(err_str_)
-                    self.set_strat_state_to_pause()
+                    self.pause_strat()
                 else:
                     err_str_ = f"Unsupported - Fill received for chore_snapshot having status " \
                                f"{chore_snapshot_obj.chore_status}, chore_snapshot_key: " \
@@ -2451,22 +4411,39 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 match chore_snapshot_obj.chore_brief.side:
                     case Side.BUY:
                         if not received_fill_after_dod:
-                            update_strat_status_obj.total_open_buy_qty = int(fetched_strat_status_obj.total_open_buy_qty -
-                                                                             chore_snapshot_obj.last_update_fill_qty)
-                            update_strat_status_obj.total_open_buy_notional = (
-                                    fetched_strat_status_obj.total_open_buy_notional -
-                                    (chore_snapshot_obj.last_update_fill_qty *
-                                     self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                                     chore_snapshot_obj.chore_brief.security.sec_id)))
+                            if chore_snapshot_obj.chore_status != ChoreStatusType.OE_OVER_FILLED:
+                                update_strat_status_obj.total_open_buy_qty = (
+                                    int(fetched_strat_status_obj.total_open_buy_qty -
+                                        chore_snapshot_obj.last_update_fill_qty))
+                                update_strat_status_obj.total_open_buy_notional = (
+                                        fetched_strat_status_obj.total_open_buy_notional -
+                                        (chore_snapshot_obj.last_update_fill_qty *
+                                         self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                         chore_snapshot_obj.chore_brief.security.sec_id)))
+                            else:
+                                # if fill made chore OVER_FILLED, then extra fill can't be removed from current open
+                                # removing only what was open originally
+                                available_qty = chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.total_amend_dn_qty
+                                extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
+                                acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
+
+                                update_strat_status_obj.total_open_buy_qty = int(
+                                    fetched_strat_status_obj.total_open_buy_qty - acceptable_remaining_fill_qty)
+                                update_strat_status_obj.total_open_buy_notional = (
+                                        fetched_strat_status_obj.total_open_buy_notional -
+                                        (acceptable_remaining_fill_qty *
+                                         self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                         chore_snapshot_obj.chore_brief.security.sec_id)))
                             update_strat_status_obj.total_open_sell_notional = (
                                 fetched_strat_status_obj.total_open_sell_notional)
-                            if fetched_strat_status_obj.total_open_buy_qty == 0:
+                            if update_strat_status_obj.total_open_buy_qty == 0:
                                 update_strat_status_obj.avg_open_buy_px = 0
                             else:
                                 update_strat_status_obj.avg_open_buy_px = \
-                                    self.get_local_px_or_notional(fetched_strat_status_obj.total_open_buy_notional,
+                                    self.get_local_px_or_notional(update_strat_status_obj.total_open_buy_notional,
                                                                   chore_snapshot_obj.chore_brief.security.sec_id) / \
-                                    fetched_strat_status_obj.total_open_buy_qty
+                                    update_strat_status_obj.total_open_buy_qty
+
                         update_strat_status_obj.total_fill_buy_qty = int(
                                 fetched_strat_status_obj.total_fill_buy_qty + chore_snapshot_obj.last_update_fill_qty)
                         update_strat_status_obj.total_fill_buy_notional = (
@@ -2475,42 +4452,79 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                     chore_snapshot_obj.last_update_fill_px,
                                     chore_snapshot_obj.chore_brief.security.sec_id))
                         update_strat_status_obj.avg_fill_buy_px = \
-                            self.get_local_px_or_notional(update_strat_status_obj.total_fill_buy_notional,
-                                                          chore_snapshot_obj.chore_brief.security.sec_id) / \
-                            update_strat_status_obj.total_fill_buy_qty
+                            (self.get_local_px_or_notional(update_strat_status_obj.total_fill_buy_notional,
+                                                          chore_snapshot_obj.chore_brief.security.sec_id) /
+                             update_strat_status_obj.total_fill_buy_qty
+                             if update_strat_status_obj.total_fill_buy_qty != 0 else 0)
                         update_strat_status_obj.total_fill_sell_notional = (
                             fetched_strat_status_obj.total_fill_sell_notional)
                         if received_fill_after_dod:
-                            update_strat_status_obj.total_cxl_buy_qty = int(
-                                    fetched_strat_status_obj.total_cxl_buy_qty -
-                                    chore_snapshot_obj.last_update_fill_qty)
-                            update_strat_status_obj.total_cxl_buy_notional = (
-                                fetched_strat_status_obj.total_cxl_buy_notional -
-                                (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                                 chore_snapshot_obj.chore_brief.security.sec_id) *
-                                 chore_snapshot_obj.last_update_fill_qty))
+                            if chore_snapshot_obj.chore_status == ChoreStatusType.OE_OVER_FILLED:
+                                # if fill made chore OVER_FILLED, then extra fill can't be removed from current cxl_qty
+                                # removing only what was cxled qty originally
+                                available_qty = chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.total_amend_dn_qty
+                                extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
+                                acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
+
+                                update_strat_status_obj.total_cxl_buy_qty = int(
+                                    fetched_strat_status_obj.total_cxl_buy_qty - acceptable_remaining_fill_qty)
+                                update_strat_status_obj.total_cxl_buy_notional = (
+                                        fetched_strat_status_obj.total_cxl_buy_notional -
+                                        (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                         chore_snapshot_obj.chore_brief.security.sec_id) *
+                                         acceptable_remaining_fill_qty))
+                            else:
+                                update_strat_status_obj.total_cxl_buy_qty = int(
+                                        fetched_strat_status_obj.total_cxl_buy_qty -
+                                        chore_snapshot_obj.last_update_fill_qty)
+                                update_strat_status_obj.total_cxl_buy_notional = (
+                                    fetched_strat_status_obj.total_cxl_buy_notional -
+                                    (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                     chore_snapshot_obj.chore_brief.security.sec_id) *
+                                     chore_snapshot_obj.last_update_fill_qty))
+                            update_strat_status_obj.avg_cxl_buy_px = (
+                                (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_buy_notional,
+                                                               chore_snapshot_obj.chore_brief.security.sec_id) /
+                                 update_strat_status_obj.total_cxl_buy_qty)
+                                if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
                             update_strat_status_obj.total_cxl_sell_notional = (
                                 fetched_strat_status_obj.total_cxl_sell_notional)
 
                     case Side.SELL:
                         if not received_fill_after_dod:
-                            update_strat_status_obj.total_open_sell_qty = int(
-                                    fetched_strat_status_obj.total_open_sell_qty -
-                                    chore_snapshot_obj.last_update_fill_qty)
-                            update_strat_status_obj.total_open_sell_notional = (
-                                    fetched_strat_status_obj.total_open_sell_notional -
-                                    (chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(
-                                        chore_snapshot_obj.chore_brief.px,
-                                        chore_snapshot_obj.chore_brief.security.sec_id)))
+                            if chore_snapshot_obj.chore_status != ChoreStatusType.OE_OVER_FILLED:
+                                update_strat_status_obj.total_open_sell_qty = (
+                                    int(fetched_strat_status_obj.total_open_sell_qty -
+                                        chore_snapshot_obj.last_update_fill_qty))
+                                update_strat_status_obj.total_open_sell_notional = (
+                                        fetched_strat_status_obj.total_open_sell_notional -
+                                        (chore_snapshot_obj.last_update_fill_qty *
+                                         self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                         chore_snapshot_obj.chore_brief.security.sec_id)))
+                            else:
+                                # if fill made chore OVER_FILLED, then extra fill can't be removed from current open
+                                # removing only what was open originally
+                                available_qty = chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.total_amend_dn_qty
+                                extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
+                                acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
+
+                                update_strat_status_obj.total_open_sell_qty = int(
+                                    fetched_strat_status_obj.total_open_sell_qty - acceptable_remaining_fill_qty)
+                                update_strat_status_obj.total_open_sell_notional = (
+                                        fetched_strat_status_obj.total_open_sell_notional -
+                                        (acceptable_remaining_fill_qty *
+                                         self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                         chore_snapshot_obj.chore_brief.security.sec_id)))
                             update_strat_status_obj.total_open_buy_notional = (
                                 fetched_strat_status_obj.total_open_buy_notional)
                             if update_strat_status_obj.total_open_sell_qty == 0:
                                 update_strat_status_obj.avg_open_sell_px = 0
                             else:
                                 update_strat_status_obj.avg_open_sell_px = \
-                                    self.get_local_px_or_notional(fetched_strat_status_obj.total_open_sell_notional,
+                                    self.get_local_px_or_notional(update_strat_status_obj.total_open_sell_notional,
                                                                   chore_snapshot_obj.chore_brief.security.sec_id) / \
-                                    fetched_strat_status_obj.total_open_sell_qty
+                                    update_strat_status_obj.total_open_sell_qty
+
                         update_strat_status_obj.total_fill_sell_qty = int(
                                 fetched_strat_status_obj.total_fill_sell_qty + chore_snapshot_obj.last_update_fill_qty)
                         update_strat_status_obj.total_fill_sell_notional = (
@@ -2518,24 +4532,48 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(
                                     chore_snapshot_obj.last_update_fill_px,
                                     chore_snapshot_obj.chore_brief.security.sec_id))
-                        update_strat_status_obj.avg_fill_sell_px = \
-                            self.get_local_px_or_notional(update_strat_status_obj.total_fill_sell_notional,
-                                                          chore_snapshot_obj.chore_brief.security.sec_id) / \
-                            update_strat_status_obj.total_fill_sell_qty
+                        if update_strat_status_obj.total_fill_sell_qty:
+                            update_strat_status_obj.avg_fill_sell_px = \
+                                self.get_local_px_or_notional(update_strat_status_obj.total_fill_sell_notional,
+                                                              chore_snapshot_obj.chore_brief.security.sec_id) / \
+                                update_strat_status_obj.total_fill_sell_qty
+                        else:
+                            update_strat_status_obj.avg_fill_sell_px = 0
                         update_strat_status_obj.total_fill_buy_notional = (
                             fetched_strat_status_obj.total_fill_buy_notional)
 
                         if received_fill_after_dod:
-                            update_strat_status_obj.total_cxl_sell_qty = int(
-                                    fetched_strat_status_obj.total_cxl_sell_qty -
-                                    chore_snapshot_obj.last_update_fill_qty)
-                            update_strat_status_obj.total_cxl_sell_notional = (
-                                fetched_strat_status_obj.total_cxl_sell_notional -
-                                (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                                 chore_snapshot_obj.chore_brief.security.sec_id) *
-                                 chore_snapshot_obj.last_update_fill_qty))
+                            if chore_snapshot_obj.chore_status == ChoreStatusType.OE_OVER_FILLED:
+                                # if fill made chore OVER_FILLED, then extra fill can't be removed from current cxl_qty
+                                # removing only what was cxled qty originally
+                                available_qty = chore_snapshot_obj.chore_brief.qty - chore_snapshot_obj.total_amend_dn_qty
+                                extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
+                                acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
+
+                                update_strat_status_obj.total_cxl_sell_qty = int(
+                                    fetched_strat_status_obj.total_cxl_sell_qty - acceptable_remaining_fill_qty)
+                                update_strat_status_obj.total_cxl_sell_notional = (
+                                        fetched_strat_status_obj.total_cxl_sell_notional -
+                                        (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                         chore_snapshot_obj.chore_brief.security.sec_id) *
+                                         acceptable_remaining_fill_qty))
+                            else:
+                                update_strat_status_obj.total_cxl_sell_qty = int(
+                                        fetched_strat_status_obj.total_cxl_sell_qty -
+                                        chore_snapshot_obj.last_update_fill_qty)
+                                update_strat_status_obj.total_cxl_sell_notional = (
+                                    fetched_strat_status_obj.total_cxl_sell_notional -
+                                    (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                     chore_snapshot_obj.chore_brief.security.sec_id) *
+                                     chore_snapshot_obj.last_update_fill_qty))
+                            update_strat_status_obj.avg_cxl_sell_px = (
+                                (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_sell_notional,
+                                                               chore_snapshot_obj.chore_brief.security.sec_id) /
+                                 update_strat_status_obj.total_cxl_sell_qty)
+                                if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
                             update_strat_status_obj.total_cxl_buy_notional = (
                                 fetched_strat_status_obj.total_cxl_buy_notional)
+
                     case other_:
                         err_str_ = f"Unsupported Side Type {other_} received for chore_snapshot_key: " \
                                    f"{get_chore_snapshot_log_key(chore_snapshot_obj)} while updating strat_status;;; " \
@@ -2656,7 +4694,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_strat_status_get_all_ws(updated_strat_status_obj)
 
-        # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
+        # updating balance_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
                                                  email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_status_obj.id,
@@ -2669,7 +4707,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_strat_status_get_all_ws(updated_strat_status_obj)
 
-        # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
+        # updating balance_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
                                                  email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_status_obj.id,
@@ -2802,7 +4840,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_strat_status_get_all_ws(strat_status_obj)
 
-        # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
+        # updating balance_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
                                                  email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=strat_status_obj.id,
@@ -3012,12 +5050,22 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         return await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_fills_journal_http(
             get_symbol_side_underlying_account_cumulative_fill_qty(symbol, side), self.get_generic_read_route())
 
+    @staticmethod
+    def is_chore_status_terminal(chore_status: ChoreStatusType) -> bool:
+        return chore_status in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED,
+                                               ChoreStatusType.OE_OVER_FILLED]
+
+    @staticmethod
+    def chore_has_terminal_state(chore_snapshot: ChoreSnapshot) -> bool:
+        return chore_snapshot.chore_status in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED,
+                                               ChoreStatusType.OE_OVER_FILLED]
+
     async def cxl_expired_open_chores(self):
         open_chore_snapshots_list: List[ChoreSnapshot] = self.strat_cache.get_open_chore_snapshots()
 
         for open_chore_snapshot in open_chore_snapshots_list:
             if (open_chore_snapshot.chore_status != ChoreStatusType.OE_CXL_UNACK and
-                    open_chore_snapshot.chore_status not in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED]):
+                    not self.chore_has_terminal_state(open_chore_snapshot)):
                 strat_limits_tuple = self.strat_cache.get_strat_limits()
                 time_delta = DateTime.utcnow() - open_chore_snapshot.create_date_time
 
@@ -3145,6 +5193,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
             # making force publish flag back to false for current strat's symbol's symbol_overview
             await self._force_unpublish_symbol_overview_from_unload_strat()
+
+        # removing strat_alert
+        try:
+            log_book_service_http_client.remove_strat_alerts_for_strat_id_query_client(self.pair_strat_id)
+        except Exception as e:
+            err_str_ = f"Some Error occurred while removing strat_alerts in snoozing strat process, exception: {e}"
+            raise HTTPException(detail=err_str_, status_code=500)
 
         # cleaning executor config.yaml file
         try:
@@ -3282,10 +5337,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
     async def barter_simulator_process_fill_query_pre(
             self, barter_simulator_process_fill_class_type: Type[BarterSimulatorProcessFill], chore_id: str,
-            px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
+            px: float, qty: int, side: Side, sec_id: str, underlying_account: str,
+            use_exact_passed_qty: bool | None = None):
         if BarterSimulator.symbol_configs is None:
             BarterSimulator.reload_symbol_configs()
-        await BarterSimulator.process_fill(chore_id, px, qty, side, sec_id, underlying_account)
+        await BarterSimulator.process_fill(chore_id, px, qty, side, sec_id, underlying_account, use_exact_passed_qty)
         return []
 
     async def barter_simulator_reload_config_query_pre(
@@ -3293,94 +5349,24 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         BarterSimulator.reload_symbol_configs()
         return []
 
-    ###################
-    # Filter WS queries
-    ###################
+    async def barter_simulator_process_amend_req_query_pre(
+            self, barter_simulator_process_amend_req_class_type: Type[BarterSimulatorProcessAmendReq], chore_id: str,
+            side: Side, sec_id: str, underlying_account: str, px: float | None = None, qty: int | None = None):
+        if px is None and qty is None:
+            logging.error("Both Px and Qty can't be None while placing amend chore - ignoring this "
+                          "amend chore creation")
+            return
+        await BarterSimulator.place_amend_req_chore(chore_id, side, sec_id, sec_id, underlying_account, px=px, qty=qty)
+        return []
 
-    async def filtered_notify_tob_update_query_ws_pre(self):
-        return tob_filter_callable
+    async def barter_simulator_process_amend_ack_query_pre(
+            self, barter_simulator_process_amend_ack_class_type: Type[BarterSimulatorProcessAmendAck],
+            chore_id: str, side: Side, sec_id: str, underlying_account: str):
+        await BarterSimulator.place_amend_ack_chore(chore_id, side, sec_id, sec_id, underlying_account)
+        return []
 
-    async def filtered_notify_chore_journal_update_query_ws_pre(self):
-        return filter_ws_chore_journal
-
-    async def filtered_notify_chore_snapshot_update_query_ws_pre(self):
-        return filter_ws_chore_snapshot
-
-    async def filtered_notify_symbol_side_snapshot_update_query_ws_pre(self):
-        return filter_ws_symbol_side_snapshot
-
-    async def filtered_notify_fills_journal_update_query_ws_pre(self):
-        return filter_ws_fills_journal
-
-    async def filtered_notify_strat_brief_update_query_ws_pre(self):
-        return filter_ws_strat_brief
-
-
-def filter_ws_chore_journal(chore_journal_obj_json: Dict, **kwargs):
-    symbols = kwargs.get("symbols")
-    chore = chore_journal_obj_json.get("chore")
-    if chore is not None:
-        security = chore.get("security")
-        if security is not None:
-            sec_id = security.get("sec_id")
-            if sec_id is not None:
-                if sec_id in symbols:
-                    return True
-    return False
-
-
-def filter_ws_chore_snapshot(chore_snapshot_obj_json: Dict, **kwargs):
-    symbols = kwargs.get("symbols")
-    chore = chore_snapshot_obj_json.get("chore")
-    if chore is not None:
-        security = chore.get("security")
-        if security is not None:
-            sec_id = security.get("sec_id")
-            if sec_id is not None:
-                if sec_id in symbols:
-                    return True
-    return False
-
-
-def filter_ws_symbol_side_snapshot(symbol_side_snapshot_obj_json: Dict, **kwargs):
-    symbols = kwargs.get("symbols")
-    security = symbol_side_snapshot_obj_json.get("security")
-    if security is not None:
-        sec_id = security.get("sec_id")
-        if sec_id is not None:
-            if sec_id == symbols:
-                return True
-    return False
-
-
-def filter_ws_fills_journal(fills_journal_obj_json: Dict, **kwargs):
-    symbols = kwargs.get("symbols")
-    fill_symbol = fills_journal_obj_json.get("fill_symbol")
-    if fill_symbol is not None:
-        if fill_symbol == symbols:
-            return True
-    return False
-
-
-def filter_ws_strat_brief(strat_brief_obj_json: Dict, **kwargs):
-    symbols = kwargs.get("symbols")
-    pair_buy_side_bartering_brief = strat_brief_obj_json.get("pair_buy_side_bartering_brief")
-    pair_sell_side_bartering_brief = strat_brief_obj_json.get("pair_sell_side_bartering_brief")
-    if pair_buy_side_bartering_brief is not None and pair_sell_side_bartering_brief is not None:
-        security_buy = pair_buy_side_bartering_brief.get("security")
-        security_sell = pair_sell_side_bartering_brief.get("security")
-        if security_buy is not None and security_sell is not None:
-            sec1_id = security_buy.get("sec_id")
-            sec2_id = security_sell.get("sec_id")
-            if sec1_id in symbols or sec2_id in symbols:
-                return True
-    return False
-
-
-def tob_filter_callable(tob_obj_json_str, **kwargs):
-    symbols = kwargs.get("symbols")
-    tob_obj_json = json.loads(tob_obj_json_str)
-    tob_symbol = tob_obj_json.get("symbol")
-    if tob_symbol in symbols:
-        return True
-    return False
+    async def barter_simulator_process_amend_rej_query_pre(
+            self, barter_simulator_process_amend_ack_class_type: Type[BarterSimulatorProcessAmendAck],
+            chore_id: str, side: Side, sec_id: str, underlying_account: str):
+        await BarterSimulator.place_amend_rej_chore(chore_id, side, sec_id, sec_id, underlying_account)
+        return []

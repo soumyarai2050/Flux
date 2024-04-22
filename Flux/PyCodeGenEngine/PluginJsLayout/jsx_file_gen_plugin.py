@@ -539,9 +539,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     src_model_name = get_all_override_default_crud.get(
                         JsxFileGenPlugin.widget_ui_option_override_default_crud_query_src_model_name_field)
                     src_model_name_camel_cased = convert_to_camel_case(src_model_name)
-                    output_str += "    const {\n"
-                    output_str += f"        {src_model_name_camel_cased}\n"
-                    output_str += "    } "+f"= useSelector(state => state.{src_model_name_camel_cased});\n"
+                    if not other_file_dependent_msg_name or src_model_name != other_file_dependent_msg_name:
+                        output_str += "    const {\n"
+                        output_str += f"        {src_model_name_camel_cased}\n"
+                        output_str += "    } "+f"= useSelector(state => state.{src_model_name_camel_cased});\n"
 
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
                 output_str += "    const currentSchema = useMemo(() => schema[props.name], []);\n"
@@ -1091,6 +1092,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                 widget_ui_option_value.get(
                                     JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field) is not None:
                             output_str += f"        dispatch(reset{msg.proto.name}());\n"
+                        elif (ui_option_override_default_crud_field_vals:=widget_ui_option_value.get(
+                                    JsxFileGenPlugin.widget_ui_option_override_default_crud_field)) is not None:
+                            for ui_option_override_default_crud_field_val in ui_option_override_default_crud_field_vals:
+                                crud_query_src_model_name = ui_option_override_default_crud_field_val.get(
+                                    JsxFileGenPlugin.widget_ui_option_override_default_crud_query_src_model_name_field)
+                                if crud_query_src_model_name == self.abbreviated_dependent_message_name:
+                                    output_str += f"        dispatch(reset{msg.proto.name}());\n"
+                                    break
                 output_str += "    }, " + f"[selected{dependent_message}Id])\n\n"
 
         if layout_type not in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
@@ -1117,12 +1126,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     other_file_dependent_msg_name_snake_cased = (
                         convert_camel_case_to_specific_case(other_file_dependent_msg_name))
                     output_str += "    useEffect(() => {\n"
-                    output_str += ("        if (currentSchema.connection_details && (currentSchema."
+                    output_str += ("        if (currentSchema.connection_details && ("
+                                   "currentSchema.widget_ui_data_element.depending_proto_model_name || currentSchema."
                                    "connection_details.dynamic_url || currentSchema.widget_ui_data_element."
                                    "depends_on_other_model_for_id)) {\n")
                     option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                                         message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-                    if (option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field) or
+                    if (option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field) or
+                        option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field) or
                         option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_dynamic_url_field)):
                         output_str += (f"            const {other_file_dependent_msg_name_camel_cased}Collections = "
                                        f"schemaCollections['{other_file_dependent_msg_name_snake_cased}'];\n")
@@ -2520,6 +2531,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
         output_dict: Dict[str, str] = {}
+
+        # sorting created message lists
+        self.layout_msg_list.sort(key=lambda message_: message_.proto.name)
+        self.root_msg_list.sort(key=lambda message_: message_.proto.name)
 
         for message in self.layout_msg_list:
             self.root_message = None

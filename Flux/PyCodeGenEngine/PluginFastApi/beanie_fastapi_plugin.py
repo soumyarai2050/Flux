@@ -201,8 +201,10 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += '    cors_dict["allow_origins"] = ["*"]\n'
         output_str += '    cors_dict["allow_credentials"] = True\n'
         output_str += "else:\n"
-        output_str += '    host_pattern = host.replace(".", "\\.")\n'
-        output_str += '    allow_origin_pattern = rf"https?://{host_pattern}(:\d+)?"\n'
+        temp = r"\\."
+        output_str += f'    host_pattern = host.replace(".", "{temp}")\n'
+        temp = r":\d+"
+        output_str += '    allow_origin_pattern = rf"https?://{host_pattern}'+f'({temp})?"\n'
         output_str += '    cors_dict["allow_origin_regex"] = allow_origin_pattern\n'
         output_str += f"{self.fastapi_app_name}.add_middleware(\n"
         output_str += f"    CORSMiddleware,\n"
@@ -251,6 +253,11 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         # else not required: core_or_util_files key is not in yaml dict config
 
         self.set_req_data_members(file)
+
+        # sorting created message lists
+        self.root_message_list.sort(key=lambda message_: message_.proto.name)
+        self.non_root_message_list.sort(key=lambda message_: message_.proto.name)
+        self.enum_list.sort(key=lambda message_: message_.proto.name)
 
         output_dict: Dict[str, str] = {
             # Adding project´s database.py

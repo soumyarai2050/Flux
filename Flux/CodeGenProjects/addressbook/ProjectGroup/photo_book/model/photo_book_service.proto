@@ -1,0 +1,22 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+import "projects_core.proto";
+
+package photo_book;
+
+
+message ProcessPairStratAPIOps{
+    option (FluxMsgJsonQuery) = {
+      QueryName: "process_strat_view_updates"
+      QueryParams: "kwargs"
+      QueryParamsDataType: "List[Dict]"
+      QueryRouteType: PATCH
+  };
+  optional bool temp = 1;
+}
+
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage{
+   optional DummyEnumP temp1 = 1;
+}

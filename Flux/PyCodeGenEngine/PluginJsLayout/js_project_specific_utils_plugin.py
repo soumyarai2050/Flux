@@ -42,6 +42,9 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
             ui_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(ui_config_file_path))
             ui_coordinates_override_msg_dict = ui_config_yaml_dict.get("ui_coordinates")
 
+        # sorting created message lists
+        self.layout_msg_list.sort(key=lambda message_: message_.proto.name)
+
         output_str = "export const defaultLayouts = [\n"
         for index, message in enumerate(self.layout_msg_list):
             if self.is_option_enabled(message, JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data_element):

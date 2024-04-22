@@ -17,10 +17,10 @@ class AppLogAnalyzer(LogAnalyzer, ABC):
         "warning": "Severity_WARNING"
     }
 
-    def __init__(self, regex_file: str, config_yaml_dict: Dict,
+    def __init__(self, regex_file_dir_path: str, config_yaml_dict: Dict,
                  log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
                  debug_mode: bool = False):
-        super().__init__(regex_file, config_yaml_dict, log_prefix_regex_pattern_to_callable_name_dict)
+        super().__init__(regex_file_dir_path, config_yaml_dict, log_prefix_regex_pattern_to_callable_name_dict)
         self.error_patterns: Dict[str, re.Pattern] = {
             "error": re.compile(r"ER(R)?OR"),
             "critical": re.compile(r"CRIT(ICAL)?"),
