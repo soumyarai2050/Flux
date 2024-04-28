@@ -198,6 +198,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str = "/* CRUD async actions */\n"
         output_str += f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll'," \
                       " async (payload, { rejectWithValue }) => " + "{\n"
+
         if (not self.current_message_is_dependent and
                 self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
             widget_ui_option_value = JsSliceFileGenPlugin.get_complex_option_value_from_proto(

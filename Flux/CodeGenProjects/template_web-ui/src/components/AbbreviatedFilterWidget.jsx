@@ -417,7 +417,7 @@ function AbbreviatedFilterWidget(props) {
                                         size='medium'>
                                         <TableHead
                                             prefixCells={1}
-                                            suffixCells={props.bufferListFieldAttrs.hide ? 0 : 1}
+                                            // suffixCells={props.bufferListFieldAttrs.hide ? 0 : 1}
                                             headCells={filteredHeadCells}
                                             mode={Modes.READ_MODE}
                                             sortOrders={sortOrders}
@@ -524,13 +524,13 @@ function AbbreviatedFilterWidget(props) {
                                                                         />
                                                                     )
                                                                 })}
-                                                                {!props.bufferListFieldAttrs.hide && (
+                                                                {/* {!props.bufferListFieldAttrs.hide && (
                                                                     <TableCell className={classes.cell} sx={{ width: 10 }}>
                                                                         <Icon title='Unload' onClick={() => props.onUnload(row["data-id"])}>
                                                                             <Delete fontSize='small' />
                                                                         </Icon>
                                                                     </TableCell>
-                                                                )}
+                                                                )} */}
                                                             </TableRow>
                                                         </Fragment>
                                                     )

@@ -87,6 +87,7 @@ class BaseProtoPlugin(ABC):
     flux_fld_elaborated_title: ClassVar[str] = "FluxFldElaborateTitle"
     flux_fld_name_color: ClassVar[str] = "FluxFldNameColor"
     flux_msg_widget_ui_data_element: ClassVar[str] = "FluxMsgWidgetUIDataElement"
+    flux_msg_widget_ui_option: ClassVar[str] = "FluxMsgWidgetUIOption"
     widget_ui_option_depending_proto_file_name_field: ClassVar[str] = "depending_proto_file_name"
     widget_ui_option_depending_proto_model_name_field: ClassVar[str] = "depending_proto_model_name"
     widget_ui_option_depends_on_other_model_for_id_field: ClassVar[str] = "depends_on_other_model_for_id"

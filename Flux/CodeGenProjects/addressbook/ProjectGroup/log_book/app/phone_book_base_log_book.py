@@ -50,17 +50,15 @@ class PairStratDbUpdateDataContainer(BaseModel):
 
 class PhoneBookBaseLogBook(AppLogBook):
     underlying_partial_update_all_portfolio_alert_http: Callable[..., Any] | None = None
-    underlying_partial_update_all_strat_alert_http: Callable[..., Any] | None = None
     underlying_read_portfolio_alert_http: Callable[..., Any] | None = None
     underlying_read_strat_alert_http: Callable[..., Any] | None = None
 
     @classmethod
     def initialize_underlying_http_callables(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_routes import (
-            underlying_partial_update_all_portfolio_alert_http, underlying_partial_update_all_strat_alert_http,
-            underlying_read_portfolio_alert_http, underlying_read_strat_alert_http)
+            underlying_partial_update_all_portfolio_alert_http, underlying_read_portfolio_alert_http,
+            underlying_read_strat_alert_http)
         cls.underlying_partial_update_all_portfolio_alert_http = underlying_partial_update_all_portfolio_alert_http
-        cls.underlying_partial_update_all_strat_alert_http = underlying_partial_update_all_strat_alert_http
         cls.underlying_read_portfolio_alert_http = underlying_read_portfolio_alert_http
         cls.underlying_read_strat_alert_http = underlying_read_strat_alert_http
 

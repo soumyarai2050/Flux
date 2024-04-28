@@ -8,6 +8,11 @@ from FluxPythonUtils.scripts.utility_functions import get_pid_from_port
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
 
 
+def restart_phone_book():
+    pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],
+                                          cwd=PAIR_STRAT_ENGINE_DIR / "scripts")
+
+
 def _test_executor_crash_recovery(
         buy_symbol, sell_symbol, pair_strat_,
         expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
@@ -333,8 +338,7 @@ def _kill_executors_n_phone_book(activated_strat_n_strat_state_tuple_list, resid
         else:
             assert False, f"Unexpected: Can't kill process - Can't find any pid from port {port}"
 
-    pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],
-                                          cwd=PAIR_STRAT_ENGINE_DIR / "scripts")
+    restart_phone_book()
     time.sleep(residual_wait_sec * 2)
 
     updated_pair_strat_n_strat_state_list: List[Tuple[PairStratBaseModel, StratState]] = []
@@ -704,8 +708,7 @@ def test_pair_strat_crash_recovery(
     else:
         assert False, f"Unexpected: Can't kill process - Can't find any pid from port {pair_strat_port}"
 
-    pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],
-                                          cwd=PAIR_STRAT_ENGINE_DIR/"scripts")
+    restart_phone_book()
     time.sleep(residual_wait_sec * 2)
 
     for old_pair_strat, strat_state_to_handle in pair_strat_n_strat_state_list:
@@ -806,8 +809,7 @@ def test_update_pair_strat_from_pair_strat_log_book(
         expect_no_chore=True)
 
     time.sleep(5)
-    pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],
-                                          cwd=PAIR_STRAT_ENGINE_DIR/"scripts")
+    restart_phone_book()
     time.sleep(residual_wait_sec * 2)
 
     updated_pair_strat = email_book_service_native_web_client.get_pair_strat_client(activated_pair_strat.id)
@@ -850,8 +852,7 @@ def test_recover_kill_switch_when_bartering_server_has_enabled(
         else:
             assert False, f"Unexpected: Can't kill process - Can't find any pid from port {pair_strat_port}"
 
-        pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],
-                                              cwd=PAIR_STRAT_ENGINE_DIR/"scripts")
+        restart_phone_book()
         time.sleep(residual_wait_sec * 2)
 
         system_control = email_book_service_native_web_client.get_system_control_client(1)
@@ -918,8 +919,7 @@ def test_recover_kill_switch_when_bartering_server_has_disabled(
         else:
             assert False, f"Unexpected: Can't kill process - Can't find any pid from port {pair_strat_port}"
 
-        pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],
-                                              cwd=PAIR_STRAT_ENGINE_DIR/"scripts")
+        restart_phone_book()
         time.sleep(residual_wait_sec * 2)
 
         system_control = email_book_service_native_web_client.get_system_control_client(1)

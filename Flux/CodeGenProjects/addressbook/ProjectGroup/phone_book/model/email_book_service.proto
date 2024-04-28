@@ -123,6 +123,17 @@ message SystemControl{
     action: "flux_toggle",
     pressed_value_as_text: "true"
   }];
+  required bool pause_all_strats = 3 [default = false, (FluxFldButton) = {
+    unpressed_caption: "Pause All Strats",
+    pressed_caption: "In Progress",
+    disabled_captions: "true=In Progress"
+    value_color_map: "true=DEBUG,false=WARNING"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true"
+    button_icon_name: "Pause"
+  }];
 }
 
 //Widget - 9
@@ -251,29 +262,6 @@ message PairStrat{
     }];
 }
 
-message StratView{
-  option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_UNSPECIFIED,
-    ReadOp: AggregateType_UNSPECIFIED,
-    UpdateOp: AggregateType_UNSPECIFIED,
-    PatchOp: AggregateType_UNSPECIFIED,
-    PatchAllOp: AggregateType_UNSPECIFIED,
-    DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
-  };
-  required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int32 strat_alert_count = 2;
-  optional Severity strat_alert_aggregated_severity = 3 [default=Severity_UNSPECIFIED, (FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
-  optional float average_premium = 4 [(FluxFldNumberFormat) = "%"];
-  optional float market_premium = 5 [(FluxFldNumberFormat) = "%"];
-  optional float balance_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="StratView.max_single_leg_notional", (FluxFldProgressBar) = {
-    value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // chore of condition matching -> left to right (select first match)
-    hover_text_type: HoverTextType_VALUE,
-    is_reverse: true
-  }];
-  optional float max_single_leg_notional = 7;
-}
-
 // Widget - 1
 message StratCollection{
   option (FluxMsgJsonRoot) = {
@@ -296,7 +284,7 @@ message StratCollection{
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // leg1_sec_id-leg2_sec_id-leg1_side-uid
-  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:PairStrat.strat_state^Strat Notional:StratView.balance_notional^Premium Limit:PairStrat.pair_strat_params.common_premium^Avg Premium:StratView.average_premium^Mkt Premium:StratView.market_premium", (FluxFldAlertBubbleSource) = "StratView.strat_alert_count", (FluxFldAlertBubbleColor) = "StratView.strat_alert_aggregated_severity"];
+  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:PairStrat.strat_state^Strat Notional:StratView.balance_notional^Premium Limit:PairStrat.pair_strat_params.common_premium^Avg Premium:StratView.average_premium^Mkt Premium:StratView.market_premium^Unload:StratView.unload_strat^Recycle:StratView.recycle_strat", (FluxFldAlertBubbleSource) = "StratView.strat_alert_count", (FluxFldAlertBubbleColor) = "StratView.strat_alert_aggregated_severity"];
   //show 9 most recently used (weight:2) & 9 most frequently used (weight: 1)
   //Sort by type, merge by weight, FILTER OUT loaded
   repeated string buffered_strat_keys = 3;

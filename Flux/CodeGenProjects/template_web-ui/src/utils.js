@@ -3128,7 +3128,7 @@ export function getServerUrl(widgetSchema, linkedObj, runningField, schemaName, 
         const connectionDetails = widgetSchema.connection_details;
         const { host, port, project_name } = connectionDetails;
         // set url only if linkedObj running field is set to true for dynamic as well as static
-        if (widgetSchema.widget_ui_data_element.depending_proto_model_name) {
+        if (widgetSchema.widget_ui_data_element?.depending_proto_model_name) {
             if (linkedObj && Object.keys(linkedObj).length && _.get(linkedObj, runningField)) {
                 if (connectionDetails.dynamic_url) {
                     const hostxpath = host.substring(host.indexOf('.') + 1);

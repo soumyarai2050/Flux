@@ -13,8 +13,6 @@ message StratAlert{
     ReadOp: AggregateType_FilterAggregate,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,
-    PatchOp: AggregateType_UNSPECIFIED,
-    PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED

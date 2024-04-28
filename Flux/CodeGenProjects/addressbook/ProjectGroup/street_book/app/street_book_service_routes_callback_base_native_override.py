@@ -46,7 +46,9 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.
     PortfolioStatusUpdatesContainer)
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
-    StratLeg, FxSymbolOverviewBaseModel, StratViewBaseModel)
+    StratLeg, FxSymbolOverviewBaseModel)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import StratViewBaseModel
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import photo_book_service_http_client
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book import (
     StreetBook, BarteringDataManager, TopOfBook, MarketDepth, MobileBookContainerCache,
     add_container_obj_for_symbol)
@@ -128,7 +130,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     underlying_read_strat_limits_http: Callable[..., Any] | None = None
     underlying_delete_strat_status_http: Callable[..., Any] | None = None
     underlying_barter_simulator_place_cxl_chore_query_http: Callable[..., Any] | None = None
-    underlying_read_strat_view_http: Callable[..., Any] | None = None
 
     @classmethod
     def initialize_underlying_http_routes(cls):
@@ -1430,7 +1431,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             logging.info("Received chore_journal with event CXL_ACK after ChoreSnapshot is fully "
                                          f"filled - ignoring this CXL_ACK, chore_journal_key: "
                                          f"{get_chore_journal_log_key(chore_journal_obj)};;; "
-                                         f"{chore_journal_obj = }, {chore_snapshot = }")
+                                         f"{chore_journal_obj=}, {chore_snapshot=}")
                         else:
                             # If chore_event is OE_UNSOL_CXL, that is treated as unsolicited cxl
                             # If CXL_ACK comes after OE_CXL_UNACK, that means cxl_ack came after cxl request
@@ -4696,7 +4697,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating balance_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 email_book_service_http_client.patch_all_strat_view_client,
+                                                 photo_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_status_obj.id,
                                                  balance_notional=
                                                  updated_strat_status_obj.balance_notional)
@@ -4709,7 +4710,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating balance_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 email_book_service_http_client.patch_all_strat_view_client,
+                                                 photo_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_status_obj.id,
                                                  balance_notional=
                                                  updated_strat_status_obj.balance_notional)
@@ -4842,7 +4843,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating balance_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 email_book_service_http_client.patch_all_strat_view_client,
+                                                 photo_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=strat_status_obj.id,
                                                  balance_notional=
                                                  strat_status_obj.balance_notional)
@@ -4854,7 +4855,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 email_book_service_http_client.patch_all_strat_view_client,
+                                                 photo_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=strat_limits_obj.id,
                                                  max_single_leg_notional=strat_limits_obj.max_single_leg_notional)
         logging.db(log_str)
@@ -4866,7 +4867,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 email_book_service_http_client.patch_all_strat_view_client,
+                                                 photo_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_limits_obj.id,
                                                  max_single_leg_notional=updated_strat_limits_obj.max_single_leg_notional)
         logging.db(log_str)
@@ -4878,7 +4879,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 email_book_service_http_client.patch_all_strat_view_client,
+                                                 photo_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_limits_obj.id,
                                                  max_single_leg_notional=updated_strat_limits_obj.max_single_leg_notional)
         logging.db(log_str)

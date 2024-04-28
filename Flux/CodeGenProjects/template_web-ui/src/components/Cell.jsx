@@ -505,6 +505,7 @@ const Cell = (props) => {
                     action={collection.button.action}
                     source={collection.source}
                     onClick={props.onButtonClick}
+                    iconName={collection.button.button_icon_name}
                 />
             </TableCell>
         )

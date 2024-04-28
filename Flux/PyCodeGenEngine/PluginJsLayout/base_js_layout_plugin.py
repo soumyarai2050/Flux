@@ -226,6 +226,9 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                                 return ""
                             else:
                                 return dependent_model_name
+                        elif BaseJSLayoutPlugin.is_option_enabled(message,
+                                                                BaseJSLayoutPlugin.flux_msg_widget_ui_option):
+                            return ""
         return None
 
     def _get_abb_option_vals_cleaned_message_n_field_list(self, field: protogen.Field) -> List[str]:
@@ -281,3 +284,24 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                 if ui_crud_type == "GET_ALL":
                     get_all_override_default_crud = override_default_crud_option_fld_val
         return get_all_override_default_crud
+
+    def _get_msg_name_from_another_file_n_used_in_abb_text(
+            self, message: protogen.Message, abbreviated_dependent_message_name: str) -> List[str]:
+        """
+        :param message: abb type message
+        :param abbreviated_dependent_message_name:
+        :return:
+        """
+        msg_list = []
+        msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+        if abbreviated_dependent_message_name in msg_used_in_abb_option_list:
+            msg_used_in_abb_option_list.remove(abbreviated_dependent_message_name)
+        for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+            for file_name, message_list in self.proto_file_name_to_message_list_dict.items():
+                if (file_name != self.current_proto_file_name and
+                        file_name not in self.file_name_to_dependency_file_names_dict[
+                            self.current_proto_file_name]):
+                    for msg in message_list:
+                        if msg.proto.name == msg_name_used_in_abb_option:
+                            msg_list.append(msg_name_used_in_abb_option)
+        return msg_list

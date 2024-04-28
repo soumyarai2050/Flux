@@ -6,7 +6,7 @@ from threading import Thread, current_thread
 import re
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import (
     YAMLConfigurationManager)
@@ -493,7 +493,7 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
                            strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
                            portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
                            severity: Severity, alert_brief: str, alert_details: str | None = None,
-                           strat_id: int | None = None) -> None:
+                           strat_id: int | None = None, alert_id_to_alert_cache_dict: Dict | None = None) -> None:
     """
     Handles strat alerts if strat id is passed else handles portfolio alerts
     """
@@ -511,6 +511,9 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
         stored_alert.last_update_date_time = updated_last_update_date_time
 
         alert_queue.put(stored_alert)
+        if alert_id_to_alert_cache_dict is not None:
+            alert_id_to_alert_cache_dict[stored_alert.id] = stored_alert
+
     else:
         # create a new stored_alert
         alert_obj: StratAlertBaseModel | PortfolioAlertBaseModel = (
@@ -520,7 +523,8 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
         alerts_cache_dict[cache_key] = alert_obj
 
         alert_queue.put(alert_obj)
-
+        if alert_id_to_alert_cache_dict is not None:
+            alert_id_to_alert_cache_dict[alert_obj.id] = alert_obj
 
 # def _create_or_update_alert(alerts: List[StratAlertBaseModel] | List[StratAlert] |
 #                                          List[PortfolioAlertBaseModel] | List[PortfolioAlert] | None,

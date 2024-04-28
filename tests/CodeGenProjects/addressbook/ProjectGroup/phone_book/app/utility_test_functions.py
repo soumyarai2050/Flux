@@ -32,6 +32,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_servi
     post_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client import PhotoBookServiceHttpClient
 
 code_gen_projects_dir_path = (PurePath(__file__).parent.parent.parent.parent.parent.parent.parent
                               / "Flux" / "CodeGenProjects")
@@ -48,6 +49,10 @@ STRAT_EXECUTOR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "
 executor_config_yaml_path: PurePath = STRAT_EXECUTOR / "data" / "config.yaml"
 executor_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(executor_config_yaml_path))
 
+STRAT_VIEW_ENGINE_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "photo_book"
+strat_view_config_yaml_path: PurePath = STRAT_VIEW_ENGINE_DIR / "data" / "config.yaml"
+strat_view_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(strat_view_config_yaml_path))
+
 HOST: Final[str] = "127.0.0.1"
 PAIR_STRAT_CACHE_HOST: Final[str] = ps_config_yaml_dict.get("server_host")
 PAIR_STRAT_BEANIE_HOST: Final[str] = ps_config_yaml_dict.get("server_host")
@@ -61,11 +66,19 @@ LOG_ANALYZER_BEANIE_PORT: Final[str] = la_config_yaml_dict.get("main_server_bean
 os.environ["HOST"] = HOST
 os.environ["PAIR_STRAT_BEANIE_PORT"] = PAIR_STRAT_BEANIE_PORT
 
+STRAT_VIEW_CACHE_HOST: Final[str] = strat_view_config_yaml_dict.get("server_host")
+STRAT_VIEW_BEANIE_HOST: Final[str] = strat_view_config_yaml_dict.get("server_host")
+STRAT_VIEW_CACHE_PORT: Final[str] = strat_view_config_yaml_dict.get("main_server_cache_port")
+STRAT_VIEW_BEANIE_PORT: Final[str] = strat_view_config_yaml_dict.get("main_server_beanie_port")
+
 email_book_service_native_web_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient(host=PAIR_STRAT_BEANIE_HOST, port=parse_to_int(PAIR_STRAT_BEANIE_PORT))
 log_book_web_client: LogBookServiceHttpClient = (
     LogBookServiceHttpClient.set_or_get_if_instance_exists(host=LOG_ANALYZER_BEANIE_HOST,
                                                                port=parse_to_int(LOG_ANALYZER_BEANIE_PORT)))
+photo_book_web_client: PhotoBookServiceHttpClient = (
+    PhotoBookServiceHttpClient.set_or_get_if_instance_exists(host=STRAT_VIEW_BEANIE_HOST,
+                                                                   port=parse_to_int(STRAT_VIEW_BEANIE_PORT)))
 
 static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
 project_dir_path = \
@@ -457,7 +470,7 @@ def update_expected_strat_brief_for_sell(expected_chore_snapshot_obj: ChoreSnaps
 
 def check_strat_view_computes(strat_view_id: int, strat_status_obj: StratStatusBaseModel,
                               strat_limits_obj: StratLimitsBaseModel) -> None:
-    strat_view = email_book_service_native_web_client.get_strat_view_client(strat_view_id)
+    strat_view = photo_book_web_client.get_strat_view_client(strat_view_id)
     assert strat_view.balance_notional == strat_status_obj.balance_notional, \
         (f"Mismatched StratView.balance_notional: expected: {strat_status_obj.balance_notional}, "
          f"received: {strat_view.balance_notional}")
@@ -2429,7 +2442,7 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
 
     # checking strat_view values
     time.sleep(1)
-    strat_view = email_book_service_native_web_client.get_strat_view_client(updated_pair_strat.id)
+    strat_view = photo_book_web_client.get_strat_view_client(updated_pair_strat.id)
     assert strat_view.max_single_leg_notional == updated_strat_limits.max_single_leg_notional, \
         (f"Mismatched max_single_leg_notional in strat_view: expected: {updated_strat_limits.max_single_leg_notional}, "
          f"received: {strat_view.max_single_leg_notional}")

@@ -132,7 +132,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
                             msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
                             output_str += ("import { setSelected"+f"{msg_name_used_in_abb_option}Id, "
-                                                                  f"set{msg_name_used_in_abb_option}ArrayWs" + " } " +
+                                                                  f"set{msg_name_used_in_abb_option}ArrayWs, "
+                                                                  f"update{msg_name_used_in_abb_option}" + " } " +
                                            f"from '../features/{msg_name_used_in_abb_option_camel_cased}Slice';\n")
 
                     for msg in self.root_msg_list:
@@ -669,19 +670,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
                         if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
                             msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += "    const { " + f"{msg_name_used_in_abb_option_camel_cased}"+("Array } = "
-                                          f"useSelector(state => state.{msg_name_used_in_abb_option_camel_cased});\n")
+                            output_str += ("    const { " + f"{msg_name_used_in_abb_option_camel_cased}"+
+                                           f"Array, {msg_name_used_in_abb_option_camel_cased}, "
+                                           f"modified{msg_name_used_in_abb_option}, "
+                                           f"selected{msg_name_used_in_abb_option}Id"+" } = "
+                                           f"useSelector(state => state.{msg_name_used_in_abb_option_camel_cased});\n")
 
                     dependent_msg_list_from_another_proto = (
                         self._get_abbreviated_msg_dependent_msg_from_other_proto_file())
-                    if dependent_msg_list_from_another_proto:
-
-                        for dep_msg_name in dependent_msg_list_from_another_proto:
-                            dep_msg_name_camel_cased = convert_to_camel_case(dep_msg_name)
-                            additional_data = f", {dep_msg_name_camel_cased}, modified{dep_msg_name}"
-                            output_str += ("    const { "+f"{dep_msg_name_camel_cased}Array"+additional_data+" }" +
-                                           f" = useSelector(state => state.{dep_msg_name_camel_cased});\n")
-
 
                 if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
                     dependent_abb_msg = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
@@ -724,6 +720,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                            "useRef([]);\n")
 
                 output_str += f"    const {dependent_message_camel_cased}ArrayRef = useRef([]);\n"
+                output_str += f"    const [updateSource, setUpdateSource] = useState();\n"
+
+                msg_name_list_used_in_abb_option = self._get_msg_name_from_another_file_n_used_in_abb_text(
+                    message, self.abbreviated_dependent_message_name)
+                for msg_name_used_in_abb_option in msg_name_list_used_in_abb_option:
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    output_str += (f"    const [{msg_name_used_in_abb_option_camel_cased}Url, "
+                                   f"set{msg_name_used_in_abb_option}Url] = useState();\n")
                 output_str += f"    const runFlush = useRef(false);\n"
         return output_str
 
@@ -1063,6 +1067,29 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
             dependent_message = self.abbreviated_dependent_message_name
             dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
+
+            if dependent_msg_list_from_another_proto is not None:
+                msg_name_list_used_in_abb_option = self._get_msg_name_from_another_file_n_used_in_abb_text(
+                    message, self.abbreviated_dependent_message_name)
+                for msg_name_used_in_abb_option in msg_name_list_used_in_abb_option:
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    msg_name_used_in_abb_option_snake_cased = (
+                        convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
+                    output_str += "    useEffect(() => {\n"
+                    output_str += (f"        let {msg_name_used_in_abb_option_camel_cased}Schema = "
+                                   f"_.get(schema, '{msg_name_used_in_abb_option_snake_cased}');\n")
+                    output_str += f"        if (!{msg_name_used_in_abb_option_camel_cased}Schema) "+"{\n"
+                    output_str += (f"            {msg_name_used_in_abb_option_camel_cased}Schema = _.get(schema, "
+                                   f"[SCHEMA_DEFINITIONS_XPATH, '{msg_name_used_in_abb_option_snake_cased}']);\n")
+                    output_str += "        }\n"
+                    output_str += (f"        if ({msg_name_used_in_abb_option_camel_cased}"
+                                   f"Schema.connection_details) ")+"{\n"
+                    output_str += (f"            let serverUrl = getServerUrl("
+                                   f"{msg_name_used_in_abb_option_camel_cased}Schema);\n")
+                    output_str += f"            set{msg_name_used_in_abb_option}Url(serverUrl);\n"
+                    output_str += "        }\n"
+                    output_str += "    }, [])\n\n"
+
             if dependent_msg_list_from_another_proto:
                 output_str += "    useEffect(() => {\n"
                 output_str += f"        prevActive{dependent_message}List.current = active{dependent_message}List;\n"
@@ -2079,32 +2106,53 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onButtonToggle = (e, xpath, value, source) => {\n"
         else:
             output_str += "    const onButtonToggle = (e, xpath, value) => {\n"
-        output_str += "        let xpathDict = {\n"
         if layout_type == JsxFileGenPlugin.non_root_type:
+            output_str += "        let xpathDict = {\n"
             output_str += f"            [DB_ID]: selected{root_message_name}Id,\n"
+            output_str += "            [xpath]: value\n"
+            output_str += "        };\n"
         elif layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
-            output_str += f"            [DB_ID]: selected{dependent_message}Id,\n"
+            output_str += "        let selectedId;\n"
+            output_str += "        let originalObj;\n"
+            output_str += "        let modifiedObj;\n"
         elif layout_type in [JsxFileGenPlugin.abbreviated_dependent_type,
                              JsxFileGenPlugin.repeated_root_type]:
+            output_str += "        let xpathDict = {\n"
             output_str += f"            [DB_ID]: selected{message_name}Id,\n"
-        output_str += "            [xpath]: value\n"
-        output_str += "        };\n"
+            output_str += "            [xpath]: value\n"
+            output_str += "        };\n"
+        else:
+            output_str += "        let xpathDict = {\n"
+            output_str += "            [xpath]: value\n"
+            output_str += "        };\n"
 
         if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
             dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
             abbreviated_dependent_msg_name = self.abbreviated_dependent_message_name
             abbreviated_dependent_msg_camel_cased = convert_to_camel_case(abbreviated_dependent_msg_name)
-            output_str += f"        let originalObj = {abbreviated_dependent_msg_camel_cased};\n"
-            output_str += f"        let modifiedObj = modified{abbreviated_dependent_msg_name};\n"
-            if dependent_msg_list_from_another_proto:
-                for dep_msg_name in dependent_msg_list_from_another_proto:
-                    dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                    dep_msg_snake_cased = convert_camel_case_to_specific_case(dep_msg_name)
-                    if self._if_any_field_mentioned_in_abb_option_has_button_option(message, dep_msg_name):
-                        output_str += f"        if (source === '{dep_msg_snake_cased}') "+"{\n"
-                        output_str += f"            originalObj = {dep_msg_camel_cased};\n"
-                        output_str += f"            modifiedObj = modified{dep_msg_name};\n"
-                        output_str += "        }\n"
+            abbreviated_dependent_msg_snake_cased = convert_camel_case_to_specific_case(abbreviated_dependent_msg_name)
+
+            output_str += f"        if (source === '{abbreviated_dependent_msg_snake_cased}') "+"{\n"
+            output_str += f"            selectedId = selected{abbreviated_dependent_msg_name}Id;\n"
+            output_str += f"            originalObj = {abbreviated_dependent_msg_camel_cased};\n"
+            output_str += f"            modifiedObj = modified{abbreviated_dependent_msg_name};\n"
+
+            msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+            for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                    msg_name_used_in_abb_option_snake_cased = (
+                        convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    output_str += "        } "+f"else if (source === '{msg_name_used_in_abb_option_snake_cased}') "+"{\n"
+                    output_str += f"            selectedId = selected{msg_name_used_in_abb_option}Id;\n"
+                    output_str += f"            originalObj = {msg_name_used_in_abb_option_camel_cased};\n"
+                    output_str += f"            modifiedObj = modified{msg_name_used_in_abb_option};\n"
+            output_str += "        }\n"
+            output_str += "        setUpdateSource(source);\n"
+            output_str += "        let xpathDict = {\n"
+            output_str += "            [DB_ID]: selectedId,\n"
+            output_str += "            [xpath]: value\n"
+            output_str += "        }\n"
             output_str += "        modifiedObj = clearxpath(cloneDeep(modifiedObj));\n"
             output_str += "        _.keys(xpathDict).forEach(xpath => {\n"
             output_str += "            _.set(modifiedObj, xpath, xpathDict[xpath]);\n"
@@ -2141,6 +2189,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type,
                            JsxFileGenPlugin.abbreviated_dependent_type]:
             output_str += f"        if ({message_name_camel_cased}[DB_ID]) " + "{\n"
+        elif layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+            output_str += "        if (originalObj[DB_ID]) {\n"
         elif layout_type == JsxFileGenPlugin.non_root_type:
             output_str += f"        if ({root_message_name_camel_cased}[DB_ID]) " + "{\n"
         else:
@@ -2385,30 +2435,160 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        }\n"
             output_str += "    }\n\n"
             output_str += "    const onConfirmSave = () => {\n"
-            output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"
-            output_str += "        if (createMode) {\n"
-            output_str += "            dispatch(setCreateMode(false));\n"
-            output_str += "        }\n"
-            output_str += f"        if (!_.isEqual({dependent_message_camel_cased}, modifiedObj)) " + "{\n"
-            output_str += f"            if (_.get({dependent_message_camel_cased}, DB_ID)) " + "{\n"
-            output_str += f"                dispatch(update{dependent_message}(activeChanges));\n"
-            output_str += "            } else {\n"
-            if message_name in self.parent_abb_msg_name_to_linked_abb_msg_name_dict.values():
-                output_str += f"                dispatch(querySearchNUpdate{dependent_message}(activeChanges));\n"
-                output_str += f"                dispatch(setModified{message_name}({message_name_camel_cased}));\n"
+            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+                output_str += f"        let originalObj;\n"
+                output_str += f"        let modifiedObj;\n"
+                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+
+                if self.abbreviated_dependent_message_name in msg_used_in_abb_option_list:
+                    msg_used_in_abb_option_list.remove(self.abbreviated_dependent_message_name)
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    msg_name_used_in_abb_option_snake_cased = (
+                        convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    if msg_name_used_in_abb_option == msg_used_in_abb_option_list[0]:
+                        output_str += (
+                                f"        if (updateSource === "
+                                f"'{msg_name_used_in_abb_option_snake_cased}') " + "{\n")
+                    else:
+                        output_str += (
+                                f"        else if (updateSource === "
+                                f"'{msg_name_used_in_abb_option_snake_cased}') " + "{\n")
+
+                    output_str += f"            originalObj = {msg_name_used_in_abb_option_camel_cased};\n"
+                    output_str += (f"            modifiedObj = "
+                                   f"clearxpath(cloneDeep(modified{msg_name_used_in_abb_option}));\n")
+                if msg_used_in_abb_option_list:
+                    output_str += "        } else {\n"
+                    output_str += f"            originalObj = {abbreviated_dependent_msg_camel_cased};\n"
+                    output_str += (f"            modifiedObj = clearxpath(cloneDeep("
+                                   f"modified{self.abbreviated_dependent_message_name}));\n")
+                    output_str += "        }\n"
+                else:
+                    output_str += f"        originalObj = {abbreviated_dependent_msg_camel_cased};\n"
+                    output_str += (f"        modifiedObj = clearxpath(cloneDeep("
+                                   f"modified{self.abbreviated_dependent_message_name}));\n")
+                output_str += "        if (createMode) {\n"
+                output_str += "            dispatch(setCreateMode(false));\n"
+                output_str += "        }\n"
+                output_str += "        if (!_.isEqual(originalObj, modifiedObj)) {\n"
+                output_str += "            if (_.get(originalObj, DB_ID)) {\n"
+                msg_name_list_used_in_abb_option = self._get_msg_names_list_used_in_abb_option_val(message)
+                if self.abbreviated_dependent_message_name in msg_name_list_used_in_abb_option:
+                    msg_name_list_used_in_abb_option.remove(self.abbreviated_dependent_message_name)
+                for msg_name_used_in_abb_option in msg_name_list_used_in_abb_option:
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    msg_name_used_in_abb_option_snake_cased = (
+                        convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
+                    if msg_name_used_in_abb_option == msg_name_list_used_in_abb_option[0]:
+                        output_str += (
+                                f"                if (updateSource === "
+                                f"'{msg_name_used_in_abb_option_snake_cased}') "+"{\n")
+                    else:
+                        output_str += (
+                                f"                else if (updateSource === "
+                                f"'{msg_name_used_in_abb_option_snake_cased}') "+"{\n")
+
+                    model_is_from_another_project = False
+                    for file_name, message_list in self.proto_file_name_to_message_list_dict.items():
+                        if (file_name != self.current_proto_file_name and
+                                file_name not in self.file_name_to_dependency_file_names_dict[
+                                    self.current_proto_file_name]):
+                            for msg in message_list:
+                                if msg.proto.name == msg_name_used_in_abb_option:
+                                    output_str += \
+                                        (f"                    dispatch(update{msg_name_used_in_abb_option}"+
+                                         "({url: stratViewUrl, data: activeChanges}));\n")
+                                    model_is_from_another_project = True
+                                    break
+                            else:
+                                continue
+                            break
+                    if not model_is_from_another_project:
+                        output_str += \
+                            f"                    dispatch(update{msg_name_used_in_abb_option}(activeChanges));\n"
+
+                if msg_name_list_used_in_abb_option:
+                    output_str += "                } else {\n"
+                    output_str += (f"                    dispatch(update"
+                                   f"{self.abbreviated_dependent_message_name}(activeChanges));\n")
+                    output_str += "                }\n"
+                else:
+                    output_str += (f"                dispatch(update"
+                                   f"{self.abbreviated_dependent_message_name}(activeChanges));\n")
+                output_str += "            } else {\n"
+                output_str += (f"                dispatch(create{self.abbreviated_dependent_message_name}"
+                               "({ data: activeChanges, abbreviated, loadedKeyName: loadListFieldAttrs.key }));\n")
+                output_str += "            }\n"
+                output_str += "        } else if (_.keys(activeChanges).length > 0) {\n"
+                output_str += "            // update triggered by button\n"
+                for msg_name_used_in_abb_option in msg_name_list_used_in_abb_option:
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    msg_name_used_in_abb_option_snake_cased = (
+                        convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
+                    if msg_name_used_in_abb_option == msg_name_list_used_in_abb_option[0]:
+                        output_str += (
+                                f"            if (updateSource === "
+                                f"'{msg_name_used_in_abb_option_snake_cased}') "+"{\n")
+                    else:
+                        output_str += (
+                                f"            else if (updateSource === "
+                                f"'{msg_name_used_in_abb_option_snake_cased}') "+"{\n")
+                    model_is_from_another_project = False
+                    for file_name, message_list in self.proto_file_name_to_message_list_dict.items():
+                        if (file_name != self.current_proto_file_name and
+                                file_name not in self.file_name_to_dependency_file_names_dict[
+                                    self.current_proto_file_name]):
+                            for msg in message_list:
+                                if msg.proto.name == msg_name_used_in_abb_option:
+                                    output_str += \
+                                        (f"                dispatch(update{msg_name_used_in_abb_option}" +
+                                         "({url: stratViewUrl, data: activeChanges}));\n")
+                                    model_is_from_another_project = True
+                                    break
+                            else:
+                                continue
+                            break
+                    if not model_is_from_another_project:
+                        output_str += \
+                            f"                dispatch(update{msg_name_used_in_abb_option}(activeChanges));\n"
+                if msg_name_list_used_in_abb_option:
+                    output_str += "            } else {\n"
+                    output_str += (f"                dispatch(update"
+                                   f"{self.abbreviated_dependent_message_name}(activeChanges));\n")
+                    output_str += "            }\n"
+                else:
+                    output_str += (f"            dispatch(update"
+                                   f"{self.abbreviated_dependent_message_name}(activeChanges));\n")
+                output_str += "        }\n"
+
             else:
-                output_str += f"                dispatch(create{dependent_message}(" \
-                              "{ data: activeChanges, abbreviated, loadedKeyName: loadListFieldAttrs.key }));\n"
-            output_str += "            }\n"
-            output_str += "        } else if (_.keys(activeChanges).length > 0) {\n"
-            output_str += f"            dispatch(update{dependent_message}(activeChanges));\n"
-            output_str += "        }\n"
+                output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"
+                output_str += "        if (createMode) {\n"
+                output_str += "            dispatch(setCreateMode(false));\n"
+                output_str += "        }\n"
+                output_str += f"        if (!_.isEqual({dependent_message_camel_cased}, modifiedObj)) " + "{\n"
+                output_str += f"            if (_.get({dependent_message_camel_cased}, DB_ID)) " + "{\n"
+                output_str += f"                dispatch(update{dependent_message}(activeChanges));\n"
+                output_str += "            } else {\n"
+                if message_name in self.parent_abb_msg_name_to_linked_abb_msg_name_dict.values():
+                    output_str += f"                dispatch(querySearchNUpdate{dependent_message}(activeChanges));\n"
+                    output_str += f"                dispatch(setModified{message_name}({message_name_camel_cased}));\n"
+                else:
+                    output_str += f"                dispatch(create{dependent_message}(" \
+                                  "{ data: activeChanges, abbreviated, loadedKeyName: loadListFieldAttrs.key }));\n"
+                output_str += "            }\n"
+                output_str += "        } else if (_.keys(activeChanges).length > 0) {\n"
+                output_str += f"            dispatch(update{dependent_message}(activeChanges));\n"
+                output_str += "        }\n"
             output_str += "        /* reset states */\n"
             output_str += "        dispatch(setActiveChanges({}));\n"
             output_str += "        dispatch(setUserChanges({}));\n"
             output_str += "        dispatch(setDiscardedChanges({}));\n"
             output_str += "        dispatch(setMode(Modes.READ_MODE));\n"
             output_str += "        dispatch(setOpenConfirmSavePopup(false));\n"
+            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+                output_str += "        setUpdateSource();\n"
             output_str += "    }\n\n"
             output_str += "    const onChange = (e, value) => {\n"
             output_str += "        setSearchValue(value);\n"

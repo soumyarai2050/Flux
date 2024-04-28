@@ -113,6 +113,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         self.__json_layout_message_list: List[protogen.Message] = []
         self.__json_non_layout_message_list: List[protogen.Message] = []
         self.__enum_list: List[protogen.Enum] = []
+        self.__root_msg_list: List[protogen.Message] = []
         self.__case_style_convert_method: Callable[[str], str] | None = None
         self.__add_autocomplete_dict: bool = False
         self._proto_project_name_to_msg_list_dict: Dict[str, List[protogen.Message]] = {}
@@ -222,6 +223,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 if message not in self.__json_non_layout_message_list:
                     self.__json_non_layout_message_list.append(message)
                 # else not required: avoiding repetition
+
+            if self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_json_root):
+                self.__root_msg_list.append(message)
 
             self.__load_dependency_messages_and_enums_in_dicts(message)
 
@@ -952,22 +956,10 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         output_str += ",\n"
         return output_str
 
-    def __handle_widget_ui_data_option_output(self, message: protogen.Message) -> str:
-        widget_ui_data_prefix_stripped = \
-            JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element.lstrip(
-                JsonSchemaConvertPlugin.msg_options_standard_prefix)
+    def __handle_connection_details_output(self, message: protogen.Message, indent_count: int) -> str:
         widget_ui_data_option_value_dict = \
             self.get_complex_option_value_from_proto(message,
                                                      JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
-
-        widget_ui_data_key = self.__case_style_convert_method(widget_ui_data_prefix_stripped)
-
-        if "i" not in widget_ui_data_option_value_dict:
-            widget_ui_data_option_value_dict["i"] = f"{self.__case_style_convert_method(message.proto.name)}"
-
-        indent_count = 2
-        json_msg_str = self._get_json_complex_key_value_str(widget_ui_data_key, widget_ui_data_option_value_dict,
-                                                            indent_count)
 
         # Also checking if msg is from another project used in this project
         is_not_from_this_project: bool = True
@@ -979,9 +971,10 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     other_project_name = project_name
                     break
 
+        json_msg_str = ""
         if not is_not_from_this_project:
             proto_model_name = widget_ui_data_option_value_dict.get(
-                    JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_name_field)
+                JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_name_field)
             dynamic_url = widget_ui_data_option_value_dict.get(
                 JsonSchemaConvertPlugin.widget_ui_option_depends_on_other_model_for_dynamic_url_field)
             indent_count += 2
@@ -1017,7 +1010,24 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 json_msg_str += (" " * indent_count) + f'"dynamic_url": false\n'
             indent_count -= 2
             json_msg_str += (" " * indent_count) + '},\n'
+        return json_msg_str
 
+    def __handle_widget_ui_data_option_output(self, message: protogen.Message) -> str:
+        widget_ui_data_prefix_stripped = \
+            JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element.lstrip(
+                JsonSchemaConvertPlugin.msg_options_standard_prefix)
+        widget_ui_data_option_value_dict = \
+            self.get_complex_option_value_from_proto(message,
+                                                     JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
+
+        widget_ui_data_key = self.__case_style_convert_method(widget_ui_data_prefix_stripped)
+
+        if "i" not in widget_ui_data_option_value_dict:
+            widget_ui_data_option_value_dict["i"] = f"{self.__case_style_convert_method(message.proto.name)}"
+
+        indent_count = 2
+        json_msg_str = self._get_json_complex_key_value_str(widget_ui_data_key, widget_ui_data_option_value_dict,
+                                                            indent_count)
         return json_msg_str
 
     def __handle_json_layout_message_schema(self, message: protogen.Message) -> str:
@@ -1033,6 +1043,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         json_msg_str += f'  "{message_name}": ' + '{\n'
         json_msg_str += '    "$schema": "http://json-schema.org/draft-04/schema#",\n'
         json_msg_str += self.__handle_widget_ui_data_option_output(message)
+        if message in self.__root_msg_list:
+            json_msg_str += self.__handle_connection_details_output(message, indent_count=2)
         json_msg_str += self.__handle_underlying_message_part(message, 4)
         if message != self.__json_layout_message_list[-1] or self.__enum_list:
             json_msg_str += '  },\n'
@@ -1051,6 +1063,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             logging.exception(err_str)
             raise Exception(err_str)
         json_msg_str += f'    "{message_name}": ' + '{\n'
+        if message in self.__root_msg_list:
+            json_msg_str += self.__handle_connection_details_output(message, indent_count=4)
         json_msg_str += self.__handle_underlying_message_part(message, 6)
         if message != self.__json_non_layout_message_list[-1]:
             json_msg_str += '    },\n'
@@ -1117,6 +1131,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         self.__enum_list.sort(key=lambda message_: message_.proto.name)
 
         json_msg_str = '{\n'
+
         # Handling json layout message schema
         for message in self.__json_layout_message_list:
             json_msg_str += self.__handle_json_layout_message_schema(message)

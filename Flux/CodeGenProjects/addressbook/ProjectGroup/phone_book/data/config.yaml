@@ -44,5 +44,6 @@ log_level: "debug"  # log lvl in int or basic log lvl name
 multi_project_plugin:
   - "street_book"
   - "log_book"
+  - "photo_book"
 
 cpp_app_so_module_file_name: "libmarketdataprovider.so"

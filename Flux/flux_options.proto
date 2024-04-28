@@ -218,6 +218,7 @@ extend google.protobuf.MessageOptions
   optional string FluxMsgCRUDSharedLock = 55257; // Name of shared lock to be used in multiple models in CRUD operations
   optional string FluxMsgUIGetAllLimit = 55258;
   optional MessageJsonRootTimeSeries FluxMsgJsonRootTimeSeries = 55259;
+  optional WidgetUIOption FluxMsgWidgetUIOption = 55260; // Use this to populate ui widget data for layout messages
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;

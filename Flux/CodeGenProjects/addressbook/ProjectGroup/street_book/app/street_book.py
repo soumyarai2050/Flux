@@ -21,7 +21,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, email_book_service_http_client, guaranteed_call_pair_strat_client)
-from FluxPythonUtils.scripts.utility_functions import clear_semaphore
+from FluxPythonUtils.scripts.utility_functions import clear_semaphore, perf_benchmark_sync_callable
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
     IsPortfolioLimitsBreached)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
@@ -884,6 +884,7 @@ class StreetBook:
         """
         return px / self.leg1_fx
 
+    @perf_benchmark_sync_callable
     def _check_tob_n_place_non_systematic_chore(self, new_chore: NewChoreBaseModel, pair_strat: PairStrat,
                                                 strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel,
                                                 top_of_books: List[TopOfBookBaseModel]) -> int:
@@ -979,6 +980,7 @@ class StreetBook:
             posted_notional = px * qty
             return posted_notional
 
+    @perf_benchmark_sync_callable
     def _check_tob_and_place_chore(self, pair_strat: PairStratBaseModel | PairStrat, strat_brief: StratBriefBaseModel,
                                    chore_limits: ChoreLimitsBaseModel, top_of_books: List[TopOfBookBaseModel]) -> int:
         posted_leg1_notional: float = 0
@@ -1065,6 +1067,7 @@ class StreetBook:
                 logging.info(f"Can't find ask_quote in tob of symbol: {tob.symbol};;; tob: {tob}")
                 return None
 
+    @perf_benchmark_sync_callable
     def _check_tob_and_place_chore_test(self, pair_strat: PairStratBaseModel | PairStrat,
                                         strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel,
                                         top_of_books: List[TopOfBookBaseModel]) -> int:

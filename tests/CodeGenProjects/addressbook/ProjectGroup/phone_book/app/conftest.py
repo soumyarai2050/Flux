@@ -499,7 +499,7 @@ def expected_portfolio_status_():
 
 @pytest.fixture()
 def expected_system_control_():
-    yield SystemControlBaseModel(_id=1, kill_switch=False)
+    yield SystemControlBaseModel(_id=1, kill_switch=False, pause_all_strats=False)
 
 
 @pytest.fixture()

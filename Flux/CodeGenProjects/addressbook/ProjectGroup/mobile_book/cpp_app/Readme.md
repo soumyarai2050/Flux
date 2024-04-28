@@ -10,6 +10,22 @@ Before proceeding with the installation, ensure that you have the following prer
 sudo apt install build-essential
 ```
 
+## Install gcc g++ version 12 and 13
+```
+sudo apt update
+sudo apt install software-properties-common
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt update
+sudo apt install gcc-12 g++-12 gcc-13 g++-13 -y
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 13 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+
+```
+
+## To Change gcc version
+``
+sudo update-alternatives --config gcc
+``
+
 ## Boost
 ### Boost provides free peer-reviewed portable C++ source libraries.
 
@@ -21,20 +37,25 @@ cd boost_1_81_0
 sudo ./b2 install
 ```
 
-## MongoC
-### MongoC is the C driver for MongoDB.
-```
-- apt install libbson-dev
-- apt install libmongoc-dev
-```
+[//]: # (## MongoC)
+
+[//]: # (### MongoC is the C driver for MongoDB.)
+
+[//]: # (```)
+
+[//]: # (sudo apt install libbson-dev)
+
+[//]: # (sudo apt install libmongoc-dev)
+
+[//]: # (```)
 
 ## Mongocxx
 ### Mongocxx is the official MongoDB C++ driver.
 ```
-curl -OL https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.7.0/mongo-cxx-driver-r3.7.0.tar.gz
-tar -xzf mongo-cxx-driver-r3.7.0.tar.gz
-cd mongo-cxx-driver-r3.7.0/build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBSONCXX_POLY_USE_BOOST=1 -DMONGOCXX_OVERRIDE_DEFAULT_INSTALL_PREFIX=OFF -DCMAKE_INSTALL_PREFIX=/usr/local
+curl -OL https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.10.1/mongo-cxx-driver-r3.10.1.tar.gz
+tar -xzf mongo-cxx-driver-r3.10.1.tar.gz
+cd mongo-cxx-driver-r3.10.1/build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DMONGOCXX_OVERRIDE_DEFAULT_INSTALL_PREFIX=OFF -DCMAKE_INSTALL_PREFIX=/usr/local
 cmake --build .
 sudo cmake --build . --target install
 ```
@@ -43,6 +64,7 @@ sudo cmake --build . --target install
 ### Quill is a C++ logging library.
 ```
 git clone https://github.com/odygrd/quill.git
+cd quill
 mkdir cmake_build
 cd cmake_build
 cmake ..
@@ -56,9 +78,9 @@ git clone --recursive https://github.com/protocolbuffers/protobuf.git
 cd protobuf
 mkdir cmake-out
 git checkout v25.0
-cmake -S. -Bcmake-out -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_CXX_STANDARD=17 -Dprotobuf_ABSL_PROVIDER=module -DCMAKE_PREFIX_PATH=/usr/local
+cmake -S. -Bcmake-out -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_CXX_STANDARD=17 -Dprotobuf_ABSL_PROVIDER=module -DCMAKE_PREFIX_PATH=/usr/local -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 cd cmake-out
-make -j4
+make -j8
 sudo make install
 ```
 

@@ -9,6 +9,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service
     get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_strat_db_updates, UpdateType)
 from FluxPythonUtils.scripts.utility_functions import (
     YAMLConfigurationManager, get_symbol_side_key)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import StratViewBaseModel
 
 CURRENT_PROJECT_DIR = PurePath(__file__).parent.parent
 CURRENT_PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
@@ -124,8 +125,8 @@ def get_new_chore_limits() -> ChoreLimits:
     return ord_limit_obj
 
 
-def get_new_strat_view_obj(obj_id: int) -> StratView:
-    strat_view_obj: StratView = StratView(_id=obj_id, strat_alert_count=0)
+def get_new_strat_view_obj(obj_id: int) -> StratViewBaseModel:
+    strat_view_obj: StratViewBaseModel = StratViewBaseModel(_id=obj_id, strat_alert_count=0)
     return strat_view_obj
 
 

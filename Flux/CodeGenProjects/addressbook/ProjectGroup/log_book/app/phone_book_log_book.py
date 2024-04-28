@@ -12,6 +12,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_base_
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client, get_reset_log_book_cache_wrapper_pattern)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import PairStratBaseModel
 from FluxPythonUtils.scripts.utility_functions import get_symbol_side_pattern, configure_logger
 
 
@@ -28,7 +29,6 @@ strat_alert_bulk_update_counts_per_call, strat_alert_bulk_update_timeout = (
 
 class PhoneBookLogBook(PhoneBookBaseLogBook):
     underlying_partial_update_all_portfolio_alert_http: Callable[..., Any] | None = None
-    underlying_partial_update_all_strat_alert_http: Callable[..., Any] | None = None
     underlying_read_portfolio_alert_by_id_http: Callable[..., Any] | None = None
     underlying_read_strat_alert_by_id_http: Callable[..., Any] | None = None
 

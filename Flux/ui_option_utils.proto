@@ -95,6 +95,10 @@ message WidgetUIDataElement {
   optional bool is_model_alert_type = 22;
 }
 
+message WidgetUIOption {
+  optional string depending_proto_file_name = 1;  // other project's proto file name on which current model is dependent
+}
+
 message ColumnOrder {
   required string column_name = 1;
   required int32 sequence = 2;
@@ -122,6 +126,7 @@ message UIButton{
   optional string value_color_map = 7;  // coma separated list of key=value
   optional string action = 8;
   required string pressed_value_as_text = 9;
+  optional string button_icon_name = 10;
 }
 
 message UIProgressBar{

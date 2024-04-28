@@ -22,7 +22,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.
     EmailBookServiceRoutesCallback
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     is_service_up, get_symbol_side_key, config_yaml_dict,
-    YAMLConfigurationManager, street_book_config_yaml_dict, ps_port,
+    YAMLConfigurationManager, street_book_config_yaml_dict, ps_port, CURRENT_PROJECT_DIR,
     CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host, get_new_portfolio_status,
     get_new_portfolio_limits, get_new_chore_limits, CURRENT_PROJECT_DATA_DIR, is_ongoing_strat,
     get_strat_key_from_pair_strat, get_id_from_strat_key, get_new_strat_view_obj,
@@ -33,8 +33,11 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate impo
     get_ongoing_pair_strat_filter, get_all_pair_strat_from_symbol_n_side, get_ongoing_or_all_pair_strats_by_sec_id)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
-from FluxPythonUtils.scripts.utility_functions import get_pid_from_port, except_n_log_alert, is_process_running
+from FluxPythonUtils.scripts.utility_functions import (
+    get_pid_from_port, except_n_log_alert, is_process_running, submit_task_with_first_completed_wait)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import get_bartering_link
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
+    photo_book_service_http_client)
 
 
 class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCallback):
@@ -59,8 +62,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
     underlying_partial_update_system_control_http: Callable[..., Any] | None = None
     underlying_read_system_control_http: Callable[..., Any] | None = None
     underlying_create_system_control_http: Callable[..., Any] | None = None
-    underlying_create_strat_view_http: Callable[..., Any] | None = None
-    underlying_delete_strat_view_http: Callable[..., Any] | None = None
 
     Fx_SO_FilePath = CURRENT_PROJECT_SCRIPTS_DIR / f"fx_so.sh"
     RecoveredKillSwitchUpdate: bool = False
@@ -78,8 +79,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
             underlying_read_pair_strat_by_id_http, underlying_partial_update_all_pair_strat_http,
             underlying_read_strat_collection_by_id_http,
             underlying_read_system_control_by_id_http, underlying_partial_update_system_control_http,
-            underlying_read_system_control_http, underlying_create_system_control_http,
-            underlying_create_strat_view_http, underlying_delete_strat_view_http)
+            underlying_read_system_control_http, underlying_create_system_control_http)
         cls.underlying_read_portfolio_status_http = underlying_read_portfolio_status_http
         cls.underlying_create_portfolio_status_http = underlying_create_portfolio_status_http
         cls.underlying_read_chore_limits_http = underlying_read_chore_limits_http
@@ -102,8 +102,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         cls.underlying_partial_update_system_control_http = underlying_partial_update_system_control_http
         cls.underlying_read_system_control_http = underlying_read_system_control_http
         cls.underlying_create_system_control_http = underlying_create_system_control_http
-        cls.underlying_create_strat_view_http = underlying_create_strat_view_http
-        cls.underlying_delete_strat_view_http = underlying_delete_strat_view_http
 
     def __init__(self):
         self.asyncio_loop = None
@@ -211,7 +209,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                     print(f"INFO: phone_book service is ready: {datetime.datetime.now().time()}")
                 else:
                     logging.warning(f"_app_launch_pre_thread_func: service not ready yet;;; "
-                                    f"{self.service_up = }")
+                                    f"{self.service_up=}")
                 if not self.service_up:
                     try:
                         if is_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
@@ -274,7 +272,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
     async def get_crashed_pair_strats(self, pair_strat_id, executor_process_id) -> PairStrat:
         pair_strat: PairStrat | None = None
         if not is_process_running(executor_process_id):
-            logging.info(f"process for {pair_strat_id = } and {executor_process_id = } found killed, "
+            logging.info(f"process for {pair_strat_id=} and {executor_process_id=} found killed, "
                          f"restarting again ...")
 
             pair_strat: PairStrat = (
@@ -293,34 +291,13 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
 
     async def _async_check_running_executors(self, pair_strat_id_to_executor_process_id_dict: Dict[int, int]) -> List[PairStrat]:
         tasks: List = []
-        pair_strat_list = []
+        pair_strat_list: List[PairStrat] = []
         for pair_strat_id, executor_process_id in pair_strat_id_to_executor_process_id_dict.items():
             task = asyncio.create_task(self.get_crashed_pair_strats(pair_strat_id, executor_process_id), name=str(pair_strat_id))
             tasks.append(task)
 
-        completed_tasks: Set | None = None
-        pending_tasks: Set | None = None
-        while True:
-            try:
-                completed_tasks, pending_tasks = \
-                    await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, timeout=60)
-            except Exception as e:
-                logging.exception(f"get_crashed_pair_strats asyncio.wait failed with exception: {e}")
-            while completed_tasks:
-                completed_task = None
-                try:
-                    completed_task = completed_tasks.pop()
-                    res = completed_task.result()
-                    if res is not None:
-                        pair_strat_list.append(res)
-                except Exception as e:
-                    pair_strat_id = int(completed_task.get_name())
-                    logging.exception(f"get_crashed_pair_strats failed for pair_strat_id: {pair_strat_id} - "
-                                      f"can't check if pair_strat is active;;; exception: {e}")
-            if pending_tasks:
-                tasks = [*pending_tasks, ]
-            else:
-                break
+        if tasks:
+            pair_strat_list = await submit_task_with_first_completed_wait(tasks)
         return pair_strat_list
 
     async def _async_start_executor_server_by_task_submit(self, pending_strats: List[PairStrat],
@@ -330,28 +307,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
             task = asyncio.create_task(self._start_executor_server(pending_strat, is_crash_recovery), name=str(idx))
             tasks.append(task)
 
-        completed_tasks: Set | None = None
-        pending_tasks: Set | None = None
-        while True:
-            try:
-                completed_tasks, pending_tasks = \
-                    await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, timeout=60)
-            except Exception as e:
-                logging.exception(f"start_executor_server asyncio.wait failed with exception: {e}")
-            while completed_tasks:
-                completed_task = None
-                try:
-                    completed_task = completed_tasks.pop()
-                    completed_task.result()
-                except Exception as e:
-                    idx = int(completed_task.get_name())
-                    logging.exception(f"start_executor_server failed for pair_strat_id: {pending_strats[idx]} - "
-                                      f"can't recover executor server for it;;; exception: {e}, "
-                                      f"pair_strat: {pending_strats[idx]}")
-            if pending_tasks:
-                tasks = [*pending_tasks, ]
-            else:
-                break
+        await submit_task_with_first_completed_wait(tasks)
 
     def recover_kill_switch_state(self):
         # if db true and bartering is false - trigger_kill_switch and not update db
@@ -436,17 +392,22 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                                 os.kill(pid, signal.SIGKILL)
 
                                 # Updating pair_strat
+                                pair_strat_json = jsonable_encoder(
+                                    PairStrat(_id=pair_strat.id,
+                                              strat_state=StratState.StratState_ERROR,
+                                              is_partially_running=False,
+                                              is_executor_running=False),
+                                              by_alias=True, exclude_none=True)
+                                pair_strat_json["port"] = None
+
                                 await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                                       underlying_partial_update_pair_strat_http(jsonable_encoder(
-                                           PairStrat(_id=pair_strat.id, strat_state=StratState.StratState_ERROR,
-                                                     port=None, is_partially_running=False,
-                                                     is_executor_running=False), by_alias=True, exclude_none=True)))
+                                       underlying_partial_update_pair_strat_http(pair_strat_json))
 
                             except Exception as e:
                                 if "Failed to establish a new connection: [Errno 111] Connection refused" in str(e):
                                     logging.error(f"PairStrat found to have port set to {pair_strat.port} but executor "
                                                   f"server is down, recovering executor for "
-                                                  f"{pair_strat.id = };;; {pair_strat = }")
+                                                  f"{pair_strat.id=};;; {pair_strat=}")
                                     crashed_strats.append(pair_strat)
                                     await (EmailBookServiceRoutesCallbackBaseNativeOverride.
                                            underlying_update_pair_strat_to_non_running_state_query_http(pair_strat.id))
@@ -462,7 +423,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                                     logging.exception("Something went wrong while checking is_service_up of executor "
                                                       f"with port: {pair_strat.port} in pair_strat strat_up recovery "
                                                       f"check - force kill this executor if is running, "
-                                                      f"exception: {e};;; {pair_strat = }")
+                                                      f"exception: {e};;; {pair_strat=}")
                             else:
                                 # If executor server is still up and is in healthy state - Finding and adding
                                 # process_id to pair_strat_id_to_executor_process_dicts
@@ -629,16 +590,16 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
             logging.warning(err_str_)
             raise HTTPException(status_code=500, detail=err_str_)
 
-    async def create_strat_view_for_strat(self, pair_strat: PairStrat):
+    def create_strat_view_for_strat(self, pair_strat: PairStrat):
         new_strat_view = get_new_strat_view_obj(pair_strat.id)
-        await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_view_http(new_strat_view)
+        photo_book_service_http_client.create_strat_view_client(new_strat_view)
 
     @except_n_log_alert()
     async def create_pair_strat_pre(self, pair_strat_obj: PairStrat):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
             err_str_ = f"create_pair_strat_pre not ready - service is not initialized yet, " \
-                       f"pair_strat_key: {get_pair_strat_log_key(pair_strat_obj)};;; {pair_strat_obj = }"
+                       f"pair_strat_key: {get_pair_strat_log_key(pair_strat_obj)};;; {pair_strat_obj=}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
         self._set_derived_side(pair_strat_obj)
@@ -652,7 +613,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         pair_strat_obj.is_partially_running = False
 
         # creating strat_view object for this start
-        await self.create_strat_view_for_strat(pair_strat_obj)
+        self.create_strat_view_for_strat(pair_strat_obj)
 
         # @@@ Warning: Below handling of state collection is handled from ui also - see where can code be remove
         # to avoid duplicate
@@ -692,7 +653,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                     (leg2_side == ongoing_pair_strat.pair_strat_params.strat_leg2.side) and
                     (ongoing_pair_strat.id != pair_strat.id)):
                 err_str_ = ("Ongoing strat already exists with same symbol-side pair legs - can't activate this "
-                            f"strat till other strat is ongoing;;; {ongoing_pair_strat = }")
+                            f"strat till other strat is ongoing;;; {ongoing_pair_strat=}")
                 logging.error(err_str_)
                 raise HTTPException(status_code=400, detail=err_str_)
 
@@ -792,16 +753,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
 
         return updated_pair_strat_obj
 
-    async def partial_update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj_dict: Dict):
-        if not self.service_ready:
-            # raise service unavailable 503 exception, let the caller retry
-            # @@@ IMPORTANT: below error string is used to catch this specific exception, please update
-            # all catch handling too if error msg is changed
-            err_str_ = "partial_update_pair_strat_pre not ready - service is not initialized yet, " \
-                       f"pair_strat_key: {get_pair_strat_log_key(stored_pair_strat_obj)}"
-            logging.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
-
+    async def _partial_update_pair_strat(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj_dict: Dict):
         updated_pair_strat_obj_dict["frequency"] = stored_pair_strat_obj.frequency + 1
 
         if updated_pair_strat_obj_dict.get("pair_strat_params") is not None:
@@ -819,13 +771,44 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         if not res:
             logging.debug(f"Alerts updated by _update_strat_status_pre, symbol_side_key: "
                           f"{get_symbol_side_key([(stored_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id, stored_pair_strat_obj.pair_strat_params.strat_leg1.side)])};;; "
-                          f"{updated_pair_strat_obj = }")
+                          f"{updated_pair_strat_obj=}")
         updated_pair_strat_obj_dict = jsonable_encoder(updated_pair_strat_obj, by_alias=True, exclude_none=True)
 
         # updating port_to_executor_http_client_dict with this port if not present
         self._update_port_to_executor_http_client_dict_from_updated_pair_strat(updated_pair_strat_obj)
-
         return updated_pair_strat_obj_dict
+
+    async def partial_update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj_dict: Dict):
+        if not self.service_ready:
+            # raise service unavailable 503 exception, let the caller retry
+            # @@@ IMPORTANT: below error string is used to catch this specific exception, please update
+            # all catch handling too if error msg is changed
+            err_str_ = "partial_update_pair_strat_pre not ready - service is not initialized yet, " \
+                       f"pair_strat_key: {get_pair_strat_log_key(stored_pair_strat_obj)}"
+            logging.error(err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
+
+        updated_pair_strat_obj_dict = \
+            await self._partial_update_pair_strat(stored_pair_strat_obj, updated_pair_strat_obj_dict)
+        return updated_pair_strat_obj_dict
+
+    async def partial_update_all_pair_strat_pre(self, stored_pair_strat_obj_list: List[PairStrat],
+                                                updated_pair_strat_obj_json_list: List[Dict]):
+        if not self.service_ready:
+            # raise service unavailable 503 exception, let the caller retry
+            # @@@ IMPORTANT: below error string is used to catch this specific exception, please update
+            # all catch handling too if error msg is changed
+            err_str_ = "partial_update_pair_strat_pre not ready - service is not initialized yet, "
+            logging.error(err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
+        tasks: List = []
+        for idx, updated_pair_strat_obj_json in enumerate(updated_pair_strat_obj_json_list):
+            task = asyncio.create_task(self._partial_update_pair_strat(stored_pair_strat_obj_list[idx],
+                                                                       updated_pair_strat_obj_json),
+                                       name=str(f"{stored_pair_strat_obj_list[idx].id}"))
+            tasks.append(task)
+        updated_pair_strat_obj_json_list = await submit_task_with_first_completed_wait(tasks)
+        return updated_pair_strat_obj_json_list
 
     async def pause_all_active_strats_query_pre(self, pair_strat_class_type: Type[PairStrat]):
         async with PairStrat.reentrant_lock:
@@ -848,16 +831,17 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
     async def update_pair_strat_to_non_running_state_query_pre(self, pair_strat_class_type: Type[PairStrat],
                                                                pair_strat_id: int):
         pair_strat = PairStratOptional(_id=pair_strat_id)
-        pair_strat.port = None
-        pair_strat.top_of_book_port = None
-        pair_strat.market_depth_port = None
-        pair_strat.last_barter_port = None
         pair_strat.is_partially_running = False
         pair_strat.is_executor_running = False
+        pair_strat_json = jsonable_encoder(pair_strat, by_alias=True, exclude_none=True)
+        pair_strat_json["port"] = None
+        pair_strat_json["top_of_book_port"] = None
+        pair_strat_json["market_depth_port"] = None
+        pair_strat_json["last_barter_port"] = None
 
         update_pair_strat = \
             await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_pair_strat_http(
-                jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
+                pair_strat_json)
         return [update_pair_strat]
 
     async def _start_executor_server(self, pair_strat: PairStrat, is_crash_recovery: bool | None = None) -> None:
@@ -917,7 +901,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         if db_name in mongo_client.list_database_names():
             mongo_client.drop_database(db_name)
         else:
-            err_str_ = (f"Unexpected: {db_name = } not found in mongo_client for uri: "
+            err_str_ = (f"Unexpected: {db_name=} not found in mongo_client for uri: "
                         f"{mongo_server_uri} being used by current strat, "
                         f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
             logging.error(err_str_)
@@ -937,15 +921,15 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                     StreetBookServiceHttpClient.set_or_get_if_instance_exists(pair_strat_to_be_deleted.host,
                                                                                  pair_strat_to_be_deleted.port))
             else:
-                err_str_ = f"pair_strat object has no port;;; {pair_strat_to_be_deleted = }"
+                err_str_ = f"pair_strat object has no port;;; {pair_strat_to_be_deleted=}"
                 logging.error(err_str_)
                 raise HTTPException(detail=err_str_, status_code=500)
 
             if strat_web_client is None:
                 err_str_ = ("Can't find any web_client present in server cache dict for ongoing strat of "
-                            f"{port = }, ignoring this strat delete, likely bug in server cache dict handling, "
+                            f"{port=}, ignoring this strat delete, likely bug in server cache dict handling, "
                             f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])};;; "
-                            f"{pair_strat_to_be_deleted = }")
+                            f"{pair_strat_to_be_deleted=}")
                 logging.error(err_str_)
                 raise HTTPException(status_code=500, detail=err_str_)
 
@@ -962,7 +946,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
             except Exception as e:
                 err_str_ = ("Some error occurred in executor while setting strat to SNOOZED state, ignoring "
                             f"delete of this strat, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}, "
-                            f"exception: {e}, ;;; {pair_strat_to_be_deleted = }")
+                            f"exception: {e}, ;;; {pair_strat_to_be_deleted=}")
                 logging.error(err_str_)
                 raise HTTPException(status_code=500, detail=err_str_)
             self._close_executor_server(pair_strat_to_be_deleted.id)  # closing executor
@@ -984,7 +968,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                     logging.error(err_str_)
                     raise HTTPException(detail=err_str_, status_code=400)
             else:
-                err_str_ = (f"Config file for {port = } missing, must exists since executor is running from this"
+                err_str_ = (f"Config file for {port=} missing, must exists since executor is running from this"
                             f"config, ignoring this strat delete, symbol_side_key: "
                             f"{get_symbol_side_key([(sec_id, side)])}")
                 logging.error(err_str_)
@@ -1002,21 +986,19 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                     strat_collection.loaded_strat_keys.remove(strat_key)
                 except ValueError as val_err:
                     if "x not in list" in str(val_err):
-                        logging.error(f"Unexpected: Can't find {strat_key = } in strat_collection's loaded"
-                                      f"keys while deleting strat;;; {strat_collection = }")
+                        logging.error(f"Unexpected: Can't find {strat_key=} in strat_collection's loaded"
+                                      f"keys while deleting strat;;; {strat_collection=}")
                     else:
-                        logging.error(f"Something unexpected happened while removing {strat_key = } from "
+                        logging.error(f"Something unexpected happened while removing {strat_key=} from "
                                       f"loaded strat_keys in strat_collection - ignoring this strat_key removal;;; "
-                                      f"{strat_collection = }")
+                                      f"{strat_collection=}")
                     return
 
                 await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
                     strat_collection)
 
             # Removing StratView for this strat
-            async with StratView.reentrant_lock:
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_view_http(
-                    pair_strat_to_be_deleted.id)
+            photo_book_service_http_client.delete_strat_view_client(pair_strat_to_be_deleted.id)
 
             logging.warning(f"ResetLogBookCache;;;pair_strat_log_key: "
                             f"{get_reset_log_book_cache_wrapper_pattern()}"
@@ -1050,21 +1032,21 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                             self.port_to_executor_http_client_dict.get(pair_strat.port))
                     else:
                         err_str_ = (f"pair_strat object has no port while unloading - "
-                                    f"ignoring this strat unload;;; {pair_strat = }")
+                                    f"ignoring this strat unload;;; {pair_strat=}")
                         logging.error(err_str_)
                         raise HTTPException(detail=err_str_, status_code=400)
 
                     if street_book_web_client is None:
                         err_str_ = ("Can't find any web_client present in server cache dict for ongoing strat of "
-                                    f"{pair_strat.port = }, ignoring this strat unload,"
-                                    f"likely bug in server cache dict handling;;; {pair_strat = }")
+                                    f"{pair_strat.port=}, ignoring this strat unload,"
+                                    f"likely bug in server cache dict handling;;; {pair_strat=}")
                         logging.error(err_str_)
                         raise HTTPException(status_code=400, detail=err_str_)
 
                     if is_ongoing_strat(pair_strat):
                         error_str = f"unloading an ongoing pair strat key: {unloaded_strat_key} is not supported, " \
-                                    f"current {pair_strat.strat_state = }, " \
-                                    f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;; {pair_strat = }"
+                                    f"current {pair_strat.strat_state=}, " \
+                                    f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;; {pair_strat=}"
                         logging.error(error_str)
                         raise HTTPException(status_code=400, detail=error_str)
                     elif pair_strat.strat_state in [StratState.StratState_DONE, StratState.StratState_READY,
@@ -1076,14 +1058,14 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                             err_str_ = (
                                 "Some error occurred in executor while setting strat to SNOOZED state, ignoring "
                                 f"unload of this strat, pair_strat_key: {get_pair_strat_log_key(pair_strat)}, ;;;"
-                                f"{pair_strat = }")
+                                f"{pair_strat=}")
                             logging.error(err_str_)
                             raise HTTPException(status_code=500, detail=err_str_)
                         self._close_executor_server(pair_strat.id)    # closing executor
                     else:
                         err_str_ = (f"Unloading strat with strat_state: {pair_strat.strat_state} is not supported,"
                                     f"try unloading when start is READY or DONE, pair_strat_key: "
-                                    f"{get_pair_strat_log_key(pair_strat)};;; {pair_strat = }")
+                                    f"{get_pair_strat_log_key(pair_strat)};;; {pair_strat=}")
                         logging.error(err_str_)
                         raise Exception(err_str_)
 
@@ -1183,6 +1165,14 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
     async def filtered_notify_pair_strat_update_query_ws_pre(self):
         return filter_ws_pair_strat
 
+    async def _update_system_control_post(self, stored_system_control_obj: SystemControl,
+                                          updated_system_control_obj: SystemControl):
+        if not stored_system_control_obj.pause_all_strats and updated_system_control_obj.pause_all_strats:
+            script_path: str = str(CURRENT_PROJECT_DIR / "pyscripts" / "pause_all_active_strats.py")
+            cmd: List[str] = ["python", script_path, "&"]
+            launcher: subprocess.Popen = subprocess.Popen(cmd)
+            logging.warning(f"Triggered pause_all_strat event on {DateTime.utcnow()}. {launcher=}")
+
     async def update_system_control_pre(self, stored_system_control_obj: SystemControl,
                                         updated_system_control_obj: SystemControl):
         if not stored_system_control_obj.kill_switch and updated_system_control_obj.kill_switch:
@@ -1202,6 +1192,11 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                 logging.critical(err_str_)
                 raise HTTPException(detail=err_str_, status_code=500)
         # else not required: other case doesn't need bartering link call
+        return updated_system_control_obj
+
+    async def update_system_control_post(self, stored_system_control_obj: SystemControl,
+                                         updated_system_control_obj: SystemControl):
+        await self._update_system_control_post(stored_system_control_obj, updated_system_control_obj)
 
     async def log_simulator_reload_config_query_pre(
             self, log_simulator_reload_config_class_type: Type[LogSimulatorReloadConfig]):
@@ -1229,7 +1224,12 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                     logging.critical(err_str_)
                     raise HTTPException(detail=err_str_, status_code=500)
             # else not required: other case doesn't need bartering link call
+        updated_system_control_obj: SystemControl = SystemControl(**updated_system_control_obj_json)
         return updated_system_control_obj_json
+
+    async def partial_update_system_control_post(self, stored_system_control_obj: SystemControl,
+                                                 updated_system_control_obj: SystemControlOptional):
+        await self._update_system_control_post(stored_system_control_obj, updated_system_control_obj)
 
 
 def filter_ws_pair_strat(pair_strat_obj_json: Dict, **kwargs):

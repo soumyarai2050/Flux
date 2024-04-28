@@ -16,6 +16,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import AlertOptional
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
 
 email_book_service_beanie_web_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient.set_or_get_if_instance_exists(HOST, parse_to_int(PAIR_STRAT_BEANIE_PORT))
@@ -726,7 +727,7 @@ def _place_sanity_complete_sell_chores(buy_symbol, sell_symbol, created_pair_str
                                                                                last_chore_id=sell_ack_chore_id)
             strat_status: StratStatusBaseModel = executor_web_client.get_strat_status_client(created_pair_strat.id)
             # time.sleep(2)
-            strat_view: StratViewBaseModel = email_book_service_native_web_client.get_strat_view_client(created_pair_strat.id)
+            strat_view: StratViewBaseModel = photo_book_web_client.get_strat_view_client(created_pair_strat.id)
             assert strat_status.balance_notional == strat_view.balance_notional, \
                 f"Mismatched {strat_status.balance_notional = }, {strat_view.balance_notional = }"
 
@@ -924,7 +925,7 @@ def test_place_sanity_parallel_complete_chores_to_check_strat_view(
     px = 10
     qty = 90
     strats_count = len(leg1_leg2_symbol_list)
-    strat_view_list = email_book_service_native_web_client.get_all_strat_view_client()
+    strat_view_list = photo_book_web_client.get_all_strat_view_client()
     expected_balance_notional = (expected_strat_limits_.max_single_leg_notional -
                                  strats_count * max_loop_count_per_side * qty * get_px_in_usd(px))
     for strat_view in strat_view_list:
@@ -952,7 +953,7 @@ def test_place_sanity_parallel_complete_chores_to_check_strat_view(
     px = 110
     qty = 7
     strats_count = len(leg1_leg2_symbol_list)
-    strat_view_list = email_book_service_native_web_client.get_all_strat_view_client()
+    strat_view_list = photo_book_web_client.get_all_strat_view_client()
     expected_balance_notional = (expected_strat_limits_.max_single_leg_notional -
                                  strats_count * max_loop_count_per_side * qty * get_px_in_usd(px))
     for strat_view in strat_view_list:
@@ -1014,7 +1015,7 @@ def _place_sanity_complete_buy_sell_pair_chores_with_pair_strat(
                                                                                     loop_wait_secs=1,
                                                                                     last_chore_id=sell_ack_chore_id)
             strat_status: StratStatusBaseModel = executor_web_client.get_strat_status_client(active_pair_strat.id)
-            strat_view: StratViewBaseModel = email_book_service_native_web_client.get_strat_view_client(
+            strat_view: StratViewBaseModel = photo_book_web_client.get_strat_view_client(
                 active_pair_strat.id)
             sell_ack_chore_id = sell_ack_chore_journal.chore.chore_id
             assert strat_status.balance_notional == strat_view.balance_notional, \
@@ -1070,7 +1071,7 @@ def test_place_sanity_parallel_buy_sell_pair_chores_to_check_strat_view(
     px = 10
     qty = 90
     strats_count = len(leg1_leg2_symbol_list)
-    strat_view_list = email_book_service_native_web_client.get_all_strat_view_client()
+    strat_view_list = photo_book_web_client.get_all_strat_view_client()
     expected_balance_notional = (expected_strat_limits_.max_single_leg_notional -
                                  strats_count * max_loop_count_per_side * qty * get_px_in_usd(px))
     for strat_view in strat_view_list:
@@ -1081,7 +1082,7 @@ def test_place_sanity_parallel_buy_sell_pair_chores_to_check_strat_view(
     px = 110
     qty = 7
     strats_count = len(leg1_leg2_symbol_list)
-    strat_view_list = email_book_service_native_web_client.get_all_strat_view_client()
+    strat_view_list = photo_book_web_client.get_all_strat_view_client()
     expected_balance_notional = (expected_strat_limits_.max_single_leg_notional -
                                  strats_count * max_loop_count_per_side * qty * get_px_in_usd(px))
     for strat_view in strat_view_list:
@@ -6744,10 +6745,10 @@ def _frequent_update_strat_view_in_strat(buy_symbol, sell_symbol, pair_strat_,
             strat_view_obj = StratViewBaseModel(_id=created_pair_strat.id, market_premium=i)
         else:
             strat_view_obj = StratViewBaseModel(_id=created_pair_strat.id, balance_notional=i)
-        email_book_service_native_web_client.patch_strat_view_client(jsonable_encoder(strat_view_obj, by_alias=True,
+        photo_book_web_client.patch_strat_view_client(jsonable_encoder(strat_view_obj, by_alias=True,
                                                                                          exclude_none=True))
 
-    updated_strat_view = email_book_service_native_web_client.get_strat_view_client(created_pair_strat.id)
+    updated_strat_view = photo_book_web_client.get_strat_view_client(created_pair_strat.id)
     assert updated_strat_view.market_premium == loop_count-2, \
         (f"Mismatched: market_premium must be {loop_count-2} but found {updated_strat_view.market_premium}, "
          f"_id: {created_pair_strat.id}")

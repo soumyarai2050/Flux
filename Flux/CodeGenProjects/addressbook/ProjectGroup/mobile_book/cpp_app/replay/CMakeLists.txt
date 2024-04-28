@@ -16,7 +16,7 @@ set(protobuf_ABSL_USED_TARGETS ${libabsl_ROOT_PATH}/libabsl_log_severity.a ${lib
         ${libabsl_ROOT_PATH}/libabsl_hashtablez_sampler.a ${libabsl_ROOT_PATH}/libabsl_low_level_hash.a
         ${libabsl_ROOT_PATH}/libabsl_spinlock_wait.a ${libabsl_ROOT_PATH}/libabsl_city.a
         ${libabsl_ROOT_PATH}/libabsl_leak_check.a ${libabsl_ROOT_PATH}/libabsl_civil_time.a
-        ${libabsl_ROOT_PATH}/libabsl_flags.a ${libabsl_ROOT_PATH}/libabsl_log_entry.a ${libabsl_ROOT_PATH}/libabsl_status.a
+         ${libabsl_ROOT_PATH}/libabsl_log_entry.a ${libabsl_ROOT_PATH}/libabsl_status.a
         ${libabsl_ROOT_PATH}/libabsl_cord.a ${libabsl_ROOT_PATH}/libabsl_flags_commandlineflag.a
         ${libabsl_ROOT_PATH}/libabsl_statusor.a ${libabsl_ROOT_PATH}/libabsl_cord_internal.a
         ${libabsl_ROOT_PATH}/libabsl_flags_commandlineflag_internal.a ${libabsl_ROOT_PATH}/libabsl_log_globals.a
@@ -68,7 +68,8 @@ project(mobile_book)
 message(WARNING ${MONGO_INCLUDE_DIR})
 message(WARNING ${BSON_INCLUDE_DIR})
 
-include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCLUDE_DIR} ${BSON_INCLUDE_DIR}
+include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCLUDE_DIR} ${BSON_THIRD_PARTY_INCLUDE_DIR}
+        ${BSON_INCLUDE_DIR}
         ${Protobuf_INCLUDE_DIRS} ${CppCodec} ${CppTest} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
         /usr/local/lib/quill /usr/include/python3.10)
 
