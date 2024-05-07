@@ -9,6 +9,7 @@ import pytest
 # project imports
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from tests.CodeGenProjects.AddressBook.ProjectGroup.conftest import *
 
 
 PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
@@ -145,13 +146,13 @@ def test_min_chore_notional_breach_in_relaxed_strat_mode(
 
         if match:
             extracted_value = match.group(1)
-            assert extracted_value != expected_chore_limits_.min_chore_notional, \
+            assert extracted_value != expected_strat_limits_.min_chore_notional, \
                 ("When strat_mode is relaxed, min_chore_notional is replaced by random value between "
                  "min_chore_notional and min_chore_notional+min_chore_notional_allowance but found value same as"
                  f"expected_chore_limits_.min_chore_notional, "
-                 f"expected_chore_limits_.min_chore_notional: {expected_chore_limits_.min_chore_notional}, "
+                 f"expected_chore_limits_.min_chore_notional: {expected_strat_limits_.min_chore_notional}, "
                  f"expected_chore_limits_.min_chore_notional_allowance: "
-                 f"{expected_chore_limits_.min_chore_notional_allowance}, "
+                 f"{expected_strat_limits_.min_chore_notional_allowance}, "
                  f"extracted_value from alert: {extracted_value}")
         else:
             assert False, "Can't find match to get value after < in alert brief"
@@ -341,7 +342,7 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
                                                                       active_pair_strat.id, executor_http_client)
 
         check_str = ("blocked generated chore, breach_px returned None from get_breach_threshold_px for "
-                     f"symbol_side_key: %%symbol-side={buy_symbol}-{Side.BUY}%%")
+                     f"symbol_side_key: %%symbol-side={buy_symbol}-{Side.BUY.value}%%")
         assert_fail_msg = f"Can't find alert saying: {check_str!r}"
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -355,7 +356,7 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
                                                                       active_pair_strat.id, executor_http_client)
 
         check_str = ("blocked generated chore, breach_px returned None from get_breach_threshold_px for "
-                     f"symbol_side_key: %%symbol-side={sell_symbol}-{Side.SELL}%%")
+                     f"symbol_side_key: %%symbol-side={sell_symbol}-{Side.SELL.value}%%")
         assert_fail_msg = f"Can't find alert saying: {check_str!r}"
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -512,7 +513,7 @@ def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits,
                                                                       active_pair_strat.id, executor_http_client)
 
         check_str = ("blocked generated chore, breach_px returned None from get_breach_threshold_px for "
-                     f"symbol_side_key: %%symbol-side={buy_symbol}-{Side.BUY}%%")
+                     f"symbol_side_key: %%symbol-side={buy_symbol}-{Side.BUY.value}%%")
         assert_fail_msg = f"Can't find alert saying: {check_str!r}"
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -608,7 +609,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
                                                                       check_str, assert_fail_msg,
                                                                       active_pair_strat.id, executor_http_client)
         check_str = ("blocked generated chore, breach_px returned None from get_breach_threshold_px for "
-                     f"symbol_side_key: %%symbol-side={buy_symbol}-{Side.BUY}%%")
+                     f"symbol_side_key: %%symbol-side={buy_symbol}-{Side.BUY.value}%%")
         assert_fail_msg = f"Can't find alert saying: {check_str!r}"
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -622,7 +623,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
                                                                       check_str, assert_fail_msg,
                                                                       active_pair_strat.id, executor_http_client)
         check_str = ("blocked generated chore, breach_px returned None from get_breach_threshold_px for "
-                     f"symbol_side_key: %%symbol-side={sell_symbol}-{Side.SELL}%%")
+                     f"symbol_side_key: %%symbol-side={sell_symbol}-{Side.SELL.value}%%")
         assert_fail_msg = f"Can't find alert saying: {check_str!r}"
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -784,7 +785,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
         px = 98
         qty = 90
         check_str = "blocked generated BUY chore, chore px = .* > allowed max_px"
-        assert_fail_message = "Could not find any alert containing message to block chores wrong max basis points"
+        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat.id, executor_http_client)
@@ -1920,13 +1921,9 @@ def test_strat_done_after_exhausted_buy_consumable_notional(
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    # updating chore_limits
-    expected_chore_limits_.min_chore_notional = 15000
-    expected_chore_limits_.id = 1
-    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_, return_obj_copy=False)
-
     # setting strat_limits for this test
     expected_strat_limits_.max_single_leg_notional = 18000
+    expected_strat_limits_.min_chore_notional = 15000
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
         expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
@@ -1941,13 +1938,9 @@ def test_strat_done_after_exhausted_sell_consumable_notional(
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    # updating chore_limits
-    expected_chore_limits_.min_chore_notional = 15000
-    expected_chore_limits_.id = 1
-    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_, return_obj_copy=False)
-
     # setting strat_limits for this test
-    expected_strat_limits_.max_single_leg_notional = 18000
+    expected_strat_limits_.max_single_leg_notional = 21000
+    expected_strat_limits_.min_chore_notional = 15000
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
         expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
@@ -2016,7 +2009,7 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
         # placing new non-systematic new_chore
         px = 1000
         qty = 90
-        check_str = (f"blocked symbol_side_key: %%symbol-side={buy_symbol}-{Side.BUY}%% chore, "
+        check_str = (f"blocked symbol_side_key: %%symbol-side={buy_symbol}-{Side.BUY.value}%% chore, "
                      "breaches available consumable open notional")
         assert_fail_message = f"Could not find any alert saying '{check_str}'"
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
@@ -2040,7 +2033,7 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
         # placing new non-systematic new_chore
         px = 7000
         qty = 90
-        check_str = (f"blocked symbol_side_key: %%symbol-side={sell_symbol}-{Side.SELL}%% chore, "
+        check_str = (f"blocked symbol_side_key: %%symbol-side={sell_symbol}-{Side.SELL.value}%% chore, "
                      "breaches available consumable open notional")
         assert_fail_message = f"Could not find any alert saying '{check_str}'"
         handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
@@ -2530,6 +2523,11 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
             executor_http_clients_n_last_chore_id_tuple_list.append(
                 (executor_http_client, buy_symbol, last_buy_chore_id, sell_symbol, last_sell_chore_id))
 
+    # checking portfolio_status open_chores
+    portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
+    assert portfolio_status.open_chores == 8, \
+        f"Mismatched portfolio_status.open_chores, expected: 8, received: {portfolio_status.open_chores=}"
+
     # Till this point since max_open_buckets limits must have breached and any new chore must not be placed,
     # checking that now...
 
@@ -2542,10 +2540,20 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list, 
         refresh_sec_update_fixture, expect_no_chore=True)
 
+    # checking portfolio_status open_chores
+    portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
+    assert portfolio_status.open_chores == 8, \
+        f"Mismatched portfolio_status.open_chores, expected: 8, received: {portfolio_status.open_chores=}"
+
+    time.sleep(5)
+    # checking if all strat pause warning is in last started strat
+    check_str = "Putting Activated Strat to PAUSE, found portfolio_limits breached already"
+    assert_fail_message = f"Could not find any alert saying '{check_str}'"
+    check_alert_str_in_strat_alerts_n_portfolio_alerts(created_pair_strat.id, check_str, assert_fail_message)
+
     # Checking alert in portfolio_alert
     check_str = "max_open_baskets breached"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
-    time.sleep(5)
     check_alert_str_in_portfolio_alert(check_str, assert_fail_message)
 
     # Checking all strat pause
@@ -2902,7 +2910,7 @@ def test_last_n_sec_chore_counts(static_data_, clean_and_set_limits, leg1_leg2_s
                 (executor_http_client, buy_symbol, last_buy_chore_id, sell_symbol, last_sell_chore_id))
 
     chore_count_updated_chore_journals = (
-        post_book_service_http_client.get_last_n_sec_chores_by_events_query_client(
+        post_barter_engine_service_http_client.get_last_n_sec_chores_by_events_query_client(
             expected_portfolio_limits_.rolling_max_chore_count.rolling_tx_count_period_seconds,
             [ChoreEventType.OE_NEW]))
 
@@ -2920,7 +2928,7 @@ def test_last_n_sec_chore_counts(static_data_, clean_and_set_limits, leg1_leg2_s
     time.sleep(3)   # wait to check after 2 sec to check no chore is found after it
 
     chore_count_updated_chore_journals = (
-        post_book_service_http_client.get_last_n_sec_chores_by_events_query_client(
+        post_barter_engine_service_http_client.get_last_n_sec_chores_by_events_query_client(
             expected_portfolio_limits_.rolling_max_chore_count.rolling_tx_count_period_seconds,
             [ChoreEventType.OE_NEW]))
 
@@ -2989,8 +2997,9 @@ def test_portfolio_limits_rolling_new_chore_breach(static_data_, clean_and_set_l
     new_buy_sell_symbol_list = leg1_leg2_symbol_list[8]
     buy_symbol = new_buy_sell_symbol_list[0]
     sell_symbol = new_buy_sell_symbol_list[1]
+    stored_pair_strat_basemodel = create_strat(buy_symbol, sell_symbol, pair_strat_)
     handle_place_both_side_chores_for_portfolio_limits_test(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+        buy_symbol, sell_symbol, stored_pair_strat_basemodel, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list, 
         refresh_sec_update_fixture, expect_no_chore=True)
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/json.hpp>
 #include <google/protobuf/util/json_util.h>
 #include <absl/status/status.h>
 
@@ -28,9 +29,37 @@ namespace FluxCppCore {
     class RootModelJsonCodec : public JsonCodecOptions {
         using JsonCodecOptions::c_p_logger_;
     public:
-        [[nodiscard]] static inline bool decode_model(RootModelType &r_model_obj, const std::string &kr_json) {
+        static inline void modify_json(std::string &r_json_str) {
+            try {
+                boost::json::value jv = boost::json::parse(r_json_str);
+                boost::json::object& obj = jv.as_object();
+                if (obj["side"].is_string()) {
+                    std::string side = std::string(obj["side"].as_string().c_str());
+                    if (side == "BID") {
+                        obj["side"] = 2;
+                    } else if (side == "ASK") {
+                        obj["side"] = 3;
+                    }
+                } else {
+                    LOG_ERROR(c_p_logger_, "Error: 'side' field is not a string in JSON. JSON: {}", r_json_str);
+                }
+                r_json_str = boost::json::serialize(jv);
+            } catch (const std::invalid_argument& e) {
+                LOG_ERROR(c_p_logger_, "Invalid argument encountered: {}, JSON: {}", e.what(), r_json_str);
+            } catch (const boost::json::system_error& e) {
+                LOG_ERROR(c_p_logger_, "Parse error encountered: {}, JSON: {}", e.what(), r_json_str);
+            }
+        }
+
+
+        [[nodiscard]] static inline bool decode_model(RootModelType &r_model_obj, std::string &kr_json) {
             google::protobuf::util::JsonParseOptions options;
             decode_options(options);
+            StringUtil string_util;
+            std::string msg_name = string_util.camel_to_snake(RootModelType::GetDescriptor()->name());
+            if (msg_name == "market_depth") {
+                modify_json(kr_json);
+            }
             absl::Status status = google::protobuf::util::JsonStringToMessage(kr_json, &r_model_obj,
                                                                                                 options);
             if (status.code() == absl::StatusCode::kOk) {
@@ -89,6 +118,30 @@ namespace FluxCppCore {
             }
         }
 
+        static inline void modify_json(std::string &r_json_str) {
+            // Parse the JSON string into a JSON object
+            boost::json::value jv = boost::json::parse(r_json_str);
+            boost::json::object& obj = jv.as_object();
+
+            // Access the "market_depth" array
+            boost::json::array& market_depth = obj["market_depth"].as_array();
+
+            // Iterate over the objects in the array
+            for (auto& item : market_depth) {
+                boost::json::object& item_obj = item.as_object();
+
+                // Replace "BID" with 1 and "ASK" with 2 in the "side" field
+                if (item_obj["side"].as_string() == "BID") {
+                    item_obj["side"] = 2;
+                } else if (item_obj["side"].as_string() == "ASK") {
+                    item_obj["side"] = 3;
+                }
+            }
+
+            // Serialize the JSON object back into a string
+            r_json_str = boost::json::serialize(jv);
+        }
+
         // ideally dash_list_json should have been a const - but we intend to reuse the top_of_book_list_json to avoid creating new string
         [[nodiscard]] static inline bool
         decode_model_list(RootModelListType &r_model_list_obj_out, std::string &r_list_json) {
@@ -105,6 +158,10 @@ namespace FluxCppCore {
             if (pos == std::string::npos && r_list_json.back() != ']')
                 r_list_json = "[" + r_list_json + "]";
             r_list_json = "{\"" + msg_name + "\":" + r_list_json + '}';
+
+            if (msg_name == "market_depth")
+                modify_json(r_list_json);
+
             absl::Status status = google::protobuf::util::JsonStringToMessage(r_list_json,
                                                                               &r_model_list_obj_out, options);
             if (status.code() == absl::StatusCode::kOk) {

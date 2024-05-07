@@ -94,8 +94,7 @@ def init_service(portfolio_alerts_cache: Dict[str, PortfolioAlertBaseModel]) -> 
             raise Exception(err_str_)
 
         for portfolio_alert in portfolio_alert_list:
-            alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
-                                            portfolio_alert.alert_details)
+            alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief)
             portfolio_alerts_cache[alert_key] = portfolio_alert
         return True
     return False
@@ -478,13 +477,10 @@ def clean_alert_str(alert_str: str) -> str:
     return cleaned_alert_str
 
 
-def get_alert_cache_key(severity: Severity, alert_brief: str, alert_details: str | None = None):
+def get_alert_cache_key(severity: Severity, alert_brief: str):
     # updated_alert_brief: str = alert_brief.split(":", 3)[-1].strip()
     updated_alert_brief = clean_alert_str(alert_str=alert_brief)
-    updated_alert_details = None
-    if alert_details:
-        updated_alert_details = clean_alert_str(alert_str=alert_details)
-    return f"{severity}@#@{updated_alert_brief}@#@{updated_alert_details}"
+    return f"{severity}@#@{updated_alert_brief}"
 
 
 def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | StratAlert] |
@@ -497,7 +493,7 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
     """
     Handles strat alerts if strat id is passed else handles portfolio alerts
     """
-    cache_key = get_alert_cache_key(severity, alert_brief, alert_details)
+    cache_key = get_alert_cache_key(severity, alert_brief)
     stored_alert = alerts_cache_dict.get(cache_key)
 
     if stored_alert is not None:
@@ -509,6 +505,8 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
         stored_alert.alert_brief = alert_brief
         stored_alert.alert_count = updated_alert_count
         stored_alert.last_update_date_time = updated_last_update_date_time
+        if alert_details is not None:
+            stored_alert.alert_details = alert_details
 
         alert_queue.put(stored_alert)
         if alert_id_to_alert_cache_dict is not None:
@@ -604,8 +602,7 @@ def update_strat_alert_cache(
         else:
             strat_alert_cache_by_strat_id_dict[strat_id] = {}
             for strat_alert in strat_alert_list:
-                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
-                                                strat_alert.alert_details)
+                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief)
                 strat_alert_cache_by_strat_id_dict[strat_id][alert_key] = strat_alert
 
 
@@ -623,6 +620,5 @@ async def async_update_strat_alert_cache(
         else:
             strat_alert_cache_by_strat_id_dict[strat_id] = {}
             for strat_alert in strat_alert_list:
-                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
-                                                strat_alert.alert_details)
+                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief)
                 strat_alert_cache_by_strat_id_dict[strat_id][alert_key] = strat_alert

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <mongocxx/exception/query_exception.hpp>
+
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppCodec/market_data_mongo_db_codec.h"
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_key_handler.h"
 #include "mongo_db_handler.h"
@@ -26,13 +28,12 @@ namespace FluxCppCore {
             try {
                 auto insert_result = m_mongo_db_collection.insert_one(r_bson_doc.view());
                 auto inserted_id = insert_result->inserted_id().get_int32().value;
-                assert(r_new_generated_id_out == inserted_id && __func__ && "Insert failed");
                 m_root_model_key_to_db_id[kr_root_model_key] = r_new_generated_id_out;
-            } catch (std::exception &e) {
-                std::cerr << "Error: " << e.what() << __func__ << std::endl;
+                return (inserted_id == r_new_generated_id_out);
+            } catch (const std::exception &e) {
+                LOG_ERROR(m_p_logger_, "Error while inserting document: {}", e.what());
                 return false;
             }
-            return true;
         }
 
         bool bulk_insert(const RootModelListType &kr_root_model_list_obj,
@@ -50,7 +51,6 @@ namespace FluxCppCore {
             auto insert_results = m_mongo_db_collection.insert_many(bson_doc_list);
             for (int i = 0; i < bson_doc_list.size(); ++i) {
                 auto inserted_id = insert_results->inserted_ids().at(i).get_int32().value;
-                assert(r_new_generated_id_list_out[i] == inserted_id);  // assert useful - avoids if in release
                 m_root_model_key_to_db_id[kr_root_model_key_list[i]] = r_new_generated_id_list_out[i];
             }
 
@@ -63,6 +63,7 @@ namespace FluxCppCore {
 
         // Insert or update the data
         bool insert_or_update(const RootModelType &kr_root_model_obj, int32_t &r_new_generated_id_out) {
+
             std::string root_model_key;
             if(CheckInitializedAndGetKey(kr_root_model_obj, root_model_key)){
                 return insert_or_update(kr_root_model_obj, root_model_key, r_new_generated_id_out);
@@ -79,13 +80,11 @@ namespace FluxCppCore {
                 // Key does not exist, so it's a new object. Insert it into the database
                 prepare_doc(kr_root_model_obj, bson_doc);
                 status = insert(bson_doc, r_root_model_key_in_n_out, r_new_generated_id_out);
-                assert(status && __func__ && "Insert failed");
 
             } else {
-                // Key already exists, so update the existing object in the database
                 prepare_doc(kr_root_model_obj, bson_doc);
                 status = update_or_patch(found->second, bson_doc);
-                assert(status && __func__ && "Update failed");
+                r_new_generated_id_out = found->second;
             }
             return status;
         }
@@ -165,20 +164,11 @@ namespace FluxCppCore {
             auto update_document = FluxCppCore::make_document(
                     FluxCppCore::kvp("$set", kr_bson_doc.view()));
 
-            get_data_by_id_from_collection(root_model_type_, kr_model_doc_id);
-            bsoncxx::builder::basic::document existing_doc;
-            prepare_doc(root_model_type_, existing_doc);
-
             try {
                 auto result = m_mongo_db_collection.update_one(update_filter.view(), update_document.view());
-                bsoncxx::builder::basic::document new_doc;
-                RootModelType rootModelType;
-                get_data_by_id_from_collection(rootModelType, kr_model_doc_id);
-                prepare_doc(rootModelType, new_doc);
-                assert(result->modified_count() == 1 && __func__ && "Update failed");
 
-            } catch (std::exception &e) {
-                std::cerr << "Error: " << e.what() << __func__ << std::endl;
+            } catch (const std::exception &e) {
+                LOG_ERROR(m_p_logger_, "error while update: {}", e.what());
                 return false;
             }
             return true;
@@ -223,6 +213,48 @@ namespace FluxCppCore {
             return status;
         }
 
+        bool get_all_data_from_collection(RootModelListType &r_root_model_list_obj_out, int32_t retry_count = 0) {
+            if (retry_count >= 10) {
+                LOG_DEBUG(m_p_logger_, "Maximum retry attempts reached while {}", __func__);
+                return false;
+            }
+            std::string all_data_from_db_json_string;
+            try {
+                mongocxx::cursor cursor = m_mongo_db_collection.find({});
+
+                for (const auto &bson_doc : cursor) {
+                    bsoncxx::builder::basic::document new_doc;
+                    for (const auto &element: bson_doc) {
+                        process_element(element, new_doc);
+                    }
+
+                    std::string doc_view = bsoncxx::to_json(new_doc.view());
+                    size_t pos = doc_view.find("_id");
+                    while (pos != std::string::npos) {
+                        if (!isalpha(doc_view[pos - 1])) {
+                            doc_view.erase(pos, 1);
+                        }
+                        pos = doc_view.find("_id", pos + 1);
+                    }
+
+                    all_data_from_db_json_string += doc_view;
+                    all_data_from_db_json_string += ",";
+                }
+
+                if (all_data_from_db_json_string.back() == ',') {
+                    all_data_from_db_json_string.pop_back();
+                } // else not required: all_data_from_db_json_string is empty so need to perform any operation
+                r_root_model_list_obj_out.Clear();
+
+                if (!all_data_from_db_json_string.empty())
+                    return FluxCppCore::RootModelListJsonCodec<RootModelListType>::decode_model_list(r_root_model_list_obj_out, all_data_from_db_json_string);
+            } catch (const mongocxx::v_noabi::query_exception& e) {
+                LOG_ERROR(m_p_logger_, "Error {}, function{}", e.what(), __func__);
+                get_all_data_from_collection(r_root_model_list_obj_out, retry_count + 1);
+            }
+            return false;
+        }
+
         bool
         bulk_update_or_patch_collection(const std::vector<int32_t> &kr_model_doc_ids,
                                         const std::vector<bsoncxx::builder::basic::document> &kr_bson_doc_list) {
@@ -242,71 +274,44 @@ namespace FluxCppCore {
                 auto matched_count = result->matched_count();
                 return (modified_count == matched_count); // Return true only if all updates were successful
             } else {
-                std::cerr << "Bulk update failed" << std::endl;
+                LOG_ERROR(m_p_logger_, "Bulk update failed {}", __func__);
                 return false;
             }
         }
 
-
-        bool get_all_data_from_collection(RootModelListType &r_root_model_list_obj_out) {
-            std::string all_data_from_db_json_string;
-            mongocxx::cursor cursor = m_mongo_db_collection.find({});
-
-            for (const auto &bson_doc : cursor) {
-                bsoncxx::builder::basic::document new_doc;
-                for (const auto &element: bson_doc) {
-                    process_element(element, new_doc);
-                }
-
-                std::string doc_view = bsoncxx::to_json(new_doc.view());
-                size_t pos = doc_view.find("_id");
-                while (pos != std::string::npos) {
-                    if (!isalpha(doc_view[pos - 1])) {
-                        doc_view.erase(pos, 1);
-                    }
-                    pos = doc_view.find("_id", pos + 1);
-                }
-
-                all_data_from_db_json_string += doc_view;
-                all_data_from_db_json_string += ",";
+        bool get_data_by_id_from_collection(RootModelType &r_root_model_obj_out, const int32_t &kr_root_model_doc_id, int32_t retry_count = 0) {
+            if (retry_count >= 10) {
+                LOG_DEBUG(m_p_logger_, "Maximum retry attempts reached while {}", __func__);
+                return false;
             }
-
-            if (all_data_from_db_json_string.back() == ',') {
-                all_data_from_db_json_string.pop_back();
-            } // else not required: all_data_from_db_json_string is empty so need to perform any operation
-            r_root_model_list_obj_out.Clear();
-            if (!all_data_from_db_json_string.empty())
-                return FluxCppCore::RootModelListJsonCodec<RootModelListType>::decode_model_list(r_root_model_list_obj_out, all_data_from_db_json_string);
-            return false;
-        }
-
-
-        bool get_data_by_id_from_collection(RootModelType &r_root_model_obj_out, const int32_t &kr_root_model_doc_id) {
             bool status = false;
-            auto cursor = m_mongo_db_collection.find(
-                    bsoncxx::builder::stream::document{} << "_id" << kr_root_model_doc_id << bsoncxx::builder::stream::finalize);
-            if (cursor.begin() != cursor.end()) {
-                auto &&doc = *cursor.begin();
+            try {
+                auto cursor = m_mongo_db_collection.find(
+                        bsoncxx::builder::stream::document{} << "_id" << kr_root_model_doc_id << bsoncxx::builder::stream::finalize);
+                if (cursor.begin() != cursor.end()) {
+                    auto &&doc = *cursor.begin();
 
-                bsoncxx::builder::basic::document new_doc;
-                for (const auto &element : doc) {
-                    process_element(element, new_doc);
-                }
-
-                std::string new_bson_doc = bsoncxx::to_json(new_doc.view());
-                size_t pos = new_bson_doc.find("_id");
-                while (pos != std::string::npos) {
-                    if (!isalpha(new_bson_doc[pos - 1])) {
-                        new_bson_doc.erase(pos, 1);
+                    bsoncxx::builder::basic::document new_doc;
+                    for (const auto &element : doc) {
+                        process_element(element, new_doc);
                     }
-                    pos = new_bson_doc.find("_id", pos + 1);
-                }
 
-                status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, new_bson_doc);
-                return status;
-            } else {
-                return status;
+                    std::string new_bson_doc = bsoncxx::to_json(new_doc.view());
+                    size_t pos = new_bson_doc.find("_id");
+                    while (pos != std::string::npos) {
+                        if (!isalpha(new_bson_doc[pos - 1])) {
+                            new_bson_doc.erase(pos, 1);
+                        }
+                        pos = new_bson_doc.find("_id", pos + 1);
+                    }
+
+                    status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, new_bson_doc);
+                }
+            } catch (const mongocxx::v_noabi::query_exception& e) {
+                LOG_ERROR(m_p_logger_, "Error {}, function{}", e.what(), __func__);
+                get_data_by_id_from_collection(r_root_model_obj_out, kr_root_model_doc_id, retry_count + 1);
             }
+            return status;
         }
 
         int64_t count_data_from_collection(const bsoncxx::builder::stream::document &filter) {

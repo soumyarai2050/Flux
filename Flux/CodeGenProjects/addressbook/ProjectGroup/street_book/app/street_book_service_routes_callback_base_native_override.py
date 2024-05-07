@@ -21,7 +21,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
     email_book_service_http_client, get_consumable_participation_qty,
     get_strat_brief_log_key, get_fills_journal_log_key, get_new_strat_limits, get_new_strat_status,
     log_book_service_http_client, executor_config_yaml_dict,
-    EXECUTOR_PROJECT_SCRIPTS_DIR, post_book_service_http_client, MobileBookMutexManager)
+    EXECUTOR_PROJECT_SCRIPTS_DIR, post_barter_engine_service_http_client, MobileBookMutexManager)
 from FluxPythonUtils.scripts.utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
@@ -42,7 +42,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate imp
     get_open_chore_snapshots_for_symbol, get_symbol_side_underlying_account_cumulative_fill_qty,
     get_symbol_overview_from_symbol, get_last_n_sec_total_barter_qty, get_market_depths,
     get_last_n_chore_journals_from_chore_id, get_last_n_sec_first_n_last_barter)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_barter_engine.generated.Pydentic.post_barter_engine_service_model_imports import (
     PortfolioStatusUpdatesContainer)
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
@@ -1309,7 +1309,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 strat_id, chore_snapshot, strat_brief, portfolio_status_updates = res
 
                 # Updating and checking portfolio_limits in portfolio_manager
-                post_book_service_http_client.check_portfolio_limits_query_client(
+                post_barter_engine_service_http_client.check_portfolio_limits_query_client(
                     strat_id, chore_journal_obj, chore_snapshot, strat_brief, portfolio_status_updates)
 
             # else not required: if result returned from _update_chore_snapshot_from_chore_journal is None, that
@@ -4028,7 +4028,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 strat_id, chore_snapshot, strat_brief, portfolio_status_updates = res
 
                 # Updating and checking portfolio_limits in portfolio_manager
-                post_book_service_http_client.check_portfolio_limits_query_client(
+                post_barter_engine_service_http_client.check_portfolio_limits_query_client(
                     strat_id, None, chore_snapshot, strat_brief, portfolio_status_updates)
 
             # else not required: if result returned from _apply_fill_update_in_chore_snapshot is None, that
@@ -5175,6 +5175,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 last_barter_obj_list[-1].market_barter_volume.participation_period_last_barter_qty_sum
 
         return [LastNSecMarketBarterVol(last_n_sec_barter_vol=last_n_sec_barter_vol)]
+
+    async def delete_symbol_overview_pre(self, pydantic_obj_to_be_deleted: SymbolOverview):
+        self.strat_cache.clear_symbol_overview(pydantic_obj_to_be_deleted.id)
 
     async def put_strat_to_snooze_query_pre(self, strat_status_class_type: Type[StratStatus]):
         # removing current strat_status

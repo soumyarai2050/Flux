@@ -8,7 +8,7 @@ import "dept_book_n_mobile_book_n_street_book_core.proto";
 import "street_book_core.proto";
 import "phone_book_n_street_book_core.proto";
 import "mobile_book_n_street_book_core.proto";
-import "street_book_n_post_book_core.proto";
+import "street_book_n_post_barter_engine_core.proto";
 
 package street_book;
 
@@ -255,9 +255,11 @@ message StratLimits{
   optional MarketBarterVolumeParticipation market_barter_volume_participation = 9 [(FluxFldHelp) = "% participation against market barterd volume within configured interval (sent with top of the book); no time window implies SOD: window-start & checking-time as end"];
   optional OpenInterestParticipation market_depth = 10 [(FluxFldHelp) = "% participation against open interest on specific side across specified depth levels"];
   optional ResidualRestriction residual_restriction = 11 [(FluxFldHelp) = "Max executed unhedged notional"];
+  optional float min_chore_notional = 12 [(FluxFldDisplayType) = "int", (FluxFldValMin) = "1000", (FluxFldHelp) = "chore qty times limit px must be greater than this limit"];
+  optional int32 min_chore_notional_allowance = 13 [(FluxFldValMax) = "50000", (FluxFldHelp) = "used by StratModeRelaxed to compute random next chore opportunity min-notional from the min-notional , min-notional + this-allowance range"];
   // same as portfolio eligible_brokers except filtered by server [strat specific symbol(s)] + user allowed to mod down
-  repeated Broker eligible_brokers = 12 [(FluxFldHelp) = "SOD / Locate / PTH limits"];
-  optional int64 strat_limits_update_seq_num = 13 [(FluxFldHide) = "True"];
+  repeated Broker eligible_brokers = 14 [(FluxFldHelp) = "SOD / Locate / PTH limits"];
+  optional int64 strat_limits_update_seq_num = 15 [(FluxFldHide) = "True"];
 }
 
 message NewChore{

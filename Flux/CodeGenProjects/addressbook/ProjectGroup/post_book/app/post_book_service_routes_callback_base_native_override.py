@@ -304,7 +304,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             chore_brief = chore_snapshot_dict.get("chore_brief")
             if chore_brief is None:
                 logging.error("chore_snapshot_dict doesn't have 'chore_brief' key - "
-                              f"ignoring this chore_snapshot create/update, {chore_snapshot_dict = }")
+                              f"ignoring this chore_snapshot create/update, {chore_snapshot_dict=}")
                 return None
             else:
                 chore_id = chore_brief.get("chore_id")
@@ -338,6 +338,9 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
     def update_strat_id_list_n_dict_from_payload(self, strat_id_list: List[int],
                                                  strat_id_to_container_obj_dict: Dict[int, ContainerObject],
                                                  payload_dict: Dict[str, Any]):
+        """
+        updates strat_id_to_container_obj_dict param - returns None
+        """
         strat_id = payload_dict.get("strat_id")
         if strat_id is None:
             logging.error("Payload doesn't contain strat_id, might be a bug at queue updater, "
@@ -386,6 +389,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                                                  strat_brief=strat_brief,
                                                  portfolio_status_updates=portfolio_status_updates_list)
             strat_id_to_container_obj_dict[strat_id] = container_obj
+        return None
 
     def add_chore_journals(self, chore_journal_list: List[ChoreJournal]):
         run_coro = PostBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_chore_journal_http(
@@ -443,14 +447,16 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                 logging.exception(f"create_or_update_strat_brief failed "
                                   f"with exception: {e}")
 
-    def check_max_open_baskets(self, max_open_baskets: int) -> bool:
+    def check_max_open_baskets(self, max_open_baskets: int, open_chores: int) -> bool:
         pause_all_strats = False
-        open_chore_count = len(self.chore_id_to_open_chore_snapshot_cache_dict)
 
-        if max_open_baskets - open_chore_count < 0:
+        if max_open_baskets - open_chores < 0:
+            # this is kept < (less than) and not <= (less than equal) intentionally - this avoids all strat
+            # pause on consumable value which is exact same as limit, above limit all strat pause is called
+
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.error(f"max_open_baskets breached, allowed {max_open_baskets = }, current {open_chore_count = } - "
+            logging.error(f"max_open_baskets breached, allowed {max_open_baskets=}, current {open_chores=} - "
                           f"initiating all strat pause")
             pause_all_strats = True
         return pause_all_strats
@@ -515,13 +521,17 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
 
     async def check_all_portfolio_limits(self) -> bool:
         portfolio_limits = email_book_service_http_client.get_portfolio_limits_client(portfolio_limits_id=1)
+        portfolio_status = email_book_service_http_client.get_portfolio_status_client(portfolio_status_id=1)
 
         pause_all_strats = False
 
         # Checking portfolio_limits.max_open_baskets
-        max_open_baskets_breached = self.check_max_open_baskets(portfolio_limits.max_open_baskets)
-        if max_open_baskets_breached:
-            pause_all_strats = True
+        if portfolio_status.open_chores is not None:
+            max_open_baskets_breached = self.check_max_open_baskets(portfolio_limits.max_open_baskets,
+                                                                    portfolio_status.open_chores)
+            if max_open_baskets_breached:
+                pause_all_strats = True
+        # else not required: considering None as no open chore is present
 
         # block for task to finish
         total_buy_open_notional = 0
@@ -538,7 +548,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             # needs to be changed in test also
             logging.error(f"max_open_notional_per_side breached for BUY side, "
                           f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
-                          f"current {total_buy_open_notional = }"
+                          f"current {total_buy_open_notional=}"
                           f" - initiating all strat pause")
             pause_all_strats = True
 
@@ -547,12 +557,11 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             # needs to be changed in test also
             logging.error(f"max_open_notional_per_side breached for SELL side, "
                           f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
-                          f"current {total_sell_open_notional = }"
+                          f"current {total_sell_open_notional=}"
                           f" - initiating all strat pause")
             pause_all_strats = True
 
         # Checking portfolio_limits.max_gross_n_open_notional
-        portfolio_status = email_book_service_http_client.get_portfolio_status_client(portfolio_status_id=1)
         total_open_notional = total_buy_open_notional + total_sell_open_notional
         total_gross_n_open_notional = (total_open_notional + portfolio_status.overall_buy_fill_notional +
                                        portfolio_status.overall_sell_fill_notional)
@@ -560,8 +569,8 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.error(f"max_gross_n_open_notional breached, "
-                          f"allowed {portfolio_limits.max_gross_n_open_notional = }, "
-                          f"current {total_gross_n_open_notional = }"
+                          f"allowed {portfolio_limits.max_gross_n_open_notional=}, "
+                          f"current {total_gross_n_open_notional=}"
                           f" - initiating all strat pause")
             pause_all_strats = True
 
@@ -655,7 +664,8 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                         overall_buy_notional=buy_notional_update,
                         overall_sell_notional=sell_notional_update,
                         overall_buy_fill_notional=buy_fill_notional_update,
-                        overall_sell_fill_notional=sell_fill_notional_update)
+                        overall_sell_fill_notional=sell_fill_notional_update,
+                        open_chore_count=len(self.chore_id_to_open_chore_snapshot_cache_dict))
                 except Exception as e:
                     res = self.check_connection_or_service_not_ready_error(e)   # True if connection or service up error
                     if not res:

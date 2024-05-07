@@ -84,6 +84,7 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
     def header_generate_handler(file_name: str, class_name_snake_cased: str):
         output_content: str = ""
         output_content += "#pragma once\n\n"
+        output_content += "#include <chrono>\n\n"
         output_content += f'#include "../../../../../../FluxCppCore/include/RandomDataGen.h"\n'
         output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n\n'
 
@@ -241,11 +242,20 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
         output_content += "\tpublic:\n\n"
 
         output_content += "\t\tstatic std::string get_utc_time() {\n"
-        output_content += "\t\t\tstd::chrono::system_clock::time_point now = std::chrono::system_clock::now();\n"
-        output_content += "\t\t\tstd::time_t now_t = std::chrono::system_clock::to_time_t(now);\n"
-        output_content += "\t\t\tchar buffer[80];\n"
-        output_content += '\t\t\tstd::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S+00:00", std::gmtime(&now_t));\n'
-        output_content += '\t\t\treturn std::string(buffer);\n'
+        output_content += "\t\t\t// Get the current time\n"
+        output_content += "\t\t\tauto now = std::chrono::system_clock::now();\n"
+        output_content += "\t\t\t// Convert to time_t for use with gmtime\n"
+        output_content += "\t\t\tauto now_as_time_t = std::chrono::system_clock::to_time_t(now);\n"
+        output_content += "\t\t\t// Convert to tm for use with put_time\n"
+        output_content += "\t\t\tstd::tm* now_as_tm = std::gmtime(&now_as_time_t);\n"
+        output_content += "\t\t\t// Get the current time as microseconds since the epoch\n"
+        output_content += '\t\t\tauto now_as_us = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());\n'
+        output_content += '\t\t\t// The number of microseconds that have passed since the last second\n'
+        output_content += '\t\t\tauto us = now_as_us.count() % 1000000;\n'
+        output_content += '\t\t\t// Create a stream and output the formatted time\n'
+        output_content += '\t\t\tstd::ostringstream oss;\n'
+        output_content += '\t\t\toss << std::put_time(now_as_tm, "%Y-%m-%d %H:%M:%S") << \'.\' << std::setfill(\'0\') << std::setw(6) << us << "+00:00";\n'
+        output_content += '\t\t\treturn oss.str();\n'
         output_content += "\t\t}\n\n"
 
         output_content += "\t\tstatic std::string get_repeated_id_field_string() {\n"

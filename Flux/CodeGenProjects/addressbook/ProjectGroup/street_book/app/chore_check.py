@@ -2,6 +2,7 @@ import random
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import get_symbol_side_key
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 
 
 class ChoreControl:
@@ -34,24 +35,24 @@ class ChoreControl:
     ORDER_CONTROL_CONSUMABLE_OPEN_NOTIONAL_FAIL: Final[int] = 0x1000000
 
     @classmethod
-    def check_min_chore_notional_normal(cls, chore_limits: ChoreLimitsBaseModel, chore_usd_notional: float,
+    def check_min_chore_notional_normal(cls, strat_limits: StratLimitsBaseModel, chore_usd_notional: float,
                                         system_symbol: str, side: Side):
         # min chore notional is to be an chore opportunity condition instead of chore check
-        if round(chore_limits.min_chore_notional) > round(chore_usd_notional):
+        if round(strat_limits.min_chore_notional) > round(chore_usd_notional):
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.error(f"blocked chore_opportunity < min_chore_notional limit: "
-                          f"{chore_usd_notional} < {chore_limits.min_chore_notional}, "
+                          f"{chore_usd_notional} < {strat_limits.min_chore_notional}, "
                           f"symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
             return cls.ORDER_CONTROL_MIN_ORDER_NOTIONAL_FAIL
         else:
             return cls.ORDER_CONTROL_SUCCESS
 
     @classmethod
-    def check_min_chore_notional_relaxed(cls, chore_limits: ChoreLimitsBaseModel, chore_usd_notional: float,
+    def check_min_chore_notional_relaxed(cls, strat_limits: StratLimitsBaseModel, chore_usd_notional: float,
                                          system_symbol: str, side: Side):
-        min_chore_notional_relaxed = random.randint(int(chore_limits.min_chore_notional),
-                                                    int(chore_limits.min_chore_notional+chore_limits.
+        min_chore_notional_relaxed = random.randint(int(strat_limits.min_chore_notional),
+                                                    int(strat_limits.min_chore_notional+strat_limits.
                                                         min_chore_notional_allowance))
 
         # min chore notional is to be an chore opportunity condition instead of chore check
@@ -66,24 +67,24 @@ class ChoreControl:
             return cls.ORDER_CONTROL_SUCCESS
 
     @classmethod
-    def check_min_chore_notional_aggressive(cls, chore_limits: ChoreLimitsBaseModel, chore_usd_notional: float,
+    def check_min_chore_notional_aggressive(cls, strat_limits: StratLimitsBaseModel, chore_usd_notional: float,
                                             system_symbol: str, side: Side):
         # todo: currently same as normal - needs to be impl
         # min chore notional is to be an chore opportunity condition instead of chore check
-        return cls.check_min_chore_notional_normal(chore_limits, chore_usd_notional, system_symbol, side)
+        return cls.check_min_chore_notional_normal(strat_limits, chore_usd_notional, system_symbol, side)
 
     @classmethod
-    def check_min_chore_notional(cls, pair_strat: PairStrat, chore_limits: ChoreLimitsBaseModel, chore_usd_notional: float,
+    def check_min_chore_notional(cls, pair_strat: PairStrat, strat_limits: StratLimitsBaseModel, chore_usd_notional: float,
                                  system_symbol: str, side: Side):
         if pair_strat.pair_strat_params.strat_mode == StratMode.StratMode_Aggressive:
             # min chore notional is to be an chore opportunity condition instead of chore check
-            checks_passed_ = ChoreControl.check_min_chore_notional_aggressive(chore_limits, chore_usd_notional,
+            checks_passed_ = ChoreControl.check_min_chore_notional_aggressive(strat_limits, chore_usd_notional,
                                                                               system_symbol, side)
         elif pair_strat.pair_strat_params.strat_mode == StratMode.StratMode_Relaxed:
-            checks_passed_ = ChoreControl.check_min_chore_notional_relaxed(chore_limits, chore_usd_notional,
+            checks_passed_ = ChoreControl.check_min_chore_notional_relaxed(strat_limits, chore_usd_notional,
                                                                            system_symbol, side)
         else:
-            checks_passed_ = ChoreControl.check_min_chore_notional_normal(chore_limits, chore_usd_notional,
+            checks_passed_ = ChoreControl.check_min_chore_notional_normal(strat_limits, chore_usd_notional,
                                                                           system_symbol, side)
         return checks_passed_
 

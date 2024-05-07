@@ -151,6 +151,11 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
     def get_symbol_overviews(self) -> List[SymbolOverviewBaseModel | SymbolOverview | None]:
         return self._symbol_overviews
 
+    def clear_symbol_overview(self, symbol_overview_id: int) -> None:
+        for symbol_overview in self._symbol_overviews:
+            if symbol_overview and symbol_overview_id == symbol_overview.id:
+                self._symbol_overviews.remove(symbol_overview)
+
     @staticmethod
     def get_key_n_symbol_from_fills_journal(
             fills_journal: FillsJournalBaseModel | FillsJournal) -> Tuple[str | None, str | None]:

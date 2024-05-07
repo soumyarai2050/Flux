@@ -60,33 +60,50 @@ namespace FluxCppCore {
 
         static bsoncxx::types::b_date convert_utc_string_to_b_date(const std::string& utc_time_str) {
             std::tm tm = {};
-            strptime(utc_time_str.c_str(), "%Y-%m-%dT%H:%M:%S%z", &tm);
+            std::istringstream ss(utc_time_str);
+            ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S"); // Parse the date-time part
+
+            // Parse microseconds
+            char ch;
+            ss >> ch; // skip the '.'
+            int microseconds = 0;
+            if (ss >> microseconds) {
+                while (microseconds >= 1000000) // ensure microseconds are in correct range
+                    microseconds /= 10;
+            }
+
+            // Parse timezone
+            ss >> ch; // skip the '+'
+            int timezone = 0;
+            if (ss >> timezone) {
+                tm.tm_hour -= timezone / 100; // adjust the hour
+                tm.tm_min -= timezone % 100; // adjust the minute
+            }
+
             std::time_t tt = timegm(&tm);
             std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(tt);
             auto duration_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch());
+
+            // Add microseconds to the duration
+            duration_since_epoch += std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::microseconds(microseconds));
+
             return bsoncxx::types::b_date(duration_since_epoch);
         }
 
-        static TimeComparison find_latest_time(const std::string& time1_str, const std::string& time2_str) {
-            // Parse time strings
-            std::tm time1_tm = {};
-            std::tm time2_tm = {};
-            std::istringstream ss1(time1_str);
-            std::istringstream ss2(time2_str);
-            ss1 >> std::get_time(&time1_tm, "%Y-%m-%dT%H:%M:%S%z");
-            ss2 >> std::get_time(&time2_tm, "%Y-%m-%dT%H:%M:%S%z");
-            auto time1 = std::chrono::system_clock::from_time_t(std::mktime(&time1_tm));
-            auto time2 = std::chrono::system_clock::from_time_t(std::mktime(&time2_tm));
 
-            // Compare times
-            if (time1 > time2) {
+
+        static TimeComparison find_latest_time(const std::string& time1_str, const std::string& time2_str) {
+            if (time1_str > time2_str) {
                 return TimeComparison::TIME1_LATER;
-            } else if (time2 > time1) {
+            } else if (time2_str > time1_str) {
+                std::cout << time2_str << std::endl;
                 return TimeComparison::TIME2_LATER;
             } else {
+                // std::cout << "time1_str: " << time1_str << " time2_str: " << time2_str << std::endl;
                 return TimeComparison::BOTH_EQUAL;
             }
         }
+
 
     };
 }

@@ -22,10 +22,10 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, email_book_service_http_client, guaranteed_call_pair_strat_client)
 from FluxPythonUtils.scripts.utility_functions import clear_semaphore, perf_benchmark_sync_callable
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_barter_engine.generated.Pydentic.post_barter_engine_service_model_imports import (
     IsPortfolioLimitsBreached)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
-    post_book_service_http_client)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_barter_engine.app.post_barter_engine_service_helper import (
+    post_barter_engine_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import (
     MobileBookContainer, TopOfBook, MarketDepth, LastBarter, MarketBarterVolume, add_container_obj_for_symbol)
 
@@ -97,7 +97,7 @@ class StreetBook:
         self._tob_leg2_update_date_time: DateTime | None = None
         self._processed_tob_date_time: DateTime | None = None
 
-        self.strat_limit: StratLimits | None = None
+        self.strat_limit: StratLimits | StratLimitsBaseModel | None = None
         self.last_chore_timestamp: DateTime | None = None
 
         self.leg1_notional: float = 0
@@ -345,7 +345,7 @@ class StreetBook:
         else:
             return True
 
-    def check_strat_limits(self, strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel,
+    def check_strat_limits(self, strat_brief: StratBriefBaseModel,
                            px: float, usd_px: float, qty: int, side: Side,
                            chore_usd_notional: float, system_symbol: str, err_dict: Dict[str, any]):
         checks_passed = ChoreControl.ORDER_CONTROL_SUCCESS
@@ -473,7 +473,7 @@ class StreetBook:
                               f"{get_strat_brief_log_key(strat_brief)}, {system_symbol = }, {side = }, "
                               f"symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
                 checks_passed |= ChoreControl.ORDER_CONTROL_CONSUMABLE_PARTICIPATION_QTY_FAIL
-                if (consumable_participation_qty * usd_px) > chore_limits.min_chore_notional:
+                if (consumable_participation_qty * usd_px) > self.strat_limit.min_chore_notional:
                     err_dict["consumable_participation_qty"] = f"{consumable_participation_qty}"
             # else check passed - no action
         else:
@@ -615,6 +615,7 @@ class StreetBook:
                     last_barter_px / 100 * chore_limits.max_px_deviation)
             max_px_by_basis_point: float = aggressive_quote_px + (aggressive_quote_px / 100 * (
                     chore_limits.max_basis_points / 100))
+            logging.debug(f"{max_px_by_basis_point = }, {max_px_by_deviation = }, {px_by_max_level = }")
             return min(max_px_by_basis_point, max_px_by_deviation, px_by_max_level)
         else:
             aggressive_quote_px: float | None = self._get_aggressive_tob_bid_quote_px(top_of_book, side)
@@ -624,6 +625,7 @@ class StreetBook:
                     last_barter_px / 100 * chore_limits.max_px_deviation)
             min_px_by_basis_point: float = aggressive_quote_px - (aggressive_quote_px / 100 * (
                     chore_limits.max_basis_points / 100))
+            logging.debug(f"{min_px_by_basis_point = }, {min_px_by_deviation = }, {px_by_max_level = }")
             return max(min_px_by_deviation, min_px_by_basis_point, px_by_max_level)
 
     def check_new_chore(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
@@ -634,7 +636,7 @@ class StreetBook:
 
         chore_usd_notional = usd_px * qty
 
-        checks_passed_ = ChoreControl.check_min_chore_notional(pair_strat, chore_limits, chore_usd_notional,
+        checks_passed_ = ChoreControl.check_min_chore_notional(pair_strat, self.strat_limit, chore_usd_notional,
                                                                system_symbol, side)
 
         if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS: checks_passed |= checks_passed_
@@ -682,7 +684,7 @@ class StreetBook:
                           f"{self.strat_cache}, symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
             checks_passed |= ChoreControl.ORDER_CONTROL_NO_TOB_FAIL
 
-        checks_passed |= self.check_strat_limits(strat_brief, chore_limits, px, usd_px, qty, side, chore_usd_notional,
+        checks_passed |= self.check_strat_limits(strat_brief, px, usd_px, qty, side, chore_usd_notional,
                                                  system_symbol, err_dict)
 
         # TODO LAZY Read config "chore_pace_seconds" to pace chores (needed for testing - not a limit)
@@ -754,7 +756,7 @@ class StreetBook:
     def check_n_pause_strat_before_run_if_portfolio_limit_breached(self):
         # Checking if portfolio_limits are still not breached
         is_portfolio_limits_breached_model_list: List[IsPortfolioLimitsBreached] = (
-            post_book_service_http_client.is_portfolio_limits_breached_query_client())
+            post_barter_engine_service_http_client.is_portfolio_limits_breached_query_client())
 
         if len(is_portfolio_limits_breached_model_list) == 1:
             is_portfolio_limits_breached: bool = (
@@ -1208,11 +1210,10 @@ class StreetBook:
         except Exception as e:
             logging.exception(f"bartering_link_place_cxl_chore failed with exception: {e}")
 
-    def is_pair_strat_done(self, strat_brief: StratBriefBaseModel, ol: ChoreLimitsBaseModel) -> int:
+    def is_pair_strat_done(self, strat_brief: StratBriefBaseModel) -> int:
         """
         Args:
             strat_brief:
-            ol: current chore limits as set by system / user
         Returns:
             0: indicates done; no notional to consume on at-least 1 leg & no-open chores for this strat in market
             -1: indicates needs-processing; strat has notional left to consume on either of the legs
@@ -1222,19 +1223,19 @@ class StreetBook:
         open_chore_count: int = self.strat_cache.get_open_chore_count_from_cache()
 
         if 0 == open_chore_count and (
-                strat_brief.pair_sell_side_bartering_brief.consumable_notional < ol.min_chore_notional):
+                strat_brief.pair_sell_side_bartering_brief.consumable_notional < self.strat_limit.min_chore_notional):
             # sell leg of strat is done - if either leg is done - strat is done
             logging.info(f"Sell Side Leg is done, no open chores remaining + sell-remainder: "
                          f"{strat_brief.pair_sell_side_bartering_brief.consumable_notional} is less than allowed"
-                         f" {ol.min_chore_notional = }, no further chores possible")
+                         f" {self.strat_limit.min_chore_notional = }, no further chores possible")
             strat_done = True
         # else not required, more notional to consume on sell leg - strat done is set to 1 (no error, not done)
         if 0 == open_chore_count and (
-                strat_brief.pair_buy_side_bartering_brief.consumable_notional < ol.min_chore_notional):
+                strat_brief.pair_buy_side_bartering_brief.consumable_notional < self.strat_limit.min_chore_notional):
             # buy leg of strat is done - if either leg is done - strat is done
             logging.info(f"Buy Side Leg is done, no open chores remaining + buy-remainder: "
                          f"{strat_brief.pair_buy_side_bartering_brief.consumable_notional} is less than allowed"
-                         f" {ol.min_chore_notional = }, no further chores possible")
+                         f" {self.strat_limit.min_chore_notional = }, no further chores possible")
             strat_done = True
         # else not required, more notional to consume on buy leg - strat done is set to 1 (no error, not done)
         if strat_done:
@@ -1343,7 +1344,7 @@ class StreetBook:
                 if chore_limits_tuple:
                     chore_limits, _ = chore_limits_tuple
                     if chore_limits and self.strat_limit:
-                        strat_done_counter = self.is_pair_strat_done(strat_brief, chore_limits)
+                        strat_done_counter = self.is_pair_strat_done(strat_brief)
                         if 0 == strat_done_counter:
                             return 0  # triggers graceful shutdown
                         elif -1 != strat_done_counter:

@@ -36,6 +36,7 @@ class CppWebSocketServerPlugin(BaseProtoPlugin):
     def header_generate_handler(package_name: str):
         output_content: str = ""
         output_content += "#pragma once\n\n"
+        output_content += "#include <chrono>\n\n"
         output_content += f'#include "../../../../../../FluxCppCore/include/web_socket_server.h"\n'
         output_content += f'#include "../../../../../../FluxCppCore/include/json_codec.h"\n'
         output_content += f'#include "../../generated/ProtoGenCc/market_data_service.pb.h"\n\n'
@@ -110,12 +111,12 @@ class CppWebSocketServerPlugin(BaseProtoPlugin):
                         output_content += f"\t\tusing BaseClass = FluxCppCore::WebSocketServer<{package_name}::{message_name}, " \
                                           f"{package_name}::{message_name}List, UserDataType>;\n"
                         output_content += "\tpublic:\n"
-                        output_content += f'\t\texplicit {class_name}{message_name}WebSocketServer(UserDataType ' \
-                                          f'&user_data, const std::string k_host = "127.0.0.1", const ' \
-                                          f'int32_t k_web_socket_server_port = 8083, const int32_t k_read_timeout = ' \
-                                          f'60, quill::Logger *p_logger = quill::get_logger()) : ' \
-                                          f'BaseClass(user_data, k_host, k_web_socket_server_port, ' \
-                                          f'k_read_timeout, p_logger) {{}}\n\n'
+                        output_content += (f'\t\texplicit {class_name}{message_name}WebSocketServer(UserDataType '
+                                           f'&user_data, const std::string k_host = "127.0.0.1", const int32_t '
+                                           f'k_web_socket_server_port = 8083, const std::chrono::seconds k_read_timeout'
+                                           f' = std::chrono::seconds(60), quill::Logger *p_logger = '
+                                           f'quill::get_logger()) : BaseClass(user_data, k_host, '
+                                           f'k_web_socket_server_port, k_read_timeout, p_logger) {{}}\n\n')
 
                         output_content += "\t\tbool NewClientCallBack(UserDataType &user_data, int16_t " \
                                           "new_client_web_socket_id) override {\n"
@@ -131,12 +132,12 @@ class CppWebSocketServerPlugin(BaseProtoPlugin):
                         output_content += f"\t\tusing BaseClass = FluxCppCore::WebSocketServer<{package_name}::{message_name}, " \
                                           f"{package_name}::{message_name}List, UserDataType>;\n"
                         output_content += "\tpublic:\n"
-                        output_content += f'\t\texplicit {class_name}{message_name}ListWebSocketServer(UserDataType ' \
-                                          f'&user_data, const std::string k_host = "127.0.0.1", const ' \
-                                          f'int32_t k_web_socket_server_port = 8083, const int32_t k_read_timeout = ' \
-                                          f'60, quill::Logger *p_logger = quill::get_logger()) : ' \
-                                          f'BaseClass(user_data, k_host, k_web_socket_server_port, ' \
-                                          f'k_read_timeout, p_logger) {{}}\n\n'
+                        output_content += (f'\t\texplicit {class_name}{message_name}ListWebSocketServer(UserDataType '
+                                           f'&user_data, const std::string k_host = "127.0.0.1", const int32_t '
+                                           f'k_web_socket_server_port = 8083, const std::chrono::seconds k_read_timeout '
+                                           f'= std::chrono::seconds(60), quill::Logger *p_logger = quill::get_logger())'
+                                           f' : BaseClass(user_data, k_host, k_web_socket_server_port, k_read_timeout,'
+                                           f' p_logger) {{}}\n\n')
 
                         output_content += "\t\tbool NewClientCallBack(UserDataType &user_data, int16_t " \
                                           "new_client_web_socket_id) override {\n"

@@ -7,9 +7,10 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.
     EmailBookServiceHttpClient
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_strat_db_updates, UpdateType)
-from FluxPythonUtils.scripts.utility_functions import (
-    YAMLConfigurationManager, get_symbol_side_key)
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import StratViewBaseModel
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
+    get_symbol_side_key)
 
 CURRENT_PROJECT_DIR = PurePath(__file__).parent.parent
 CURRENT_PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
@@ -97,7 +98,8 @@ def get_new_portfolio_status() -> PortfolioStatus:
     portfolio_status: PortfolioStatus = PortfolioStatus(_id=1, overall_buy_notional=0,
                                                         overall_sell_notional=0,
                                                         overall_buy_fill_notional=0,
-                                                        overall_sell_fill_notional=0)
+                                                        overall_sell_fill_notional=0,
+                                                        open_chores=0)
     return portfolio_status
 
 
@@ -120,8 +122,7 @@ def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> Po
 
 def get_new_chore_limits() -> ChoreLimits:
     ord_limit_obj: ChoreLimits = ChoreLimits(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                                             max_chore_qty=500, min_chore_notional=100,
-                                             max_chore_notional=90_000)
+                                             max_chore_qty=500, max_chore_notional=90_000)
     return ord_limit_obj
 
 

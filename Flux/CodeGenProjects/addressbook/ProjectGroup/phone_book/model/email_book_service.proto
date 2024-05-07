@@ -81,9 +81,7 @@ message ChoreLimits{
   optional int32 max_px_levels = 4 [(FluxFldValMax) = "20", (FluxFldHelp) = "max chorebook levels allowed to be consumed by single chore"];
   optional int32 max_chore_qty = 5[(FluxFldValMax) = "1000000", (FluxFldHelp) = "max qty for securities that barter in shares"];
   optional int32 max_contract_qty = 6 [(FluxFldValMax) = "10000", (FluxFldHelp) = "max qty for securities that barter in contracts"];
-  optional float min_chore_notional = 7 [(FluxFldDisplayType) = "int", (FluxFldValMin) = "1000", (FluxFldHelp) = "chore qty times limit px must be greater than this limit"];
-  optional float max_chore_notional = 8 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "500000", (FluxFldHelp) = "chore qty times limit px must be less than this limit"];
-  optional int32 min_chore_notional_allowance = 9 [(FluxFldValMax) = "50000", (FluxFldHelp) = "used by StratModeRelaxed to compute random next chore opportunity min-notional from the min-notional , min-notional + this-allowance range"];
+  optional float max_chore_notional = 7 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "500000", (FluxFldHelp) = "chore qty times limit px must be less than this limit"];
 }
 
 message SystemControl{
@@ -166,6 +164,8 @@ message PortfolioStatus{
     QueryParamsDataType: "float | None = None",
     QueryParams: "overall_sell_fill_notional",
     QueryParamsDataType: "float | None = None",
+    QueryParams: "open_chore_count",
+    QueryParamsDataType: "int | None = None"
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -175,6 +175,7 @@ message PortfolioStatus{
   optional float overall_buy_fill_notional = 5 [(FluxFldDisplayType) = "int"];
   // Executed
   optional float overall_sell_fill_notional = 6 [(FluxFldDisplayType) = "int"];
+  optional int32 open_chores = 7;
 }
 
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly

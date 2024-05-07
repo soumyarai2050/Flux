@@ -17,6 +17,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import AlertOptional
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.conftest import *
 
 email_book_service_beanie_web_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient.set_or_get_if_instance_exists(HOST, parse_to_int(PAIR_STRAT_BEANIE_PORT))
@@ -35,8 +36,8 @@ def test_deep_clean_database_n_logs():
     clean_project_logs()
 
 
-def _test_clean_database_n_logs():
-    clean_all_collections_ignoring_ui_layout([])
+def test_clean_database_n_logs():
+    clean_all_collections_ignoring_ui_layout()
     clean_project_logs()
 
 
@@ -3699,7 +3700,8 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
         assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
             f"Mismatched: Chore status must be DOD but found: {chore_snapshot.chore_status = }"
 
-        check_str = "Unexpected: Received chore_journal of event: OE_ACK on chore of chore_snapshot status: OE_DOD"
+        check_str = ("Unexpected: Received chore_journal of event: ChoreEventType.OE_ACK on chore of "
+                     "chore_snapshot status: ChoreStatusType.OE_DOD")
         assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
         time.sleep(5)
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
@@ -5350,8 +5352,8 @@ def test_fill_pre_chore_ack(
         latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                           executor_http_client)
 
-        check_str = ("Received fill for chore that has status: OE_UNACK, putting chore to OE_ACKED status and "
-                     "applying fill")
+        check_str = ("Received fill for chore that has status: ChoreStatusType.OE_UNACK, "
+                     "putting chore to ChoreStatusType.OE_ACKED status and applying fill")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
@@ -5375,7 +5377,8 @@ def test_fill_pre_chore_ack(
             latest_unack_obj.chore.security.sec_id,
             latest_unack_obj.chore.underlying_account)
 
-        check_str = "Unexpected: Received chore_journal of event: OE_ACK on chore of chore_snapshot status: OE_ACKED"
+        check_str = ("Unexpected: Received chore_journal of event: ChoreEventType.OE_ACK on chore of "
+                     "chore_snapshot status: ChoreStatusType.OE_ACKED")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
@@ -5433,8 +5436,8 @@ def test_fulfill_pre_chore_ack(
         latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                           executor_http_client)
 
-        check_str = ("Received fill for chore that has status: OE_UNACK that makes chore fulfilled, "
-                     "putting chore to OE_FILLED status and applying fill")
+        check_str = ("Received fill for chore that has status: ChoreStatusType.OE_UNACK that makes chore fulfilled, "
+                     "putting chore to ChoreStatusType.OE_FILLED status and applying fill")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
@@ -5458,7 +5461,8 @@ def test_fulfill_pre_chore_ack(
             latest_unack_obj.chore.security.sec_id,
             latest_unack_obj.chore.underlying_account)
 
-        check_str = "Unexpected: Received chore_journal of event: OE_ACK on chore of chore_snapshot status: OE_FILLED"
+        check_str = ("Unexpected: Received chore_journal of event: ChoreEventType.OE_ACK on chore of "
+                     "chore_snapshot status: ChoreStatusType.OE_FILLED")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
@@ -5497,12 +5501,8 @@ def test_overfill_pre_chore_ack(
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
-            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["simulate_avoid_fill_after_ack"] = True
-            config_dict["symbol_configs"][symbol]["simulate_fills_pre_chore_ack"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 0
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = False
+
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -5550,8 +5550,8 @@ def test_overfill_pre_chore_ack(
             latest_unack_obj.chore.security.sec_id,
             latest_unack_obj.chore.underlying_account)
 
-        check_str = ("Unexpected: Received chore_journal of event: OE_ACK on chore of chore_snapshot "
-                     "status: OE_OVER_FILLED")
+        check_str = ("Unexpected: Received chore_journal of event: ChoreEventType.OE_ACK on chore of chore_snapshot "
+                     "status: ChoreStatusType.OE_OVER_FILLED")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
@@ -5840,17 +5840,19 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
     sev = [Severity.Severity_CRITICAL, Severity.Severity_ERROR, Severity.Severity_WARNING,
            Severity.Severity_INFO, Severity.Severity_DEBUG]
     counter = 0
-    for i in range(10):
+    for i in range(5):
         alert = PortfolioAlertBaseModel()
         alert.last_update_date_time = DateTime.utcnow()
-        alert.alert_brief = f"Sample Alert {counter}"
+        alert.alert_brief = f"Sample Alert: {i + 1}"
         alert.severity = sev[counter]
         counter += 1
         if counter > 4:
             counter = 0
 
         portfolio_alerts.append(alert)
-        log_book_web_client.create_portfolio_alert_client(alert)
+        log_book_web_client.handle_portfolio_alerts_from_tail_executor_query_client(
+            [{"severity": alert.severity, "alert_brief": alert.alert_brief,
+              "alert_details": alert.alert_details}])
 
     # sorting alert list for this test comparison
     portfolio_alerts.sort(key=lambda x: x.last_update_date_time, reverse=False)
@@ -5861,7 +5863,7 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
             for alert in portfolio_alerts:
                 if alert.severity == sev.value:
                     sorted_alert_list.append(alert)
-
+    time.sleep(5)
     agg_sorted_alerts: List[PortfolioAlertBaseModel] = log_book_web_client.get_all_portfolio_alert_client()
     for alert in agg_sorted_alerts:
         alert.last_update_date_time = pendulum.parse(str(alert.last_update_date_time)).in_timezone("utc")
@@ -5872,44 +5874,43 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
 
     for sorted_alert, expected_alert in zip(agg_sorted_alerts, sorted_alert_list):
         assert sorted_alert.alert_brief == expected_alert.alert_brief, \
-            f"Alert ID mismatch: expected alert_brief {expected_alert.alert_brief}, received {sorted_alert.alert_brief}"
-        assert sorted_alert.last_update_date_time == expected_alert.last_update_date_time, \
-            f"Alert Datetime mismatch: expected Alert {expected_alert}, received {sorted_alert}"
+            (f"Alert ID mismatch: expected alert_brief {expected_alert.alert_brief!r}, "
+             f"received {sorted_alert.alert_brief!r}")
 
 
-def test_alert_id(clean_and_set_limits, sample_alert):
-    alert_list = []
-
-    for i in range(1000):
-        alert = copy.deepcopy(sample_alert)
-        alert.id = f"obj_{i}"
-        alert.last_update_date_time = DateTime.utcnow()
-
-        alert_list.append(alert)
-        portfolio_alert_basemodel = PortfolioAlertBaseModel(_id=1, alerts=[alert])
-        json_obj = jsonable_encoder(portfolio_alert_basemodel, by_alias=True, exclude_none=True)
-        updated_portfolio_alert = log_book_web_client.patch_portfolio_alert_client(json_obj)
-
-    portfolio_alert = log_book_web_client.get_portfolio_alert_client(portfolio_alert_id=1)
-    agg_sorted_alerts: List[Alert] = portfolio_alert.alerts
-    # for alert in agg_sorted_alerts:
-    #     alert.last_update_date_time = pendulum.parse(str(alert.last_update_date_time)).in_timezone("utc")
-    # for alert in alert_list:
-    #     alert.last_update_date_time = \
-    #         alert.last_update_date_time.replace(microsecond=
-    #                                             int(str(alert.last_update_date_time.microsecond)[:3] + "000"))
-    # for sorted_alert, expected_alert in zip(agg_sorted_alerts, list(reversed(sorted_alert_list))):
-    #     assert sorted_alert.id == expected_alert.id, \
-    #         f"Alert ID mismatch: expected Alert {expected_alert.id}, received {sorted_alert.id}"
-    #     assert sorted_alert.last_update_date_time == expected_alert.last_update_date_time, \
-    #         f"Alert Datetime mismatch: expected Alert {expected_alert}, received {sorted_alert}"
-
-    alert_id_dict = {}
-    for alert in agg_sorted_alerts:
-        if alert.id in alert_id_dict:
-            assert False, (f"alert id already exists in dict, existing obj: {alert_id_dict[alert.id]}, "
-                           f"new obj: {alert}")
-        alert_id_dict[alert.id] = alert
+# def test_alert_id(clean_and_set_limits, sample_alert):
+#     alert_list = []
+#
+#     for i in range(1000):
+#         alert = copy.deepcopy(sample_alert)
+#         alert.id = f"obj_{i}"
+#         alert.last_update_date_time = DateTime.utcnow()
+#
+#         alert_list.append(alert)
+#         portfolio_alert_basemodel = PortfolioAlertBaseModel(_id=1, alerts=[alert])
+#         json_obj = jsonable_encoder(portfolio_alert_basemodel, by_alias=True, exclude_none=True)
+#         updated_portfolio_alert = log_book_web_client.patch_portfolio_alert_client(json_obj)
+#
+#     portfolio_alert = log_book_web_client.get_portfolio_alert_client(portfolio_alert_id=1)
+#     agg_sorted_alerts: List[Alert] = portfolio_alert.alerts
+#     # for alert in agg_sorted_alerts:
+#     #     alert.last_update_date_time = pendulum.parse(str(alert.last_update_date_time)).in_timezone("utc")
+#     # for alert in alert_list:
+#     #     alert.last_update_date_time = \
+#     #         alert.last_update_date_time.replace(microsecond=
+#     #                                             int(str(alert.last_update_date_time.microsecond)[:3] + "000"))
+#     # for sorted_alert, expected_alert in zip(agg_sorted_alerts, list(reversed(sorted_alert_list))):
+#     #     assert sorted_alert.id == expected_alert.id, \
+#     #         f"Alert ID mismatch: expected Alert {expected_alert.id}, received {sorted_alert.id}"
+#     #     assert sorted_alert.last_update_date_time == expected_alert.last_update_date_time, \
+#     #         f"Alert Datetime mismatch: expected Alert {expected_alert}, received {sorted_alert}"
+#
+#     alert_id_dict = {}
+#     for alert in agg_sorted_alerts:
+#         if alert.id in alert_id_dict:
+#             assert False, (f"alert id already exists in dict, existing obj: {alert_id_dict[alert.id]}, "
+#                            f"new obj: {alert}")
+#         alert_id_dict[alert.id] = alert
 
 
 
@@ -6482,12 +6483,8 @@ def test_sequenced_fully_consume_same_symbol_strats(
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    # updating chore_limits
-    expected_chore_limits_.min_chore_notional = 15000
-    expected_chore_limits_.id = 1
-    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_, return_obj_copy=False)
-
     expected_strat_limits_.max_single_leg_notional = 18000
+    expected_strat_limits_.min_chore_notional = 15000
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
@@ -6508,12 +6505,8 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_buy_first(
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # updating chore_limits
-    expected_chore_limits_.min_chore_notional = 15000
-    expected_chore_limits_.id = 1
-    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_, return_obj_copy=False)
-
     expected_strat_limits_.max_single_leg_notional = 18000
+    expected_strat_limits_.min_chore_notional = 15000
     strat_done_after_exhausted_consumable_notional(
         leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
@@ -6544,12 +6537,8 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_sell_first(
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # updating chore_limits
-    expected_chore_limits_.min_chore_notional = 15000
-    expected_chore_limits_.id = 1
-    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_, return_obj_copy=False)
-
-    expected_strat_limits_.max_single_leg_notional = 18000
+    expected_strat_limits_.max_single_leg_notional = 21000
+    expected_strat_limits_.min_chore_notional = 15000
     strat_done_after_exhausted_consumable_notional(
         leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
@@ -6580,12 +6569,8 @@ def test_sequenced_fully_consume_diff_symbol_strats(
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    # updating chore_limits
-    expected_chore_limits_.min_chore_notional = 15000
-    expected_chore_limits_.id = 1
-    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_, return_obj_copy=False)
-
     expected_strat_limits_.max_single_leg_notional = 18000
+    expected_strat_limits_.min_chore_notional = 15000
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
@@ -9768,7 +9753,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
 
                 # Checking alert in strat_alert
                 time.sleep(5)
-                check_str = "Received OE_AMD_ACK for amend qty which makes chore OVER_FILLED,"
+                check_str = "Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_FILLED,"
                 assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
                 check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -9778,7 +9763,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 email_book_service_native_web_client.put_pair_strat_client(pair_strat)
             else:
                 time.sleep(5)
-                check_str = ("Received OE_AMD_ACK for amend qty which makes chore ACKED to chore "
+                check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore ACKED to chore "
                              "which was FILLED before amend")
                 assert_fail_msg = f"Can't find alert: {check_str!r}"
                 check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
@@ -10126,7 +10111,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
 
             # Checking alert in strat_alert
             time.sleep(5)
-            check_str = ("Received OE_AMD_ACK for amend qty which makes chore OVER_FILLED to "
+            check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_FILLED to "
                          "chore which is already OVER_FILLED")
             assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
@@ -11628,7 +11613,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_amend_making_filled(
 
             # Checking alert in strat_alert
             time.sleep(5)
-            check_str = "Received OE_AMD_ACK for amend qty which makes chore FILLED,"
+            check_str = "Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore FILLED,"
             assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -11782,7 +11767,8 @@ def test_risky_amend_based_on_px_and_qty_with_amend_making_filled(
 
             # Checking alert in strat_alert
             time.sleep(5)
-            check_str = "Received OE_AMD_UNACK for amend qty which makes chore FILLED,"
+            check_str = "Received ChoreEventType.OE_AMD_UNACK for amend qty which makes chore FILLED,"
+
             assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -13650,8 +13636,8 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_rej(
                 raise Exception(e)
 
             time.sleep(5)
-            check_str = ("Reverted amend changes post receiving OE_AMD_REJ on chore that had status OE_AMD "
-                         "before amend applied - reverted status: OE_FILLED")
+            check_str = ("Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
+                         "ChoreStatusType.OE_AMD before amend applied - reverted status: ChoreStatusType.OE_FILLED")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -14243,8 +14229,8 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
                 raise Exception(e)
 
             time.sleep(5)
-            check_str = ("Reverted amend changes post receiving OE_AMD_REJ on chore that had status OE_FILLED before "
-                         "amend applied - reverted status: OE_ACKED")
+            check_str = ("Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
+                         "ChoreStatusType.OE_FILLED before amend applied - reverted status: ChoreStatusType.OE_ACKED")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 

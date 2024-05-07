@@ -118,6 +118,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         self.__add_autocomplete_dict: bool = False
         self._proto_project_name_to_msg_list_dict: Dict[str, List[protogen.Message]] = {}
         self._current_project_name: str | None = None
+        self.__main_file_message_name_list: List[str] = []
         self._current_project_model_file: protogen.File | None = None
 
     def __proto_data_type_to_json(self, field: protogen.Field) -> Tuple[str, str]:
@@ -966,7 +967,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         other_project_name: str | None = None
         for project_name, message_list in self._proto_project_name_to_msg_list_dict.items():
             if project_name != self._current_project_name:
-                if message in message_list:
+                if message in message_list and message.proto.name not in self.__main_file_message_name_list:
                     is_not_from_this_project: bool = False
                     other_project_name = project_name
                     break
@@ -1110,6 +1111,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 self._proto_project_name_to_msg_list_dict[f.proto.package] = f.messages
                 self.__load_json_layout_and_non_layout_messages_in_dicts(f)
             file = file[0]  # since first file will be this project's proto file
+            self.__main_file_message_name_list = [p.proto.name for p in file.messages]
             self._current_project_name = file.proto.package
             self._current_project_model_file = file
         else:

@@ -7,11 +7,12 @@ import threading
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import (
     StreetBookServiceKeyHandler)
-from FluxPythonUtils.scripts.utility_functions import get_symbol_side_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.phone_book_n_street_book_client import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
+    get_symbol_side_key)
 
 update_strat_status_lock: threading.Lock = threading.Lock()
 
@@ -22,7 +23,7 @@ def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_er
             email_book_service_http_client.get_all_ui_layout_client())
 
         ui_layout_list: List[UILayoutBaseModel] = (
-            post_book_service_http_client.get_all_ui_layout_client())
+            post_barter_engine_service_http_client.get_all_ui_layout_client())
 
         ui_layout_list: List[UILayoutBaseModel] = (
             log_book_service_http_client.get_all_ui_layout_client())
@@ -181,7 +182,8 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
                                             cancel_rate=cancel_rate,
                                             market_barter_volume_participation=market_barter_volume_participation,
                                             market_depth=market_depth,
-                                            residual_restriction=residual_restriction
+                                            residual_restriction=residual_restriction,
+                                            min_chore_notional=100
                                             )
     return strat_limits
 

@@ -1,6 +1,10 @@
 #pragma once
 
 #include <boost/asio.hpp>
+#include <Python.h>
+
+#include "market_data_service.pb.h"
+#include "market_data_constants.h"
 
 namespace FluxCppCore {
 
@@ -24,7 +28,9 @@ namespace FluxCppCore {
     struct MessageTypeToPythonArgs {
 
         static PyObject* message_type_to_python_args(const market_data::MarketDepth &kr_market_depth_obj) {
-            return PyTuple_Pack(13, PyLong_FromLong(kr_market_depth_obj.id()),
+            PyObject* p_args = nullptr;
+            if (kr_market_depth_obj.side() == market_data::TickType::BID) {
+                p_args = PyTuple_Pack(13, PyLong_FromLong(kr_market_depth_obj.id()),
                                 PyUnicode_DecodeUTF8(kr_market_depth_obj.symbol().c_str(),
                                                      static_cast<Py_ssize_t>(kr_market_depth_obj.symbol().size()),
                                                      nullptr),
@@ -34,7 +40,7 @@ namespace FluxCppCore {
                                 PyUnicode_DecodeUTF8(kr_market_depth_obj.arrival_time().c_str(),
                                                      static_cast<Py_ssize_t>(kr_market_depth_obj.arrival_time().size()),
                                                      nullptr),
-                                PyLong_FromLong(kr_market_depth_obj.side()),
+                                PyUnicode_DecodeUTF8("BID", static_cast<Py_ssize_t>(std::string("BID").size()), nullptr),
                                 PyLong_FromLong(kr_market_depth_obj.position()),
                                 PyFloat_FromDouble(kr_market_depth_obj.px()),
                                 PyLong_FromLong(kr_market_depth_obj.qty()),
@@ -45,6 +51,30 @@ namespace FluxCppCore {
                                 PyFloat_FromDouble(kr_market_depth_obj.cumulative_notional()),
                                 PyLong_FromLong(kr_market_depth_obj.cumulative_qty()),
                                 PyFloat_FromDouble(kr_market_depth_obj.cumulative_avg_px()));
+            } else {
+                p_args = p_args = PyTuple_Pack(13, PyLong_FromLong(kr_market_depth_obj.id()),
+                                PyUnicode_DecodeUTF8(kr_market_depth_obj.symbol().c_str(),
+                                                     static_cast<Py_ssize_t>(kr_market_depth_obj.symbol().size()),
+                                                     nullptr),
+                                PyUnicode_DecodeUTF8(kr_market_depth_obj.exch_time().c_str(),
+                                                     static_cast<Py_ssize_t>(kr_market_depth_obj.exch_time().size()),
+                                                     nullptr),
+                                PyUnicode_DecodeUTF8(kr_market_depth_obj.arrival_time().c_str(),
+                                                     static_cast<Py_ssize_t>(kr_market_depth_obj.arrival_time().size()),
+                                                     nullptr),
+                                PyUnicode_DecodeUTF8("ASK", static_cast<Py_ssize_t>(std::string("ASk").size()), nullptr),
+                                PyLong_FromLong(kr_market_depth_obj.position()),
+                                PyFloat_FromDouble(kr_market_depth_obj.px()),
+                                PyLong_FromLong(kr_market_depth_obj.qty()),
+                                PyUnicode_DecodeUTF8(kr_market_depth_obj.market_maker().c_str(),
+                                                     static_cast<Py_ssize_t>(kr_market_depth_obj.market_maker().size()),
+                                                     nullptr),
+                                PyBool_FromLong(kr_market_depth_obj.is_smart_depth()),
+                                PyFloat_FromDouble(kr_market_depth_obj.cumulative_notional()),
+                                PyLong_FromLong(kr_market_depth_obj.cumulative_qty()),
+                                PyFloat_FromDouble(kr_market_depth_obj.cumulative_avg_px()));
+            }
+            return p_args;
         }
 
         static PyObject* message_type_to_python_args(const market_data::LastTrade &kr_last_trade_obj, PyObject* p_market_trade_volume) {
@@ -118,8 +148,8 @@ namespace FluxCppCore {
     struct AddOrGetContainerObj {
 
         static void add_container_obj_for_symbol(const std::string &kr_symbol) {
-            static PyObject* p_module = nullptr;
-            static PyObject* p_add_container_obj_for_symbol_func_ = nullptr;
+            PyObject* p_module = nullptr;
+            PyObject* p_add_container_obj_for_symbol_func_ = nullptr;
             PyObject* p_args = nullptr;
 
             p_module = PyImport_ImportModule(market_data_handler::market_data_cache_module_name.c_str());
@@ -131,10 +161,10 @@ namespace FluxCppCore {
         }
 
         static PyObject* get_market_data_container_instance(const std::string &kr_symbol) {
-            static PyObject* p_market_data_container_class = nullptr;
+            PyObject* p_market_data_container_class = nullptr;
             PyObject* p_market_data_container_instance = nullptr;
             PyObject* p_args = nullptr;
-            static PyObject* mp_module_ = nullptr;
+            PyObject* mp_module_ = nullptr;
             // TODO: avoid calling PyImport_ImportModule multiple times make member variable
             mp_module_ = PyImport_ImportModule(market_data_handler::market_data_cache_module_name.c_str());
 

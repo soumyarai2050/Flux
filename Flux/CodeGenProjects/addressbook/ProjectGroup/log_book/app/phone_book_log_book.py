@@ -12,8 +12,10 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_base_
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client, get_reset_log_book_cache_wrapper_pattern)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
+    get_symbol_side_pattern)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import PairStratBaseModel
-from FluxPythonUtils.scripts.utility_functions import get_symbol_side_pattern, configure_logger
+from FluxPythonUtils.scripts.utility_functions import configure_logger
 
 
 LOG_ANALYZER_DATA_DIR = (

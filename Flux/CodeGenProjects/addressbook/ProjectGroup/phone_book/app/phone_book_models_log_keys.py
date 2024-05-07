@@ -1,8 +1,22 @@
+# standard imports
+from typing import List, Tuple
+
+# project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import PairStrat, \
     PairStratBaseModel, PairStratOptional
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_key_handler import \
     EmailBookServiceKeyHandler
-from FluxPythonUtils.scripts.utility_functions import get_symbol_side_key
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import Side
+
+
+def get_symbol_side_pattern():
+    return "%%"
+
+
+def get_symbol_side_key(symbol_side_tuple_list: List[Tuple[str, Side]]) -> str:
+    symbol_side_pattern: str = get_symbol_side_pattern()
+    key_str = ",".join([f"symbol-side={symbol}-{side.value}" for symbol, side in symbol_side_tuple_list])
+    return f"{symbol_side_pattern}{key_str}{symbol_side_pattern}"
 
 
 def get_pair_strat_log_key(pair_strat: PairStrat | PairStratBaseModel | PairStratOptional):

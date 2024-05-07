@@ -3,9 +3,6 @@
 #include "mobile_book_service.pb.h"
 #include "mongo_db_handler.h"
 #include "mongo_db_codec.h"
-#include "base_web_client.h"
-#include "mobile_book_max_id_handler.h"
-#include "mobile_book_cache.h"
 #include "mobile_book_web_socket_server.h"
 #include "utility_functions.h"
 
@@ -24,11 +21,11 @@ namespace mobile_book_handler {
             update_top_of_book_cache_();
         }
 
-        void insert_or_update_top_of_book(mobile_book::TopOfBook &kr_top_of_book_obj) {
+        void insert_or_update_top_of_book(const mobile_book::TopOfBook &kr_top_of_book_obj) {
             int32_t db_id;
             std::string top_of_book_key;
             bool stat = m_top_of_book_db_codec_.insert_or_update(kr_top_of_book_obj, db_id);
-            assert(stat && __func__ && "TopOfBook insert or update failed");
+            assert(stat);
             MobileBookKeyHandler::get_key_out(kr_top_of_book_obj, top_of_book_key);
             db_id = m_top_of_book_db_codec_.m_root_model_key_to_db_id[top_of_book_key];
             mobile_book::TopOfBook ws_top_of_book_obj;

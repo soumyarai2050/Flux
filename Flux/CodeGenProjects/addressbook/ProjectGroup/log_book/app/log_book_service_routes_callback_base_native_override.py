@@ -36,7 +36,7 @@ project_group_path = PurePath(__file__).parent.parent.parent
 phone_book_log_dir: PurePath = project_group_path / "phone_book" / "log"
 mobile_book_log_dir: PurePath = project_group_path / "mobile_book" / "log"
 street_book_log_dir: PurePath = project_group_path / "street_book" / "log"
-post_barter_log_dir: PurePath = project_group_path / "post_book" / "log"
+post_barter_log_dir: PurePath = project_group_path / "post_barter_engine" / "log"
 photo_book_log_dir: PurePath = project_group_path / "photo_book" / "log"
 
 debug_mode: bool = False if ((debug_env := os.getenv("PS_LOG_ANALYZER_DEBUG")) is None or
@@ -265,8 +265,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
             portfolio_alerts: List[PortfolioAlert] = submitted_task_result(future)
             for portfolio_alert in portfolio_alerts:
-                alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
-                                                portfolio_alert.alert_details)
+                alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief)
                 self.portfolio_alerts_cache_dict[alert_key] = portfolio_alert
                 self.portfolio_alert_id_to_obj_dict[portfolio_alert.id] = portfolio_alert
                 self.portfolio_alert_created_ids_dict[portfolio_alert.id] = True
@@ -295,8 +294,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             for strat_alert in strat_alerts:
                 strat_alert_cache = self.strat_alert_cache_dict_by_strat_id_dict.get(strat_alert.strat_id)
 
-                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
-                                                strat_alert.alert_details)
+                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief)
                 if strat_alert_cache is None:
                     self.strat_alert_cache_dict_by_strat_id_dict[strat_alert.strat_id] = {alert_key: strat_alert}
                 else:
@@ -557,15 +555,15 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 log_prefix_regex_pattern_to_callable_name_dict=perf_benchmark_pattern_to_callable_name_dict,
                 log_file_path_is_regex=True),
             StratLogDetail(
-                service="post_book",
-                log_file_path=str(post_barter_log_dir / f"post_book_*_{datetime_str}.log"),
+                service="post_barter_engine",
+                log_file_path=str(post_barter_log_dir / f"post_barter_engine_*_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_file_path_is_regex=True),
             StratLogDetail(
-                service="post_book_perf_bench",
+                service="post_barter_engine_perf_bench",
                 log_file_path=str(
-                    post_barter_log_dir / f"post_book_*_{datetime_str}.log"),
+                    post_barter_log_dir / f"post_barter_engine_*_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=perf_benchmark_pattern_to_callable_name_dict,
                 log_file_path_is_regex=False),
@@ -610,7 +608,25 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     phone_book_log_dir / f"pause_all_active_strats_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
-                log_file_path_is_regex=False)
+                log_file_path_is_regex=False),
+            StratLogDetail(
+                # used for test to verify file_watcher's tail_executor start handler with full path
+                # IMPO: Also it is configs in this are used in test - if changed needs changes in tests also
+                service="test_street_book_with_full_path",
+                log_file_path=str(
+                    street_book_log_dir / f"sample_test.log"),
+                critical=True,
+                log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_file_path_is_regex=False),
+            StratLogDetail(
+                # used for test to verify file_watcher's tail_executor start handler with pattern path
+                # IMPO: Also it is configs in this are used in test - if changed needs changes in tests also
+                service="test_street_book_with_pattern",
+                log_file_path=str(
+                    street_book_log_dir / f"sample_*_test.log"),
+                critical=True,
+                log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_file_path_is_regex=True)
         ]
         PhoneBookLogBook.log_file_watcher(log_details, tail_multiprocess_queue, StratLogDetail,
                                                     self.log_file_watcher_err_handler,
@@ -644,6 +660,32 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             raise HTTPException(status_code=503, detail=err_str_)
         return updated_strat_alert_obj_list
 
+    async def update_strat_alert_pre(self, stored_strat_alert_obj: StratAlert, updated_strat_alert_obj: StratAlert):
+        if not self.service_ready:
+            # raise service unavailable 503 exception, let the caller retry
+            err_str_ = f"update_strat_alert_pre not ready - service is not initialized yet"
+            self.portfolio_alert_fail_logger.error(err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
+        return updated_strat_alert_obj
+
+    async def partial_update_strat_alert_pre(self, stored_strat_alert_obj: StratAlert,
+                                             updated_strat_alert_obj_json: Dict):
+        if not self.service_ready:
+            # raise service unavailable 503 exception, let the caller retry
+            err_str_ = f"partial_update_strat_alert_pre not ready - service is not initialized yet"
+            self.portfolio_alert_fail_logger.error(err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
+        return updated_strat_alert_obj_json
+
+    async def partial_update_all_strat_alert_pre(self, stored_strat_alert_obj_list: List[StratAlert],
+                                                 updated_strat_alert_obj_json_list: List[Dict]):
+        if not self.service_ready:
+            # raise service unavailable 503 exception, let the caller retry
+            err_str_ = f"partial_update_all_strat_alert_pre not ready - service is not initialized yet"
+            self.portfolio_alert_fail_logger.error(err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
+        return updated_strat_alert_obj_json_list
+
     async def create_all_strat_alert_pre(self, strat_alert_obj_list: List[StratAlert]):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
@@ -653,8 +695,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
     async def delete_portfolio_alert_post(self, delete_web_response):
         portfolio_alert = self.portfolio_alert_id_to_obj_dict.get(delete_web_response.id)
-        alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
-                                        portfolio_alert.alert_details)
+        alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief)
         self.portfolio_alerts_cache_dict.pop(alert_key, None)
         self.portfolio_alert_id_to_obj_dict.pop(delete_web_response.id, None)
         self.portfolio_alert_created_ids_dict.pop(delete_web_response.id, None)
@@ -662,7 +703,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def delete_strat_alert_post(self, delete_web_response):
         strat_alert = self.strat_alert_id_to_obj_dict.get(delete_web_response.id)
         strat_alert_cache_dict = self.strat_alert_cache_dict_by_strat_id_dict.get(strat_alert.strat_id)
-        alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief, strat_alert.alert_details)
+        alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief)
         strat_alert_cache_dict.pop(alert_key, None)
         self.strat_alert_id_to_obj_dict.pop(delete_web_response.id, None)
         self.strat_alert_created_ids_dict.pop(delete_web_response.id, None)
@@ -707,10 +748,11 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def log_book_restart_tail_query_pre(
             self, log_book_restart_tail_class_type: Type[LogBookRestartTail], log_file_name: str,
             start_timestamp: str | None = None):
-        try:
-            pendulum.parse(start_timestamp)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Couldn't parse start_datetime, exception: {e}")
+        if start_timestamp is not None:
+            try:
+                pendulum.parse(start_timestamp)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Couldn't parse start_datetime, exception: {e}")
 
         # first killing process
         await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_log_book_force_kill_tail_executor_query_http(
@@ -771,6 +813,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             self, log_book_remove_file_from_created_cache_class_type: Type[LogBookRemoveFileFromCreatedCache],
             log_file_path_list: List[str]):
         for log_file_path in log_file_path_list:
+            # consumer of this queue handles task to release cache for this file entry - logs error if file
+            # not found in cache
             self.clear_cache_file_path_queue.put(log_file_path)
         return []
 

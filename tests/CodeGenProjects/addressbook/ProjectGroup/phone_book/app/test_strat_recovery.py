@@ -6,7 +6,7 @@ import signal
 
 from FluxPythonUtils.scripts.utility_functions import get_pid_from_port
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
-
+from tests.CodeGenProjects.AddressBook.ProjectGroup.conftest import *
 
 def restart_phone_book():
     pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],
@@ -668,16 +668,15 @@ def test_pair_strat_crash_recovery(
     symbols_n_strat_state_list = []
     strat_state_list = [StratState.StratState_ACTIVE, StratState.StratState_READY, StratState.StratState_PAUSED,
                         StratState.StratState_SNOOZED, StratState.StratState_ERROR, StratState.StratState_DONE]
-    # strat_state_list = [StratState.StratState_READY]
+
     for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(strat_state_list)]):
         symbols_n_strat_state_list.append((symbol_tuple[0], symbol_tuple[1], strat_state_list[index]))
 
     total_chore_count_for_each_side_ = 1
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_strat_state_list)) as executor:
         results = [executor.submit(_activate_pair_strat_n_place_sanity_chores, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_),
-                                   deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
-                                   deepcopy(symbol_overview_obj_list),
+                                   deepcopy(pair_strat_), deepcopy(expected_strat_limits_),
+                                   deepcopy(expected_strat_status_), deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    strat_state_to_handle, refresh_sec_update_fixture,
                                    total_chore_count_for_each_side_)
@@ -764,23 +763,20 @@ def test_update_pair_strat_from_pair_strat_log_book(
         expected_chore_limits_, refresh_sec_update_fixture):
     """
     INFO: created strat and activates it with low max_single_leg_notional so consumable_notional becomes low and
-    chore_limits.min_chore_notional is made higher than consumable_notional intentionally.
+    strat_limits.min_chore_notional is made higher than consumable_notional intentionally.
     After this pair_strat engine process is killed and since executor service is still up, triggers place chore
-    which results in getting rejected as strat is found as Done because of consumable_notional < ol.min_chore_notional
-    and pair_start is tried to be updated as Done but pair_strat engine is down so executor logs this
-    as log to be handled by pair_strat log analyzer once pair_strat is up. pair_strat is restarted and
-    then test checks state must be Done
+    which results in getting rejected as strat is found as Done because of
+    consumable_notional < strat_limits.min_chore_notional and pair_start is tried to be updated as Done but
+    pair_strat engine is down so executor logs this as log to be handled by pair_strat log analyzer once
+    pair_strat is up. pair_strat is restarted and then test checks state must be Done
     """
 
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    expected_chore_limits_.min_chore_notional = 1000
-    expected_chore_limits_.id = 1
-    email_book_service_native_web_client.put_chore_limits_client(expected_chore_limits_)
-
     # create pair_strat
     expected_strat_limits_.max_single_leg_notional = 100
+    expected_strat_limits_.min_chore_notional = 1000
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 

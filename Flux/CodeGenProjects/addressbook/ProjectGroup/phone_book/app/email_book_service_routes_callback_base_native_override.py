@@ -49,7 +49,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
     underlying_create_portfolio_limits_http: Callable[..., Any] | None = None
     underlying_read_pair_strat_http: Callable[..., Any] | None = None
     underlying_read_portfolio_status_by_id_http: Callable[..., Any] | None = None
-    underlying_partial_update_portfolio_status_http: Callable[..., Any] | None = None
+    underlying_update_portfolio_status_http: Callable[..., Any] | None = None
     underlying_read_strat_collection_http: Callable[..., Any] | None = None
     underlying_create_strat_collection_http: Callable[..., Any] | None = None
     underlying_update_strat_collection_http: Callable[..., Any] | None = None
@@ -73,7 +73,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
             underlying_read_chore_limits_http, underlying_create_chore_limits_http,
             underlying_read_portfolio_limits_http, underlying_create_portfolio_limits_http,
             underlying_read_pair_strat_http, underlying_read_portfolio_status_by_id_http,
-            underlying_partial_update_portfolio_status_http, underlying_read_strat_collection_http,
+            underlying_update_portfolio_status_http, underlying_read_strat_collection_http,
             underlying_create_strat_collection_http, underlying_update_strat_collection_http,
             underlying_partial_update_pair_strat_http, underlying_update_pair_strat_to_non_running_state_query_http,
             underlying_read_pair_strat_by_id_http, underlying_partial_update_all_pair_strat_http,
@@ -88,7 +88,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         cls.underlying_create_portfolio_limits_http = underlying_create_portfolio_limits_http
         cls.underlying_read_pair_strat_http = underlying_read_pair_strat_http
         cls.underlying_read_portfolio_status_by_id_http = underlying_read_portfolio_status_by_id_http
-        cls.underlying_partial_update_portfolio_status_http = underlying_partial_update_portfolio_status_http
+        cls.underlying_update_portfolio_status_http = underlying_update_portfolio_status_http
         cls.underlying_read_strat_collection_http = underlying_read_strat_collection_http
         cls.underlying_create_strat_collection_http = underlying_create_strat_collection_http
         cls.underlying_update_strat_collection_http = underlying_update_strat_collection_http
@@ -498,35 +498,34 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
     async def update_portfolio_status_by_chore_or_fill_data_query_pre(
             self, portfolio_status_class_type: Type[PortfolioStatus], overall_buy_notional: float | None = None,
             overall_sell_notional: float | None = None, overall_buy_fill_notional: float | None = None,
-            overall_sell_fill_notional: float | None = None):
+            overall_sell_fill_notional: float | None = None, open_chore_count: int | None = None):
         async with PortfolioStatus.reentrant_lock:
-            updated_portfolio_status = PortfolioStatusOptional()
             portfolio_status: PortfolioStatus = (
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_status_by_id_http(1))
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_status_by_id_http(
+                    1))
 
-            updated_portfolio_status.id = portfolio_status.id
             if overall_buy_notional is not None:
                 if portfolio_status.overall_buy_notional is None:
                     portfolio_status.overall_buy_notional = 0
-                updated_portfolio_status.overall_buy_notional = (portfolio_status.overall_buy_notional +
-                                                                 overall_buy_notional)
+                portfolio_status.overall_buy_notional += overall_buy_notional
             if overall_sell_notional is not None:
                 if portfolio_status.overall_sell_notional is None:
                     portfolio_status.overall_sell_notional = 0
-                updated_portfolio_status.overall_sell_notional = (portfolio_status.overall_sell_notional +
-                                                                  overall_sell_notional)
+                portfolio_status.overall_sell_notional += overall_sell_notional
             if overall_buy_fill_notional is not None:
                 if portfolio_status.overall_buy_fill_notional is None:
                     portfolio_status.overall_buy_fill_notional = 0
-                updated_portfolio_status.overall_buy_fill_notional = (portfolio_status.overall_buy_fill_notional +
-                                                                      overall_buy_fill_notional)
+                portfolio_status.overall_buy_fill_notional += overall_buy_fill_notional
             if overall_sell_fill_notional is not None:
                 if portfolio_status.overall_sell_fill_notional is None:
                     portfolio_status.overall_sell_fill_notional = 0
-                updated_portfolio_status.overall_sell_fill_notional = (portfolio_status.overall_sell_fill_notional +
-                                                                       overall_sell_fill_notional)
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_portfolio_status_http(
-                json.loads(updated_portfolio_status.model_dump_json(by_alias=True, exclude_none=True)))
+                portfolio_status.overall_sell_fill_notional += overall_sell_fill_notional
+            if open_chore_count is not None:
+                portfolio_status.open_chores = open_chore_count
+
+            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_portfolio_status_http(
+                portfolio_status)
+
         return []
 
     # Code-generated

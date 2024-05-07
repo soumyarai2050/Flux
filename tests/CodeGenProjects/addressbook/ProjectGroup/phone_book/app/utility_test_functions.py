@@ -28,8 +28,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
     LogBookServiceHttpClient)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
-    post_book_service_http_client)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_barter_engine.app.post_barter_engine_service_helper import (
+    post_barter_engine_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client import PhotoBookServiceHttpClient
@@ -105,7 +105,7 @@ def clean_all_collections_ignoring_ui_layout() -> None:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=["UILayout", "PortfolioAlert",
                                                         "RawPerformanceData", "ProcessedPerformanceAnalysis"])
-        elif "phone_book" == db_name or "post_book" == db_name:
+        elif "phone_book" == db_name or "post_barter_engine" == db_name or "photo_book" == db_name:
             ignore_collections = ["UILayout"]
             if db_name == "phone_book":
                 ignore_collections.append("StratCollection")
@@ -118,8 +118,8 @@ def clean_all_collections_ignoring_ui_layout() -> None:
 def drop_all_databases() -> None:
     mongo_server_uri: str = get_mongo_server_uri()
     for db_name in get_mongo_db_list(mongo_server_uri):
-        if "log_book" == db_name or "phone_book" == db_name or "post_book" == db_name or \
-                "street_book_" in db_name:
+        if "log_book" == db_name or "phone_book" == db_name or "post_barter_engine" == db_name or \
+                "photo_book" == db_name or "street_book_" in db_name:
             drop_mongo_database(mongo_server_uri=mongo_server_uri, database_name=db_name)
         # else ignore drop database
 
@@ -128,15 +128,17 @@ def clean_project_logs():
     # clean all project log file, strat json.lock files, generated md, so scripts and script logs
     barter_engine_dir: PurePath = code_gen_projects_path / "AddressBook" / "ProjectGroup"
     phone_book_dir: PurePath = barter_engine_dir / "phone_book"
-    post_book_dir: PurePath = barter_engine_dir / "post_book"
+    post_barter_engine_dir: PurePath = barter_engine_dir / "post_barter_engine"
     log_book_dir: PurePath = barter_engine_dir / "log_book"
     street_book_dir: PurePath = barter_engine_dir / "street_book"
+    photo_book_dir: PurePath = barter_engine_dir / "photo_book"
 
     delete_file_glob_pattens: List[str] = [
         str(phone_book_dir / "log" / "*.log*"),
-        str(post_book_dir / "log" / "*.log*"),
+        str(post_barter_engine_dir / "log" / "*.log*"),
         str(log_book_dir / "log" / "*.log*"),
         str(street_book_dir / "log" / "*.log*"),
+        str(photo_book_dir / "log" / "*.log*"),
         str(phone_book_dir / "scripts" / "fx_so.sh*"),
         str(phone_book_dir / "data" / "*.json.lock"),
         str(log_book_dir / "log" / "tail_executors" / "*.log*"),
@@ -2339,7 +2341,8 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
             pass
     else:
         assert False, (f"is_partially_running state must be True, found false, "
-                       f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+                       f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}, "
+                       f"{stored_pair_strat_basemodel=}")
 
     assert updated_pair_strat.port is not None, (
         "Once pair_strat is partially running it also must contain executor port, updated object has "
@@ -2740,9 +2743,6 @@ def wait_for_get_new_chore_placed_from_tob(wait_stop_px: int | float, symbol_to_
 
 
 def clean_log_book_alerts():
-    # deleting strat view
-    strat_alerts = log_book_web_client.delete_all_strat_alert_client()
-
     portfolio_alert_list = log_book_web_client.get_all_portfolio_alert_client()
     for alert in portfolio_alert_list:
         if "Log analyzer running in simulation mode" not in alert.alert_brief:
@@ -2762,16 +2762,6 @@ def renew_strat_collection():
 def clean_executors_and_today_activated_symbol_side_lock_file():
     existing_pair_strat = email_book_service_native_web_client.get_all_pair_strat_client()
     for pair_strat in existing_pair_strat:
-        pair_strat = PairStratBaseModel(_id=pair_strat.id, strat_state=StratState.StratState_DONE)
-        email_book_service_native_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True,
-                                                                        exclude_none=True))
-        # removing today_activated_symbol_side_lock_file
-        admin_control_obj: AdminControlBaseModel = AdminControlBaseModel(command_type=CommandType.CLEAR_STRAT,
-                                                                         datetime=DateTime.utcnow())
-        email_book_service_native_web_client.create_admin_control_client(admin_control_obj)
-
-        email_book_service_native_web_client.delete_pair_strat_client(pair_strat.id)
-
         # force killing all tails
         datetime_str = datetime.datetime.now().strftime("%Y%m%d")
         log_simulator_log_file = str(STRAT_EXECUTOR / "log" / f"log_simulator_{pair_strat.id}_logs_{datetime_str}.log")
@@ -2781,7 +2771,18 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
                                       f"street_book_{pair_strat.id}_logs_{datetime_str}.log")
         if os.path.exists(street_book_log_file):
             log_book_web_client.log_book_force_kill_tail_executor_query_client(street_book_log_file)
-        time.sleep(2)
+        time.sleep(1)
+
+        pair_strat = PairStratBaseModel(_id=pair_strat.id, strat_state=StratState.StratState_DONE)
+        email_book_service_native_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True,
+                                                                        exclude_none=True))
+        # removing today_activated_symbol_side_lock_file
+        admin_control_obj: AdminControlBaseModel = AdminControlBaseModel(command_type=CommandType.CLEAR_STRAT,
+                                                                         datetime=DateTime.utcnow())
+        email_book_service_native_web_client.create_admin_control_client(admin_control_obj)
+
+        email_book_service_native_web_client.delete_pair_strat_client(pair_strat.id)
+        time.sleep(1)
 
 
 def set_n_verify_limits(expected_chore_limits_obj, expected_portfolio_limits_obj):
@@ -4338,7 +4339,7 @@ def clear_cache_in_model():
     admin_control_obj: AdminControlBaseModel = AdminControlBaseModel(command_type=CommandType.RESET_STATE,
                                                                      datetime=DateTime.utcnow())
     email_book_service_native_web_client.create_admin_control_client(admin_control_obj)
-    post_book_service_http_client.reload_cache_query_client()
+    post_barter_engine_service_http_client.reload_cache_query_client()
 
 
 def append_csv_file(file_name: str, records: List[List[any]]):
