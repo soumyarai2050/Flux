@@ -23,7 +23,7 @@ def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_er
             email_book_service_http_client.get_all_ui_layout_client())
 
         ui_layout_list: List[UILayoutBaseModel] = (
-            post_barter_engine_service_http_client.get_all_ui_layout_client())
+            post_book_service_http_client.get_all_ui_layout_client())
 
         ui_layout_list: List[UILayoutBaseModel] = (
             log_book_service_http_client.get_all_ui_layout_client())

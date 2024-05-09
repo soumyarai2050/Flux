@@ -88,7 +88,8 @@ if [ -n "$PRJ_GRP" ]; then
     cd -
   fi
   if [ ! -d "$PRJ_TEST_DIR" ]; then
-    mkdir -p $PRJ_TEST_DIR
+    mkdir -p "$PRJ_TEST_DIR"
+    cp -pr "$ORIG_PRJ_TEST_DIR/conftest.py" $PRJ_TEST_DIR/.
   fi
 fi
 if [ -d "$PRJ_DIR" ] ; then

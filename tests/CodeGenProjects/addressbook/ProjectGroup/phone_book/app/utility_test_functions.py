@@ -28,8 +28,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
     LogBookServiceHttpClient)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_barter_engine.app.post_barter_engine_service_helper import (
-    post_barter_engine_service_http_client)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
+    post_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client import PhotoBookServiceHttpClient
@@ -105,7 +105,7 @@ def clean_all_collections_ignoring_ui_layout() -> None:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=["UILayout", "PortfolioAlert",
                                                         "RawPerformanceData", "ProcessedPerformanceAnalysis"])
-        elif "phone_book" == db_name or "post_barter_engine" == db_name or "photo_book" == db_name:
+        elif "phone_book" == db_name or "post_book" == db_name or "photo_book" == db_name:
             ignore_collections = ["UILayout"]
             if db_name == "phone_book":
                 ignore_collections.append("StratCollection")
@@ -118,7 +118,7 @@ def clean_all_collections_ignoring_ui_layout() -> None:
 def drop_all_databases() -> None:
     mongo_server_uri: str = get_mongo_server_uri()
     for db_name in get_mongo_db_list(mongo_server_uri):
-        if "log_book" == db_name or "phone_book" == db_name or "post_barter_engine" == db_name or \
+        if "log_book" == db_name or "phone_book" == db_name or "post_book" == db_name or \
                 "photo_book" == db_name or "street_book_" in db_name:
             drop_mongo_database(mongo_server_uri=mongo_server_uri, database_name=db_name)
         # else ignore drop database
@@ -128,14 +128,14 @@ def clean_project_logs():
     # clean all project log file, strat json.lock files, generated md, so scripts and script logs
     barter_engine_dir: PurePath = code_gen_projects_path / "AddressBook" / "ProjectGroup"
     phone_book_dir: PurePath = barter_engine_dir / "phone_book"
-    post_barter_engine_dir: PurePath = barter_engine_dir / "post_barter_engine"
+    post_book_dir: PurePath = barter_engine_dir / "post_book"
     log_book_dir: PurePath = barter_engine_dir / "log_book"
     street_book_dir: PurePath = barter_engine_dir / "street_book"
     photo_book_dir: PurePath = barter_engine_dir / "photo_book"
 
     delete_file_glob_pattens: List[str] = [
         str(phone_book_dir / "log" / "*.log*"),
-        str(post_barter_engine_dir / "log" / "*.log*"),
+        str(post_book_dir / "log" / "*.log*"),
         str(log_book_dir / "log" / "*.log*"),
         str(street_book_dir / "log" / "*.log*"),
         str(photo_book_dir / "log" / "*.log*"),
@@ -4339,7 +4339,7 @@ def clear_cache_in_model():
     admin_control_obj: AdminControlBaseModel = AdminControlBaseModel(command_type=CommandType.RESET_STATE,
                                                                      datetime=DateTime.utcnow())
     email_book_service_native_web_client.create_admin_control_client(admin_control_obj)
-    post_barter_engine_service_http_client.reload_cache_query_client()
+    post_book_service_http_client.reload_cache_query_client()
 
 
 def append_csv_file(file_name: str, records: List[List[any]]):

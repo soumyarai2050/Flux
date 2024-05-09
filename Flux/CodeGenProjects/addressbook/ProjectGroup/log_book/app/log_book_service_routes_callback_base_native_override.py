@@ -36,7 +36,7 @@ project_group_path = PurePath(__file__).parent.parent.parent
 phone_book_log_dir: PurePath = project_group_path / "phone_book" / "log"
 mobile_book_log_dir: PurePath = project_group_path / "mobile_book" / "log"
 street_book_log_dir: PurePath = project_group_path / "street_book" / "log"
-post_barter_log_dir: PurePath = project_group_path / "post_barter_engine" / "log"
+post_barter_log_dir: PurePath = project_group_path / "post_book" / "log"
 photo_book_log_dir: PurePath = project_group_path / "photo_book" / "log"
 
 debug_mode: bool = False if ((debug_env := os.getenv("PS_LOG_ANALYZER_DEBUG")) is None or
@@ -555,15 +555,15 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 log_prefix_regex_pattern_to_callable_name_dict=perf_benchmark_pattern_to_callable_name_dict,
                 log_file_path_is_regex=True),
             StratLogDetail(
-                service="post_barter_engine",
-                log_file_path=str(post_barter_log_dir / f"post_barter_engine_*_{datetime_str}.log"),
+                service="post_book",
+                log_file_path=str(post_barter_log_dir / f"post_book_*_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_file_path_is_regex=True),
             StratLogDetail(
-                service="post_barter_engine_perf_bench",
+                service="post_book_perf_bench",
                 log_file_path=str(
-                    post_barter_log_dir / f"post_barter_engine_*_{datetime_str}.log"),
+                    post_barter_log_dir / f"post_book_*_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=perf_benchmark_pattern_to_callable_name_dict,
                 log_file_path_is_regex=False),

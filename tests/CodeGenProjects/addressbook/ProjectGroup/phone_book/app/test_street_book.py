@@ -2910,7 +2910,7 @@ def test_last_n_sec_chore_counts(static_data_, clean_and_set_limits, leg1_leg2_s
                 (executor_http_client, buy_symbol, last_buy_chore_id, sell_symbol, last_sell_chore_id))
 
     chore_count_updated_chore_journals = (
-        post_barter_engine_service_http_client.get_last_n_sec_chores_by_events_query_client(
+        post_book_service_http_client.get_last_n_sec_chores_by_events_query_client(
             expected_portfolio_limits_.rolling_max_chore_count.rolling_tx_count_period_seconds,
             [ChoreEventType.OE_NEW]))
 
@@ -2928,7 +2928,7 @@ def test_last_n_sec_chore_counts(static_data_, clean_and_set_limits, leg1_leg2_s
     time.sleep(3)   # wait to check after 2 sec to check no chore is found after it
 
     chore_count_updated_chore_journals = (
-        post_barter_engine_service_http_client.get_last_n_sec_chores_by_events_query_client(
+        post_book_service_http_client.get_last_n_sec_chores_by_events_query_client(
             expected_portfolio_limits_.rolling_max_chore_count.rolling_tx_count_period_seconds,
             [ChoreEventType.OE_NEW]))
 

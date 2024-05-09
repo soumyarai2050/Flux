@@ -8,7 +8,7 @@ import "dept_book_n_mobile_book_n_street_book_core.proto";
 import "street_book_core.proto";
 import "phone_book_n_street_book_core.proto";
 import "mobile_book_n_street_book_core.proto";
-import "street_book_n_post_barter_engine_core.proto";
+import "street_book_n_post_book_core.proto";
 
 package street_book;
 

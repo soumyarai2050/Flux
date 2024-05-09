@@ -22,10 +22,10 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, email_book_service_http_client, guaranteed_call_pair_strat_client)
 from FluxPythonUtils.scripts.utility_functions import clear_semaphore, perf_benchmark_sync_callable
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_barter_engine.generated.Pydentic.post_barter_engine_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
     IsPortfolioLimitsBreached)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_barter_engine.app.post_barter_engine_service_helper import (
-    post_barter_engine_service_http_client)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
+    post_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import (
     MobileBookContainer, TopOfBook, MarketDepth, LastBarter, MarketBarterVolume, add_container_obj_for_symbol)
 
@@ -756,7 +756,7 @@ class StreetBook:
     def check_n_pause_strat_before_run_if_portfolio_limit_breached(self):
         # Checking if portfolio_limits are still not breached
         is_portfolio_limits_breached_model_list: List[IsPortfolioLimitsBreached] = (
-            post_barter_engine_service_http_client.is_portfolio_limits_breached_query_client())
+            post_book_service_http_client.is_portfolio_limits_breached_query_client())
 
         if len(is_portfolio_limits_breached_model_list) == 1:
             is_portfolio_limits_breached: bool = (

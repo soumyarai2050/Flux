@@ -1,0 +1,77 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+import "projects_core.proto";
+
+package photo_book;
+
+
+message StratView{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIOption) = {
+    depending_proto_file_name: "email_book_service.proto",
+  };
+  required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional int32 strat_alert_count = 2;
+  optional Severity strat_alert_aggregated_severity = 3 [default=Severity_UNSPECIFIED, (FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
+  optional float average_premium = 4 [(FluxFldNumberFormat) = "%"];
+  optional float market_premium = 5 [(FluxFldNumberFormat) = "%"];
+  optional float balance_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="StratView.max_single_leg_notional", (FluxFldProgressBar) = {
+    value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // chore of condition matching -> left to right (select first match)
+    hover_text_type: HoverTextType_VALUE,
+    is_reverse: true
+  }];
+  optional float max_single_leg_notional = 7;
+  required bool unload_strat = 8 [default = false, (FluxFldButton) = {
+    unpressed_caption: "Unload Strat",
+    pressed_caption: "In Progress",
+    disabled_captions: "true=In Progress"
+    value_color_map: "true=DEBUG,false=ERROR"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true",
+    button_icon_name: "Delete"
+  }];
+  required bool recycle_strat = 9 [default = false, (FluxFldButton) = {
+    unpressed_caption: "Recycle Strat",
+    pressed_caption: "In Progress",
+    disabled_captions: "true=In Progress"
+    value_color_map: "true=DEBUG,false=SUCCESS"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true",
+    button_icon_name: "Recycling"
+  }];
+}
+
+message ProcessPairStratAPIOps{
+    option (FluxMsgJsonQuery) = {
+      QueryName: "process_strat_view_updates"
+      QueryParams: "kwargs"
+      QueryParamsDataType: "List[Dict]"
+      QueryRouteType: PATCH
+  };
+  optional bool temp = 1;
+}
+
+message ResetAllStratViewCountNSeverity{
+      option (FluxMsgJsonQuery) = {
+      QueryName: "reset_all_strat_view_count_n_severity"
+  };
+  optional bool temp = 1;
+}
+
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage{
+   optional DummyEnumP temp1 = 1;
+}
