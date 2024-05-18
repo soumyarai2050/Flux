@@ -53,34 +53,34 @@
 }
 
 .critical {
-    color: #9C0006 !important;
-    background-color: #ffc7ce;
+    background-color: var(--red-800) !important;
+    /* background-color: #ffc7ce; */
     animation: blink 0.5s step-start infinite;
 }
 
 .error {
-    color: #9C0006 !important;
-    background-color: #ffc7ce;
+    background-color: var(--red-600) !important;
+    /* background-color: #ffc7ce; */
 }
 
 .warning {
-    color: #9c6500 !important;
-    background-color: #ffeb9c;
+    background-color: var(--yellow-800) !important;
+    /* background-color: #ffeb9c; */
 }
 
 .info {
-    color: blue !important;
-    background-color: #c2d1ff;
+    background-color: var(--blue-400) !important;
+    /* background-color: #c2d1ff; */
 }
 
 .debug {
-    color: black !important;
-    background-color: #ccc;
+    background-color: var(--grey-600) !important;
+    /* background-color: #ccc; */
 }
 
 .success {
-    color: darkgreen !important;
-    background-color: aquamarine;
+    background-color: var(--green-400) !important;
+    /* background-color: aquamarine; */
 }
 
 @keyframes blink {

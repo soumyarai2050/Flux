@@ -5000,7 +5000,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     if updated_residual is not None:
                         strat_status = StratStatusOptional(_id=strat_status.id,
                                                            residual=updated_residual)
-                                                           # residual=ResidualOptional(**updated_residual.model_dump()))
                         (await StreetBookServiceRoutesCallbackBaseNativeOverride.
                          underlying_partial_update_strat_status_http(
                             jsonable_encoder(strat_status, by_alias=True, exclude_none=True)))

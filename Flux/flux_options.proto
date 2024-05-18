@@ -284,6 +284,8 @@ extend google.protobuf.FieldOptions
   optional string FluxFldTextAlign = 55272;  // Use this to set text alignment
   optional string FluxFldMicroSeparator = 55273;  // Use this to replace field separator
   optional bool FluxFldServerRunningStatus = 55274;
+  optional string FluxFldColumnSize = 55275;  // Use this to set column size, supported: [small, medium, large]
+  optional string FluxFldColumnDirection = 55276;  // Use this to set column direction, supported: [ltr, rtl]
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

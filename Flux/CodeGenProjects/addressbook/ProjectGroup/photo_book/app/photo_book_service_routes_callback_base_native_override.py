@@ -171,23 +171,22 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
 
     async def reset_all_strat_view_count_n_severity_query_pre(
             self, reset_all_strat_view_count_n_severity_class_type: Type[ResetAllStratViewCountNSeverity]):
-        async with StratView.reentrant_lock:
-            strat_view_list: List[StratView] = \
-                await PhotoBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_view_http()
+        strat_view_list: List[StratView] = \
+            await PhotoBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_view_http()
 
-            tasks: List = []
-            for strat_view in strat_view_list:
-                strat_view.strat_alert_aggregated_severity = Severity.Severity_UNSPECIFIED
-                strat_view.strat_alert_count = 0
+        tasks: List = []
+        for strat_view in strat_view_list:
+            strat_view.strat_alert_aggregated_severity = Severity.Severity_UNSPECIFIED
+            strat_view.strat_alert_count = 0
 
-                task = asyncio.create_task(
-                    PhotoBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_view_http(
-                        strat_view),
-                    name=str(f"{strat_view.id}"))
-                tasks.append(task)
+            task = asyncio.create_task(
+                PhotoBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_view_http(
+                    strat_view),
+                name=str(f"{strat_view.id}"))
+            tasks.append(task)
 
-            if tasks:
-                await submit_task_with_first_completed_wait(tasks, 10)
+        if tasks:
+            await submit_task_with_first_completed_wait(tasks, 10)
         return []
 
     async def _update_strat_view_post(self, stored_strat_view_obj: StratView, updated_strat_view_obj: StratView):

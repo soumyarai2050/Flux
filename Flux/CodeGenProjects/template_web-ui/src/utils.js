@@ -27,6 +27,17 @@ export const Message = {
     MIN: 'field value exceeds the min limit'
 }
 
+export const ColumnSize = {
+    SMALL: 'small',
+    MEDIUM: 'medium',
+    LARGE: 'large',
+}
+
+export const ColumnDirection = {
+    LTR: 'ltr',
+    RTL: 'rtl',
+}
+
 // complex field properties that are to be passed to the child components
 const complexFieldProps = [
     { propertyName: "server_populate", usageName: "serverPopulate" },
@@ -75,6 +86,8 @@ const fieldProps = [
     { propertyName: "server_running_status", usageName: "server_running_status" },
     { propertyName: "mapping_underlying_meta_field", usageName: "mapping_underlying_meta_field" },
     { propertyName: "mapping_src", usageName: "mapping_src" },
+    { propertyName: "column_size", usageName: "columnSize" },
+    { propertyName: "column_direction", usageName: "columnDirection" },
 ]
 
 // properties supported explicitly on the array types
@@ -1408,17 +1421,27 @@ export function getAlertBubbleCount(data, bubbleSourcePath) {
     return bubbleCount;
 }
 
-export function getColorTypeFromValue(collection, value) {
+export function getColorTypeFromValue(collection, value, separator = '-') {
     let color = ColorTypes.DEFAULT;
     if (collection && collection.color) {
-        let colorSplit = collection.color.split(',');
-        for (let i = 0; i < colorSplit.length; i++) {
-            let valueColorSet = colorSplit[i].trim();
-            let [val, colorType] = valueColorSet.split('=');
-            if (val === value) {
-                color = ColorTypes[colorType];
-                break;
+        const colorSplit = collection.color.split(',').map(valueColor => valueColor.trim());
+        const valueColorMap = {};
+        colorSplit.forEach(valueColor => {
+            const [val, colorType] = valueColor.split('=');
+            valueColorMap[val] = colorType;
+        })
+        let v = value;
+        if (collection.xpath.split('-').length > 1) {
+            for(let i=0; i<collection.xpath.split('-').length; i++) {
+                v = value.split(separator)[i];
+                if (valueColorMap.hasOwnProperty(v)) {
+                    const color = ColorTypes[valueColorMap[v]];
+                    return color;
+                }
             }
+        } else if (valueColorMap.hasOwnProperty(v)) {
+            const color = ColorTypes[valueColorMap[v]];
+            return color;
         }
     }
     return color;
@@ -1919,13 +1942,13 @@ export function applyWebSocketUpdateForAlertModel(storedArray, updatedObj, uiLim
                 // positive array size limit
                 if (uiLimit >= 0) {
                     if (updatedArray.length >= uiLimit) {
-                        const storedObj =  updatedArray[0];
+                        const storedObj = updatedArray[0];
                         updatedArray.shift();
                         AlertCache.updateSeverityCache(modelName, id, storedObj.severity, -1);
                     }
                 } else {  // negative array size limit
                     if (updatedArray.length >= Math.abs(uiLimit)) {
-                        const storedObj =  updatedArray[updatedArray.length - 1];
+                        const storedObj = updatedArray[updatedArray.length - 1];
                         updatedArray.pop();
                         AlertCache.updateSeverityCache(modelName, id, storedObj.severity, -1);
                     }
@@ -3177,11 +3200,24 @@ export function getAbbreviatedCollections(widgetCollectionsDict, abbreviated) {
                 .filter(col => col.tableTitle === path)[0];
         })
         // if a single field has values from multiple source separated by hyphen, then
-        // attributes of first field is considered as field attributes
+        // attributes of all fields are combined
         source = xpath.split('-')[0];
         const collectionsCopy = widgetCollectionsDict[widgetName].map(col => Object.assign({}, col));
         const collection = collectionsCopy.find(col => col.tableTitle === source);
         if (collection) {
+            xpath.split('-').forEach(path => {
+                const pathCollection = collectionsCopy.find(col => col.tableTitle === path);
+                // additional handling to prevent override
+                Object.keys(pathCollection).forEach(key => {
+                    if (['serverPopulate', 'ormNoUpdate'].includes(key)) {
+                        if (!(collection.hasOwnProperty(key) && collection[key]) && pathCollection.hasOwnProperty(key)) {
+                            collection[key] = pathCollection[key];
+                        }
+                    } else {
+                        collection[key] = pathCollection[key];
+                    }
+                })
+            })
             // create a custom collection object
             collection.sequenceNumber = index + 1;
             collection.source = widgetName;

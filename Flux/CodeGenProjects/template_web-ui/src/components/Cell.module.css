@@ -99,7 +99,7 @@
 }
 
 .abbreviated_json_cell {
-    max-width: 150px;
+    max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -158,4 +158,30 @@
 :global .MuiAutocomplete-root .MuiInputBase-sizeSmall {
     padding: 5px !important;
     /* margin: 2px !important; */
+}
+
+.column_size_small {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.column_size_medium {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.column_size_large {
+    max-width: 600px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.column_direction_ltr {
+    direction: ltr;
+}
+
+.column_direction_rtl {
+    direction: rtl;
 }

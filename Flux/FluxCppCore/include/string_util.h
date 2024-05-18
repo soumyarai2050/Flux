@@ -96,10 +96,8 @@ namespace FluxCppCore {
             if (time1_str > time2_str) {
                 return TimeComparison::TIME1_LATER;
             } else if (time2_str > time1_str) {
-                std::cout << time2_str << std::endl;
                 return TimeComparison::TIME2_LATER;
             } else {
-                // std::cout << "time1_str: " << time1_str << " time2_str: " << time2_str << std::endl;
                 return TimeComparison::BOTH_EQUAL;
             }
         }

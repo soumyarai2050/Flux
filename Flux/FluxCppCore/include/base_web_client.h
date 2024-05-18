@@ -44,7 +44,7 @@ namespace FluxCppCore {
             }
         }
 
-        const int timeout_seconds = 300;
+        const int timeout_seconds = market_data_handler::connection_timeout;
 
         [[nodiscard]] bool send_http_request(const boost::beast::http::verb &kr_method, const std::string_view url,
                                              const std::string_view request_json, std::string &response_json_out) const {
@@ -172,7 +172,8 @@ namespace FluxCppCore {
             StringLiteral delete_client_url>
     class RootModelWebClient : public BaseWebClient {
     public:
-        RootModelWebClient(const std::string &kr_host = "127.0.0.1", const std::string &kr_port = "8025") : BaseWebClient(kr_host, kr_port) {}
+        RootModelWebClient(const std::string &kr_host = market_data_handler::host,
+            const std::string &kr_port = market_data_handler::port) : BaseWebClient(kr_host, kr_port) {}
 
         [[nodiscard]] auto get_max_id_client() const {
             std::string json_out;

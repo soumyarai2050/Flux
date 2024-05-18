@@ -134,6 +134,8 @@ class BaseProtoPlugin(ABC):
     flux_fld_display_type: ClassVar[str] = "FluxFldDisplayType"
     flux_fld_display_zero: ClassVar[str] = "FluxFldDisplayZero"
     flux_fld_text_align: ClassVar[str] = "FluxFldTextAlign"
+    flux_fld_column_size: ClassVar[str] = "FluxFldColumnSize"
+    flux_fld_column_direction: ClassVar[str] = "FluxFldColumnDirection"
     flux_fld_micro_separator: ClassVar[str] = "FluxFldMicroSeparator"
     flux_msg_ui_get_all_limit: ClassVar[str] = "FluxMsgUIGetAllLimit"
     flux_fld_abbreviated_link: ClassVar[str] = "FluxFldAbbreviatedLink"

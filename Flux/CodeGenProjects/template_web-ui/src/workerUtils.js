@@ -261,7 +261,7 @@ export function sortAlertArray(alertArray) {
         } else if (severityB > severityA) {
             return 1;
         } else {  // same severity
-            if (a.last_update_date_time >= b.last_update_date_time) {
+            if (a.last_update_analyzer_time >= b.last_update_analyzer_time) {
                 return -1;
             } else {
                 return 1;

@@ -6,7 +6,7 @@ import os
 from random import randint, choices, getrandbits, choice, random
 import string
 import time
-from datetime import datetime
+from pendulum import DateTime
 from pathlib import PurePath
 
 # project imports
@@ -111,7 +111,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         match field.kind.name.lower():
             case "int32" | "int64":
                 if self.is_option_enabled(field, JsonSampleGenPlugin.flux_fld_val_is_datetime):
-                    json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": "{datetime.utcnow()}"'
+                    json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": "{DateTime.utcnow()}"'
                 else:
                     random_int = randint(*JsonSampleGenPlugin.random_int_range)
                     json_sample_output += " "*indent_space_count + f'"{field_name_case_styled}": {random_int}'
@@ -145,7 +145,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
             case "int32" | "int64":
                 if self.is_option_enabled(field, JsonSampleGenPlugin.flux_fld_val_is_datetime):
                     json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": ' \
-                                          f'["{datetime.utcnow()}"\n' + " " * indent_space_count + ']'
+                                          f'["{DateTime.utcnow()}"\n' + " " * indent_space_count + ']'
                 else:
                     random_int = randint(*JsonSampleGenPlugin.random_int_range)
                     json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": [{random_int}\n' + \

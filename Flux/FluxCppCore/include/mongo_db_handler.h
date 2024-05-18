@@ -26,8 +26,9 @@ namespace FluxCppCore {
     public:
         explicit MongoDBHandler(const std::string &kr_db_uri,
                                 const std::string &_kr_db_name,
-                                quill::Logger* p_logger = quill::get_logger(), const int min_pool_size = 2,
-                                const int max_pool_size = 2):
+                                quill::Logger* p_logger = quill::get_logger(),
+                                const int min_pool_size = market_data_handler::min_pool_size_val,
+                                const int max_pool_size = market_data_handler::max_pool_size_val):
         str_uri(kr_db_uri + "/?minPoolSize=" + std::to_string(min_pool_size) + "&maxPoolSize=" + std::to_string(max_pool_size)),
         client(pool.acquire()), m_db_name_(_kr_db_name), market_data_service_db((*client)[m_db_name_]),
         m_min_pool_size_(min_pool_size), m_max_pool_size_(max_pool_size), m_p_logger_(p_logger) {

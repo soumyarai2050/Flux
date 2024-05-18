@@ -7,12 +7,12 @@
 
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
-#include <boost/json/src.hpp>
 #include <boost/asio.hpp>
 #include "quill/Quill.h"
 
 #include "json_codec.h"
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/cpp_app/replay/cpp_app_shared_resource.h"
+#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_constants.h"
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -27,9 +27,10 @@ namespace FluxCppCore {
     template <typename RootModelType, typename RootModelListType, typename UserDataType>
     class WebSocketServer {
     public:
-        explicit WebSocketServer(UserDataType &user_data, const std::string k_host = "127.0.0.1",
-                                 const int32_t k_web_socket_server_port = 8083,
-                                 const std::chrono::seconds k_read_timeout = std::chrono::seconds(60),
+        explicit WebSocketServer(UserDataType &user_data, const std::string k_host = market_data_handler::host,
+                                 const int32_t k_web_socket_server_port = stoi(market_data_handler::port),
+                                 const std::chrono::seconds k_read_timeout =
+                                 std::chrono::seconds(market_data_handler::connection_timeout),
                                  quill::Logger *p_logger = quill::get_logger()) :
         m_user_data(user_data), km_host_(k_host), km_port_(k_web_socket_server_port),
         km_read_timeout_seconds(std::chrono::duration_cast<std::chrono::seconds>(k_read_timeout).count()),
@@ -39,7 +40,8 @@ namespace FluxCppCore {
 
         void start_connection() {
             try {
-                m_acceptor_ = std::make_unique<tcp::acceptor>(m_io_context_, tcp::endpoint{asio::ip::make_address(km_host_), static_cast<port_type>(km_port_)});
+                m_acceptor_ = std::make_unique<tcp::acceptor>(m_io_context_,
+                    tcp::endpoint{asio::ip::make_address(km_host_), static_cast<port_type>(km_port_)});
             } catch (const boost::system::system_error& error) {
                 LOG_ERROR(mp_logger, "Failed to start server: {} in function: {}", error.what(), __func__);
                 LOG_INFO(mp_logger, "Retrying server initialization in function: {}", __func__);

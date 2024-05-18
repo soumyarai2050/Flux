@@ -384,13 +384,13 @@ def get_total_strat_alert_count_n_highest_severity(strat_id: int):
     return agg_pipeline
 
 
-def sort_alerts_based_on_severity_n_last_update_date_time(strat_id_or_pydantic_obj: int | BaseModel | None = None,
-                                                          limit: int | None = None):
+def sort_alerts_based_on_severity_n_last_update_analyzer_time(strat_id_or_pydantic_obj: int | BaseModel | None = None,
+                                                              limit: int | None = None):
     """
     - $addFields: Adds a new field severityPriority based on the priority mapping defined using $switch.
     - $switch: Evaluates each case expression and returns the value associated with the first case expression that
     evaluates to true.
-    - $sort: Sorts documents based on severityPriority in descending chore and then by last_update_datetime in
+    - $sort: Sorts documents based on severityPriority in descending chore and then by last_update_analyzer_time in
     descending chore.
     - $project: Excludes the severityPriority field from the final output.
     """
@@ -416,7 +416,7 @@ def sort_alerts_based_on_severity_n_last_update_date_time(strat_id_or_pydantic_o
         {
             '$sort': {
                 'severityPriority': -1,
-                'last_update_date_time': 1
+                'last_update_analyzer_time': 1
             }
         },
         {
@@ -458,7 +458,7 @@ def sort_alerts_based_on_severity_n_last_update_date_time(strat_id_or_pydantic_o
     if limit is not None:   # putting limit at last layer
         if limit < 0:
             limit = abs(limit)
-            agg_pipeline[3]["$sort"]["last_update_date_time"] = -1
+            agg_pipeline[3]["$sort"]["last_update_analyzer_time"] = -1
 
         agg_pipeline.append({
             "$limit": limit

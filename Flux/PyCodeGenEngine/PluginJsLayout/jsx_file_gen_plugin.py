@@ -133,7 +133,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                             msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
                             output_str += ("import { setSelected"+f"{msg_name_used_in_abb_option}Id, "
                                                                   f"set{msg_name_used_in_abb_option}ArrayWs, "
-                                                                  f"update{msg_name_used_in_abb_option}" + " } " +
+                                                                  f"update{msg_name_used_in_abb_option}, "
+                                                                  f"setModified{msg_name_used_in_abb_option}" + " } " +
                                            f"from '../features/{msg_name_used_in_abb_option_camel_cased}Slice';\n")
 
                     for msg in self.root_msg_list:
@@ -189,7 +190,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    getNewItem, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId, createCollections, " \
                           "getWidgetOptionById, getWidgetTitle,\n"
             output_str += ("    getAbbreviatedCollections, getServerUrl, getAbbreviatedDependentWidgets, "
-                           "isWebSocketAlive\n")
+                           "isWebSocketAlive, \n")
+            output_str += "    getRepeatedWidgetModifiedArray\n"
         output_str += "} from '../utils';\n"
         output_str += "/* custom components */\n"
         output_str += "import WidgetContainer from '../components/WidgetContainer';\n"
@@ -720,7 +722,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                            "useRef([]);\n")
 
                 output_str += f"    const {dependent_message_camel_cased}ArrayRef = useRef([]);\n"
-                output_str += f"    const [updateSource, setUpdateSource] = useState();\n"
+                output_str += f"    const [updateSource, setUpdateSource] = useState(null);\n"
 
                 msg_name_list_used_in_abb_option = self._get_msg_name_from_another_file_n_used_in_abb_text(
                     message, self.abbreviated_dependent_message_name)
@@ -832,6 +834,22 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += (f"                        '{msg_name_used_in_abb_option_snake_cased}': "
                                    f"{msg_name_used_in_abb_option_camel_cased}Array,\n")
         output_str += "                    }}\n"
+        output_str += "                    modifiedItemsMetadataDict={{\n"
+        output_str += (f"                        '{abb_dependent_message_name_snake_cased}': "
+                       f"getRepeatedWidgetModifiedArray({dependent_msg_name_camel_cased}Array, "
+                       f"selected{dependent_msg_name}Id, modified{dependent_msg_name}),\n")
+        if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+            msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+            for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    msg_name_used_in_abb_option_snake_cased = convert_camel_case_to_specific_case(
+                        msg_name_used_in_abb_option)
+                    output_str += (f"                        '{msg_name_used_in_abb_option_snake_cased}': "
+                                   f"getRepeatedWidgetModifiedArray({msg_name_used_in_abb_option_camel_cased}Array, "
+                                   f"selected{msg_name_used_in_abb_option}Id, "
+                                   f"modified{msg_name_used_in_abb_option}),\n")
+        output_str += "                    }}\n"
         output_str += "                    itemSchema={dependentWidgetSchema}\n"
         output_str += "                    itemCollectionsDict={dependentWidgetCollectionsDict}\n"
         if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
@@ -854,6 +872,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    dependentLoading={dependentLoading}\n"
         output_str += "                    columnOrders={columnOrders}\n"
         output_str += "                    onColumnOrdersChange={onColumnOrdersChange}\n"
+        output_str += "                    onUpdate={onUpdate}\n"
+        output_str += "                    onUserChange={onUserChange}\n"
         output_str += "                />\n"
         output_str += "            )}\n"
         output_str += "            <FormValidation\n"
@@ -2023,38 +2043,35 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onChangeMode = () => {\n"
             output_str += "        setMode(Modes.EDIT_MODE);\n"
             output_str += "    }\n\n"
-        output_str += "    const onSave = (e, openPopup = false) => {\n"
+        output_str += "    const onSave = (e, modifiedObj = null) => {\n"
         output_str += "        /* if save event is triggered from button (openPopup is true), " \
                       "open the confirm save dialog.\n"
         output_str += "         * if user local changes is present, open confirm save dialog for confirmation,\n"
         output_str += "         * otherwise call confirmSave to reset states\n"
         output_str += "        */\n"
-        output_str += "        if (_.keys(formValidation).length > 0) {\n"
-        if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type]:
-            output_str += "            setOpenFormValidationPopup(true);\n"
-        else:
-            output_str += "            dispatch(setOpenFormValidationPopup(true));\n"
+        output_str += "        if (Object.keys(formValidation).length > 0) {\n"
+        output_str += "            setOpenFormValidationPopup(true);\n"
         output_str += "            return;\n"
         output_str += "        }\n"
         if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type,
                            JsxFileGenPlugin.simple_abbreviated_type,
                            JsxFileGenPlugin.parent_abbreviated_type]:
-            output_str += "        let differences = {};\n"
-            output_str += "        if (e) {\n"
+            output_str += "        if (!modifiedObj) {\n"
             if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type]:
-                output_str += f"            let modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
-                output_str += f"            differences = compareJSONObjects({message_name_camel_cased}, " \
-                              f"modifiedObj);\n"
+                output_str += f"            modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
+                output_str += "        }\n"
+                output_str += (f"        const changesDiff = "
+                               f"compareJSONObjects({message_name_camel_cased}, modifiedObj);\n")
             else:
-                output_str += f"            let modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"
+                output_str += f"            modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"
                 output_str += "            if (createMode) {\n"
                 output_str += "                delete modifiedObj[DB_ID];\n"
                 output_str += "            }\n"
-                output_str += f"            differences = compareJSONObjects({dependent_message_camel_cased}, " \
-                              f"modifiedObj);\n"
-            output_str += "            dispatch(setActiveChanges(differences));\n"
-            output_str += "        }\n"
-        output_str += "        if (e === null && openPopup) {\n"
+                output_str += "        }\n"
+                output_str += (f"        const changesDiff = "
+                               f"compareJSONObjects({dependent_message_camel_cased}, modifiedObj);\n")
+            output_str += "        dispatch(setActiveChanges(changesDiff));\n\n"
+        output_str += "        if (e === null && modifiedObj) {\n"
         if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.abbreviated_dependent_type,
                            JsxFileGenPlugin.repeated_root_type]:
             option_dict = {}
@@ -2073,7 +2090,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                            JsxFileGenPlugin.simple_abbreviated_type,
                            JsxFileGenPlugin.parent_abbreviated_type]:
 
-            output_str += "        if (_.keys(differences).length > 0) {\n"
+            output_str += "        if (Object.keys(changesDiff).length > 0) {\n"
             if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type]:
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                     message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
@@ -2102,27 +2119,50 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onUpdate = (updatedData) => {\n"
             output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
             output_str += "    }\n\n"
-        if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-            output_str += "    const onButtonToggle = (e, xpath, value, source) => {\n"
-        else:
-            output_str += "    const onButtonToggle = (e, xpath, value) => {\n"
+        output_str += "    const onButtonToggle = (e, xpath, value, source = null, confirmSave = false) => {\n"
+        output_str += "        if (Object.keys(userChanges).length > 0) {\n"
         if layout_type == JsxFileGenPlugin.non_root_type:
+            output_str += "            confirmSave = false;\n"
+            output_str += "        }\n"
+            output_str += f"        const originalObj = {root_message_name_camel_cased};\n"
+            output_str += f"        const modifiedObj = clearxpath(cloneDeep(modified{root_message_name}));\n"
             output_str += "        let xpathDict = {\n"
             output_str += f"            [DB_ID]: selected{root_message_name}Id,\n"
             output_str += "            [xpath]: value\n"
             output_str += "        };\n"
         elif layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+            output_str += "            if (updateSource !== null && updateSource !== source) {\n"
+            output_str += ("                let errStr = 'Collection view does not support update on multiple "
+                           "sources in single iteration. ' + \n")
+            output_str += ("                'existingSource: ' + updateSource + ', existingUpdateDict: ' + "
+                           "JSON.stringify(userChanges) + \n")
+            output_str += ("                ', newSource: ' + source + ', newUpdateDict: ' + "
+                           "JSON.stringify({[xpath]: value}); \n")
+            output_str += "                alert(errStr);\n"
+            output_str += "                onReload();\n"
+            output_str += "                return;\n"
+            output_str += "            }\n"
+            output_str += "            confirmSave = false;\n"
+            output_str += "        }\n"
             output_str += "        let selectedId;\n"
             output_str += "        let originalObj;\n"
             output_str += "        let modifiedObj;\n"
         elif layout_type in [JsxFileGenPlugin.abbreviated_dependent_type,
                              JsxFileGenPlugin.repeated_root_type]:
+            output_str += "            confirmSave = false;\n"
+            output_str += "        }\n"
+            output_str += f"        const originalObj = {message_name_camel_cased};\n"
+            output_str += f"        const modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
             output_str += "        let xpathDict = {\n"
             output_str += f"            [DB_ID]: selected{message_name}Id,\n"
             output_str += "            [xpath]: value\n"
             output_str += "        };\n"
         else:
-            output_str += "        let xpathDict = {\n"
+            output_str += "            confirmSave = false;\n"
+            output_str += "        }\n"
+            output_str += f"        const originalObj = {message_name_camel_cased};\n"
+            output_str += f"        const modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
+            output_str += "        const xpathDict = {\n"
             output_str += "            [xpath]: value\n"
             output_str += "        };\n"
 
@@ -2149,15 +2189,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += f"            modifiedObj = modified{msg_name_used_in_abb_option};\n"
             output_str += "        }\n"
             output_str += "        setUpdateSource(source);\n"
-            output_str += "        let xpathDict = {\n"
+            output_str += "        modifiedObj = clearxpath(cloneDeep(modifiedObj));\n"
+            output_str += "        const xpathDict = {\n"
             output_str += "            [DB_ID]: selectedId,\n"
             output_str += "            [xpath]: value\n"
             output_str += "        }\n"
-            output_str += "        modifiedObj = clearxpath(cloneDeep(modifiedObj));\n"
-            output_str += "        _.keys(xpathDict).forEach(xpath => {\n"
+            output_str += "        Object.keys(xpathDict).forEach(xpath => {\n"
             output_str += "            _.set(modifiedObj, xpath, xpathDict[xpath]);\n"
             output_str += "        })\n"
-            output_str += "        let differences = compareJSONObjects(originalObj, modifiedObj);\n"
             if dependent_msg_list_from_another_proto:
                 for dep_msg_name in dependent_msg_list_from_another_proto:
                     dep_msg_snake_cased = convert_camel_case_to_specific_case(dep_msg_name)
@@ -2168,34 +2207,18 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         output_str += f"            return;\n"
                         output_str += "        }\n"
         else:
-            if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type,
-                               JsxFileGenPlugin.abbreviated_dependent_type]:
-                output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
-            elif layout_type == JsxFileGenPlugin.non_root_type:
-                output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{root_message_name}));\n"
-            else:
-                output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"
-            output_str += "        _.keys(xpathDict).forEach(xpath => {\n"
+            output_str += "        Object.keys(xpathDict).forEach(xpath => {\n"
             output_str += "            _.set(modifiedObj, xpath, xpathDict[xpath]);\n"
             output_str += "        })\n"
-            if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type,
-                               JsxFileGenPlugin.abbreviated_dependent_type]:
-                output_str += f"        let differences = compareJSONObjects({message_name_camel_cased}, modifiedObj);\n"
-            elif layout_type == JsxFileGenPlugin.non_root_type:
-                output_str += f"        let differences = compareJSONObjects({root_message_name_camel_cased}, modifiedObj);\n"
-            else:
-                output_str += f"        let differences = compareJSONObjects({dependent_message_camel_cased}, modifiedObj);\n"
-        output_str += "        dispatch(setActiveChanges(differences));\n"
-        if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type,
-                           JsxFileGenPlugin.abbreviated_dependent_type]:
-            output_str += f"        if ({message_name_camel_cased}[DB_ID]) " + "{\n"
-        elif layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-            output_str += "        if (originalObj[DB_ID]) {\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
-            output_str += f"        if ({root_message_name_camel_cased}[DB_ID]) " + "{\n"
+        output_str += "        if (confirmSave) {\n"
+        output_str += "            // on confirm save, force trigger update call without confirmation\n"
+        if layout_type == JsxFileGenPlugin.non_root_type:
+            output_str += "            onSave(null, modifiedObj);\n"
         else:
-            output_str += f"        if ({dependent_message_camel_cased}[DB_ID]) " + "{\n"
-        output_str += "            onSave(null, true);\n"
+            output_str += "            onConfirmSave(null, modifiedObj);\n"
+        output_str += "        } else if (originalObj[DB_ID]) {\n"
+        output_str += "            // not confirm save. if object already exists, open confirmation\n"
+        output_str += "            onSave(null, modifiedObj);\n"
         output_str += "        }\n"
         output_str += "    }\n\n"
 
@@ -2275,26 +2298,33 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        reloadStates();\n"
             output_str += "        cleanAllCache(props.name);\n"
             output_str += "    }\n\n"
-            output_str += "    const onConfirmSave = () => {\n"
-            output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
+            output_str += "    const onConfirmSave = (e, modifiedObj = null) => {\n"
+            output_str += f"        let changesDiff;\n"
+            output_str += "        if (!modifiedObj) {\n"
+            output_str += f"            modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
+            output_str += f"            changesDiff = activeChanges\n"
+            output_str += "        } else {\n"
+            output_str += (f"            changesDiff = compareJSONObjects("
+                           f"{message_name_camel_cased}, modifiedObj);\n")
+            output_str += "        }\n"
             output_str += f"        if (!_.isEqual({message_name_camel_cased}, modifiedObj)) "+"{\n"
             output_str += f"            if (_.get({message_name_camel_cased}, DB_ID)) "+"{\n"
             # other model project
             if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
-                output_str += f"                dispatch(update{message_name}("+"{ url, data: activeChanges }));\n"
+                output_str += f"                dispatch(update{message_name}("+"{ url, data: changesDiff }));\n"
             else:
-                output_str += f"                dispatch(update{message_name}(activeChanges));\n"
+                output_str += f"                dispatch(update{message_name}(changesDiff));\n"
             output_str += "            } else {\n"
             if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
-                output_str += f"                dispatch(create{message_name}("+"{ url, data: activeChanges }));\n"
+                output_str += f"                dispatch(create{message_name}("+"{ url, data: changesDiff }));\n"
             else:
-                output_str += f"                dispatch(create{message_name}(activeChanges));\n"
+                output_str += f"                dispatch(create{message_name}(changesDiff));\n"
             output_str += "            }\n"
-            output_str += "        } else if (_.keys(activeChanges).length > 0) {\n"
+            output_str += "        } else if (Object.keys(changesDiff).length > 0) {\n"
             if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
-                output_str += f"            dispatch(update{message_name}("+"{ url, data: activeChanges }));\n"
+                output_str += f"            dispatch(update{message_name}("+"{ url, data: changesDiff }));\n"
             else:
-                output_str += f"            dispatch(update{message_name}(activeChanges));\n"
+                output_str += f"            dispatch(update{message_name}(changesDiff));\n"
             output_str += "        }\n"
             output_str += f"        /* reset states */\n"
             output_str += "        dispatch(setActiveChanges({}));\n"
@@ -2368,24 +2398,31 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        dispatch(setModified{message_name}(updatedObj));\n"
             output_str += "        setMode(Modes.EDIT_MODE);\n"
             output_str += "    }\n\n"
-            output_str += "    const onConfirmSave = () => {\n"
-            output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
+            output_str += "    const onConfirmSave = (e, modifiedObj = null) => {\n"
+            output_str += f"        let changesDiff;\n"
+            output_str += "        if (!modifiedObj) {\n"
+            output_str += f"            modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
+            output_str += f"            changesDiff = activeChanges\n"
+            output_str += "        } else {\n"
+            output_str += (f"            changesDiff = compareJSONObjects("
+                           f"{message_name_camel_cased}, modifiedObj);\n")
+            output_str += "        }\n"
             output_str += f"        if (!_.isEqual({message_name_camel_cased}, modifiedObj)) " + "{\n"
             output_str += f"            if (_.get({message_name_camel_cased}, DB_ID)) " + "{\n"
             if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
-                output_str += f"                dispatch(update{message_name}("+"{ url, data: activeChanges }));\n"
+                output_str += f"                dispatch(update{message_name}("+"{ url, data: changesDiff }));\n"
                 output_str += "            } else {\n"
-                output_str += f"                dispatch(create{message_name}("+"{ url, data: activeChanges }));\n"
+                output_str += f"                dispatch(create{message_name}("+"{ url, data: changesDiff }));\n"
                 output_str += "            }\n"
-                output_str += "        } else if (_.keys(activeChanges).length > 0) {\n"
-                output_str += f"            dispatch(update{message_name}("+"{ url, data: activeChanges }));\n"
+                output_str += "        } else if (Object.keys(changesDiff).length > 0) {\n"
+                output_str += f"            dispatch(update{message_name}("+"{ url, data: changesDiff }));\n"
             else:
-                output_str += f"                dispatch(update{message_name}(activeChanges));\n"
+                output_str += f"                dispatch(update{message_name}(changesDiff));\n"
                 output_str += "            } else {\n"
-                output_str += f"                dispatch(create{message_name}(activeChanges));\n"
+                output_str += f"                dispatch(create{message_name}(changesDiff));\n"
                 output_str += "            }\n"
-                output_str += "        } else if (_.keys(activeChanges).length > 0) {\n"
-                output_str += f"            dispatch(update{message_name}(activeChanges));\n"
+                output_str += "        } else if (Object.keys(changesDiff).length > 0) {\n"
+                output_str += f"            dispatch(update{message_name}(changesDiff));\n"
             output_str += "        }\n"
             output_str += "        /* reset states */\n"
             output_str += "        dispatch(setActiveChanges({}));\n"
@@ -2434,10 +2471,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"            dispatch(setModified{message_name}(modifiedObj));\n"
             output_str += "        }\n"
             output_str += "    }\n\n"
-            output_str += "    const onConfirmSave = () => {\n"
+            output_str += "    const onConfirmSave = (e, modifiedObj = null) => {\n"
             if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+                output_str += f"        let changesDiff;\n"
                 output_str += f"        let originalObj;\n"
-                output_str += f"        let modifiedObj;\n"
                 msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
 
                 if self.abbreviated_dependent_message_name in msg_used_in_abb_option_list:
@@ -2456,18 +2493,41 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                 f"'{msg_name_used_in_abb_option_snake_cased}') " + "{\n")
 
                     output_str += f"            originalObj = {msg_name_used_in_abb_option_camel_cased};\n"
-                    output_str += (f"            modifiedObj = "
-                                   f"clearxpath(cloneDeep(modified{msg_name_used_in_abb_option}));\n")
                 if msg_used_in_abb_option_list:
                     output_str += "        } else {\n"
                     output_str += f"            originalObj = {abbreviated_dependent_msg_camel_cased};\n"
-                    output_str += (f"            modifiedObj = clearxpath(cloneDeep("
-                                   f"modified{self.abbreviated_dependent_message_name}));\n")
                     output_str += "        }\n"
                 else:
                     output_str += f"        originalObj = {abbreviated_dependent_msg_camel_cased};\n"
                     output_str += (f"        modifiedObj = clearxpath(cloneDeep("
                                    f"modified{self.abbreviated_dependent_message_name}));\n")
+                output_str += "        if (!modifiedObj) {\n"
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    msg_name_used_in_abb_option_snake_cased = (
+                        convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    if msg_name_used_in_abb_option == msg_used_in_abb_option_list[0]:
+                        output_str += (
+                                f"            if (updateSource === "
+                                f"'{msg_name_used_in_abb_option_snake_cased}') " + "{\n")
+                    else:
+                        output_str += (
+                                f"            else if (updateSource === "
+                                f"'{msg_name_used_in_abb_option_snake_cased}') " + "{\n")
+                    output_str += (f"                modifiedObj = clearxpath(cloneDeep("
+                                   f"modified{msg_name_used_in_abb_option}));\n")
+                if msg_used_in_abb_option_list:
+                    output_str += "            } else {\n"
+                    output_str += (f"                modifiedObj = clearxpath(cloneDeep("
+                                   f"modified{self.abbreviated_dependent_message_name}));\n")
+                    output_str += "            }\n"
+                else:
+                    output_str += (f"            modifiedObj = clearxpath(cloneDeep("
+                                   f"modified{self.abbreviated_dependent_message_name}));\n")
+                output_str += "            changesDiff = activeChanges;\n"
+                output_str += "        } else {\n"
+                output_str += "            changesDiff = compareJSONObjects(originalObj, modifiedObj);\n"
+                output_str += "        }\n"
                 output_str += "        if (createMode) {\n"
                 output_str += "            dispatch(setCreateMode(false));\n"
                 output_str += "        }\n"
@@ -2496,9 +2556,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                     self.current_proto_file_name]):
                             for msg in message_list:
                                 if msg.proto.name == msg_name_used_in_abb_option:
+                                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(
+                                        msg_name_used_in_abb_option)
                                     output_str += \
-                                        (f"                    dispatch(update{msg_name_used_in_abb_option}"+
-                                         "({url: stratViewUrl, data: activeChanges}));\n")
+                                        (f"                    dispatch(update{msg_name_used_in_abb_option}"
+                                         "({url: "+f"{msg_name_used_in_abb_option_camel_cased}"+"Url, "
+                                         "data: changesDiff}));\n")
                                     model_is_from_another_project = True
                                     break
                             else:
@@ -2506,21 +2569,21 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                             break
                     if not model_is_from_another_project:
                         output_str += \
-                            f"                    dispatch(update{msg_name_used_in_abb_option}(activeChanges));\n"
+                            f"                    dispatch(update{msg_name_used_in_abb_option}(changesDiff));\n"
 
                 if msg_name_list_used_in_abb_option:
                     output_str += "                } else {\n"
                     output_str += (f"                    dispatch(update"
-                                   f"{self.abbreviated_dependent_message_name}(activeChanges));\n")
+                                   f"{self.abbreviated_dependent_message_name}(changesDiff));\n")
                     output_str += "                }\n"
                 else:
                     output_str += (f"                dispatch(update"
-                                   f"{self.abbreviated_dependent_message_name}(activeChanges));\n")
+                                   f"{self.abbreviated_dependent_message_name}(changesDiff));\n")
                 output_str += "            } else {\n"
                 output_str += (f"                dispatch(create{self.abbreviated_dependent_message_name}"
-                               "({ data: activeChanges, abbreviated, loadedKeyName: loadListFieldAttrs.key }));\n")
+                               "({ data: changesDiff, abbreviated, loadedKeyName: loadListFieldAttrs.key }));\n")
                 output_str += "            }\n"
-                output_str += "        } else if (_.keys(activeChanges).length > 0) {\n"
+                output_str += "        } else if (Object.keys(changesDiff).length > 0) {\n"
                 output_str += "            // update triggered by button\n"
                 for msg_name_used_in_abb_option in msg_name_list_used_in_abb_option:
                     msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
@@ -2543,7 +2606,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                 if msg.proto.name == msg_name_used_in_abb_option:
                                     output_str += \
                                         (f"                dispatch(update{msg_name_used_in_abb_option}" +
-                                         "({url: stratViewUrl, data: activeChanges}));\n")
+                                         "({url: "+f"{msg_name_used_in_abb_option_camel_cased}Url, "
+                                         "data: changesDiff}));\n")
                                     model_is_from_another_project = True
                                     break
                             else:
@@ -2551,15 +2615,15 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                             break
                     if not model_is_from_another_project:
                         output_str += \
-                            f"                dispatch(update{msg_name_used_in_abb_option}(activeChanges));\n"
+                            f"                dispatch(update{msg_name_used_in_abb_option}(changesDiff));\n"
                 if msg_name_list_used_in_abb_option:
                     output_str += "            } else {\n"
                     output_str += (f"                dispatch(update"
-                                   f"{self.abbreviated_dependent_message_name}(activeChanges));\n")
+                                   f"{self.abbreviated_dependent_message_name}(changesDiff));\n")
                     output_str += "            }\n"
                 else:
                     output_str += (f"            dispatch(update"
-                                   f"{self.abbreviated_dependent_message_name}(activeChanges));\n")
+                                   f"{self.abbreviated_dependent_message_name}(changesDiff));\n")
                 output_str += "        }\n"
 
             else:
@@ -2588,7 +2652,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        dispatch(setMode(Modes.READ_MODE));\n"
             output_str += "        dispatch(setOpenConfirmSavePopup(false));\n"
             if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                output_str += "        setUpdateSource();\n"
+                output_str += "        setUpdateSource(null);\n"
             output_str += "    }\n\n"
             output_str += "    const onChange = (e, value) => {\n"
             output_str += "        setSearchValue(value);\n"
@@ -2654,6 +2718,50 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const onContinueCollectionEdit = () => {\n"
                 output_str += "        setOpenCollectionSwitchPopup(false);\n"
                 output_str += "    }\n\n"
+            output_str += "    const onUpdate = (updatedObj, source) => {\n"
+
+            msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+            for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                    msg_name_used_in_abb_option_snake_cased = (
+                        convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    output_str += f"        if (source === '{msg_name_used_in_abb_option_snake_cased}') " + "{\n"
+                    output_str += f"            dispatch(setModified{msg_name_used_in_abb_option}(updatedObj));\n"
+
+            abbreviated_dependent_msg_name = self.abbreviated_dependent_message_name
+            abbreviated_dependent_msg_camel_cased = convert_to_camel_case(abbreviated_dependent_msg_name)
+            abbreviated_dependent_msg_snake_cased = convert_camel_case_to_specific_case(abbreviated_dependent_msg_name)
+
+            if msg_used_in_abb_option_list:
+                output_str += "        } else if (source === " + f"'{abbreviated_dependent_msg_snake_cased}') " + "{\n"
+            else:
+                output_str += "        if (source === " + f"'{abbreviated_dependent_msg_snake_cased}') " + "{\n"
+            output_str += f"            dispatch(setModified{abbreviated_dependent_msg_name}(updatedObj));\n"
+            output_str += "        } // else incorrect source\n"
+            output_str += "    }\n\n"
+            output_str += "    const onUserChange = (xpath, value, dict = null, source) => {\n"
+            output_str += "        let updatedData = cloneDeep(userChanges);\n"
+            output_str += "        if (updateSource !== null && source !== updateSource) {\n"
+            output_str += ("            let errStr = 'Collection view does not support update on multiple "
+                           "sources in single iteration. ' + \n")
+            output_str += ("            'existingSource: ' + updateSource + ', existingUpdateDict: ' + "
+                           "JSON.stringify(userChanges) + \n")
+            output_str += ("            ', newSource: ' + source + ', newUpdateDict: ' + "
+                           "JSON.stringify({[xpath]: value}); \n")
+            output_str += "            alert(errStr);\n"
+            output_str += "            onReload();\n"
+            output_str += "            return;\n"
+            output_str += "        }\n"
+            output_str += "        setUpdateSource(source);\n"
+            output_str += "        if (dict) {\n"
+            output_str += "            updatedData = { ...updatedData, ...dict };\n"
+            output_str += "        } else {\n"
+            output_str += ("            updatedData = { ...updatedData, [xpath]: value, [DB_ID]: "
+                           f"selected{abbreviated_dependent_msg_name}Id "+"};\n")
+            output_str += "        }\n"
+            output_str += "        dispatch(setUserChanges(updatedData));\n"
+            output_str += "    }\n\n"
 
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type or \
                 layout_type == JsxFileGenPlugin.abbreviated_dependent_type:

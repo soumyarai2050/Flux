@@ -17,7 +17,6 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import AlertOptional
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
-from tests.CodeGenProjects.AddressBook.ProjectGroup.conftest import *
 
 email_book_service_beanie_web_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient.set_or_get_if_instance_exists(HOST, parse_to_int(PAIR_STRAT_BEANIE_PORT))
@@ -748,7 +747,6 @@ def _place_sanity_complete_sell_chores(buy_symbol, sell_symbol, created_pair_str
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-@pytest.mark.nightly
 def test_place_sanity_parallel_complete_chores(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
@@ -5842,7 +5840,7 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
     counter = 0
     for i in range(5):
         alert = PortfolioAlertBaseModel()
-        alert.last_update_date_time = DateTime.utcnow()
+        alert.last_update_analyzer_time = DateTime.utcnow()
         alert.alert_brief = f"Sample Alert: {i + 1}"
         alert.severity = sev[counter]
         counter += 1
@@ -5855,7 +5853,7 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
               "alert_details": alert.alert_details}])
 
     # sorting alert list for this test comparison
-    portfolio_alerts.sort(key=lambda x: x.last_update_date_time, reverse=False)
+    portfolio_alerts.sort(key=lambda x: x.last_update_analyzer_time, reverse=False)
 
     sorted_alert_list: List[PortfolioAlertBaseModel] = []
     for sev in Severity:
@@ -5866,11 +5864,11 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
     time.sleep(5)
     agg_sorted_alerts: List[PortfolioAlertBaseModel] = log_book_web_client.get_all_portfolio_alert_client()
     for alert in agg_sorted_alerts:
-        alert.last_update_date_time = pendulum.parse(str(alert.last_update_date_time)).in_timezone("utc")
+        alert.last_update_analyzer_time = pendulum.parse(str(alert.last_update_analyzer_time)).in_timezone("utc")
     for alert in portfolio_alerts:
-        alert.last_update_date_time = \
-            alert.last_update_date_time.replace(microsecond=
-                                                int(str(alert.last_update_date_time.microsecond)[:3] + "000"))
+        alert.last_update_analyzer_time = \
+            alert.last_update_analyzer_time.replace(microsecond=
+                                                int(str(alert.last_update_analyzer_time.microsecond)[:3] + "000"))
 
     for sorted_alert, expected_alert in zip(agg_sorted_alerts, sorted_alert_list):
         assert sorted_alert.alert_brief == expected_alert.alert_brief, \

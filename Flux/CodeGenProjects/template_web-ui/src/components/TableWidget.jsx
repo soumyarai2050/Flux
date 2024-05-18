@@ -257,7 +257,6 @@ const TableWidget = (props) => {
         } else {
             if (props.widgetType === 'repeatedRoot') {
                 const idx = data.findIndex(obj => obj[DB_ID] === selectedRows[0]);
-                console.log(idx);
                 if (idx !== -1) {
                     const updatedArray = cloneDeep(data);
                     updatedArray[idx] = updatedData;
@@ -396,14 +395,14 @@ const TableWidget = (props) => {
         props.onUserChange(xpath, value);
     }, [data, props.onUpdate, props.onUserChange])
 
-    const onButtonClick = useCallback((e, action, xpath, value) => {
+    const onButtonClick = useCallback((e, action, xpath, value, source = null, confirmSave = false) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
-            props.onButtonToggle(e, xpath, updatedData);
+            props.onButtonToggle(e, xpath, updatedData, source, confirmSave);
         } else if (action === 'flux_trigger_strat') {
             let updatedData = flux_trigger_strat(value);
             if (updatedData) {
-                props.onButtonToggle(e, xpath, updatedData);
+                props.onButtonToggle(e, xpath, updatedData, source, confirmSave);
             }
         }
     }, [flux_toggle, flux_trigger_strat, props.onButtonToggle])

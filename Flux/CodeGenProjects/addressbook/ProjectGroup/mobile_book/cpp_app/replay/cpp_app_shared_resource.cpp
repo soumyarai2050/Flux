@@ -1,0 +1,14 @@
+#include "cpp_app_shared_resource.h"
+
+namespace mobile_book_handler {
+    int32_t tob_ws_port = FluxCppCore::find_free_port();
+    int32_t md_ws_port = FluxCppCore::find_free_port();
+    int32_t lt_ws_port = FluxCppCore::find_free_port();
+    mobile_book::TopOfBook top_of_book_obj;
+    mobile_book::LastBarter last_barter_obj;
+    mobile_book::MarketDepth market_depth_obj;
+    mobile_book_cache::MarketDepthCache market_DepthCache;
+    mobile_book_cache::TopOfBookCache topOfBookCache_;
+    mobile_book_cache::LastBarterCache lastBarterCache_;
+    const std::chrono::seconds TIME_OUT_CONNECTION = std::chrono::seconds(mobile_book_handler::connection_timeout);
+}

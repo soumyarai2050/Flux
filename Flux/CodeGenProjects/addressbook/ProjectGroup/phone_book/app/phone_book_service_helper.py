@@ -193,7 +193,7 @@ async def get_single_exact_match_strat_from_symbol_n_side(sec_id: str, side: Sid
 def get_strat_key_from_pair_strat(pair_strat: PairStrat | PairStratBaseModel):
     strat_key = f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}-" \
                 f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}-" \
-                f"{pair_strat.pair_strat_params.strat_leg1.side}-{pair_strat.id}"
+                f"{pair_strat.pair_strat_params.strat_leg1.side.value}-{pair_strat.id}"
     return strat_key
 
 

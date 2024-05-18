@@ -17,7 +17,7 @@ option (FluxFileWebPageUIData) = {
 message StratLeg{
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
   required Security sec = 2;
-  optional Side side = 3 [default = SIDE_UNSPECIFIED];
+  optional Side side = 3 [default = SIDE_UNSPECIFIED, (FluxFldColor) = "BUY=SUCCESS,SELL=ERROR"];
   optional string company = 4 [(FluxFldServerPopulate) = true];
 }
 

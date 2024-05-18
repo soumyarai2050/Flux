@@ -23,7 +23,6 @@ namespace mobile_book_handler {
         }
 
         void replay() {
-
             int market_depth_index = 0;
             int last_barter_index = 0;
 

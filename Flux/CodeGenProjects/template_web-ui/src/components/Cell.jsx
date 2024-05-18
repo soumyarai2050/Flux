@@ -55,7 +55,7 @@ const Cell = (props) => {
     const [active, setActive] = useState(false);
     const [open, setOpen] = useState(false);
     const [oldValue, setOldValue] = useState(null);
-    const [newUpdateClass, setNewUpdateClass] = useState("");
+    const [newUpdateClass, setNewUpdateClass] = useState('');
     const [clipboardText, setClipboardText] = useState(null);
     const timeoutRef = useRef(null);
     const validationError = useRef(null);
@@ -170,7 +170,9 @@ const Cell = (props) => {
                 value = value ? value : null;
             }
         } else if (type === DataTypes.STRING) {
-            value = inputValue ? inputValue : inputValue;
+            // if (mode === Modes.EDIT_MODE) {
+            //     value = inputValue ? inputValue : inputValue;
+            // }
         }
     }
     let color = getColorTypeFromValue(collection, currentValue);
@@ -195,7 +197,7 @@ const Cell = (props) => {
     }
     const placeholder = collection.placeholder ? collection.placeholder : !required ? 'optional' : null;
 
-    if (mode === Modes.EDIT_MODE && active && !disabled && !(props.widgetType === 'repeatedRoot' && !props.selected)) {
+    if (mode === Modes.EDIT_MODE && active && !disabled && !(['repeatedRoot', 'abbreviatedFilter'].includes(props.widgetType) && !props.selected) && !collection.ormNoUpdate && !collection.serverPopulate) {
         if (collection.autocomplete) {
             validationError.current = validateConstraints(collection, value);
 
@@ -237,7 +239,7 @@ const Cell = (props) => {
                         value={collection.value}
                         onBlur={onFocusOut}
                         autoFocus
-                        onChange={(e, v) => props.onAutocompleteOptionChange(e, v, dataxpath, xpath)}
+                        onChange={(e, v) => props.onAutocompleteOptionChange(e, v, dataxpath, xpath, collection.source)}
                         renderInput={(params) => (
                             <TextField
                                 {...params}
@@ -283,7 +285,7 @@ const Cell = (props) => {
                         name={collection.key}
                         className={classes.select}
                         value={value}
-                        onChange={(e) => props.onSelectItemChange(e, dataxpath, xpath)}
+                        onChange={(e) => props.onSelectItemChange(e, dataxpath, xpath, collection.source)}
                         size='small'
                         endAdornment={endAdornment}
                         error={validationError.current !== null}
@@ -360,7 +362,7 @@ const Cell = (props) => {
                         disabled={disabled}
                         thousandSeparator=','
                         onValueChange={(values, sourceInfo) => props.onTextChange(sourceInfo.event, type, xpath, values.value, dataxpath,
-                            validateConstraints(collection, values.value, min, max))}
+                            validateConstraints(collection, values.value, min, max), collection.source)}
                         variant='outlined'
                         decimalScale={decimalScale}
                         placeholder={placeholder}
@@ -399,7 +401,7 @@ const Cell = (props) => {
                             required={required}
                             inputFormat="DD-MM-YYYY HH:mm:ss"
                             InputProps={inputProps}
-                            onChange={(newValue) => props.onDateTimeChange(dataxpath, xpath, new Date(newValue).toISOString())}
+                            onChange={(newValue) => props.onDateTimeChange(dataxpath, xpath, new Date(newValue).toISOString(), collection.source)}
                             inputProps={{
                                 style: { padding: '6px 10px' },
                                 dataxpath: dataxpath,
@@ -433,7 +435,7 @@ const Cell = (props) => {
                         // ref={inputRef}
                         placeholder={placeholder}
                         onChange={(e) => handleTextChange(e, type, xpath, e.target.value, dataxpath,
-                            validateConstraints(collection, e.target.value))}
+                            validateConstraints(collection, e.target.value), collection.source)}
                         variant='outlined'
                         InputProps={inputProps}
                         inputProps={{
@@ -448,9 +450,23 @@ const Cell = (props) => {
         }
     }
 
+    // components in read-only mode
+    const classesArray = [classes.cell];
+
+    // add column size class if column size is set
+    if (collection.columnSize && classes[`column_size_${collection.columnSize}`]) {
+        classesArray.push(classes['column_size_' + collection.columnSize]);
+    }
+    // add column direction (text direction) class if column direction is set
+    if (collection.columnDirection && classes[`column_direction_${collection.columnDirection}`]) {
+        classesArray.push(classes[`column_direction_${collection.columnDirection}`])
+    }
+
+    // read-only checkbox component
     if (type === DataTypes.BOOLEAN) {
+        const classesStr = classesArray.join(' ');
         return (
-            <TableCell className={classes.cell} align='center' size='small' onClick={onFocusIn}>
+            <TableCell className={classesStr} align='center' size='small' onClick={onFocusIn}>
                 <Checkbox
                     className={classes.checkbox}
                     disabled
@@ -461,27 +477,33 @@ const Cell = (props) => {
         )
     }
 
+    // button components support click in both read and edit mode
     if (type === 'button') {
+        // do not display button if value not set
         if (value === undefined || value === null) {
-            let tableCellRemove = dataRemove ? classes.remove : '';
+            classesArray.push(classes.disabled);
+            if (dataRemove) {
+                classesArray.push(classes.remove);
+            }
+            const classesStr = classesArray.join(' ');
             return (
-                <TableCell className={`${classes.cell} ${classes.disabled} ${tableCellRemove}`} />
+                <TableCell className={classesStr} align='center' size='small' />
             )
         }
 
-        let disabledCaptions = {};
+        const disabledValueCaptionDict = {};
         if (collection.button.disabled_captions) {
             collection.button.disabled_captions.split(',').forEach(valueCaptionPair => {
-                let [buttonValue, caption] = valueCaptionPair.split('=');
-                disabledCaptions[buttonValue] = caption;
+                const [buttonValue, caption] = valueCaptionPair.split('=');
+                disabledValueCaptionDict[buttonValue] = caption;
             })
         }
-        let isDisabledValue = _.keys(disabledCaptions).includes(String(value));
-        let disabledCaption = isDisabledValue ? disabledCaptions[String(value)] : '';
-        let checked = String(value) === collection.button.pressed_value_as_text;
-        let color = getColorTypeFromValue(collection, String(value));
-        let size = getSizeFromValue(collection.button.button_size);
-        let shape = getShapeFromValue(collection.button.button_type);
+        const isDisabledValue = disabledValueCaptionDict.hasOwnProperty(String(value));
+        const disabledCaption = isDisabledValue ? disabledValueCaptionDict[String(value)] : '';
+        const checked = String(value) === collection.button.pressed_value_as_text;
+        const color = getColorTypeFromValue(collection, String(value));
+        const size = getSizeFromValue(collection.button.button_size);
+        const shape = getShapeFromValue(collection.button.button_type);
         let caption = String(value);
 
         if (isDisabledValue) {
@@ -492,8 +514,11 @@ const Cell = (props) => {
             caption = collection.button.unpressed_caption;
         }
 
+        classesArray.push(classes.cell_no_padding);
+        const classesStr = classesArray.join(' ');
+
         return (
-            <TableCell className={`${classes.cell} ${classes.cell_no_padding}`} align='center' size='medium'>
+            <TableCell className={classesStr} align='center' size='small'>
                 <ValueBasedToggleButton
                     size={size}
                     shape={shape}
@@ -513,28 +538,34 @@ const Cell = (props) => {
 
     if (type === 'progressBar') {
         if (value === undefined || value === null) {
-            let tableCellRemove = dataRemove ? classes.remove : '';
+            classesArray.push(classes.disabled);
+            if (dataRemove) {
+                classesArray.push(classes.remove);
+            }
+            const classesStr = classesArray.join(' ');
+
             return (
-                <TableCell className={`${classes.cell} ${classes.disabled} ${tableCellRemove}`} />
+                <TableCell className={classesStr} size='small' />
             )
         }
 
+        const valueFieldName = props.name;
         let maxFieldName = collection.maxFieldName;
-        let valueFieldName = props.name;
         let min = collection.min;
         if (typeof (min) === DataTypes.STRING) {
             min = getValueFromReduxStoreFromXpath(reducerDict, min);
         }
-
         let max = collection.max;
         if (typeof (max) === DataTypes.STRING) {
             maxFieldName = max.substring(max.lastIndexOf(".") + 1);
             max = getValueFromReduxStoreFromXpath(reducerDict, max);
         }
-        let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
+        const hoverType = getHoverTextType(collection.progressBar.hover_text_type);
+        classesArray.push(classes.cell_no_padding);
+        const classesStr = classesArray.join(' ');
 
         return (
-            <TableCell className={`${classes.cell} ${classes.cell_no_padding}`} align='center' size='medium'>
+            <TableCell className={classesStr} align='center' size='small'>
                 <ValueBasedProgressBarWithHover
                     inlineTable={true}
                     collection={collection}
@@ -550,7 +581,9 @@ const Cell = (props) => {
     }
 
     if (collection.abbreviated && collection.abbreviated === "JSON") {
-        let tableCellRemove = dataRemove ? classes.remove : '';
+        if (dataRemove) {
+            classesArray.push(classes.remove);
+        }
         let updatedData = currentValue;
         if (type === DataTypes.OBJECT || type === DataTypes.ARRAY || (type === DataTypes.STRING && isValidJsonString(updatedData))) {
             if (type === DataTypes.OBJECT || type === DataTypes.ARRAY) {
@@ -562,16 +595,18 @@ const Cell = (props) => {
                 updatedData = JSON.parse(updatedData);
             }
             excludeNullFromObject(updatedData);
+            classesArray.push(classes.abbreviated_json_cell);
+            const classesStr = classesArray.join(' ');
 
             return (
-                <TableCell className={`${classes.cell} ${classes.abbreviated_json_cell} ${tableCellRemove}`} align='center' size='medium' onClick={onOpenTooltip}>
+                <TableCell className={classesStr} align='center' size='small' onClick={onOpenTooltip}>
                     <AbbreviatedJson open={open} onClose={onCloseTooltip} src={updatedData} />
                 </TableCell >
             )
         } else if (type === DataTypes.STRING && !isValidJsonString(updatedData)) {
-            let tooltipText = "";
+            let tooltipText = '';
             if (updatedData !== null && updatedData !== undefined) {
-                let lines = updatedData.split("\n");
+                let lines = updatedData.split('\n');
                 tooltipText = (
                     <>
                         {lines.map((line, idx) => (
@@ -587,8 +622,11 @@ const Cell = (props) => {
                     </>
                 )
             }
+            classesArray.push(classes.abbreviated_json_cell);
+            const classesStr = classesArray.join(' ');
+
             return (
-                <TableCell className={`${classes.cell} ${classes.abbreviated_json_cell} ${tableCellRemove}`} align='center' size='medium' onClick={onOpenTooltip}>
+                <TableCell className={classesStr} align='center' size='small' onClick={onOpenTooltip}>
                     <CopyToClipboard text={clipboardText} copy={clipboardText !== null} />
                     <ClickAwayListener onClickAway={onCloseTooltip}>
                         <div className={classes.abbreviated_json_cell}>
@@ -634,6 +672,12 @@ const Cell = (props) => {
         text = linkText ? dayjs.utc(linkText).format('HH:mm:ss.SSS') : null;
     }
     let dataModified = previousValue !== currentValue;
+    if (tableCellColorClass) {
+        classesArray.push(tableCellColorClass);
+    }
+    if (disabledClass) {
+        classesArray.push(disabledClass);
+    }
 
     if (mode === Modes.EDIT_MODE && dataModified) {
         let originalValue = previousValue !== undefined && previousValue !== null ? previousValue : '';
@@ -641,8 +685,10 @@ const Cell = (props) => {
             originalValue = floatToInt(originalValue);
         }
         originalValue = originalValue.toLocaleString();
+
+        const classesStr = classesArray.join(' ');
         return (
-            <TableCell className={`${classes.cell} ${tableCellColorClass} ${disabledClass}`} align={textAlign} size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
+            <TableCell className={classesStr} align={textAlign} size='small' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
                 {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
                 {value ? <span className={classes.modified}>{value}{numberSuffix}</span> : <span className={classes.modified}>{value}</span>}
                 {validationError.current && (
@@ -651,8 +697,15 @@ const Cell = (props) => {
             </TableCell>
         )
     } else {
+        if (tableCellRemove) {
+            classesArray.push(tableCellRemove);
+        }
+        if (newUpdateClass) {
+            classesArray.push(newUpdateClass);
+        }
+        const classesStr = classesArray.join(' ');
         return (
-            <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`} align={textAlign} size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
+            <TableCell className={classesStr} align={textAlign} size='small' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
                 {collection.displayType === 'time' ? <LinkText text={text} linkText={linkText} /> :
                     value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
                 {validationError.current && (

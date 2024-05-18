@@ -167,7 +167,6 @@ namespace mobile_book_cache {
                 // std::lock_guard<std::mutex> lock(*lock_mutex);
                 std::unique_lock<std::mutex> lock(*lock_mutex, std::try_to_lock_t{});
                 if (!lock.owns_lock()) {
-                    std::cout << "unable to do lock" << __func__ << std::endl;
                     return;
                 }
 
@@ -242,7 +241,6 @@ namespace mobile_book_cache {
                 // std::lock_guard<std::mutex> lock(*lock_mutex);
                 std::unique_lock<std::mutex> lock(*lock_mutex, std::try_to_lock_t{});
                 if (!lock.owns_lock()) {
-                    std::cout << "unable to do lock" << __func__ << std::endl;
                     return;
                 }
 
@@ -320,8 +318,6 @@ namespace mobile_book_cache {
                     p_last_barter_instance = PyObject_CallObject(p_set_func, nullptr);
 
                     if (p_last_barter_instance == Py_None) {
-                        std::cout << "calling create_last_barter_cache\n";
-                        std::cout << kr_last_barter_obj.DebugString() << std::endl;
                         create_last_barter_cache(kr_last_barter_obj, p_mobile_book_container_instance, mp_market_barter_vol_class_);
                     } else {
                         assert(p_last_barter_instance != Py_None);
@@ -334,8 +330,6 @@ namespace mobile_book_cache {
                         FluxCppCore::TimeComparison time = FluxCppCore::StringUtil::find_latest_time(time_str,
                                                                                                      kr_last_barter_obj.exch_time());
                         if (time == FluxCppCore::TimeComparison::TIME2_LATER or time == FluxCppCore::TimeComparison::BOTH_EQUAL) {
-                            std::cout << "calling update_last_barter_cache\n";
-                            std::cout << kr_last_barter_obj.DebugString() << std::endl;
                             update_last_barter_cache(kr_last_barter_obj, p_mobile_book_container_instance, p_mutex);
                         }
                         // update_last_barter_cache(kr_last_barter_obj, p_mobile_book_container_instance, p_mutex);
@@ -478,13 +472,11 @@ namespace mobile_book_cache {
                     const std::string time_str = PyUnicode_AsUTF8(PyObject_Str(PyObject_GetAttrString(p_top_of_book_instance, "last_update_date_time")));
                     FluxCppCore::TimeComparison time = FluxCppCore::StringUtil::find_latest_time(time_str,
                             kr_top_of_book.last_update_date_time());
-                    std::cout << "time_str: " << time_str << " kr_top_of_book.last_update_date_time(): " << kr_top_of_book.last_update_date_time() << std::endl;
 
                     if (kr_side == "BID") {
 
                         PyObject* p_get_top_of_book_bid_quote = PyObject_GetAttrString(p_mobile_book_container_instance, get_top_of_book_bid_quote_key.c_str());
                         PyObject* p_last_update_date_time = PyObject_GetAttrString(p_top_of_book_instance, "last_update_date_time");
-                        std::cout << "Last update date time: " << PyUnicode_AsUTF8(PyObject_Str(p_last_update_date_time)) << std::endl;
 
                         assert(p_get_top_of_book_bid_quote != nullptr);
 
@@ -506,9 +498,7 @@ namespace mobile_book_cache {
                         if (PyObject_CallObject(p_get_top_of_book_ask_quote, nullptr) == Py_None) {
                             create_top_of_book_ask_quote(kr_top_of_book, p_mobile_book_container_instance);
                         } else {
-                            std::cout << "top_of_book_obj: " << kr_top_of_book.DebugString() << std::endl;
                             if (time == FluxCppCore::TimeComparison::TIME2_LATER or time == FluxCppCore::TimeComparison::BOTH_EQUAL) {
-                                std::cout << "Calling update_top_of_book_ask_quote\n";
                                 update_top_of_book_ask_quote(kr_top_of_book, p_mobile_book_container_instance, p_mutex);
                             }
                             // update_top_of_book_ask_quote(kr_top_of_book, p_mobile_book_container_instance, p_mutex);

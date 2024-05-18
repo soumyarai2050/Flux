@@ -229,9 +229,12 @@ class CppConstantsHandlerPlugin(BaseProtoPlugin):
         output_content += "{\n\n"
         output_content += '    const std::string db_uri = getenv("MONGO_URI") ? getenv("MONGO_URI") : ' \
                           '"mongodb://localhost:27017";\n'
-        output_content += 'const std::string host = getenv("HOST") ? getenv("HOST") : "127.0.0.1";\n'
-        output_content += 'const std::string port = getenv("PORT") ? getenv("PORT") : "8040";\n'
+        output_content += '\tconst std::string host = getenv("HOST") ? getenv("HOST") : "127.0.0.1";\n'
+        output_content += '\tconst std::string port = getenv("PORT") ? getenv("PORT") : "8040";\n\n'
 
+        output_content += "\tconstexpr int min_pool_size_val = 2;\n"
+        output_content += "\tconstexpr int max_pool_size_val = 2;\n"
+        output_content += "\tconstexpr int connection_timeout = 3600;\n\n"
         file_name = str(file.proto.name).split(".")[0]
         output_content += (f'    const std::string {file_name}_db_name = getenv("DB_NAME") ? getenv("DB_NAME") : '
                            f'"{package_name}_8040";\n')

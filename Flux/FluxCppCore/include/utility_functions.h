@@ -8,7 +8,7 @@
 
 namespace FluxCppCore {
 
-    int32_t find_free_port() {
+    inline int32_t find_free_port() {
         boost::asio::io_service io;
         boost::asio::ip::tcp::acceptor acceptor(io, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), 0));
         return static_cast<int32_t>(acceptor.local_endpoint().port());

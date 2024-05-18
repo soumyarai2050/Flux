@@ -38,15 +38,19 @@ class UpdateType(StrEnum):
 def create_alert(
         strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
         portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
-        alert_brief: str, alert_details: str | None = None,
+        alert_brief: str, alert_details: AlertDetail | None = None,
         severity: Severity = Severity.Severity_ERROR,
-        strat_id: int | None = None) -> StratAlertBaseModel | PortfolioAlertBaseModel:
+        strat_id: int | None = None, component_path: str | None = None,
+        source_file_name: str | None = None, line_num: int | None = None,
+        alert_create_date_time: DateTime | None = None) -> StratAlertBaseModel | PortfolioAlertBaseModel:
     """
     Handles strat alerts if strat id is passed else handles portfolio alerts
     """
     kwargs = {}
     kwargs.update(severity=severity, alert_brief=alert_brief, dismiss=False,
-                  last_update_date_time=DateTime.utcnow(), alert_count=1)
+                  last_update_analyzer_time=DateTime.utcnow(), alert_count=1,
+                  component_file_path=component_path, source_file_name=source_file_name,
+                  line_num=line_num, alert_create_date_time=alert_create_date_time)
     if alert_details is not None:
         kwargs.update(alert_details=alert_details)
     if strat_id is not None:
@@ -94,7 +98,9 @@ def init_service(portfolio_alerts_cache: Dict[str, PortfolioAlertBaseModel]) -> 
             raise Exception(err_str_)
 
         for portfolio_alert in portfolio_alert_list:
-            alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief)
+            alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
+                                            portfolio_alert.component_file_path, portfolio_alert.source_file_name,
+                                            portfolio_alert.line_num)
             portfolio_alerts_cache[alert_key] = portfolio_alert
         return True
     return False
@@ -370,12 +376,14 @@ def _alert_queue_handler_err_handler(e, pydantic_obj_list, queue_obj, err_handli
         logging.debug(f"Calling Error handler func provided with param: {non_existing_obj}")
         err_handling_callable(non_existing_obj)
     elif "Failed to establish a new connection: [Errno 111] Connection refused" in str(e):
-        logging.exception(
-            f"Connection Error occurred while calling {web_client_callable.__name__}, "
-            f"will stay on wait for 5 secs and again retry - ignoring all data for this call")
-
         if client_connection_fail_retry_secs is None:
             client_connection_fail_retry_secs = 5 * 60  # 5 minutes
+
+        logging.exception(
+            f"Connection Error occurred while calling {web_client_callable.__name__}, "
+            f"will stay on wait for {client_connection_fail_retry_secs} secs and again retry - "
+            f"ignoring all data for this call")
+
         time.sleep(client_connection_fail_retry_secs)
     else:
         logging.exception(
@@ -387,7 +395,7 @@ def _alert_queue_handler_err_handler(e, pydantic_obj_list, queue_obj, err_handli
 def alert_queue_handler(run_state: bool, queue_obj: queue.Queue, bulk_transactions_counts_per_call: int,
                         bulk_transaction_timeout: int, create_web_client_callable: Callable[..., Any],
                         err_handling_callable, update_web_client_callable: Callable[..., Any] | None = None,
-                        created_alert_id_dict: Dict[int, bool] | None = None,
+                        created_alert_id_dict: Dict[int, StratAlert | PortfolioAlert] | None = None,
                         client_connection_fail_retry_secs: int | None = None):
     create_pydantic_obj_list = []
     update_pydantic_obj_list = []
@@ -414,7 +422,7 @@ def alert_queue_handler(run_state: bool, queue_obj: queue.Queue, bulk_transactio
                         update_pydantic_obj_list.append(pydantic_obj)
                     else:
                         create_pydantic_obj_list.append(pydantic_obj)
-                        created_alert_id_dict[pydantic_obj.id] = True
+                    created_alert_id_dict[pydantic_obj.id] = pydantic_obj
                 else:
                     # if created_alert_id_dict is not passed then only creating
                     create_pydantic_obj_list.append(pydantic_obj)
@@ -477,9 +485,17 @@ def clean_alert_str(alert_str: str) -> str:
     return cleaned_alert_str
 
 
-def get_alert_cache_key(severity: Severity, alert_brief: str):
+def get_alert_cache_key(severity: Severity, alert_brief: str, component_path: str | None = None,
+                        source_file_path: str | None = None, line_num: int | None = None) -> str:
     # updated_alert_brief: str = alert_brief.split(":", 3)[-1].strip()
     updated_alert_brief = clean_alert_str(alert_str=alert_brief)
+    alert_key = f"{severity}@#@{updated_alert_brief}"
+    if component_path:
+        alert_key += f"@#@{component_path}"
+    if source_file_path:
+        alert_key += f"@#@{source_file_path}"
+    if line_num:
+        alert_key += f"@#@{line_num}"
     return f"{severity}@#@{updated_alert_brief}"
 
 
@@ -488,104 +504,66 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
                            alert_queue: queue.Queue,
                            strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
                            portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
-                           severity: Severity, alert_brief: str, alert_details: str | None = None,
-                           strat_id: int | None = None, alert_id_to_alert_cache_dict: Dict | None = None) -> None:
+                           severity: Severity, alert_brief: str, alert_details: AlertDetail | str | None = None,
+                           strat_id: int | None = None, component_path: str | None = None,
+                           source_file_name: str | None = None, line_num: int | None = None,
+                           alert_create_date_time: DateTime | None = None) -> None:
     """
     Handles strat alerts if strat id is passed else handles portfolio alerts
     """
-    cache_key = get_alert_cache_key(severity, alert_brief)
+    cache_key = get_alert_cache_key(severity, alert_brief, component_path, source_file_name, line_num)
     stored_alert = alerts_cache_dict.get(cache_key)
 
     if stored_alert is not None:
         updated_alert_count: int = stored_alert.alert_count + 1
-        updated_last_update_date_time: DateTime = DateTime.utcnow()
+        last_update_analyzer_time: DateTime = DateTime.utcnow()
 
         # update the stored_alert in cache
         stored_alert.dismiss = False
         stored_alert.alert_brief = alert_brief
         stored_alert.alert_count = updated_alert_count
-        stored_alert.last_update_date_time = updated_last_update_date_time
+        stored_alert.last_update_analyzer_time = last_update_analyzer_time
         if alert_details is not None:
-            stored_alert.alert_details = alert_details
-
+            if stored_alert.alert_details is not None:
+                if isinstance(alert_details, str):
+                    if stored_alert.alert_details.first != alert_details:
+                        stored_alert.alert_details.latest = alert_details
+                    # else not required: avoiding update unless latest found is different from first
+                else:
+                    if stored_alert.alert_details.first != alert_details.latest:
+                        stored_alert.alert_details.latest = alert_details.latest
+                    # else not required: avoiding update unless latest found is different from first
+            else:
+                if isinstance(alert_details, str):
+                    stored_alert.alert_details = AlertDetailOptional()
+                    stored_alert.alert_details.first = alert_details
+                else:
+                    stored_alert.alert_details.first = alert_details.first
+        if component_path is not None:
+            stored_alert.component_file_path = component_path
+        if source_file_name is not None:
+            stored_alert.source_file_name = source_file_name
+        if line_num is not None:
+            stored_alert.line_num = line_num
+        if alert_create_date_time is not None:
+            stored_alert.alert_create_date_time = alert_create_date_time
         alert_queue.put(stored_alert)
-        if alert_id_to_alert_cache_dict is not None:
-            alert_id_to_alert_cache_dict[stored_alert.id] = stored_alert
 
     else:
         # create a new stored_alert
+        if isinstance(alert_details, str):
+            alert_details_str = alert_details
+            alert_details = AlertDetailOptional()
+            alert_details.first = alert_details_str
+        # else not required: taking alert_details obj as it is
         alert_obj: StratAlertBaseModel | PortfolioAlertBaseModel = (
             create_alert(alert_brief=alert_brief, alert_details=alert_details,
                          severity=severity, strat_id=strat_id, strat_alert_type=strat_alert_type,
-                         portfolio_alert_type=portfolio_alert_type))
+                         portfolio_alert_type=portfolio_alert_type, component_path=component_path,
+                         source_file_name=source_file_name, line_num=line_num,
+                         alert_create_date_time=alert_create_date_time))
         alerts_cache_dict[cache_key] = alert_obj
-
         alert_queue.put(alert_obj)
-        if alert_id_to_alert_cache_dict is not None:
-            alert_id_to_alert_cache_dict[alert_obj.id] = alert_obj
-
-# def _create_or_update_alert(alerts: List[StratAlertBaseModel] | List[StratAlert] |
-#                                          List[PortfolioAlertBaseModel] | List[PortfolioAlert] | None,
-#                            alert_queue: queue.Queue,
-#                            strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
-#                            portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
-#                            severity: Severity, alert_brief: str, alert_details: str | None = None,
-#                            strat_id: int | None = None) -> None:
-#     """
-#     Handles strat alerts if strat id is passed else handles portfolio alerts
-#     """
-#
-#     alert_obj: StratAlertBaseModel | PortfolioAlertBaseModel | None = None
-#     if alerts is not None:
-#         # stored_alert is stored cache alert for current strat_id
-#         for stored_alert in alerts:
-#             stored_alert_brief: str = stored_alert.alert_brief
-#             stored_alert_brief = stored_alert_brief.split(":", 3)[-1].strip()
-#             stored_alert_brief = clean_alert_str(alert_str=stored_alert_brief)
-#
-#             stored_alert_details: str | None = stored_alert.alert_details
-#             if stored_alert_details is not None:
-#                 stored_alert_details = clean_alert_str(alert_str=stored_alert_details)
-#
-#             updated_alert_brief: str = alert_brief.split(":", 3)[-1].strip()
-#             updated_alert_brief = clean_alert_str(alert_str=updated_alert_brief)
-#             updated_alert_details: str | None = alert_details
-#             if alert_details is not None:
-#                 updated_alert_details = clean_alert_str(alert_str=updated_alert_details)
-#
-#             if updated_alert_brief == stored_alert_brief and severity == stored_alert.severity:
-#                 # handling truncated mismatch
-#                 if updated_alert_details is not None and stored_alert_details is not None:
-#                     if len(updated_alert_details) > len(stored_alert_details):
-#                         updated_alert_details = updated_alert_details[:len(stored_alert_details)]
-#                     else:
-#                         stored_alert_details = stored_alert_details[:len(updated_alert_details)]
-#                 if updated_alert_details == stored_alert_details:
-#                     updated_alert_count: int = stored_alert.alert_count + 1
-#                     updated_last_update_date_time: DateTime = DateTime.utcnow()
-#
-#                     # update the stored_alert in cache
-#                     stored_alert.dismiss = False
-#                     stored_alert.alert_brief = alert_brief
-#                     stored_alert.alert_count = updated_alert_count
-#                     stored_alert.last_update_date_time = updated_last_update_date_time
-#
-#                     alert_queue.put(stored_alert)
-#                     return
-#
-#                 # else not required: stored_alert details not matched
-#             # else not required: stored_alert not matched with existing alerts
-#     if alert_obj is None:
-#         # create a new stored_alert
-#         alert_obj: StratAlertBaseModel | PortfolioAlertBaseModel = (
-#             create_alert(alert_brief=alert_brief, alert_details=alert_details,
-#                          severity=severity, strat_id=strat_id, strat_alert_type=strat_alert_type,
-#                          portfolio_alert_type=portfolio_alert_type))
-#         alerts.append(alert_obj)
-#
-#         alert_queue.put(alert_obj)
-#
-#         return
 
 
 def update_strat_alert_cache(
@@ -602,7 +580,9 @@ def update_strat_alert_cache(
         else:
             strat_alert_cache_by_strat_id_dict[strat_id] = {}
             for strat_alert in strat_alert_list:
-                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief)
+                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
+                                                strat_alert.component_file_path,
+                                                strat_alert.source_file_name, strat_alert.line_num)
                 strat_alert_cache_by_strat_id_dict[strat_id][alert_key] = strat_alert
 
 
@@ -620,5 +600,36 @@ async def async_update_strat_alert_cache(
         else:
             strat_alert_cache_by_strat_id_dict[strat_id] = {}
             for strat_alert in strat_alert_list:
-                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief)
+                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
+                                                strat_alert.component_file_path,
+                                                strat_alert.source_file_name, strat_alert.line_num)
                 strat_alert_cache_by_strat_id_dict[strat_id][alert_key] = strat_alert
+
+
+def get_source_name_n_line_num_from_log(log_line: str) -> Tuple[str, int] | None:
+    match = re.search(r'\[([^:]+)\s*:\s*(\d+)\]', log_line)
+    if match:
+        file_name = match.group(1)
+        line_number = match.group(2)
+        return file_name.strip(), line_number
+    return None
+
+
+def get_log_line_date_time(log_line: str) -> DateTime | None:
+    match = re.search(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})', log_line)
+    if match:
+        timestamp = match.group(1)
+        timestamp = pendulum.parse(timestamp, tz=pendulum.local_timezone())     # logs are stored in local datetime
+        return timestamp.in_tz('UTC')   # returning utc datetime
+    return None
+
+
+def get_alert_data_from_log_line(log_line: str) -> Tuple[str | None, int | None, DateTime | None]:
+    source_file_name_n_line_num = get_source_name_n_line_num_from_log(log_line)
+    source_file_name: str | None = None
+    line_num: int | None = None
+    if source_file_name_n_line_num:
+        source_file_name, line_num = source_file_name_n_line_num
+    alert_create_date_time: DateTime | None = get_log_line_date_time(log_line)
+    return source_file_name, line_num, alert_create_date_time
+

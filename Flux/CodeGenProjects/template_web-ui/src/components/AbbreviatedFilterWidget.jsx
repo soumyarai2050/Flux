@@ -1,4 +1,4 @@
-import React, { Fragment, useState, useEffect, useMemo } from 'react';
+import React, { Fragment, useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Autocomplete, Box, Button, Chip, Divider, TextField, Table, TableContainer, TableBody, TableRow, TableCell,
     TablePagination, Select, MenuItem, FormControlLabel, Checkbox, Snackbar, Alert, Popover
@@ -61,7 +61,7 @@ function AbbreviatedFilterWidget(props) {
         if (window.Worker) {
             worker.postMessage({
                 items,
-                itemsDataDict: props.itemsMetadataDict,
+                itemsDataDict: props.modifiedItemsMetadataDict,
                 itemProps: props.collections,
                 abbreviation: props.abbreviated,
                 loadedProps: props.loadListFieldAttrs,
@@ -71,7 +71,7 @@ function AbbreviatedFilterWidget(props) {
                 filters: props.filters
             });
         }
-    }, [items, props.itemsMetadataDict, page, rowsPerPage, sortOrders, props.filters])
+    }, [items, props.modifiedItemsMetadataDict, page, rowsPerPage, sortOrders, props.filters])
 
     useEffect(() => {
         if (window.Worker) {
@@ -115,14 +115,14 @@ function AbbreviatedFilterWidget(props) {
         }
     }, [items, props.setSelectedItem])
 
-    const onButtonClick = (e, action, xpath, value, source) => {
+    const onButtonClick = (e, action, xpath, value, source, confirmSave = false) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
-            props.onButtonToggle(e, xpath, updatedData, source);
+            props.onButtonToggle(e, xpath, updatedData, source, confirmSave);
         } else if (action === 'flux_trigger_strat') {
             let updatedData = flux_trigger_strat(value);
             if (updatedData) {
-                props.onButtonToggle(e, xpath, updatedData, source);
+                props.onButtonToggle(e, xpath, updatedData, source, confirmSave);
             }
         }
     }
@@ -277,19 +277,40 @@ function AbbreviatedFilterWidget(props) {
         props.onColumnOrdersChange(columnOrders);
     }
 
+    const onTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes, source) => {
+        if (value === '') {
+            value = null;
+        }
+        if (type === DataTypes.NUMBER) {
+            if (value !== null) {
+                value = value * 1;
+            }
+        }
+        const data = props.modifiedItemsMetadataDict[source].find(o => o[DB_ID] === props.selected);
+        if (data) {
+            const updatedData = cloneDeep(data);
+            _.set(updatedData, dataxpath, value);
+            props.onUpdate(updatedData, source);
+            props.onUserChange(xpath, value, null, source);
+            if (props.onFormUpdate) {
+                props.onFormUpdate(xpath, validationRes);
+            }
+        }
+    }, [props.onUpdate, props.onUserChange, props.modifiedItemsMetadataDict, props.selected])
+
     const filteredHeadCells = sortColumns(headCells.filter(cell => commonKeys.filter(c => c.key === cell.key).length === 0), props.columnOrders, true);
     const maxSequence = Math.max(...headCells.map(cell => cell.sequenceNumber));
 
     const dynamicMenu = (
         <>
-            {Object.keys(props.itemsMetadataDict).map(metadataName => {
+            {Object.keys(props.modifiedItemsMetadataDict).map(metadataName => {
                 return (
                     <DynamicMenu
                         key={metadataName}
                         name={props.headerProps.name}
                         collections={props.collections.filter(col => col.source === metadataName)}
                         commonKeyCollections={commonKeys.filter(col => col.source === metadataName)}
-                        data={props.itemsMetadataDict[metadataName]}
+                        data={props.modifiedItemsMetadataDict[metadataName]}
                         filters={props.filters}
                         onFiltersChange={props.onFiltersChange}
                         collectionView={true}
@@ -419,7 +440,8 @@ function AbbreviatedFilterWidget(props) {
                                             prefixCells={1}
                                             // suffixCells={props.bufferListFieldAttrs.hide ? 0 : 1}
                                             headCells={filteredHeadCells}
-                                            mode={Modes.READ_MODE}
+                                            // mode={Modes.READ_MODE}
+                                            mode={props.headerProps.mode}
                                             sortOrders={sortOrders}
                                             onRequestSort={handleRequestSort}
                                             onRemoveSort={handleRemoveSort}
@@ -439,7 +461,7 @@ function AbbreviatedFilterWidget(props) {
                                                         if (props.linkedItemsMetadata) {
                                                             alertBubbleData = props.linkedItemsMetadata.find(o => _.get(o, DB_ID) === row['data-id']);
                                                         } else {
-                                                            alertBubbleData = props.itemsMetadataDict[source].find(meta => _.get(meta, DB_ID) === row['data-id']);
+                                                            alertBubbleData = props.modifiedItemsMetadataDict[source].find(meta => _.get(meta, DB_ID) === row['data-id']);
                                                         }
                                                         alertBubbleCount = getAlertBubbleCount(alertBubbleData, bubbleSourcePath);
                                                         if (props.alertBubbleColorSource) {
@@ -448,6 +470,10 @@ function AbbreviatedFilterWidget(props) {
                                                         }
                                                     }
                                                     let disabled = false;
+                                                    const storedMetadaDict = {};
+                                                    Object.keys(props.itemsMetadataDict).map((source) => {
+                                                        storedMetadaDict[source] = props.itemsMetadataDict[source].find(o => o[DB_ID] === row['data-id']);    
+                                                    })
                                                     const buttonDisable = props.selected !== row["data-id"];
 
                                                     return (
@@ -461,7 +487,8 @@ function AbbreviatedFilterWidget(props) {
                                                                 </TableCell>
                                                                 {filteredHeadCells.map((cell, i) => {
                                                                     if (cell.hide) return;
-                                                                    let mode = Modes.READ_MODE;
+                                                                    // let mode = Modes.READ_MODE;
+                                                                    let mode = props.headerProps.mode;
                                                                     let rowindex = row["data-id"];
                                                                     let collection = props.collections.filter(c => c.key === cell.key)[0];
                                                                     if (collection.type === "progressBar") {
@@ -470,7 +497,7 @@ function AbbreviatedFilterWidget(props) {
                                                                             let min = collection.min;
                                                                             const source = min.split('.')[0];
                                                                             collection.minFieldName = min.split('.').pop();
-                                                                            const metadataArray = props.itemsMetadataDict[source];
+                                                                            const metadataArray = props.modifiedItemsMetadataDict[source];
                                                                             if (metadataArray) {
                                                                                 const metadata = metadataArray.find(meta => _.get(meta, DB_ID) === row['data-id']);
                                                                                 if (metadata) {
@@ -482,7 +509,7 @@ function AbbreviatedFilterWidget(props) {
                                                                             let max = collection.max;
                                                                             const source = max.split('.')[0];
                                                                             collection.maxFieldName = max.split('.').pop();
-                                                                            const metadataArray = props.itemsMetadataDict[source];
+                                                                            const metadataArray = props.modifiedItemsMetadataDict[source];
                                                                             if (metadataArray) {
                                                                                 const metadata = metadataArray.find(meta => _.get(meta, DB_ID) === row['data-id']);
                                                                                 if (metadata) {
@@ -493,16 +520,25 @@ function AbbreviatedFilterWidget(props) {
                                                                     }
                                                                     let xpath = collection.xpath;
                                                                     let value = row[collection.key];
+                                                                    let storedValue;
+                                                                    if (xpath.indexOf('-') !== -1) {
+                                                                        const storedValueArray = xpath.split('-').map(path => _.get(storedMetadaDict[collection.source], path))
+                                                                                                                 .filter(val => val !== null && val !== undefined);
+                                                                        storedValue = storedValueArray.join('-');
+                                                                    } else {
+                                                                        storedValue = _.get(storedMetadaDict[collection.source], xpath);
+                                                                    }
 
                                                                     return (
                                                                         <Cell
                                                                             key={i}
                                                                             mode={mode}
+                                                                            selected={selected}
                                                                             rowindex={rowindex}
                                                                             name={cell.key}
                                                                             elaborateTitle={cell.tableTitle}
                                                                             currentValue={value}
-                                                                            previousValue={value}
+                                                                            previousValue={storedValue}
                                                                             collection={collection}
                                                                             xpath={xpath}
                                                                             dataxpath={xpath}
@@ -515,12 +551,13 @@ function AbbreviatedFilterWidget(props) {
                                                                             onDoubleClick={() => { }}
                                                                             onButtonClick={onButtonClick}
                                                                             onCheckboxChange={() => { }}
-                                                                            onTextChange={() => { }}
+                                                                            onTextChange={onTextChange}
                                                                             onSelectItemChange={() => { }}
                                                                             onAutocompleteOptionChange={() => { }}
                                                                             onDateTimeChange={() => { }}
-                                                                            forceUpdate={collection.type === DataTypes.STRING ? new Boolean(true) : false}
+                                                                            forceUpdate={[DataTypes.STRING, DataTypes.NUMBER].includes(collection.type) ? new Boolean(true) : false}
                                                                             truncateDateTime={props.truncateDateTime}
+                                                                            widgetType='abbreviatedFilter'
                                                                         />
                                                                     )
                                                                 })}

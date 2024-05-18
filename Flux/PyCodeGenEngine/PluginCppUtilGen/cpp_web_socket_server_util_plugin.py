@@ -102,7 +102,7 @@ class CppWebSocketServerUtilPlugin(BaseProtoPlugin):
                     field_name: str = field.proto.name
                     field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
                     if CppWebSocketServerUtilPlugin.is_option_enabled(field, CppWebSocketServerUtilPlugin.flux_fld_PK):
-                        output_content += f"\tvoid prepare_{message_name_snake_cased}_list_obj({package_name}::{message_name}List " \
+                        output_content += f"\tinline void prepare_{message_name_snake_cased}_list_obj({package_name}::{message_name}List " \
                                           f"&r_{message_name_snake_cased}_list_obj_in_n_out, const int32_t size = 5) {{\n"
                         output_content += f"\t\t{package_name}::{message_name} {message_name_snake_cased};\n"
                         output_content += "\t\tfor (int i = 0; i < size; ++i) {\n"
@@ -112,7 +112,7 @@ class CppWebSocketServerUtilPlugin(BaseProtoPlugin):
                                           f"{message_name_snake_cased}()->CopyFrom({message_name_snake_cased});\n"
                         output_content += "\t\t}\n\t}\n\n"
 
-                        output_content += f"\tvoid send_{message_name_snake_cased}_to_web_client() {{\n"
+                        output_content += f"\tinline void send_{message_name_snake_cased}_to_web_client() {{\n"
                         output_content += f"\t\t{package_name}::{message_name} {message_name_snake_cased};\n"
                         output_content += f"\t\t{class_name}PopulateRandomValues::{message_name_snake_cased}" \
                                           f"({message_name_snake_cased});\n"
@@ -125,7 +125,7 @@ class CppWebSocketServerUtilPlugin(BaseProtoPlugin):
                                           f"{message_name_snake_cased}, -1);\n"
                         output_content += "\t}\n\n"
 
-                        output_content += f"\tvoid send_{message_name_snake_cased}_list_to_web_client() {{\n"
+                        output_content += f"\tinline void send_{message_name_snake_cased}_list_to_web_client() {{\n"
                         output_content += f"\t\t{package_name}::{message_name}List {message_name_snake_cased}_list;\n"
                         output_content += f"\t\tprepare_{message_name_snake_cased}_list_obj({message_name_snake_cased}_list);\n"
                         output_content += f"\t\t{class_name}{message_name}ListWebSocketServer<{package_name}::{message_name}List>" \

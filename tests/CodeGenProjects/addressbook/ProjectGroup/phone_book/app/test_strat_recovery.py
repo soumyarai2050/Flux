@@ -6,7 +6,6 @@ import signal
 
 from FluxPythonUtils.scripts.utility_functions import get_pid_from_port
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
-from tests.CodeGenProjects.AddressBook.ProjectGroup.conftest import *
 
 def restart_phone_book():
     pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],

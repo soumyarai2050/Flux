@@ -33,9 +33,14 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_servi
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client import PhotoBookServiceHttpClient
+from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_http_client import PerformanceBenchmarkServiceHttpClient
 
 code_gen_projects_dir_path = (PurePath(__file__).parent.parent.parent.parent.parent.parent.parent
                               / "Flux" / "CodeGenProjects")
+
+PERF_BENCH_DIR = code_gen_projects_dir_path / "performance_benchmark"
+pb_config_yaml_path: PurePath = PERF_BENCH_DIR / "data" / "config.yaml"
+pb_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(pb_config_yaml_path))
 
 PAIR_STRAT_ENGINE_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "phone_book"
 ps_config_yaml_path: PurePath = PAIR_STRAT_ENGINE_DIR / "data" / "config.yaml"
@@ -54,6 +59,12 @@ strat_view_config_yaml_path: PurePath = STRAT_VIEW_ENGINE_DIR / "data" / "config
 strat_view_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(strat_view_config_yaml_path))
 
 HOST: Final[str] = "127.0.0.1"
+
+PERF_BENCH_CACHE_HOST: Final[str] = pb_config_yaml_dict.get("server_host")
+PERF_BENCH_BEANIE_HOST: Final[str] = pb_config_yaml_dict.get("server_host")
+PERF_BENCH_CACHE_PORT: Final[str] = pb_config_yaml_dict.get("main_server_cache_port")
+PERF_BENCH_BEANIE_PORT: Final[str] = pb_config_yaml_dict.get("main_server_beanie_port")
+
 PAIR_STRAT_CACHE_HOST: Final[str] = ps_config_yaml_dict.get("server_host")
 PAIR_STRAT_BEANIE_HOST: Final[str] = ps_config_yaml_dict.get("server_host")
 PAIR_STRAT_CACHE_PORT: Final[str] = ps_config_yaml_dict.get("main_server_cache_port")
@@ -71,6 +82,8 @@ STRAT_VIEW_BEANIE_HOST: Final[str] = strat_view_config_yaml_dict.get("server_hos
 STRAT_VIEW_CACHE_PORT: Final[str] = strat_view_config_yaml_dict.get("main_server_cache_port")
 STRAT_VIEW_BEANIE_PORT: Final[str] = strat_view_config_yaml_dict.get("main_server_beanie_port")
 
+perf_benchmark_web_client: PerformanceBenchmarkServiceHttpClient = (
+    PerformanceBenchmarkServiceHttpClient(host=PERF_BENCH_BEANIE_HOST, port=parse_to_int(PERF_BENCH_BEANIE_PORT)))
 email_book_service_native_web_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient(host=PAIR_STRAT_BEANIE_HOST, port=parse_to_int(PAIR_STRAT_BEANIE_PORT))
 log_book_web_client: LogBookServiceHttpClient = (
@@ -2444,14 +2457,29 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
                        f"{strat_limits_list = }")
 
     # checking strat_view values
-    time.sleep(1)
-    strat_view = photo_book_web_client.get_strat_view_client(updated_pair_strat.id)
-    assert strat_view.max_single_leg_notional == updated_strat_limits.max_single_leg_notional, \
-        (f"Mismatched max_single_leg_notional in strat_view: expected: {updated_strat_limits.max_single_leg_notional}, "
-         f"received: {strat_view.max_single_leg_notional}")
-    assert strat_view.balance_notional == strat_status.balance_notional, \
-        (f"Mismatched balance_notional in strat_view: expected: {strat_status.balance_notional}, "
-         f"received: {strat_view.balance_notional}")
+    start_time = DateTime.utcnow()
+    for _ in range(10):
+        strat_view = photo_book_web_client.get_strat_view_client(updated_pair_strat.id)
+        max_single_leg_notional_passed = False
+        balance_notional_passed = False
+        if strat_view.max_single_leg_notional == updated_strat_limits.max_single_leg_notional:
+            max_single_leg_notional_passed = True
+        if strat_view.balance_notional == strat_status.balance_notional:
+            balance_notional_passed = True
+
+        if max_single_leg_notional_passed and balance_notional_passed:
+            print(f"IMPORTANT: strat_view initial update took {(start_time-DateTime.utcnow()).total_seconds()} secs "
+                  f"to be passed in this test")
+            break
+        time.sleep(1)
+    else:
+        strat_view = photo_book_web_client.get_strat_view_client(updated_pair_strat.id)
+        assert strat_view.max_single_leg_notional == updated_strat_limits.max_single_leg_notional, \
+            (f"Mismatched max_single_leg_notional in strat_view: expected: {updated_strat_limits.max_single_leg_notional}, "
+             f"received: {strat_view.max_single_leg_notional}")
+        assert strat_view.balance_notional == strat_status.balance_notional, \
+            (f"Mismatched balance_notional in strat_view: expected: {strat_status.balance_notional}, "
+             f"received: {strat_view.balance_notional}")
 
     # checking is_running_state of executor
     updated_pair_strat = email_book_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id)

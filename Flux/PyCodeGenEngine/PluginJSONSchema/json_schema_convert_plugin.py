@@ -56,6 +56,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_display_type,
         BaseProtoPlugin.flux_fld_display_zero,
         BaseProtoPlugin.flux_fld_text_align,
+        BaseProtoPlugin.flux_fld_column_size,
+        BaseProtoPlugin.flux_fld_column_direction,
         BaseProtoPlugin.flux_fld_micro_separator,
         BaseProtoPlugin.flux_fld_val_time_field,
         BaseProtoPlugin.flux_fld_val_meta_field,

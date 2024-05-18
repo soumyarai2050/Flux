@@ -33,7 +33,7 @@ sudo update-alternatives --config gcc
 wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.gz
 tar -xf boost_1_81_0.tar.gz
 cd boost_1_81_0
-./bootstrap.sh --prefix=/usr/local
+./bootstrap.sh --prefix=/home/subham/cpp_libs/libs_12/boost
 sudo ./b2 install
 ```
 
@@ -78,7 +78,7 @@ git clone --recursive https://github.com/protocolbuffers/protobuf.git
 cd protobuf
 mkdir cmake-out
 git checkout v25.0
-cmake -S. -Bcmake-out -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_CXX_STANDARD=17 -Dprotobuf_ABSL_PROVIDER=module -DCMAKE_PREFIX_PATH=/usr/local -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+cmake -S. -Bcmake-out -DCMAKE_INSTALL_PREFIX=/home/subham/cpp_libs/libs/protobuf_25.2 -DCMAKE_CXX_STANDARD=17 -Dprotobuf_ABSL_PROVIDER=module -DCMAKE_PREFIX_PATH=/home/subham/cpp_libs/libs/protobuf_25.2
 cd cmake-out
 make -j8
 sudo make install

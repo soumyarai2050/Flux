@@ -1,7 +1,3 @@
-//
-// Created by pc on 8/16/2023.
-//
-
 #pragma once
 
 #include <iostream>
@@ -11,12 +7,13 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
-#include <boost/json/src.hpp>
+#include <boost/json.hpp>
 #include <boost/asio.hpp>
 #include <boost/asio/deadline_timer.hpp>
 
 #include "json_codec.h"
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/ProtoGenCc/market_data_service.pb.h"
+#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_constants.h"
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -27,8 +24,9 @@ using tcp = boost::asio::ip::tcp;
 template <typename UserDataType, typename CallBackType = std::function<void(UserDataType&)>>
 class WebSocketClient {
 public:
-    explicit WebSocketClient(UserDataType &user_data, const std::string k_server_address = "127.0.0.1",
-                             const int32_t port = 8083, const int32_t k_read_timeout = 60,
+    explicit WebSocketClient(UserDataType &user_data, const std::string k_server_address = market_data_handler::host,
+                             const int32_t port = stoi(market_data_handler::port),
+                             const int32_t k_read_timeout = market_data_handler::connection_timeout,
                              const std::string handshake_address = "/",
                              quill::Logger *p_logger = quill::get_logger(), CallBackType call_back = {}) :
                              km_user_data_type_name_(UserDataType::GetDescriptor()->name()),

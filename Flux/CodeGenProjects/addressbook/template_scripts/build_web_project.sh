@@ -39,6 +39,14 @@ python gen_beanie_fastapi.py
 python gen_js_layouts.py
 python gen_json_schema.py
 python gen_executor_files.py
+
+# cython file to cpp generation
+cd ../app
+if [ -f "setup.py" ]; then
+    python setup.py build_ext --inplace
+fi
+cd -
+
 # cpp plugins
 python gen_cpp_db_codec.py
 python gen_cpp_constants.py

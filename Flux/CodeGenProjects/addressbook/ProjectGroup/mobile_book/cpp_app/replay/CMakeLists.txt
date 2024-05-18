@@ -3,11 +3,12 @@ set(CMAKE_CXX_STANDARD 23)
 list(APPEND CMAKE_MODULE_PATH "../cmake/")
 message (WARNING ${CMAKE_MODULE_PATH})
 find_package(Mongo REQUIRED)
-find_package(Protobuf REQUIRED)
-find_package(quill REQUIRED)
+#find_package(Protobuf REQUIRED)
+#find_package(quill REQUIRED)
 find_package(Python REQUIRED COMPONENTS Development)
 
-set(libabsl_ROOT_PATH  /usr/local/lib)
+set(libabsl_ROOT_PATH  /home/subham/cpp_libs/libs_13/protobuf/static/lib/)
+set(ABSL_INCLUDE_DIR /home/subham/cpp_libs/libs_13/protobuf/static/include)
 set(protobuf_lib ${libabsl_ROOT_PATH}/libprotobuf.a)
 set(lib_utf ${libabsl_ROOT_PATH}/libutf8_validity.a)
 set(protobuf_ABSL_USED_TARGETS ${libabsl_ROOT_PATH}/libabsl_log_severity.a ${libabsl_ROOT_PATH}/libabsl_raw_logging_internal.a
@@ -48,33 +49,48 @@ set(protobuf_ABSL_USED_TARGETS ${libabsl_ROOT_PATH}/libabsl_log_severity.a ${lib
         ${libabsl_ROOT_PATH}/libabsl_debugging_internal.a ${libabsl_ROOT_PATH}/libabsl_int128.a
         ${libabsl_ROOT_PATH}/libabsl_base.a)
 
+set(Boost_INCLUDE_DIRS /home/subham/cpp_libs/libs_13/boost/include)
+set(Boost_INCLUDE_LIBS /home/subham/cpp_libs/libs_13/boost/lib)
+set(Boost_INCLUDE_LIBS_TARGET ${Boost_INCLUDE_LIBS}/libboost_atomic.so ${Boost_INCLUDE_LIBS}/libboost_chrono.so
+         ${Boost_INCLUDE_LIBS}/libboost_container.so ${Boost_INCLUDE_LIBS}/libboost_context.so
+         ${Boost_INCLUDE_LIBS}/libboost_contract.so ${Boost_INCLUDE_LIBS}/libboost_coroutine.so
+         ${Boost_INCLUDE_LIBS}/libboost_date_time.so ${Boost_INCLUDE_LIBS}/libboost_fiber.so
+         ${Boost_INCLUDE_LIBS}/libboost_filesystem.so ${Boost_INCLUDE_LIBS}/libboost_graph.so
+         ${Boost_INCLUDE_LIBS}/libboost_iostreams.so ${Boost_INCLUDE_LIBS}/libboost_json.so
+         ${Boost_INCLUDE_LIBS}/libboost_locale.so ${Boost_INCLUDE_LIBS}/libboost_log_setup.so
+         ${Boost_INCLUDE_LIBS}/libboost_log.so ${Boost_INCLUDE_LIBS}/libboost_nowide.so
+         ${Boost_INCLUDE_LIBS}/libboost_prg_exec_monitor.so ${Boost_INCLUDE_LIBS}/libboost_program_options.so
+         ${Boost_INCLUDE_LIBS}/libboost_serialization.so ${Boost_INCLUDE_LIBS}/libboost_stacktrace_addr2line.so
+         ${Boost_INCLUDE_LIBS}/libboost_stacktrace_backtrace.so ${Boost_INCLUDE_LIBS}/libboost_stacktrace_basic.so
+         ${Boost_INCLUDE_LIBS}/libboost_stacktrace_noop.so ${Boost_INCLUDE_LIBS}/libboost_system.so
+         ${Boost_INCLUDE_LIBS}/libboost_thread.so ${Boost_INCLUDE_LIBS}/libboost_timer.so
+         ${Boost_INCLUDE_LIBS}/libboost_type_erasure.so ${Boost_INCLUDE_LIBS}/libboost_url.so ${Boost_INCLUDE_LIBS}/libboost_wave.so
+         ${Boost_INCLUDE_LIBS}/libboost_wserialization.so
+         )
+
 set(CppCodec ../../generated/CppCodec)
 set(CppTest ../../generated/generated/CppTest)
 set(CppUtilGen ../../generated/CppUtilGen)
 set(ProtoGenCc ../../generated/ProtoGenCc)
-#set(FluxCodeGenCore ../../../../../Flux/PyCodeGenEngine/FluxCodeGenCore)
-#set(App ../../../../../Flux/CodeGenProjects/mobile_book/cpp_app/include)
 set(FluxCppCore ../../../../../../FluxCppCore/include/)
 
-file(GLOB CppCodec_SRC ${CppCodec}/*)
-file(GLOB CppTest_SRC ${CppTest}/*)
-file(GLOB CppUtilGen_SRC ${CppUtilGen}/*)
-file(GLOB ProtoGenCc_SRC ${ProtoGenCc}/*)
-#file(GLOB App_SRC ${App}/*)
-file(GLOB FluxCppCore_SRC ${FluxCppCore}/*)
+file(GLOB CppCodec_SRC ${CppCodec}/*.cpp)
+#file(GLOB CppTest_SRC ${CppTest}/*.cpp)
+file(GLOB CppUtilGen_SRC ${CppUtilGen}/*.cpp)
+file(GLOB ProtoGenCc_SRC ${ProtoGenCc}/*.cc)
+file(GLOB FluxCppCore_SRC ${FluxCppCore}/*.cpp)
 
 project(mobile_book)
 
 message(WARNING ${MONGO_INCLUDE_DIR})
 message(WARNING ${BSON_INCLUDE_DIR})
 
-include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCLUDE_DIR} ${BSON_THIRD_PARTY_INCLUDE_DIR}
-        ${BSON_INCLUDE_DIR}
-        ${Protobuf_INCLUDE_DIRS} ${CppCodec} ${CppTest} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
-        /usr/local/lib/quill /usr/include/python3.10)
+include_directories(${MONGO_INCLUDE_DIR} ${BSON_THIRD_PARTY_DIR} ${BSON_INCLUDE_DIR} ${Boost_INCLUDE_DIRS}
+        ${Protobuf_INCLUDE_DIRS} ${ABSL_INCLUDE_DIR} ${CppCodec} ${CppTest} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
+        /home/subham/cpp_libs/libs_13/quill/include /usr/include/python3.12)
 
 set(MD_MODEL ../../generated/CppProto2)
-protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/mobile_book_service.proto)
+# protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/mobile_book_service.proto)
 
 set(SRC_FILES
         ${CppCodec_SRC}
@@ -87,24 +103,48 @@ set(SRC_FILES
 message(SRC_FILES ${SRC_FILES})
 message(${Python_LIBRARIES})
 # Create shared library including dependencies
-add_library(mobile_book SHARED ${SRC_FILES})
+add_library(marketdataprovider SHARED ${SRC_FILES} cpp_app_launcher.cpp
+        cpp_app_semaphore.cpp
+        mongo_db_singleton.cpp
+        mock_mobile_book_cache.cpp
+        cpp_app_shared_resource.cpp)
 
 # Link dependencies to the shared library
-target_link_libraries(mobile_book
-        ${Python_LIBRARIES}
-        ${MONGO_LIB}
-        ${BSON_LIB}
-        ${Protobuf_LIBRARIES}
+target_link_libraries(marketdataprovider
+        /usr/lib/x86_64-linux-gnu/libpython3.12.so
+#        /usr/lib/x86_64-linux-gnu/libpython3.10.so
+        ${MONGO_LIB_CPP}
+        ${BSON_LIB_CPP}
+#        ${MONGO_LIB}
+#        ${BSON_LIB}
+#        ${SSL_LIB}
+#        /usr/local/ssl/lib64/libcrypto.a
+#        -L/lib/x86_64-linux-gnu/ -lsasl2
+        ${protobuf_lib}
         ${lib_utf}
         ${protobuf_ABSL_USED_TARGETS}
-        quill::quill
+        /home/subham/cpp_libs/libs_13/quill/lib/libquill.a
+        ${Boost_INCLUDE_LIBS_TARGET}
 )
 
 # Add compile options to the shared library
-target_compile_options(mobile_book PRIVATE -g)
+target_compile_options(marketdataprovider PRIVATE -g -Wno-deprecated)
 
 # Create executable
-add_executable(mobile_book_exec main.cpp)
+add_executable(mobile_book_exec main.cpp ${SRC_FILES} cpp_app_semaphore.cpp
+        mongo_db_singleton.cpp cpp_app_shared_resource.cpp)
+#
+## Link the shared library to the executable
+target_link_libraries(mobile_book_exec
+        /usr/lib/x86_64-linux-gnu/libpython3.12.so
+        ${MONGO_LIB_CPP}
+        ${BSON_LIB_CPP}
+        ${protobuf_lib}
+        ${lib_utf}
+        ${protobuf_ABSL_USED_TARGETS}
+        /home/subham/cpp_libs/libs_13/quill/lib/libquill.a
+        ${Boost_INCLUDE_LIBS_TARGET}
+        )
 
 # Link the shared library to the executable
-target_link_libraries(mobile_book_exec mobile_book)
+#target_link_libraries(mobile_book_exec mobile_book)

@@ -688,7 +688,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                              package_name: str, message_name: str):
         output_content: str = ""
         # output_content += f"\tprotected:\n\n"
-        output_content += f"\tvoid prepare_doc(const {package_name}::{message_name} " \
+        output_content += f"\tinline void prepare_doc(const {package_name}::{message_name} " \
                           f"&kr_{message_name_snake_cased}_obj, bsoncxx::builder::basic::document " \
                           f"&r_{message_name_snake_cased}_document) "
         output_content += " {\n"
@@ -763,7 +763,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                               package_name: str, message_name: str):
 
         output_content: str = ""
-        output_content += f"\tvoid prepare_list_doc(const {package_name}::{message_name}List " \
+        output_content += f"\tinline void prepare_list_doc(const {package_name}::{message_name}List " \
                           f"&r_{message_name_snake_cased}_list_obj, std::vector<bsoncxx::builder::basic::document> " \
                           f"&r_{message_name_snake_cased}_document_list) "
         output_content += " {\n"

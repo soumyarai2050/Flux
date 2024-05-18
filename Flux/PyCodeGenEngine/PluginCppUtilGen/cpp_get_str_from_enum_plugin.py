@@ -68,7 +68,7 @@ class CppGetStrFromEnumPlugin(BaseProtoPlugin):
         for enum in self.root_enum_list:
             enum_name: str = enum.proto.name
             enum_name_snake_cased: str = convert_camel_case_to_specific_case(enum_name)
-            output_content += (f"\tstd::string get_str_from_enum(const {package_name}::{enum_name} "
+            output_content += (f"\tinline std::string get_str_from_enum(const {package_name}::{enum_name} "
                                f"&kr_{enum_name_snake_cased}) {{\n")
             output_content += f"\t\tswitch (kr_{enum_name_snake_cased}) {{\n"
             for enum_val in enum.values:

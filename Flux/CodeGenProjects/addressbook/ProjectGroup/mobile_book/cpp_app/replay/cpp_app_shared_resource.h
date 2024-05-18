@@ -7,14 +7,14 @@
 #include "utility_functions.h"
 
 namespace mobile_book_handler {
-    static int32_t tob_ws_port = FluxCppCore::find_free_port();
-    static int32_t md_ws_port = FluxCppCore::find_free_port();
-    static int32_t lt_ws_port = FluxCppCore::find_free_port();
-    mobile_book::TopOfBook top_of_book_obj;
-    mobile_book::LastBarter last_barter_obj;
-    mobile_book::MarketDepth market_depth_obj;
-    mobile_book_cache::MarketDepthCache market_DepthCache;
-    mobile_book_cache::TopOfBookCache topOfBookCache_;
-    mobile_book_cache::LastBarterCache lastBarterCache_;
-    const std::chrono::seconds TIME_OUT_CONNECTION = std::chrono::seconds(36000);
+    extern int32_t tob_ws_port;
+    extern int32_t md_ws_port;
+    extern int32_t lt_ws_port;
+    extern mobile_book::TopOfBook top_of_book_obj;
+    extern mobile_book::LastBarter last_barter_obj;
+    extern mobile_book::MarketDepth market_depth_obj;
+    extern mobile_book_cache::MarketDepthCache market_DepthCache;
+    extern mobile_book_cache::TopOfBookCache topOfBookCache_;
+    extern mobile_book_cache::LastBarterCache lastBarterCache_;
+    extern const std::chrono::seconds TIME_OUT_CONNECTION;
 }

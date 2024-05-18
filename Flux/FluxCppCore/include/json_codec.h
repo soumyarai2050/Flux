@@ -28,7 +28,7 @@ namespace FluxCppCore {
     template<typename RootModelType>
     class RootModelJsonCodec : public JsonCodecOptions {
         using JsonCodecOptions::c_p_logger_;
-    public:
+    protected:
         static inline void modify_json(std::string &r_json_str) {
             try {
                 boost::json::value jv = boost::json::parse(r_json_str);
@@ -51,6 +51,7 @@ namespace FluxCppCore {
             }
         }
 
+    public:
 
         [[nodiscard]] static inline bool decode_model(RootModelType &r_model_obj, std::string &kr_json) {
             google::protobuf::util::JsonParseOptions options;
@@ -92,6 +93,39 @@ namespace FluxCppCore {
     template<typename RootModelListType>
     class RootModelListJsonCodec : public JsonCodecOptions {
         using JsonCodecOptions::c_p_logger_;
+    protected:
+
+        static inline void modify_json(std::string &r_json_str) {
+            // Parse the JSON string into a JSON object
+            boost::json::value jv = boost::json::parse(r_json_str);
+            boost::json::object& obj = jv.as_object();
+
+            // Access the "market_depth" array
+            boost::json::array& market_depth = obj["market_depth"].as_array();
+
+            // Iterate over the objects in the array
+            for (auto& item : market_depth) {
+                try {
+                    boost::json::object& item_obj = item.as_object();
+
+                    // Replace "BID" with 1 and "ASK" with 2 in the "side" field
+                    if (item_obj["side"].as_string() == "BID") {
+                        item_obj["side"] = 2;
+                    } else if (item_obj["side"].as_string() == "ASK") {
+                        item_obj["side"] = 3;
+                    } else {
+                        LOG_ERROR(c_p_logger_, "Error: 'side' field is not a string in JSON. JSON: {}", r_json_str);
+                    }
+                    // Serialize the JSON object back into a string
+                    r_json_str = boost::json::serialize(jv);
+                } catch (const std::invalid_argument& e) {
+                    LOG_ERROR(c_p_logger_, "Invalid argument encountered: {}, JSON: {}", e.what(), r_json_str);
+                } catch (const boost::json::system_error& e) {
+                    LOG_ERROR(c_p_logger_, "Parse error encountered: {}, JSON: {}", e.what(), r_json_str);
+                }
+            }
+        }
+
     public:
 
         [[nodiscard]] static inline bool
@@ -116,30 +150,6 @@ namespace FluxCppCore {
                           RootModelListType::GetDescriptor()->name(), kr_model_list_obj.DebugString());
                 return false;
             }
-        }
-
-        static inline void modify_json(std::string &r_json_str) {
-            // Parse the JSON string into a JSON object
-            boost::json::value jv = boost::json::parse(r_json_str);
-            boost::json::object& obj = jv.as_object();
-
-            // Access the "market_depth" array
-            boost::json::array& market_depth = obj["market_depth"].as_array();
-
-            // Iterate over the objects in the array
-            for (auto& item : market_depth) {
-                boost::json::object& item_obj = item.as_object();
-
-                // Replace "BID" with 1 and "ASK" with 2 in the "side" field
-                if (item_obj["side"].as_string() == "BID") {
-                    item_obj["side"] = 2;
-                } else if (item_obj["side"].as_string() == "ASK") {
-                    item_obj["side"] = 3;
-                }
-            }
-
-            // Serialize the JSON object back into a string
-            r_json_str = boost::json::serialize(jv);
         }
 
         // ideally dash_list_json should have been a const - but we intend to reuse the top_of_book_list_json to avoid creating new string
