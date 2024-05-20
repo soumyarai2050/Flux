@@ -2721,8 +2721,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onUpdate = (updatedObj, source) => {\n"
 
             msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+            is_single_source = True
             for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
                 if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                    is_single_source = False
                     msg_name_used_in_abb_option_snake_cased = (
                         convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
                     msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
@@ -2733,7 +2735,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             abbreviated_dependent_msg_camel_cased = convert_to_camel_case(abbreviated_dependent_msg_name)
             abbreviated_dependent_msg_snake_cased = convert_camel_case_to_specific_case(abbreviated_dependent_msg_name)
 
-            if msg_used_in_abb_option_list:
+            if not is_single_source:
                 output_str += "        } else if (source === " + f"'{abbreviated_dependent_msg_snake_cased}') " + "{\n"
             else:
                 output_str += "        if (source === " + f"'{abbreviated_dependent_msg_snake_cased}') " + "{\n"

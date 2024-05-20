@@ -631,7 +631,7 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
                                    copy.deepcopy(expected_strat_limits_),
                                    copy.deepcopy(expected_strat_status_), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
-                                    max_loop_count_per_side,
+                                   max_loop_count_per_side,
                                    refresh_sec_update_fixture)
                    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
 

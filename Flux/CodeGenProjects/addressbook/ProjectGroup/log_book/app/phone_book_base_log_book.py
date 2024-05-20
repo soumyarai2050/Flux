@@ -397,12 +397,9 @@ class PhoneBookBaseLogBook(AppLogBook):
                                        alert_create_date_time=DateTime.utcnow())
 
     def notify_tail_error_in_log_service(self, brief_msg_str: str, detail_msg_str: str):
-        source_file_name, line_num, alert_create_date_time = get_alert_data_from_log_line(detail_msg_str)
         self.send_portfolio_alerts(severity=self.get_severity("warning"), alert_brief=brief_msg_str,
                                    alert_details=detail_msg_str,
-                                   component_path=self.component_file_path,
-                                   source_file_name=source_file_name, line_num=line_num,
-                                   alert_create_date_time=alert_create_date_time)
+                                   component_path=self.component_file_path)
 
     def notify_error(self, error_msg: str, source_name: str, line_num: int, log_create_date_time: DateTime):
         log_seperator_index: int = error_msg.find(PhoneBookBaseLogBook.log_seperator)
@@ -454,7 +451,10 @@ class PhoneBookBaseLogBook(AppLogBook):
                                        line_num=inspect.currentframe().f_lineno,
                                        alert_create_date_time=DateTime.utcnow())
 
-    def handle_log_simulator_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail):
+    def handle_log_simulator_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail,
+                                                 log_date_time: DateTime | None = None,
+                                                 log_source_file_name: str | None = None,
+                                                 line_num: int | None = None):
         logging.debug(f"Processing log simulator line: {log_message[:200]}...")
         # put in method
         if log_message.startswith(self.pattern_for_log_simulator):
@@ -463,17 +463,19 @@ class PhoneBookBaseLogBook(AppLogBook):
             self._process_barter_simulator_message(log_message)
             return
 
-        source_file_name, line_num, alert_create_date_time = get_alert_data_from_log_line(log_message)
         error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=log_prefix, log_message=log_message)
         if error_dict is not None:
             severity, alert_brief, alert_details = self._create_alert(error_dict)
             self.send_portfolio_alerts(severity=severity, alert_brief=alert_brief, alert_details=alert_details,
                                        component_path=self.component_file_path,
-                                       source_file_name=source_file_name,
-                                       line_num=line_num, alert_create_date_time=alert_create_date_time)
+                                       source_file_name=log_source_file_name,
+                                       line_num=line_num, alert_create_date_time=log_date_time)
         # else not required: error pattern doesn't match, no alerts to send
 
-    def handle_perf_benchmark_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail):
+    def handle_perf_benchmark_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail,
+                                                  log_date_time: DateTime | None = None,
+                                                  log_source_file_name: str | None = None,
+                                                  line_num: int | None = None):
         pattern = re.compile(f"{self.timeit_pattern}.*{self.timeit_pattern}")
         if search_obj := re.search(pattern, log_message):
             found_pattern = search_obj.group()

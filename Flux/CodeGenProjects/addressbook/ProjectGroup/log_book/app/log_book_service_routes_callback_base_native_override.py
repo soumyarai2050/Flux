@@ -71,14 +71,38 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     log_prefix_regex_pattern_to_callable_name_dict = {
         pair_strat_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
     }
+    log_prefix_regex_pattern_to_log_date_time_regex_pattern = {
+        pair_strat_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
+    }
+    log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern = {
+        pair_strat_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
+    }
     debug_log_prefix_regex_pattern_to_callable_name_dict = {
         debug_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
+    }
+    debug_log_prefix_regex_pattern_to_log_date_time_regex_pattern = {
+        debug_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
+    }
+    debug_log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern = {
+        debug_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
     }
     log_perf_benchmark_pattern_to_callable_name_dict = {
         perf_benchmark_log_prefix_regex_pattern: "handle_perf_benchmark_matched_log_message"
     }
+    log_perf_benchmark_pattern_to_log_date_time_regex_pattern = {
+        perf_benchmark_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
+    }
+    log_perf_benchmark_pattern_to_log_source_patter_n_line_num_regex_pattern = {
+        perf_benchmark_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
+    }
     log_simulator_prefix_regex_pattern_to_callable_name_dict = {
         log_simulator_log_prefix_regex_pattern: "handle_log_simulator_matched_log_message"
+    }
+    log_simulator_prefix_regex_pattern_to_log_date_time_regex_pattern = {
+        log_simulator_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
+    }
+    log_simulator_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern = {
+        log_simulator_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
     }
     background_log_prefix_regex_pattern_to_callable_name_dict = {
         background_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
@@ -246,6 +270,16 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         self.tail_file_multiprocess_queue.put("EXIT")
         self.strat_alert_queue.put("EXIT")
         self.portfolio_alert_queue.put("EXIT")
+
+        # deleting lock file for suppress alert regex
+        regex_lock_file_name = config_yaml_dict.get("regex_lock_file_name")
+        if regex_lock_file_name is not None:
+            regex_lock_file = LOG_ANALYZER_DATA_DIR / regex_lock_file_name
+            if os.path.exists(regex_lock_file):
+                os.remove(regex_lock_file)
+        else:
+            err_str_ = "Can't find key 'regex_lock_file_name' in config dict - can't delete regex pattern lock file"
+            logging.error(err_str_)
 
     def _handle_portfolio_alert_queue_err_handler(self, *args):
         err_str_ = f"_handle_portfolio_alert_queue_err_handler called, passed args: {args}"
@@ -547,6 +581,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     phone_book_log_dir / f"phone_book_logs_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern,
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
                 service="phone_book_background_debug",
@@ -575,6 +615,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 log_file_path=str(street_book_log_dir / f"street_book_*_logs_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern,
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=True,
                 strat_id_find_callable=strat_id_from_executor_log_file),
             StratLogDetail(
@@ -589,6 +635,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 log_file_path=str(post_barter_log_dir / f"post_book_*_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern,
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=True),
             StratLogDetail(
                 service="post_book_perf_bench",
@@ -617,6 +669,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     photo_book_log_dir / f"photo_book_logs_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern,
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
                 service="phone_book_unload_strat_event",
@@ -624,6 +682,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     phone_book_log_dir / f"unload_strat_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern,
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
                 service="phone_book_recycle_strat_event",
@@ -631,6 +695,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     phone_book_log_dir / f"recycle_strat_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern,
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
                 service="phone_book_pause_all_active_strat_event",
@@ -638,6 +708,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     phone_book_log_dir / f"pause_all_active_strats_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern,
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
                 # used for test to verify file_watcher's tail_executor start handler with full path
@@ -647,6 +723,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     street_book_log_dir / f"sample_test.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern,
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
                 # used for test to verify file_watcher's tail_executor start handler with pattern path
@@ -656,6 +738,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     street_book_log_dir / f"sample_*_test.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern,
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
+                LogBookServiceRoutesCallbackBaseNativeOverride.
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=True)
         ]
         PhoneBookLogBook.log_file_watcher(log_details, tail_multiprocess_queue, StratLogDetail,

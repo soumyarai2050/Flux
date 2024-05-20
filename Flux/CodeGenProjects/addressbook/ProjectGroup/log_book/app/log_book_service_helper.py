@@ -606,30 +606,3 @@ async def async_update_strat_alert_cache(
                 strat_alert_cache_by_strat_id_dict[strat_id][alert_key] = strat_alert
 
 
-def get_source_name_n_line_num_from_log(log_line: str) -> Tuple[str, int] | None:
-    match = re.search(r'\[([^:]+)\s*:\s*(\d+)\]', log_line)
-    if match:
-        file_name = match.group(1)
-        line_number = match.group(2)
-        return file_name.strip(), line_number
-    return None
-
-
-def get_log_line_date_time(log_line: str) -> DateTime | None:
-    match = re.search(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})', log_line)
-    if match:
-        timestamp = match.group(1)
-        timestamp = pendulum.parse(timestamp, tz=pendulum.local_timezone())     # logs are stored in local datetime
-        return timestamp.in_tz('UTC')   # returning utc datetime
-    return None
-
-
-def get_alert_data_from_log_line(log_line: str) -> Tuple[str | None, int | None, DateTime | None]:
-    source_file_name_n_line_num = get_source_name_n_line_num_from_log(log_line)
-    source_file_name: str | None = None
-    line_num: int | None = None
-    if source_file_name_n_line_num:
-        source_file_name, line_num = source_file_name_n_line_num
-    alert_create_date_time: DateTime | None = get_log_line_date_time(log_line)
-    return source_file_name, line_num, alert_create_date_time
-
