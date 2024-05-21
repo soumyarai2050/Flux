@@ -39,18 +39,16 @@ def create_alert(
         strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
         portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
         alert_brief: str, alert_details: AlertDetail | None = None,
-        severity: Severity = Severity.Severity_ERROR,
-        strat_id: int | None = None, component_path: str | None = None,
-        source_file_name: str | None = None, line_num: int | None = None,
-        alert_create_date_time: DateTime | None = None) -> StratAlertBaseModel | PortfolioAlertBaseModel:
+        severity: Severity = Severity.Severity_ERROR, strat_id: int | None = None,
+        alert_meta: AlertMeta | None = None) -> StratAlertBaseModel | PortfolioAlertBaseModel:
     """
     Handles strat alerts if strat id is passed else handles portfolio alerts
     """
     kwargs = {}
     kwargs.update(severity=severity, alert_brief=alert_brief, dismiss=False,
-                  last_update_analyzer_time=DateTime.utcnow(), alert_count=1,
-                  component_file_path=component_path, source_file_name=source_file_name,
-                  line_num=line_num, alert_create_date_time=alert_create_date_time)
+                  last_update_analyzer_time=DateTime.utcnow(), alert_count=1)
+    if alert_meta:
+        kwargs['alert_meta'] = alert_meta
     if alert_details is not None:
         kwargs.update(alert_details=alert_details)
     if strat_id is not None:
@@ -98,9 +96,9 @@ def init_service(portfolio_alerts_cache: Dict[str, PortfolioAlertBaseModel]) -> 
             raise Exception(err_str_)
 
         for portfolio_alert in portfolio_alert_list:
+            component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(portfolio_alert)
             alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
-                                            portfolio_alert.component_file_path, portfolio_alert.source_file_name,
-                                            portfolio_alert.line_num)
+                                            component_file_path, source_file_name, line_num)
             portfolio_alerts_cache[alert_key] = portfolio_alert
         return True
     return False
@@ -505,13 +503,13 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
                            strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
                            portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
                            severity: Severity, alert_brief: str, alert_details: AlertDetail | str | None = None,
-                           strat_id: int | None = None, component_path: str | None = None,
-                           source_file_name: str | None = None, line_num: int | None = None,
-                           alert_create_date_time: DateTime | None = None) -> None:
+                           strat_id: int | None = None, alert_meta: AlertMeta | None = None) -> None:
     """
     Handles strat alerts if strat id is passed else handles portfolio alerts
     """
-    cache_key = get_alert_cache_key(severity, alert_brief, component_path, source_file_name, line_num)
+
+    cache_key = get_alert_cache_key(severity, alert_brief, alert_meta.component_file_path,
+                                    alert_meta.source_file_name, alert_meta.line_num)
     stored_alert = alerts_cache_dict.get(cache_key)
 
     if stored_alert is not None:
@@ -539,14 +537,18 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
                     stored_alert.alert_details.first = alert_details
                 else:
                     stored_alert.alert_details.first = alert_details.first
-        if component_path is not None:
-            stored_alert.component_file_path = component_path
-        if source_file_name is not None:
-            stored_alert.source_file_name = source_file_name
-        if line_num is not None:
-            stored_alert.line_num = line_num
-        if alert_create_date_time is not None:
-            stored_alert.alert_create_date_time = alert_create_date_time
+        if stored_alert.alert_meta is not None:
+            if alert_meta.component_file_path is not None:
+                stored_alert.alert_meta.component_file_path = alert_meta.component_file_path
+            if alert_meta.source_file_name is not None:
+                stored_alert.alert_meta.source_file_name = alert_meta.source_file_name
+            if alert_meta.line_num is not None:
+                stored_alert.alert_meta.line_num = alert_meta.line_num
+            if alert_meta.alert_create_date_time is not None:
+                stored_alert.alert_meta.alert_create_date_time = alert_meta.alert_create_date_time
+        else:
+            stored_alert.alert_meta = alert_meta
+
         alert_queue.put(stored_alert)
 
     else:
@@ -556,12 +558,11 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
             alert_details = AlertDetailOptional()
             alert_details.first = alert_details_str
         # else not required: taking alert_details obj as it is
+
         alert_obj: StratAlertBaseModel | PortfolioAlertBaseModel = (
             create_alert(alert_brief=alert_brief, alert_details=alert_details,
                          severity=severity, strat_id=strat_id, strat_alert_type=strat_alert_type,
-                         portfolio_alert_type=portfolio_alert_type, component_path=component_path,
-                         source_file_name=source_file_name, line_num=line_num,
-                         alert_create_date_time=alert_create_date_time))
+                         portfolio_alert_type=portfolio_alert_type, alert_meta=alert_meta))
         alerts_cache_dict[cache_key] = alert_obj
         alert_queue.put(alert_obj)
 
@@ -580,9 +581,9 @@ def update_strat_alert_cache(
         else:
             strat_alert_cache_by_strat_id_dict[strat_id] = {}
             for strat_alert in strat_alert_list:
+                component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(strat_alert)
                 alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
-                                                strat_alert.component_file_path,
-                                                strat_alert.source_file_name, strat_alert.line_num)
+                                                component_file_path, source_file_name, line_num)
                 strat_alert_cache_by_strat_id_dict[strat_id][alert_key] = strat_alert
 
 
@@ -600,9 +601,42 @@ async def async_update_strat_alert_cache(
         else:
             strat_alert_cache_by_strat_id_dict[strat_id] = {}
             for strat_alert in strat_alert_list:
+                component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(strat_alert)
                 alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
-                                                strat_alert.component_file_path,
-                                                strat_alert.source_file_name, strat_alert.line_num)
+                                                component_file_path, source_file_name, line_num)
                 strat_alert_cache_by_strat_id_dict[strat_id][alert_key] = strat_alert
 
 
+def get_alert_meta_obj(component_path: str | None = None,
+                       source_file_name: str | None = None, line_num: int | None = None,
+                       alert_create_date_time: DateTime | None = None) -> AlertMeta | None:
+    alert_meta = AlertMeta()
+    alert_meta_has_update = False
+    if component_path is not None:
+        alert_meta_has_update = True
+        alert_meta.component_file_path = component_path
+    if source_file_name is not None:
+        alert_meta_has_update = True
+        alert_meta.source_file_name = source_file_name
+    if line_num is not None:
+        alert_meta_has_update = True
+        alert_meta.line_num = line_num
+    if alert_create_date_time:
+        alert_meta_has_update = True
+        alert_meta.alert_create_date_time = alert_create_date_time
+
+    if alert_meta_has_update:
+        return alert_meta
+    else:
+        return None
+
+
+def get_key_meta_data_from_obj(alert_obj: StratAlert | PortfolioAlert | StratAlertBaseModel | PortfolioAlertBaseModel):
+    component_file_path = None
+    source_file_name = None
+    line_num = None
+    if alert_obj.alert_meta:
+        component_file_path = alert_obj.alert_meta.component_file_path
+        source_file_name = alert_obj.alert_meta.source_file_name
+        line_num = alert_obj.alert_meta.line_num
+    return component_file_path, source_file_name, line_num

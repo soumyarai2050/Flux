@@ -107,14 +107,8 @@ class PhoneBookBaseLogBook(AppLogBook):
                 "alert_brief": portfolio_alert.alert_brief,
                 "alert_details": portfolio_alert.alert_details
             }
-            if portfolio_alert.component_file_path:
-                portfolio_alert_dict.update(component_file_path=portfolio_alert.component_file_path)
-            if portfolio_alert.source_file_name:
-                portfolio_alert_dict.update(source_file_name=portfolio_alert.source_file_name)
-            if portfolio_alert.line_num:
-                portfolio_alert_dict.update(line_num=portfolio_alert.line_num)
-            if portfolio_alert.alert_create_date_time:
-                portfolio_alert_dict.update(alert_create_date_time=str(portfolio_alert.alert_create_date_time))
+            if portfolio_alert.alert_meta:
+                portfolio_alert_dict.update(alert_meta=portfolio_alert.alert_meta)
             portfolio_alert_data_list.append(portfolio_alert_dict)
 
         log_book_service_http_client.handle_portfolio_alerts_from_tail_executor_query_client(
@@ -153,12 +147,6 @@ class PhoneBookBaseLogBook(AppLogBook):
         else:
             alert_brief = alert_brief_n_detail_lists[0]
             alert_details = ". ".join(alert_brief_n_detail_lists[1:])
-
-        # removing extra prefix other than alert_brief msf
-        match = re.search(r'\]\s*:\s*(.+)$', alert_brief)
-        if match:
-            alert_brief = match.group(1)
-        # else taking existing alert_brief
 
         alert_brief = self._truncate_str(alert_brief).strip()
         alert_details = self._truncate_str(alert_details).strip()
@@ -356,11 +344,11 @@ class PhoneBookBaseLogBook(AppLogBook):
             # else not required
 
             severity: Severity = get_severity_type_from_severity_str(severity_str=severity)
+            alert_meta = get_alert_meta_obj(component_path, source_file_name,
+                                            line_num, alert_create_date_time)
             create_or_update_alert(self.portfolio_alerts_cache_dict, self.portfolio_alert_queue,
                                    StratAlertBaseModel, PortfolioAlertBaseModel,
-                                   severity, alert_brief, alert_details, component_path=component_path,
-                                   source_file_name=source_file_name, line_num=line_num,
-                                   alert_create_date_time=alert_create_date_time)
+                                   severity, alert_brief, alert_details, alert_meta=alert_meta)
         except Exception as e:
             log_book_service_http_client.portfolio_alert_fail_logger_query_client(
                 f"send_portfolio_alerts failed{PhoneBookBaseLogBook.log_seperator} exception: {e};;; "
@@ -375,9 +363,9 @@ class PhoneBookBaseLogBook(AppLogBook):
             if match:
                 error_dict: Dict = {
                     'type': error_type,
-                    'line': log_prefix.replace(pattern.search(log_prefix)[0], " ") + log_message
+                    'line': log_message
                 }
-                logging.info(f"Error pattern matched, creating alert. {error_dict = }")
+                logging.info(f"Error pattern matched, creating alert. {error_dict=}")
                 return error_dict
         return None
 
@@ -396,10 +384,13 @@ class PhoneBookBaseLogBook(AppLogBook):
                                        line_num=inspect.currentframe().f_lineno,
                                        alert_create_date_time=DateTime.utcnow())
 
-    def notify_tail_error_in_log_service(self, brief_msg_str: str, detail_msg_str: str):
+    def notify_tail_error_in_log_service(self, brief_msg_str: str, detail_msg_str: str,
+                                         source_file_name: str, line_num: int,
+                                         alert_create_date_time: DateTime):
         self.send_portfolio_alerts(severity=self.get_severity("warning"), alert_brief=brief_msg_str,
-                                   alert_details=detail_msg_str,
-                                   component_path=self.component_file_path)
+                                   alert_details=detail_msg_str, component_path=self.component_file_path,
+                                   source_file_name=source_file_name, line_num=line_num,
+                                   alert_create_date_time=alert_create_date_time)
 
     def notify_error(self, error_msg: str, source_name: str, line_num: int, log_create_date_time: DateTime):
         log_seperator_index: int = error_msg.find(PhoneBookBaseLogBook.log_seperator)

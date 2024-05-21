@@ -11,6 +11,14 @@ message AlertDetail {
   optional string latest = 2;
 }
 
+message AlertMeta{
+  optional string component_file_path = 1;
+  optional string source_file_name = 2;
+  optional int32 line_num = 3;
+  optional int64 alert_create_date_time = 4 [(FluxFldValIsDateTime) = true];
+
+}
+
 message StratAlert{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
@@ -82,14 +90,11 @@ message StratAlert{
   }];
   required Severity severity = 4 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED", (FluxFldOrmNoUpdate) = true];
   optional int32 alert_count = 5 [(FluxFldOrmNoUpdate) = true, (FluxFldColumnSize) = "small"];
-  optional string component_file_path = 6 [(FluxFldOrmNoUpdate) = true, (FluxFldHide) = "True", (FluxFldAbbreviated) = "JSON", (FluxFldColumnDirection) = "rtl"];
-  optional string source_file_name = 7 [(FluxFldOrmNoUpdate) = true];
-  optional int32 line_num = 8 [(FluxFldOrmNoUpdate) = true, (FluxFldColumnSize) = "small"];
-  required string alert_brief = 9 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left", (FluxFldOrmNoUpdate) = true];
+  required string alert_brief = 6 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left", (FluxFldOrmNoUpdate) = true];
   // must prefix strat:<strat-name> for strat alerts
-  optional AlertDetail alert_details = 10 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
-  optional int64 last_update_analyzer_time = 11 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
-  optional int64 alert_create_date_time = 12 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true, (FluxFldHide) = "True"];
+  optional AlertDetail alert_details = 7 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
+  optional int64 last_update_analyzer_time = 8 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
+  optional AlertMeta alert_meta = 9 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
 }
 
 message PortfolioAlert{
@@ -142,13 +147,10 @@ message PortfolioAlert{
   }];
   required Severity severity = 3 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED", (FluxFldOrmNoUpdate) = true];
   optional int32 alert_count = 4 [(FluxFldOrmNoUpdate) = true, (FluxFldColumnSize) = "small"];
-  optional string component_file_path = 5 [(FluxFldOrmNoUpdate) = true, (FluxFldHide) = "True", (FluxFldAbbreviated) = "JSON", (FluxFldColumnDirection) = "rtl"];
-  optional string source_file_name = 6 [(FluxFldOrmNoUpdate) = true];
-  optional int32 line_num = 7 [(FluxFldOrmNoUpdate) = true, (FluxFldColumnSize) = "small"];
-  required string alert_brief = 8 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left", (FluxFldOrmNoUpdate) = true];
-  optional AlertDetail alert_details = 9 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
-  optional int64 last_update_analyzer_time = 10 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
-  optional int64 alert_create_date_time = 11 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true, (FluxFldHide) = "True"];
+  required string alert_brief = 5 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left", (FluxFldOrmNoUpdate) = true];
+  optional AlertDetail alert_details = 6 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
+  optional int64 last_update_analyzer_time = 7 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
+  optional AlertMeta alert_meta = 8 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
 }
 
 message RemoveStratAlertsForStratId{

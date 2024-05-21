@@ -443,8 +443,9 @@ def verify_alert_in_strat_alert_cache(strat_alert: StratAlertBaseModel):
         f"{strat_alert.id=} must exist in strat_alert_id_to_obj_cache_dict in log analyzer"
 
     strat_alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
-                                          strat_alert.component_file_path, strat_alert.source_file_name,
-                                          strat_alert.line_num)
+                                          strat_alert.alert_meta.component_file_path,
+                                          strat_alert.alert_meta.source_file_name,
+                                          strat_alert.alert_meta.line_num)
     container_obj_list: List[StratAlertCacheDictByStratIdDictBaseModel] = (
         log_book_web_client.verify_strat_alert_id_in_strat_alert_cache_dict_by_strat_id_dict_query_client(
             strat_alert.strat_id, strat_alert_key))
@@ -468,8 +469,9 @@ def verify_alert_not_in_strat_alert_cache(strat_alert: StratAlertBaseModel):
         f"{strat_alert.id=} must not exist in strat_alert_id_to_obj_cache_dict in log analyzer after deletion"
 
     strat_alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
-                                          strat_alert.component_file_path, strat_alert.source_file_name,
-                                          strat_alert.line_num)
+                                          strat_alert.alert_meta.component_file_path,
+                                          strat_alert.alert_meta.source_file_name,
+                                          strat_alert.alert_meta.line_num)
     container_obj_list: List[StratAlertCacheDictByStratIdDictBaseModel] = (
         log_book_web_client.verify_strat_alert_id_in_strat_alert_cache_dict_by_strat_id_dict_query_client(
             strat_alert.strat_id, strat_alert_key))
@@ -493,8 +495,9 @@ def verify_alert_in_portfolio_alert_cache(portfolio_alert: PortfolioAlertBaseMod
         f"{portfolio_alert.id=} must exist in portfolio_alert_id_to_obj_cache_dict in log analyzer"
 
     strat_alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
-                                          portfolio_alert.component_file_path, portfolio_alert.source_file_name,
-                                          portfolio_alert.line_num)
+                                          portfolio_alert.alert_meta.component_file_path,
+                                          portfolio_alert.alert_meta.source_file_name,
+                                          portfolio_alert.alert_meta.line_num)
     container_obj_list: List[PortfolioAlertCacheDictBaseModel] = (
         log_book_web_client.verify_portfolio_alerts_cache_dict_query_client(strat_alert_key))
     assert len(container_obj_list) == 1, \
@@ -515,8 +518,9 @@ def verify_alert_not_in_portfolio_alert_cache(portfolio_alert: PortfolioAlertBas
         f"{portfolio_alert.id=} must not exist in portfolio_alert_id_to_obj_cache_dict in log analyzer after deletion"
 
     strat_alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
-                                          portfolio_alert.component_file_path, portfolio_alert.source_file_name,
-                                          portfolio_alert.line_num)
+                                          portfolio_alert.alert_meta.component_file_path,
+                                          portfolio_alert.alert_meta.source_file_name,
+                                          portfolio_alert.alert_meta.line_num)
     container_obj_list: List[PortfolioAlertCacheDictBaseModel] = (
         log_book_web_client.verify_portfolio_alerts_cache_dict_query_client(strat_alert_key))
     assert len(container_obj_list) == 1, \
@@ -1467,17 +1471,17 @@ def test_check_create_call_in_queue_handler_waits_if_server_is_down(
 
 def check_log_info_fields_in_alert(alert_obj: StratAlertBaseModel | PortfolioAlertBaseModel,
                                    component_file_path: str, source_file_name: str, line_no: int):
-    assert alert_obj.component_file_path == component_file_path, \
-        (f"Mismatched: expected strat_alert.component_file_path: {component_file_path}, found "
-         f"{alert_obj.component_file_path=}")
-    assert alert_obj.source_file_name == source_file_name, \
-        (f"Mismatched: expected strat_alert.source_file_name: {source_file_name}, found "
-         f"{alert_obj.source_file_name=}")
-    assert alert_obj.line_num == line_no, \
-        (f"Mismatched: expected strat_alert.line_num: {line_no}, found "
-         f"{alert_obj.line_num=}")
-    assert alert_obj.alert_create_date_time is not None, \
-        f"Mismatched: expected strat_alert.alert_create_date_time not None, found None"
+    assert alert_obj.alert_meta.component_file_path == component_file_path, \
+        (f"Mismatched: expected component_file_path: {component_file_path}, found "
+         f"{alert_obj.alert_meta.component_file_path=}")
+    assert alert_obj.alert_meta.source_file_name == source_file_name, \
+        (f"Mismatched: expected source_file_name: {source_file_name}, found "
+         f"{alert_obj.alert_meta.source_file_name=}")
+    assert alert_obj.alert_meta.line_num == line_no, \
+        (f"Mismatched: expected line_num: {line_no}, found "
+         f"{alert_obj.alert_meta.line_num=}")
+    assert alert_obj.alert_meta.alert_create_date_time is not None, \
+        f"Mismatched: expected alert_create_date_time not None, found None"
 
 
 def test_log_info_in_alerts(

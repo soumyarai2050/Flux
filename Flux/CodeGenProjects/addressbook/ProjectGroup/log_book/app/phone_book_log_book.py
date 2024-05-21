@@ -95,11 +95,22 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
 
     def _handle_strat_alert_queue_err_handler(self, *args):
         try:
-            pydantic_obj_list: List[StratAlertBaseModel] = args[0]     # single unprocessed pydantic object is passed
-            for pydantic_obj in pydantic_obj_list:
-                self.send_portfolio_alerts(pydantic_obj.severity, pydantic_obj.alert_brief, pydantic_obj.alert_details,
-                                           pydantic_obj.component_file_path, pydantic_obj.source_file_name,
-                                           pydantic_obj.line_num, pydantic_obj.alert_create_date_time)
+            strat_alert_obj_list: List[StratAlertBaseModel] = args[0]     # single unprocessed pydantic object is passed
+            strat_alert_obj: StratAlertBaseModel
+            for strat_alert_obj in strat_alert_obj_list:
+                alert_meta = strat_alert_obj.alert_meta
+                component_path: str | None = None
+                source_file_name: str | None = None
+                line_num: int | None = None
+                alert_create_date_time: DateTime | None = None
+                if alert_meta is not None:
+                    component_path = alert_meta.component_file_path
+                    source_file_name = alert_meta.source_file_name
+                    line_num = alert_meta.line_num
+                    alert_create_date_time = alert_meta.alert_create_date_time
+                self.send_portfolio_alerts(strat_alert_obj.severity, strat_alert_obj.alert_brief,
+                                           strat_alert_obj.alert_details, component_path,
+                                           source_file_name, line_num, alert_create_date_time)
         except Exception as e:
             err_str_ = f"_handle_strat_alert_queue_err_handler failed, passed args: {args};;; exception: {e}"
             log_book_service_http_client.portfolio_alert_fail_logger_query_client(err_str_)
@@ -113,15 +124,8 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
                 "alert_brief": strat_alert.alert_brief,
                 "alert_details": strat_alert.alert_details
             }
-            if strat_alert.component_file_path:
-                strat_alert_dict.update(component_file_path=strat_alert.component_file_path)
-            if strat_alert.source_file_name:
-                strat_alert_dict.update(source_file_name=strat_alert.source_file_name)
-            if strat_alert.line_num:
-                strat_alert_dict.update(line_num=strat_alert.line_num)
-            if strat_alert.alert_create_date_time:
-                strat_alert_dict.update(alert_create_date_time=str(strat_alert.alert_create_date_time))
-
+            if strat_alert.alert_meta:
+                strat_alert_dict.update(alert_meta=strat_alert.alert_meta)
             strat_alert_data_list.append(strat_alert_dict)
         log_book_service_http_client.handle_strat_alerts_from_tail_executor_query_client(strat_alert_data_list)
         return strat_alerts
@@ -285,11 +289,11 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             if not alert_details:
                 alert_details = None
             severity: Severity = get_severity_type_from_severity_str(severity_str=severity)
+            alert_meta = get_alert_meta_obj(self.component_file_path, source_file_name,
+                                            line_num, alert_create_date_time)
             create_or_update_alert(self.strat_alert_cache_dict_by_strat_id_dict[strat_id],
-                                   self.strat_alert_queue,
-                                   StratAlertBaseModel, PortfolioAlertBaseModel,
-                                   severity, alert_brief, alert_details, strat_id,
-                                   component_path, source_file_name, line_num, alert_create_date_time)
+                                   self.strat_alert_queue, StratAlertBaseModel, PortfolioAlertBaseModel,
+                                   severity, alert_brief, alert_details, strat_id, alert_meta)
         except Exception as e:
             err_msg: str = (f"_send_strat_alerts failed, exception: {e} received {strat_id=}, "
                             f"{severity=}, {alert_brief=}, {alert_details=}")
