@@ -6,7 +6,7 @@ from threading import Thread
 from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_routes_callback import (
     PerformanceBenchmarkServiceRoutesCallback)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import *
-from FluxPythonUtils.scripts.utility_functions import except_n_log_alert
+from FluxPythonUtils.scripts.utility_functions import except_n_log_alert, handle_refresh_configurable_data_members
 from Flux.PyCodeGenEngine.FluxCodeGenCore.aggregate_core import get_raw_performance_data_from_callable_name_agg_pipeline
 
 
@@ -21,6 +21,11 @@ class PerformanceBenchmarkServiceRoutesCallbackBaseNativeOverride(PerformanceBen
     def __init__(self):
         super().__init__()
         self.asyncio_loop = None
+        self.config_yaml_last_modified_timestamp = os.path.getmtime(config_yaml_path)
+        # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
+        self.config_key_to_data_member_name_dict: Dict[str, str] = {
+            "min_refresh_interval": "min_refresh_interval"
+        }
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
         self.service_up: bool = False
         self.service_ready = False
@@ -65,6 +70,13 @@ class PerformanceBenchmarkServiceRoutesCallbackBaseNativeOverride(PerformanceBen
                 else:
                     should_sleep = True
                     # any periodic refresh code goes here
+
+                    last_modified_timestamp = os.path.getmtime(config_yaml_path)
+                    if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                        self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                        handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                 str(config_yaml_path))
             else:
                 should_sleep = True
 

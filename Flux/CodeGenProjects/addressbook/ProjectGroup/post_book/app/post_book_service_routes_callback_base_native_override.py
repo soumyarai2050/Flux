@@ -16,7 +16,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.FastApi.p
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client)
-from FluxPythonUtils.scripts.utility_functions import except_n_log_alert
+from FluxPythonUtils.scripts.utility_functions import except_n_log_alert, handle_refresh_configurable_data_members
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.aggregate import get_open_chore_counts, get_last_n_sec_chores_by_events
 
 
@@ -60,6 +60,11 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         super().__init__()
         self.port = None
         self.asyncio_loop = None
+        self.config_yaml_last_modified_timestamp = os.path.getmtime(config_yaml_path)
+        # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
+        self.config_key_to_data_member_name_dict: Dict[str, str] = {
+            "min_refresh_interval": "min_refresh_interval"
+        }
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
         self.service_up: bool = False
         self.service_ready = False
@@ -113,6 +118,13 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                 else:
                     should_sleep = True
                     # any periodic refresh code goes here
+
+                    last_modified_timestamp = os.path.getmtime(config_yaml_path)
+                    if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                        self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                        handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                 str(config_yaml_path))
             else:
                 should_sleep = True
 

@@ -2,6 +2,7 @@
 
 #include <boost/asio.hpp>
 #include <Python.h>
+#include <quill/Quill.h>
 
 #include "market_data_service.pb.h"
 #include "market_data_constants.h"
@@ -52,7 +53,7 @@ namespace FluxCppCore {
                                 PyLong_FromLong(kr_market_depth_obj.cumulative_qty()),
                                 PyFloat_FromDouble(kr_market_depth_obj.cumulative_avg_px()));
             } else {
-                p_args = p_args = PyTuple_Pack(13, PyLong_FromLong(kr_market_depth_obj.id()),
+                p_args = PyTuple_Pack(13, PyLong_FromLong(kr_market_depth_obj.id()),
                                 PyUnicode_DecodeUTF8(kr_market_depth_obj.symbol().c_str(),
                                                      static_cast<Py_ssize_t>(kr_market_depth_obj.symbol().size()),
                                                      nullptr),
@@ -98,33 +99,74 @@ namespace FluxCppCore {
         }
 
         static PyObject* message_type_to_python_args(const market_data::TopOfBook &kr_top_of_book_obj, PyObject* p_market_trade_volume) {
-            return PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
-                                PyUnicode_DecodeUTF8(kr_top_of_book_obj.symbol().c_str(),
-                                                     static_cast<Py_ssize_t>(kr_top_of_book_obj.symbol().size()),
-                                                     nullptr),
-                                PyFloat_FromDouble(kr_top_of_book_obj.bid_quote().px()),
-                                PyLong_FromLong(kr_top_of_book_obj.bid_quote().qty()),
-                                PyFloat_FromDouble(kr_top_of_book_obj.bid_quote().premium()),
-                                PyFloat_FromDouble(kr_top_of_book_obj.ask_quote().px()),
-                                PyLong_FromLong(kr_top_of_book_obj.ask_quote().qty()),
-                                PyFloat_FromDouble(kr_top_of_book_obj.ask_quote().premium()),
-                                PyFloat_FromDouble(kr_top_of_book_obj.last_trade().px()),
-                                PyLong_FromLong(kr_top_of_book_obj.last_trade().qty()),
-                                PyFloat_FromDouble(kr_top_of_book_obj.last_trade().premium()),
-                                PyUnicode_DecodeUTF8(kr_top_of_book_obj.bid_quote().last_update_date_time().c_str(),
-                                                     static_cast<Py_ssize_t>(kr_top_of_book_obj.bid_quote().last_update_date_time().size()),
-                                                     nullptr),
-                                PyUnicode_DecodeUTF8(kr_top_of_book_obj.ask_quote().last_update_date_time().c_str(),
-                                                     static_cast<Py_ssize_t>(kr_top_of_book_obj.ask_quote().last_update_date_time().size()),
-                                                     nullptr),
-                                PyUnicode_DecodeUTF8(kr_top_of_book_obj.last_trade().last_update_date_time().c_str(),
-                                                     static_cast<Py_ssize_t>(kr_top_of_book_obj.last_trade().last_update_date_time().size()),
-                                                     nullptr),
-                                PyLong_FromLong(kr_top_of_book_obj.total_trading_security_size()),
-                                p_market_trade_volume,
-                                PyUnicode_DecodeUTF8(kr_top_of_book_obj.last_update_date_time().c_str(),
-                                                     static_cast<Py_ssize_t>(kr_top_of_book_obj.last_update_date_time().size()),
-                                                     nullptr));
+            PyObject* p_args = nullptr;
+
+            if (kr_top_of_book_obj.has_bid_quote()) {
+                LOG_INFO(quill::get_logger(), "Bid Quote: {}, total_trading_security_size: {}",
+                    kr_top_of_book_obj.bid_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
+                p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
+                            PyUnicode_DecodeUTF8(kr_top_of_book_obj.symbol().c_str(),
+                                static_cast<Py_ssize_t>(kr_top_of_book_obj.symbol().size()), nullptr),
+                            PyFloat_FromDouble(kr_top_of_book_obj.bid_quote().px()),
+                            PyLong_FromLong(kr_top_of_book_obj.bid_quote().qty()),
+                            PyFloat_FromDouble(kr_top_of_book_obj.bid_quote().premium()),
+                            Py_None, Py_None, Py_None, Py_None, Py_None, Py_None,
+                            PyUnicode_DecodeUTF8(kr_top_of_book_obj.bid_quote().last_update_date_time().c_str(),
+                                static_cast<Py_ssize_t>(kr_top_of_book_obj.bid_quote().last_update_date_time().size()),
+                                nullptr),
+                            Py_None, Py_None,
+                            kr_top_of_book_obj.has_total_trading_security_size() ? Py_None : PyLong_FromLong(
+                                kr_top_of_book_obj.total_trading_security_size()),
+                            Py_None,
+                            PyUnicode_DecodeUTF8(kr_top_of_book_obj.last_update_date_time().c_str(),
+                                static_cast<Py_ssize_t>(kr_top_of_book_obj.last_update_date_time().size()), nullptr));
+            }
+
+            if (kr_top_of_book_obj.has_ask_quote()) {
+                LOG_INFO(quill::get_logger(), "Ask Quote: {}, total_trading_security_size: {}",
+                    kr_top_of_book_obj.ask_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
+                p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
+                            PyUnicode_DecodeUTF8(kr_top_of_book_obj.symbol().c_str(),
+                                static_cast<Py_ssize_t>(kr_top_of_book_obj.symbol().size()), nullptr),
+                            Py_None, Py_None, Py_None,
+                            PyFloat_FromDouble(kr_top_of_book_obj.ask_quote().px()),
+                            PyLong_FromLong(kr_top_of_book_obj.ask_quote().qty()),
+                            PyFloat_FromDouble(kr_top_of_book_obj.ask_quote().premium()),
+                            Py_None, Py_None, Py_None, Py_None,
+                            PyUnicode_DecodeUTF8(kr_top_of_book_obj.ask_quote().last_update_date_time().c_str(),
+                                static_cast<Py_ssize_t>(kr_top_of_book_obj.ask_quote().last_update_date_time().size()),
+                                nullptr),
+                            Py_None,
+                            kr_top_of_book_obj.has_total_trading_security_size() ? Py_None : PyLong_FromLong(
+                                kr_top_of_book_obj.total_trading_security_size()),
+                            Py_None,
+                            PyUnicode_DecodeUTF8(kr_top_of_book_obj.last_update_date_time().c_str(),
+                                static_cast<Py_ssize_t>(kr_top_of_book_obj.last_update_date_time().size()), nullptr));
+            }
+
+            if (kr_top_of_book_obj.has_last_trade()) {
+                LOG_INFO(quill::get_logger(), "Last Trade: {}, total_trading_security_size: {}",
+                    kr_top_of_book_obj.ask_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
+                p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
+                            PyUnicode_DecodeUTF8(kr_top_of_book_obj.symbol().c_str(),
+                                static_cast<Py_ssize_t>(kr_top_of_book_obj.symbol().size()), nullptr),
+                            Py_None, Py_None, Py_None, Py_None, Py_None, Py_None,
+                            PyFloat_FromDouble(kr_top_of_book_obj.last_trade().px()),
+                            PyLong_FromLong(kr_top_of_book_obj.last_trade().qty()),
+                            PyFloat_FromDouble(kr_top_of_book_obj.last_trade().premium()),
+                            Py_None, Py_None,
+                            PyUnicode_DecodeUTF8(kr_top_of_book_obj.last_trade().last_update_date_time().c_str(),
+                                static_cast<Py_ssize_t>(kr_top_of_book_obj.last_trade().last_update_date_time().size()),
+                                nullptr),
+                            kr_top_of_book_obj.has_total_trading_security_size() ? Py_None : PyLong_FromLong(
+                                kr_top_of_book_obj.total_trading_security_size()),
+                            p_market_trade_volume,
+                            PyUnicode_DecodeUTF8(kr_top_of_book_obj.last_update_date_time().c_str(),
+                                static_cast<Py_ssize_t>(kr_top_of_book_obj.last_update_date_time().size()), nullptr));
+            }
+
+            return p_args;
+
         }
 
         static PyObject* message_type_to_python_args(const market_data::MarketTradeVolume &kr_market_trade_volume_obj) {

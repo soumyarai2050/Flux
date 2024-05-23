@@ -3,6 +3,10 @@
 #include "../../../../../../FluxCppCore/include/mongo_db_handler.h"
 #include "last_barter_handler.h"
 #include "market_depth_handler.h"
+#include <chrono>
+#include <numeric>
+#include <quill/Quill.h>
+
 
 namespace mobile_book_handler {
 
@@ -25,12 +29,15 @@ namespace mobile_book_handler {
         void replay() {
             int market_depth_index = 0;
             int last_barter_index = 0;
-
+            std::vector<double> time_el_;
+            time_el_.reserve(20);
+            mobile_book::MarketDepth market_depth;
             while (market_depth_index < m_market_depth_history_collection_.raw_market_depth_history_size() ||
                    last_barter_index < m_last_barter_collection_.raw_last_barter_history_size()) {
                 if (market_depth_index < m_market_depth_history_collection_.raw_market_depth_history_size() &&
                     (last_barter_index >= m_last_barter_collection_.raw_last_barter_history_size())) {
-                    mobile_book::MarketDepth market_depth;
+                    auto t_start = std::chrono::high_resolution_clock::now();
+
                     // Replay market depth
                     const auto& market_depth_history =
                             m_market_depth_history_collection_.raw_market_depth_history(market_depth_index);
@@ -45,7 +52,15 @@ namespace mobile_book_handler {
                     market_depth.set_position(market_depth_history.position());
 
                     mr_market_depth_handler.handle_md_update(market_depth);
+                    auto t_end = std::chrono::high_resolution_clock::now();
+                    double elapsed_time_ms = std::chrono::duration<double, std::milli>(t_end-t_start).count();
+                    time_el_.push_back(elapsed_time_ms);
+                    if (time_el_.size() == 20) {
+                        auto sum = std::accumulate(time_el_.begin(), time_el_.end(), 0);
+                        LOG_INFO(quill::get_logger(), "Sum of total time: {}", sum);
+                    }
                     ++market_depth_index;
+                    market_depth.Clear();
                 } else {
                     // Replay last barter
                     mobile_book::RawLastBarterHistory history_last_barter = m_last_barter_collection_.raw_last_barter_history(last_barter_index);

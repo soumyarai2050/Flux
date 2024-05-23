@@ -148,15 +148,16 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                                 if fld_abbreviated_option_value is not None:
                                     break
                             else:
-                                err_str = f"Could not find {BaseJSLayoutPlugin.flux_fld_abbreviated} in any of fields of " \
-                                          f"abbreviated type message {message.proto.name}"
+                                err_str = (f"Could not find {BaseJSLayoutPlugin.flux_fld_abbreviated} in any "
+                                           f"of fields of abbreviated type message {message.proto.name}")
                                 logging.exception(err_str)
                                 raise Exception(err_str)
                             dependent_msg_name = fld_abbreviated_option_value.split(".")[0]
                             if ":" in dependent_msg_name:
                                 dependent_msg_name = dependent_msg_name.split(":")[-1]
                             # else not required: if ":" not present then taking first '.' seperated name
-                            self.abbreviated_msg_name_to_dependent_msg_name_dict[message.proto.name] = dependent_msg_name
+                            self.abbreviated_msg_name_to_dependent_msg_name_dict[message.proto.name] = (
+                                dependent_msg_name)
                         else:
                             err_str = f"{layout_type} is not a valid layout option value found in proto message " \
                                       f"{message.proto.name}"

@@ -418,10 +418,10 @@ namespace FluxCppCore {
         }
 
         std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db;
-        quill::Logger* m_p_logger_;
         mongocxx::collection m_mongo_db_collection;
         RootModelType root_model_type_;
         static inline int32_t c_cur_unused_max_id = 1;
+        quill::Logger* m_p_logger_;
     };
 
 

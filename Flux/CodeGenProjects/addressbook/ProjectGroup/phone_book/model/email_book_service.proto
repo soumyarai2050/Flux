@@ -249,7 +249,7 @@ message PairStrat{
     optional int64 market_depth_port = 11 [(FluxFldHide) = "True"];
     optional int64 last_barter_port = 12 [(FluxFldHide) = "True"];
     optional bool is_executor_running = 13 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
-    optional bool is_partially_running = 14 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
+    optional bool is_partially_running = 14 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true];
     // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
     required StratState strat_state = 15 [default = StratState_SNOOZED, (FluxFldButton) = {
       unpressed_caption: "Activate",

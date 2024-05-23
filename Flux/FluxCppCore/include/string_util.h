@@ -35,7 +35,7 @@ namespace FluxCppCore {
 
             // Traverse the string from
             // ist index to last index
-            for (int i = 1; i < msg_name.length(); i++) {
+            for (size_t i = 1; i < msg_name.length(); i++) {
 
                 char ch = msg_name[i];
 

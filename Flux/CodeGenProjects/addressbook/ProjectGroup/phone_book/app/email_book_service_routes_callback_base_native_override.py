@@ -21,7 +21,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_routes_callback import \
     EmailBookServiceRoutesCallback
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    is_service_up, get_symbol_side_key, config_yaml_dict,
+    is_service_up, get_symbol_side_key, config_yaml_dict, config_yaml_path,
     YAMLConfigurationManager, street_book_config_yaml_dict, ps_port, CURRENT_PROJECT_DIR,
     CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host, get_new_portfolio_status,
     get_new_portfolio_limits, get_new_chore_limits, CURRENT_PROJECT_DATA_DIR, is_ongoing_strat,
@@ -34,7 +34,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate impo
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
 from FluxPythonUtils.scripts.utility_functions import (
-    get_pid_from_port, except_n_log_alert, is_process_running, submit_task_with_first_completed_wait)
+    get_pid_from_port, except_n_log_alert, is_process_running, submit_task_with_first_completed_wait,
+    handle_refresh_configurable_data_members)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import get_bartering_link
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
@@ -110,6 +111,11 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         self.static_data: SecurityRecordManager | None = None
         self.pair_strat_id_to_executor_process_id_dict: Dict[int, int] = {}
         self.port_to_executor_http_client_dict: Dict[int, StreetBookServiceHttpClient] = {}
+        self.config_yaml_last_modified_timestamp = os.path.getmtime(config_yaml_path)
+        # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
+        self.config_key_to_data_member_name_dict: Dict[str, str] = {
+            "min_refresh_interval": "min_refresh_interval"
+        }
 
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
         if self.min_refresh_interval is None:
@@ -240,6 +246,13 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
 
                     # Checking and Restarting crashed executors
                     self.run_crashed_executors()
+
+                    last_modified_timestamp = os.path.getmtime(config_yaml_path)
+                    if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                        self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                        handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                 str(config_yaml_path))
             else:
                 should_sleep = True
 

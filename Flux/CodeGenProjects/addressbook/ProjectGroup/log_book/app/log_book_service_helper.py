@@ -38,8 +38,7 @@ class UpdateType(StrEnum):
 def create_alert(
         strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
         portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
-        alert_brief: str, alert_details: AlertDetail | None = None,
-        severity: Severity = Severity.Severity_ERROR, strat_id: int | None = None,
+        alert_brief: str, severity: Severity = Severity.Severity_ERROR, strat_id: int | None = None,
         alert_meta: AlertMeta | None = None) -> StratAlertBaseModel | PortfolioAlertBaseModel:
     """
     Handles strat alerts if strat id is passed else handles portfolio alerts
@@ -49,8 +48,6 @@ def create_alert(
                   last_update_analyzer_time=DateTime.utcnow(), alert_count=1)
     if alert_meta:
         kwargs['alert_meta'] = alert_meta
-    if alert_details is not None:
-        kwargs.update(alert_details=alert_details)
     if strat_id is not None:
         kwargs["strat_id"] = strat_id
         start_alert = strat_alert_type(**kwargs)
@@ -494,7 +491,7 @@ def get_alert_cache_key(severity: Severity, alert_brief: str, component_path: st
         alert_key += f"@#@{source_file_path}"
     if line_num:
         alert_key += f"@#@{line_num}"
-    return f"{severity}@#@{updated_alert_brief}"
+    return alert_key
 
 
 def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | StratAlert] |
@@ -502,7 +499,7 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
                            alert_queue: queue.Queue,
                            strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
                            portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
-                           severity: Severity, alert_brief: str, alert_details: AlertDetail | str | None = None,
+                           severity: Severity, alert_brief: str,
                            strat_id: int | None = None, alert_meta: AlertMeta | None = None) -> None:
     """
     Handles strat alerts if strat id is passed else handles portfolio alerts
@@ -521,48 +518,50 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
         stored_alert.alert_brief = alert_brief
         stored_alert.alert_count = updated_alert_count
         stored_alert.last_update_analyzer_time = last_update_analyzer_time
-        if alert_details is not None:
-            if stored_alert.alert_details is not None:
-                if isinstance(alert_details, str):
-                    if stored_alert.alert_details.first != alert_details:
-                        stored_alert.alert_details.latest = alert_details
-                    # else not required: avoiding update unless latest found is different from first
-                else:
-                    if stored_alert.alert_details.first != alert_details.latest:
-                        stored_alert.alert_details.latest = alert_details.latest
-                    # else not required: avoiding update unless latest found is different from first
+        if alert_meta:
+            if stored_alert.alert_meta is not None:
+                if alert_meta.component_file_path is not None:
+                    stored_alert.alert_meta.component_file_path = alert_meta.component_file_path
+                if alert_meta.source_file_name is not None:
+                    stored_alert.alert_meta.source_file_name = alert_meta.source_file_name
+                if alert_meta.line_num is not None:
+                    stored_alert.alert_meta.line_num = alert_meta.line_num
+                if alert_meta.alert_create_date_time is not None:
+                    stored_alert.alert_meta.alert_create_date_time = alert_meta.alert_create_date_time
+                if alert_meta.first_detail:
+                    if stored_alert.alert_meta.first_detail is None:
+                        stored_alert.alert_meta.first_detail = alert_meta.first_detail
+                    # else not required: avoid update of first_detail once it is set
+                if alert_meta.latest_detail:
+                    if stored_alert.alert_meta.latest_detail is None:
+                        stored_alert.alert_meta.latest_detail = alert_meta.latest_detail
+                    else:
+                        if stored_alert.alert_meta.latest_detail != alert_meta.latest_detail:
+                            stored_alert.alert_meta.latest_detail = alert_meta.latest_detail
+                        # else not required: avoiding update if same latest alert detail is found
             else:
-                if isinstance(alert_details, str):
-                    stored_alert.alert_details = AlertDetailOptional()
-                    stored_alert.alert_details.first = alert_details
-                else:
-                    stored_alert.alert_details.first = alert_details.first
-        if stored_alert.alert_meta is not None:
-            if alert_meta.component_file_path is not None:
-                stored_alert.alert_meta.component_file_path = alert_meta.component_file_path
-            if alert_meta.source_file_name is not None:
-                stored_alert.alert_meta.source_file_name = alert_meta.source_file_name
-            if alert_meta.line_num is not None:
-                stored_alert.alert_meta.line_num = alert_meta.line_num
-            if alert_meta.alert_create_date_time is not None:
-                stored_alert.alert_meta.alert_create_date_time = alert_meta.alert_create_date_time
-        else:
-            stored_alert.alert_meta = alert_meta
+                stored_alert.alert_meta = alert_meta
 
         alert_queue.put(stored_alert)
 
     else:
-        # create a new stored_alert
-        if isinstance(alert_details, str):
-            alert_details_str = alert_details
-            alert_details = AlertDetailOptional()
-            alert_details.first = alert_details_str
-        # else not required: taking alert_details obj as it is
+        if alert_meta is not None:
+            # avoiding empty detail fields
+            if not alert_meta.first_detail:
+                alert_meta.first_detail = None
+            if not alert_meta.latest_detail:
+                alert_meta.latest_detail = None
 
+            # if first_detail and latest_detail are same at create time then removing latest_detail to only take
+            # first_detail with value at creation time
+            if alert_meta.first_detail == alert_meta.latest_detail:
+                alert_meta.latest_detail = None
+
+        # create a new stored_alert
         alert_obj: StratAlertBaseModel | PortfolioAlertBaseModel = (
-            create_alert(alert_brief=alert_brief, alert_details=alert_details,
-                         severity=severity, strat_id=strat_id, strat_alert_type=strat_alert_type,
-                         portfolio_alert_type=portfolio_alert_type, alert_meta=alert_meta))
+            create_alert(alert_brief=alert_brief, severity=severity, strat_id=strat_id,
+                         strat_alert_type=strat_alert_type, portfolio_alert_type=portfolio_alert_type,
+                         alert_meta=alert_meta))
         alerts_cache_dict[cache_key] = alert_obj
         alert_queue.put(alert_obj)
 
@@ -609,7 +608,8 @@ async def async_update_strat_alert_cache(
 
 def get_alert_meta_obj(component_path: str | None = None,
                        source_file_name: str | None = None, line_num: int | None = None,
-                       alert_create_date_time: DateTime | None = None) -> AlertMeta | None:
+                       alert_create_date_time: DateTime | None = None,
+                       first_detail: str | None = None, latest_detail: str | None = None) -> AlertMeta | None:
     alert_meta = AlertMeta()
     alert_meta_has_update = False
     if component_path is not None:
@@ -624,6 +624,14 @@ def get_alert_meta_obj(component_path: str | None = None,
     if alert_create_date_time:
         alert_meta_has_update = True
         alert_meta.alert_create_date_time = alert_create_date_time
+    if first_detail:
+        alert_meta_has_update = True
+        alert_meta.first_detail = first_detail
+        # if latest_detail is passed it will be replaced in next if condition
+        alert_meta.latest_detail = first_detail
+    if latest_detail:
+        alert_meta_has_update = True
+        alert_meta.latest_detail = latest_detail
 
     if alert_meta_has_update:
         return alert_meta

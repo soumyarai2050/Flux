@@ -48,12 +48,10 @@ void initialize_database(const char *db_uri, const char *db_name, PyObject *port
     PyGILState_Release(gstate);
 }
 
-void create_or_update_md_n_tob(const int32_t id, const char *symbol, const char *exch_time, const char *arrival_time, const int side, const int32_t position, const float px, const int64_t qty, const char *market_maker, const bool is_smart_depth, const float cumulative_notional, const int64_t cumulative_qty, const float cumulative_avg_px) {
-    auto sp_mongo_db = MongoDBHandlerSingleton::get_instance();
-    TopOfBookHandler topOfBookHandler(sp_mongo_db, top_of_book_websocket_server);
-    MarketDepthHandler market_depth_handler(sp_mongo_db, market_depth_websocket_server, topOfBookHandler,
-        mobile_book_handler::market_DepthCache, mobile_book_handler::topOfBookCache_);
-
+void create_or_update_md_n_tob(const int32_t id, const char *symbol, const char *exch_time,
+    const char *arrival_time, const int side, const int32_t position, const float px, const int64_t qty,
+    const char *market_maker, const bool is_smart_depth, const float cumulative_notional,
+    const int64_t cumulative_qty, const float cumulative_avg_px) {
     mobile_book::TickType k_side;
     if (side == 1) {
         k_side = mobile_book::TickType::BID;
@@ -61,7 +59,14 @@ void create_or_update_md_n_tob(const int32_t id, const char *symbol, const char 
         k_side = mobile_book::TickType::ASK;
     }
 
-    // LOG_INFO(quill::get_logger(), "inside {}, symbol: {}, side: {}", __func__, symbol, TickType_Name(k_side));
+    LOG_INFO(quill::get_logger(), "inside {}, symbol: {}, side: {}", __func__, symbol, TickType_Name(k_side));
+
+    auto sp_mongo_db = MongoDBHandlerSingleton::get_instance();
+    TopOfBookHandler topOfBookHandler(sp_mongo_db, top_of_book_websocket_server);
+    MarketDepthHandler market_depth_handler(sp_mongo_db, market_depth_websocket_server, topOfBookHandler,
+                                            mobile_book_handler::market_DepthCache, mobile_book_handler::topOfBookCache_);
+
+
     mobile_book::MarketDepth market_depth;
     market_depth.set_id(id);
     market_depth.set_symbol(symbol);
@@ -78,7 +83,7 @@ void create_or_update_md_n_tob(const int32_t id, const char *symbol, const char 
     market_depth.set_cumulative_avg_px(cumulative_avg_px);
 
     market_depth_handler.handle_md_update(market_depth);
-    // LOG_INFO(quill::get_logger(), "exit {}, symbol: {}, side: {}", __func__, symbol,TickType_Name(market_depth_obj.side()));
+    LOG_INFO(quill::get_logger(), "exit {}, symbol: {}, side: {}", __func__, symbol, TickType_Name(market_depth_obj.side()));
 }
 
 void create_or_update_last_barter_n_tob(const int32_t id, const char *symbol, const char *exch_id,

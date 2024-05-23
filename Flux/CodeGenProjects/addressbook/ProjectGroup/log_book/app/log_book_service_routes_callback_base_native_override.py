@@ -21,7 +21,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     pair_strat_client_call_log_str, UpdateType, email_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.aggregate import *
 from FluxPythonUtils.scripts.utility_functions import (
-    except_n_log_alert, create_logger, submitted_task_result)
+    except_n_log_alert, create_logger, submitted_task_result, handle_refresh_configurable_data_members)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
 
@@ -62,29 +62,34 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                                                r"DEBUG|INFO|DB|WARNING|ERROR|CRITICAL) : \[[a-zA-Z._]* : \d*\] : "
     pair_strat_log_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (" \
                                                r"DB|WARNING|ERROR|CRITICAL) : \[[a-zA-Z._]* : \d*\] : "
-    background_log_prefix_regex_pattern: str = r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : )?(" \
-                                               r"WARNING|ERROR|CRITICAL):"
+    background_log_prefix_regex_pattern: str = r"^(.*(?:Error|Exception).*)\s*:\s*(.+)$"
     log_simulator_log_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (" \
                                                   r"INFO|WARNING|ERROR|CRITICAL) : \[[a-zA-Z._]* : \d*] : "
     perf_benchmark_log_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (" \
                                                    r"TIMING) : \[[a-zA-Z._]* : \d*] : "
     log_prefix_regex_pattern_to_callable_name_dict = {
-        pair_strat_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
+        pair_strat_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message",
+        perf_benchmark_log_prefix_regex_pattern: "handle_perf_benchmark_matched_log_message"
     }
     log_prefix_regex_pattern_to_log_date_time_regex_pattern = {
-        pair_strat_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
+        pair_strat_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})',
+        perf_benchmark_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
     }
     log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern = {
-        pair_strat_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
+        pair_strat_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]',
+        perf_benchmark_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
     }
     debug_log_prefix_regex_pattern_to_callable_name_dict = {
-        debug_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
+        debug_prefix_regex_pattern: "handle_pair_strat_matched_log_message",
+        perf_benchmark_log_prefix_regex_pattern: "handle_perf_benchmark_matched_log_message"
     }
     debug_log_prefix_regex_pattern_to_log_date_time_regex_pattern = {
-        debug_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
+        debug_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})',
+        perf_benchmark_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
     }
     debug_log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern = {
-        debug_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
+        debug_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]',
+        perf_benchmark_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
     }
     log_perf_benchmark_pattern_to_callable_name_dict = {
         perf_benchmark_log_prefix_regex_pattern: "handle_perf_benchmark_matched_log_message"
@@ -107,9 +112,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     background_log_prefix_regex_pattern_to_callable_name_dict = {
         background_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
     }
-    debug_background_log_prefix_regex_pattern_to_callable_name_dict = {
-        debug_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
-    }
     datetime_str: str = datetime.now().strftime("%Y%m%d")
     underlying_read_portfolio_alert_http: Callable[..., Any] | None = None
     underlying_create_all_portfolio_alert_http: Callable[..., Any] | None = None
@@ -124,6 +126,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     def __init__(self):
         super().__init__()
         self.asyncio_loop = None
+        self.config_yaml_last_modified_timestamp = os.path.getmtime(config_yaml_path)
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
         self.service_up: bool = False
         self.service_ready = False
@@ -147,6 +150,10 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             self.min_refresh_interval = 30
         self.portfolio_alert_fail_logger = create_logger("portfolio_alert_fail_logger", logging.DEBUG,
                                                          str(CURRENT_PROJECT_LOG_DIR), portfolio_alert_fail_log)
+        # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
+        self.config_key_to_data_member_name_dict: Dict[str, str] = {
+            "min_refresh_interval": "min_refresh_interval"
+        }
 
     def initialize_underlying_http_callables(self):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_routes import (
@@ -245,6 +252,13 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 else:
                     should_sleep = True
                     # any periodic refresh code goes here
+
+                    last_modified_timestamp = os.path.getmtime(config_yaml_path)
+                    if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                        self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                        handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                 str(config_yaml_path))
             else:
                 should_sleep = True
 
@@ -416,9 +430,22 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         try:
             pydantic_obj_list: List[StratAlertBaseModel] = args[0]     # single unprocessed pydantic object is passed
             for pydantic_obj in pydantic_obj_list:
-                self.send_portfolio_alerts(pydantic_obj.severity, pydantic_obj.alert_brief, pydantic_obj.alert_details,
-                                           pydantic_obj.component_file_path, pydantic_obj.source_file_name,
-                                           pydantic_obj.line_num, pydantic_obj.alert_create_date_time)
+                component_file_path = None
+                source_file_name = None
+                line_num = None
+                alert_create_date_time = None
+                first_detail = None
+                latest_detail = None
+                if pydantic_obj.alert_meta is not None:
+                    component_file_path = pydantic_obj.alert_meta.component_file_path
+                    source_file_name = pydantic_obj.alert_meta.source_file_name
+                    line_num = pydantic_obj.alert_meta.line_num
+                    alert_create_date_time = pydantic_obj.alert_meta.alert_create_date_time
+                    first_detail = pydantic_obj.alert_meta.first_detail
+                    latest_detail = pydantic_obj.alert_meta.latest_detail
+                alert_meta = get_alert_meta_obj(component_file_path, source_file_name, line_num,
+                                                alert_create_date_time, first_detail, latest_detail)
+                self.send_portfolio_alerts(pydantic_obj.severity, pydantic_obj.alert_brief, alert_meta)
         except Exception as e:
             err_str_ = f"_handle_strat_alert_queue_err_handler failed, passed args: {args};;; exception: {e}"
             self.portfolio_alert_fail_logger.exception(err_str_)
@@ -439,48 +466,38 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         strat_alert_handler_thread.start()
 
     def send_portfolio_alerts(self, severity: str, alert_brief: str,
-                              alert_details: AlertDetailOptional | str | None = None,
-                              component_path: str | None = None,
-                              source_file_name: str | None = None, line_num: int | None = None,
-                              alert_create_date_time: DateTime | None = None) -> None:
-        logging.debug(f"sending alert with {severity=}, {alert_brief=}, "
-                      f"{alert_details=}")
+                              alert_meta: AlertMeta | None = None) -> None:
+        logging.debug(f"sending alert with {severity=}, {alert_brief=}")
         try:
             severity: Severity = get_severity_type_from_severity_str(severity_str=severity)
-            alert_meta = get_alert_meta_obj(component_path, source_file_name,
-                                            line_num, alert_create_date_time)
             create_or_update_alert(self.portfolio_alerts_cache_dict, self.portfolio_alert_queue,
-                                   StratAlert, PortfolioAlert, severity, alert_brief, alert_details,
+                                   StratAlert, PortfolioAlert, severity, alert_brief,
                                    alert_meta=alert_meta)
         except Exception as e:
             self.portfolio_alert_fail_logger.exception(
                 f"send_portfolio_alerts failed{PhoneBookBaseLogBook.log_seperator} exception: {e};;; "
-                f"received: {severity=}, {alert_brief=}, {alert_details=}")
+                f"received: {severity=}, {alert_brief=}, {alert_meta=}")
 
-    def _send_strat_alerts(self, strat_id: int, severity: str, alert_brief: str,
-                           alert_details: AlertDetailOptional | None = None, component_path: str | None = None,
-                           source_file_name: str | None = None, line_num: int | None = None,
-                           alert_create_date_time: DateTime | None = None) -> None:
-        logging.debug(f"sending strat alert with {strat_id=}, {severity=}, "
-                      f"{alert_brief=}, {alert_details=}")
+    def _send_strat_alerts(self, strat_id: int, severity_str: str, alert_brief: str,
+                           alert_meta: AlertMeta | None = None) -> None:
+        logging.debug(f"sending strat alert with {strat_id=}, {severity_str=}, "
+                      f"{alert_brief=}, {alert_meta=}")
         try:
-            if not alert_details:
-                alert_details = None
-
-            severity: Severity = get_severity_type_from_severity_str(severity_str=severity)
-            alert_meta = get_alert_meta_obj(component_path, source_file_name,
-                                            line_num, alert_create_date_time)
+            severity: Severity = get_severity_type_from_severity_str(severity_str=severity_str)
             create_or_update_alert(self.strat_alert_cache_dict_by_strat_id_dict[strat_id],
                                    self.strat_alert_queue, StratAlert, PortfolioAlert, severity,
-                                   alert_brief, alert_details, strat_id, alert_meta)
+                                   alert_brief, strat_id, alert_meta)
         except Exception as e:
             err_msg: str = (f"_send_strat_alerts failed, exception: {e}, "
-                            f"received {strat_id=}, {severity=}, {alert_brief=}, {alert_details=}")
+                            f"received {strat_id=}, {severity_str=}, {alert_brief=}")
+            if alert_meta is not None:
+                err_msg += f", {alert_meta=}"
+                alert_meta = get_alert_meta_obj(alert_meta.component_file_path, alert_meta.source_file_name,
+                                                alert_meta.line_num, alert_meta.alert_create_date_time,
+                                                alert_meta.first_detail, err_msg)
+
             logging.exception(err_msg)
-            self.send_portfolio_alerts(severity=PhoneBookBaseLogBook.get_severity("error"),
-                                       alert_brief=alert_brief, alert_details=err_msg,
-                                       component_path=component_path, source_file_name=source_file_name,
-                                       line_num=line_num, alert_create_date_time=alert_create_date_time)
+            self.send_portfolio_alerts(severity=severity_str, alert_brief=alert_brief, alert_meta=alert_meta)
 
     async def handle_strat_alerts_from_tail_executor_query_pre(
             self, handle_strat_alerts_from_tail_executor_class_type: Type[HandleStratAlertsFromTailExecutor],
@@ -490,30 +507,24 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             strat_id = strat_alert_data.get("strat_id")
             severity = strat_alert_data.get("severity")
             alert_brief = strat_alert_data.get("alert_brief")
-            alert_details = strat_alert_data.get("alert_details")
-            if alert_details:
-                alert_details = AlertDetailOptional(**alert_details)
             alert_meta = strat_alert_data.get("alert_meta")
             if alert_meta:
                 alert_meta = AlertMeta(**alert_meta)
-            else:
-                alert_meta = AlertMeta()
 
             if strat_id is not None and severity is not None and alert_brief is not None:
                 await async_update_strat_alert_cache(strat_id, self.strat_alert_cache_dict_by_strat_id_dict,
                                                      LogBookServiceRoutesCallbackBaseNativeOverride.
                                                      underlying_filtered_strat_alert_by_strat_id_query_http)
-                self._send_strat_alerts(strat_id, severity, alert_brief, alert_details,
-                                        alert_meta.component_file_path, alert_meta.source_file_name,
-                                        alert_meta.line_num, alert_meta.alert_create_date_time)
+                self._send_strat_alerts(strat_id, severity, alert_brief, alert_meta)
             else:
                 err_severity = PhoneBookBaseLogBook.get_severity("error")
                 err_brief = ("handle_strat_alerts_from_tail_executor_query_pre failed - start_alert data found with "
                              "missing data, can't create strat alert")
-                err_details = f"received: {strat_id=}, {severity=}, {alert_brief=}, {alert_details=}"
-                self.send_portfolio_alerts(err_severity, err_brief, err_details,
-                                           alert_meta.component_file_path, alert_meta.source_file_name,
-                                           alert_meta.line_num, alert_meta.alert_create_date_time)
+                err_details = f"received: {strat_id=}, {severity=}, {alert_brief=}, {alert_meta=}"
+                alert_meta = get_alert_meta_obj(alert_meta.component_file_path, alert_meta.source_file_name,
+                                                alert_meta.line_num, alert_meta.alert_create_date_time,
+                                                alert_meta.first_detail, err_details)
+                self.send_portfolio_alerts(err_severity, err_brief, alert_meta)
                 raise HTTPException(detail=f"{err_severity};;;{err_details}", status_code=400)
         return []
 
@@ -524,23 +535,16 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         for portfolio_alert_data in portfolio_alert_data_list:
             severity = portfolio_alert_data.get("severity")
             alert_brief = portfolio_alert_data.get("alert_brief")
-            alert_details = portfolio_alert_data.get("alert_details")
-            if alert_details:
-                alert_details = AlertDetailOptional(**alert_details)
             alert_meta = portfolio_alert_data.get("alert_meta")
             if alert_meta:
                 alert_meta = AlertMeta(**alert_meta)
-            else:
-                alert_meta = AlertMeta()
 
             if severity is not None and alert_brief is not None:
-                self.send_portfolio_alerts(severity, alert_brief, alert_details,
-                                           alert_meta.component_file_path, alert_meta.source_file_name,
-                                           alert_meta.line_num, alert_meta.alert_create_date_time)
+                self.send_portfolio_alerts(severity, alert_brief, alert_meta)
             else:
                 err_str_ = ("handle_portfolio_alerts_from_tail_executor_query_pre failed - portfolio_alert data "
                             "found with missing data, can't create strat alert;;; "
-                            f"received: {severity=}, {alert_brief=}, {alert_details=}")
+                            f"received: {severity=}, {alert_brief=}, {alert_meta=}")
                 self.portfolio_alert_fail_logger.error(err_str_)
                 raise HTTPException(detail=err_str_, status_code=400)
         return []
@@ -561,15 +565,24 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         if debug_mode:
             log_prefix_regex_pattern_to_callable_name_dict = (
                 LogBookServiceRoutesCallbackBaseNativeOverride.debug_log_prefix_regex_pattern_to_callable_name_dict)
-            background_log_prefix_regex_pattern_to_callable_name_dict = (
-                LogBookServiceRoutesCallbackBaseNativeOverride.
-                debug_background_log_prefix_regex_pattern_to_callable_name_dict)
+            log_prefix_regex_pattern_to_log_date_time_regex_pattern = (
+                LogBookServiceRoutesCallbackBaseNativeOverride.debug_log_prefix_regex_pattern_to_log_date_time_regex_pattern
+            )
+            log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern = (
+                LogBookServiceRoutesCallbackBaseNativeOverride.debug_log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern
+            )
         else:
             log_prefix_regex_pattern_to_callable_name_dict = (
                 LogBookServiceRoutesCallbackBaseNativeOverride.log_prefix_regex_pattern_to_callable_name_dict)
-            background_log_prefix_regex_pattern_to_callable_name_dict = (
-                LogBookServiceRoutesCallbackBaseNativeOverride.
-                background_log_prefix_regex_pattern_to_callable_name_dict)
+            log_prefix_regex_pattern_to_log_date_time_regex_pattern = (
+                LogBookServiceRoutesCallbackBaseNativeOverride.log_prefix_regex_pattern_to_log_date_time_regex_pattern
+            )
+            log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern = (
+                LogBookServiceRoutesCallbackBaseNativeOverride.log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern
+            )
+        background_log_prefix_regex_pattern_to_callable_name_dict = (
+            LogBookServiceRoutesCallbackBaseNativeOverride.
+            background_log_prefix_regex_pattern_to_callable_name_dict)
         log_simulator_prefix_regex_pattern_to_callable_name_dict = (
             LogBookServiceRoutesCallbackBaseNativeOverride.log_simulator_prefix_regex_pattern_to_callable_name_dict
         )
@@ -583,10 +596,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
@@ -605,51 +616,26 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 log_prefix_regex_pattern_to_callable_name_dict=background_log_prefix_regex_pattern_to_callable_name_dict,
                 log_file_path_is_regex=False),
             StratLogDetail(
-                service="phone_book_perf_bench",
-                log_file_path=str(
-                    phone_book_log_dir / f"phone_book_logs_{datetime_str}.log"),
-                critical=True,
-                log_prefix_regex_pattern_to_callable_name_dict=perf_benchmark_pattern_to_callable_name_dict,
-                log_file_path_is_regex=False),
-            StratLogDetail(
                 service="street_book",
                 log_file_path=str(street_book_log_dir / f"street_book_*_logs_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=True,
                 strat_id_find_callable=strat_id_from_executor_log_file),
-            StratLogDetail(
-                service="street_book_perf_bench",
-                log_file_path=str(
-                    street_book_log_dir / f"street_book_*_logs_{datetime_str}.log"),
-                critical=True,
-                log_prefix_regex_pattern_to_callable_name_dict=perf_benchmark_pattern_to_callable_name_dict,
-                log_file_path_is_regex=True),
             StratLogDetail(
                 service="post_book",
                 log_file_path=str(post_barter_log_dir / f"post_book_*_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=True),
-            StratLogDetail(
-                service="post_book_perf_bench",
-                log_file_path=str(
-                    post_barter_log_dir / f"post_book_*_{datetime_str}.log"),
-                critical=True,
-                log_prefix_regex_pattern_to_callable_name_dict=perf_benchmark_pattern_to_callable_name_dict,
-                log_file_path_is_regex=False),
             StratLogDetail(
                 service="log_simulator",
                 log_file_path=str(street_book_log_dir / f"log_simulator_*_{datetime_str}.log"),
@@ -671,10 +657,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
@@ -684,10 +668,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
@@ -697,10 +679,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
@@ -710,10 +690,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
@@ -725,10 +703,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
             StratLogDetail(
@@ -740,10 +716,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
-                LogBookServiceRoutesCallbackBaseNativeOverride.
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=True)
         ]
@@ -752,12 +726,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                                                     clear_cache_file_path_queue)
 
     def log_file_watcher_err_handler(self, alert_brief, **kwargs):
+
+        alert_meta = get_alert_meta_obj(kwargs.get('component_path'), kwargs.get("source_file_name"),
+                                        kwargs.get("line_num"), kwargs.get("alert_create_date_time"),
+                                        kwargs.get("first_detail"), kwargs.get("latest_detail"))
         self.send_portfolio_alerts(severity=PhoneBookBaseLogBook.get_severity("error"),
-                                   alert_brief=alert_brief, alert_details=kwargs.get("alert_details"),
-                                   component_path=kwargs.get("component_path"),
-                                   source_file_name=kwargs.get("source_file_name"),
-                                   line_num=kwargs.get("line_num"),
-                                   alert_create_date_time=kwargs.get("alert_create_date_time"))
+                                   alert_brief=alert_brief, alert_meta=alert_meta)
 
     async def read_all_ui_layout_pre(self):
         # Setting asyncio_loop in ui_layout_pre since it called to check current service up

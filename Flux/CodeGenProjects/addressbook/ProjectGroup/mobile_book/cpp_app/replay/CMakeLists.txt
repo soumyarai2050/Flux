@@ -7,8 +7,8 @@ find_package(Mongo REQUIRED)
 #find_package(quill REQUIRED)
 find_package(Python REQUIRED COMPONENTS Development)
 
-set(libabsl_ROOT_PATH  /home/subham/cpp_libs/libs_13/protobuf/static/lib/)
-set(ABSL_INCLUDE_DIR /home/subham/cpp_libs/libs_13/protobuf/static/include)
+set(libabsl_ROOT_PATH  /home/subham/cpp_libs/libs_13/protobuf_25.2/lib)
+set(ABSL_INCLUDE_DIR /home/subham/cpp_libs/libs_13/protobuf_25.2/include)
 set(protobuf_lib ${libabsl_ROOT_PATH}/libprotobuf.a)
 set(lib_utf ${libabsl_ROOT_PATH}/libutf8_validity.a)
 set(protobuf_ABSL_USED_TARGETS ${libabsl_ROOT_PATH}/libabsl_log_severity.a ${libabsl_ROOT_PATH}/libabsl_raw_logging_internal.a
@@ -85,8 +85,8 @@ project(mobile_book)
 message(WARNING ${MONGO_INCLUDE_DIR})
 message(WARNING ${BSON_INCLUDE_DIR})
 
-include_directories(${MONGO_INCLUDE_DIR} ${BSON_THIRD_PARTY_DIR} ${BSON_INCLUDE_DIR} ${Boost_INCLUDE_DIRS}
-        ${Protobuf_INCLUDE_DIRS} ${ABSL_INCLUDE_DIR} ${CppCodec} ${CppTest} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
+include_directories(${MONGO_INCLUDE_DIR} ${BSON_THIRD_PARTY_INCLUDE_DIR} ${BSON_INCLUDE_DIR} ${Boost_INCLUDE_DIRS}
+        ${Protobuf_INCLUDE_DIRS} ${ABSL_INCLUDE_DIR} ${CppCodec} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
         /home/subham/cpp_libs/libs_13/quill/include /usr/include/python3.12)
 
 set(MD_MODEL ../../generated/CppProto2)
@@ -94,7 +94,6 @@ set(MD_MODEL ../../generated/CppProto2)
 
 set(SRC_FILES
         ${CppCodec_SRC}
-        ${CppTest_SRC}
         ${CppUtilGen_SRC}
         ${ProtoGenCc_SRC}
         ${FluxCppCore_SRC}
@@ -112,14 +111,8 @@ add_library(marketdataprovider SHARED ${SRC_FILES} cpp_app_launcher.cpp
 # Link dependencies to the shared library
 target_link_libraries(marketdataprovider
         /usr/lib/x86_64-linux-gnu/libpython3.12.so
-#        /usr/lib/x86_64-linux-gnu/libpython3.10.so
-        ${MONGO_LIB_CPP}
-        ${BSON_LIB_CPP}
-#        ${MONGO_LIB}
-#        ${BSON_LIB}
-#        ${SSL_LIB}
-#        /usr/local/ssl/lib64/libcrypto.a
-#        -L/lib/x86_64-linux-gnu/ -lsasl2
+        ${MONGO_LIB}
+        ${BSON_LIB}
         ${protobuf_lib}
         ${lib_utf}
         ${protobuf_ABSL_USED_TARGETS}
@@ -128,7 +121,7 @@ target_link_libraries(marketdataprovider
 )
 
 # Add compile options to the shared library
-target_compile_options(marketdataprovider PRIVATE -g -Wno-deprecated)
+target_compile_options(marketdataprovider PRIVATE -g -Werror -Wall -Wextra -Wno-deprecated-declarations)
 
 # Create executable
 add_executable(mobile_book_exec main.cpp ${SRC_FILES} cpp_app_semaphore.cpp
@@ -137,8 +130,8 @@ add_executable(mobile_book_exec main.cpp ${SRC_FILES} cpp_app_semaphore.cpp
 ## Link the shared library to the executable
 target_link_libraries(mobile_book_exec
         /usr/lib/x86_64-linux-gnu/libpython3.12.so
-        ${MONGO_LIB_CPP}
-        ${BSON_LIB_CPP}
+        ${MONGO_LIB}
+        ${BSON_LIB}
         ${protobuf_lib}
         ${lib_utf}
         ${protobuf_ABSL_USED_TARGETS}

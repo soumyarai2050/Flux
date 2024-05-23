@@ -104,8 +104,7 @@ class PhoneBookBaseLogBook(AppLogBook):
         for portfolio_alert in portfolio_alerts:
             portfolio_alert_dict = {
                 "severity": portfolio_alert.severity,
-                "alert_brief": portfolio_alert.alert_brief,
-                "alert_details": portfolio_alert.alert_details
+                "alert_brief": portfolio_alert.alert_brief
             }
             if portfolio_alert.alert_meta:
                 portfolio_alert_dict.update(alert_meta=portfolio_alert.alert_meta)
@@ -213,36 +212,33 @@ class PhoneBookBaseLogBook(AppLogBook):
                             alert_details: str = f"{pydantic_basemodel_type=}, exception: {e}"
                             logging.exception(f"{alert_brief}{PhoneBookBaseLogBook.log_seperator} "
                                               f"{alert_details}")
+                            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                                            inspect.currentframe().f_lineno, DateTime.utcnow(),
+                                                            alert_details)
                             self.send_portfolio_alerts(severity=self.get_severity("error"),
                                                        alert_brief=alert_brief,
-                                                       alert_details=alert_details,
-                                                       component_path=self.component_file_path,
-                                                       source_file_name=PurePath(__file__).name,
-                                                       line_num=inspect.currentframe().f_lineno,
-                                                       alert_create_date_time=DateTime.utcnow())
+                                                       alert_meta=alert_meta)
                             break
             except Exception as e:
                 err_str_brief = f"_pair_strat_db_update_queue_handler failed"
                 err_str_detail = f"exception: {e}"
                 logging.exception(f"{err_str_brief}{PhoneBookBaseLogBook.log_seperator} {err_str_detail}")
+                alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                                inspect.currentframe().f_lineno, DateTime.utcnow(),
+                                                err_str_detail)
                 self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
-                                           alert_details=err_str_detail,
-                                           component_path=self.component_file_path,
-                                           source_file_name=PurePath(__file__).name,
-                                           line_num=inspect.currentframe().f_lineno,
-                                           alert_create_date_time=DateTime.utcnow())
+                                           alert_meta=alert_meta)
 
     def _snapshot_type_callable_err_handler(self, pydantic_basemodel_class_type: Type[BaseModel], kwargs):
         err_str_brief = ("Can't find _id key in patch kwargs dict - ignoring this update in "
                          "get_update_obj_for_snapshot_type_update, "
                          f"pydantic_basemodel_class_type: {pydantic_basemodel_class_type.__name__}, "
-                         f"{kwargs = }")
+                         f"{kwargs=}")
         logging.exception(f"{err_str_brief}")
+        alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                        inspect.currentframe().f_lineno, DateTime.utcnow())
         self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
-                                   component_path=self.component_file_path,
-                                   source_file_name=PurePath(__file__).name,
-                                   line_num=inspect.currentframe().f_lineno,
-                                   alert_create_date_time=DateTime.utcnow())
+                                   alert_meta=alert_meta)
 
     def dynamic_queue_handler_err_handler(self, pydantic_basemodel_type: str, update_type: UpdateType,
                                           err_str_: Exception):
@@ -251,12 +247,11 @@ class PhoneBookBaseLogBook(AppLogBook):
         err_str_detail = f"exception: {err_str_}"
         logging.exception(f"{err_str_brief}{PhoneBookBaseLogBook.log_seperator} "
                           f"{err_str_detail}")
+        alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                        inspect.currentframe().f_lineno, DateTime.utcnow(),
+                                        err_str_detail)
         self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
-                                   alert_details=err_str_detail,
-                                   component_path=self.component_file_path,
-                                   source_file_name=PurePath(__file__).name,
-                                   line_num=inspect.currentframe().f_lineno,
-                                   alert_create_date_time=DateTime.utcnow())
+                                   alert_meta=alert_meta)
 
     def get_update_obj_list_for_journal_type_update(
             self, pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str,
@@ -320,21 +315,17 @@ class PhoneBookBaseLogBook(AppLogBook):
             alert_details: str = f"{message = }, exception: {e}"
             logging.exception(f"{alert_brief}{PhoneBookBaseLogBook.log_seperator} "
                               f"{alert_details}")
+            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                            inspect.currentframe().f_lineno, DateTime.utcnow(),
+                                            alert_details)
             self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
-                                       alert_details=alert_details,
-                                       component_path=self.component_file_path,
-                                       source_file_name=PurePath(__file__).name,
-                                       line_num=inspect.currentframe().f_lineno,
-                                       alert_create_date_time=DateTime.utcnow())
+                                       alert_meta=alert_meta)
 
     # portfolio lvl alerts handling
     def send_portfolio_alerts(self, severity: str, alert_brief: str,
-                              alert_details: AlertDetailOptional | str | None = None,
-                              component_path: str | None = None,
-                              source_file_name: str | None = None, line_num: int | None = None,
-                              alert_create_date_time: DateTime | None = None) -> None:
+                              alert_meta: AlertMeta | None = None) -> None:
         logging.debug(f"sending alert with {severity=}, {alert_brief=}, "
-                      f"{alert_details=}")
+                      f"{alert_meta=}")
         try:
             if not self.service_up:
                 self.service_up: bool = init_service(self.portfolio_alerts_cache_dict)
@@ -344,15 +335,13 @@ class PhoneBookBaseLogBook(AppLogBook):
             # else not required
 
             severity: Severity = get_severity_type_from_severity_str(severity_str=severity)
-            alert_meta = get_alert_meta_obj(component_path, source_file_name,
-                                            line_num, alert_create_date_time)
             create_or_update_alert(self.portfolio_alerts_cache_dict, self.portfolio_alert_queue,
                                    StratAlertBaseModel, PortfolioAlertBaseModel,
-                                   severity, alert_brief, alert_details, alert_meta=alert_meta)
+                                   severity, alert_brief, alert_meta=alert_meta)
         except Exception as e:
             log_book_service_http_client.portfolio_alert_fail_logger_query_client(
                 f"send_portfolio_alerts failed{PhoneBookBaseLogBook.log_seperator} exception: {e};;; "
-                f"received: {severity=}, {alert_brief=}, {alert_details=}")
+                f"received: {severity=}, {alert_brief=}, {alert_meta=}")
             self.service_up = False
 
     def _get_error_dict(self, log_prefix: str, log_message: str) -> \
@@ -378,19 +367,19 @@ class PhoneBookBaseLogBook(AppLogBook):
             alert_brief: str = f"No new logs found for {log_detail.service} for last " \
                                f"{non_activity_secs} seconds"
             alert_details: str = f"{log_detail.service} log file path: {log_detail.log_file_path}"
+            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                            inspect.currentframe().f_lineno, DateTime.utcnow(),
+                                            alert_details)
             self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
-                                       alert_details=alert_details, component_path=self.component_file_path,
-                                       source_file_name=PurePath(__file__).name,
-                                       line_num=inspect.currentframe().f_lineno,
-                                       alert_create_date_time=DateTime.utcnow())
+                                       alert_meta=alert_meta)
 
     def notify_tail_error_in_log_service(self, brief_msg_str: str, detail_msg_str: str,
                                          source_file_name: str, line_num: int,
                                          alert_create_date_time: DateTime):
+        alert_meta = get_alert_meta_obj(self.component_file_path, source_file_name,
+                                        line_num, alert_create_date_time, detail_msg_str)
         self.send_portfolio_alerts(severity=self.get_severity("warning"), alert_brief=brief_msg_str,
-                                   alert_details=detail_msg_str, component_path=self.component_file_path,
-                                   source_file_name=source_file_name, line_num=line_num,
-                                   alert_create_date_time=alert_create_date_time)
+                                   alert_meta=alert_meta)
 
     def notify_error(self, error_msg: str, source_name: str, line_num: int, log_create_date_time: DateTime):
         log_seperator_index: int = error_msg.find(PhoneBookBaseLogBook.log_seperator)
@@ -402,11 +391,10 @@ class PhoneBookBaseLogBook(AppLogBook):
             msg_detail = error_msg[log_seperator_index + len(PhoneBookBaseLogBook.log_seperator):]
         else:
             msg_brief = error_msg
-
+        alert_meta = get_alert_meta_obj(self.component_file_path, source_name,
+                                        line_num, log_create_date_time, msg_detail)
         self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=msg_brief,
-                                   alert_details=msg_detail, component_path=self.component_file_path,
-                                   source_file_name=source_name, line_num=line_num,
-                                   alert_create_date_time=log_create_date_time)
+                                   alert_meta=alert_meta)
 
     def _process_barter_simulator_message(self, message: str) -> None:
         try:
@@ -435,12 +423,11 @@ class PhoneBookBaseLogBook(AppLogBook):
             alert_brief: str = f"_process_barter_simulator_message failed in log analyzer"
             alert_details: str = f"message: {message}, exception: {e}"
             logging.exception(f"{alert_brief};;; {alert_details}")
+            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                            inspect.currentframe().f_lineno, DateTime.utcnow(),
+                                            alert_details)
             self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
-                                       alert_details=alert_details,
-                                       component_path=self.component_file_path,
-                                       source_file_name=PurePath(__file__).name,
-                                       line_num=inspect.currentframe().f_lineno,
-                                       alert_create_date_time=DateTime.utcnow())
+                                       alert_meta=alert_meta)
 
     def handle_log_simulator_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail,
                                                  log_date_time: DateTime | None = None,
@@ -457,10 +444,10 @@ class PhoneBookBaseLogBook(AppLogBook):
         error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=log_prefix, log_message=log_message)
         if error_dict is not None:
             severity, alert_brief, alert_details = self._create_alert(error_dict)
-            self.send_portfolio_alerts(severity=severity, alert_brief=alert_brief, alert_details=alert_details,
-                                       component_path=self.component_file_path,
-                                       source_file_name=log_source_file_name,
-                                       line_num=line_num, alert_create_date_time=log_date_time)
+            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                            inspect.currentframe().f_lineno, DateTime.utcnow(),
+                                            alert_details)
+            self.send_portfolio_alerts(severity=severity, alert_brief=alert_brief, alert_meta=alert_meta)
         # else not required: error pattern doesn't match, no alerts to send
 
     def handle_perf_benchmark_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail,

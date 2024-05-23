@@ -75,36 +75,36 @@ def check_alert_exists_in_portfolio_alert(
         portfolio_alerts: List[PortfolioAlertBaseModel] = log_book_web_client.get_all_portfolio_alert_client()
         for portfolio_alert in portfolio_alerts:
             if portfolio_alert.alert_brief == expected_alert_brief:
-                expected_alert_details = AlertDetailOptional()
-                expected_alert_details.first = expected_alert_detail_first
-                expected_alert_details.latest = expected_alert_detail_latest
-                if portfolio_alert.alert_details == expected_alert_details:
+                if (portfolio_alert.alert_meta.first_detail == expected_alert_detail_first and
+                        portfolio_alert.alert_meta.latest_detail == expected_alert_detail_latest):
                     print("-" * 100)
                     print(f"Result: Found portfolio alert in {(DateTime.utcnow() - start_time).total_seconds()} secs")
                     print("-" * 100)
                     return portfolio_alert
                 else:
-                    assert False, ("portfolio_alert found with correct brief but mismatched alert_details, "
-                                   f"expected {expected_alert_details}, found: {portfolio_alert.alert_details}")
+                    if portfolio_alert.alert_meta.first_detail == expected_alert_detail_first:
+                        assert False, ("portfolio_alert found with correct brief but mismatched "
+                                       f"portfolio_alert.alert_meta.first_detail, "
+                                       f"expected {expected_alert_detail_first}, "
+                                       f"found: {portfolio_alert.alert_meta.first_detail}")
+                    else:
+                        assert False, ("portfolio_alert found with correct brief but mismatched "
+                                       f"portfolio_alert.alert_meta.latest_detail, "
+                                       f"expected {expected_alert_detail_latest}, "
+                                       f"found: {portfolio_alert.alert_meta.latest_detail}")
     else:
         assert False, f"Cant find any portfolio_alert with {expected_alert_brief=}, {log_file_path=}"
 
 
-def check_alert_doesnt_exist_in_portfolio_alert(expected_alert_brief: str, log_file_path: str,
-                                                expected_alert_detail_first: str,
-                                                expected_alert_detail_latest: str | None = None):
+def check_alert_doesnt_exist_in_portfolio_alert(expected_alert_brief: str, log_file_path: str):
     expected_alert_brief = get_expected_brief(expected_alert_brief)
     for i in range(10):
         time.sleep(1)
         portfolio_alerts: List[PortfolioAlertBaseModel] = log_book_web_client.get_all_portfolio_alert_client()
         for portfolio_alert in portfolio_alerts:
             if portfolio_alert.alert_brief == expected_alert_brief:
-                expected_alert_details = AlertDetailOptional()
-                expected_alert_details.first = expected_alert_detail_first
-                expected_alert_details.latest = expected_alert_detail_latest
-                if portfolio_alert.alert_details == expected_alert_details:
-                    assert False, (f"Unexpected: portfolio_alert must not exist with strat_brief: "
-                                   f"{expected_alert_brief}, found {portfolio_alert=}, {log_file_path=}")
+                assert False, (f"Unexpected: portfolio_alert must not exist with strat_brief: "
+                               f"{expected_alert_brief}, found {portfolio_alert=}, {log_file_path=}")
 
 
 def check_alert_exists_in_strat_alert(active_strat: PairStratBaseModel, expected_alert_brief: str,
@@ -118,24 +118,29 @@ def check_alert_exists_in_strat_alert(active_strat: PairStratBaseModel, expected
             log_book_web_client.filtered_strat_alert_by_strat_id_query_client(strat_id=active_strat.id))
         for strat_alert in strat_alerts:
             if strat_alert.alert_brief == expected_alert_brief:
-                expected_alert_details = AlertDetailOptional()
-                expected_alert_details.first = expected_alert_detail_first
-                expected_alert_details.latest = expected_alert_detail_latest
-                if strat_alert.alert_details == expected_alert_details:
+                if (strat_alert.alert_meta.first_detail == expected_alert_detail_first and
+                        strat_alert.alert_meta.latest_detail == expected_alert_detail_latest):
                     print("-"*100)
                     print(f"Result: Found strat alert in {(DateTime.utcnow()-start_time).total_seconds()} secs")
                     print("-"*100)
                     return strat_alert
                 else:
-                    assert False, ("strat_alert found with correct brief but mismatched alert_details, "
-                                   f"expected {expected_alert_details}, found: {strat_alert.alert_detail}")
+                    if strat_alert.alert_meta.first_detail == expected_alert_detail_first:
+                        assert False, ("strat_alert found with correct brief but mismatched "
+                                       f"strat_alert.alert_meta.first_detail, "
+                                       f"expected {expected_alert_detail_first}, "
+                                       f"found: {strat_alert.alert_meta.first_detail}")
+                    else:
+                        assert False, ("strat_alert found with correct brief but mismatched "
+                                       f"strat_alert.alert_meta.latest_detail, "
+                                       f"expected {expected_alert_detail_latest}, "
+                                       f"found: {strat_alert.alert_meta.latest_detail}")
     else:
         assert False, f"Cant find any strat_alert with {expected_alert_brief=}, {log_file_path=}"
 
 
 def check_alert_doesnt_exist_in_strat_alert(active_strat: PairStratBaseModel | None, expected_alert_brief: str,
-                                            log_file_path: str, expected_alert_detail_first: str,
-                                            expected_alert_detail_latest: str | None = None):
+                                            log_file_path: str):
     expected_alert_brief = get_expected_brief(expected_alert_brief)
     for i in range(10):
         time.sleep(1)
@@ -147,12 +152,8 @@ def check_alert_doesnt_exist_in_strat_alert(active_strat: PairStratBaseModel | N
                 log_book_web_client.get_all_strat_alert_client())
         for strat_alert in strat_alerts:
             if strat_alert.alert_brief == expected_alert_brief:
-                expected_alert_details = AlertDetailOptional()
-                expected_alert_details.first = expected_alert_detail_first
-                expected_alert_details.latest = expected_alert_detail_latest
-                if strat_alert.alert_details == expected_alert_details:
-                    assert False, (f"Unexpected: strat_alert must not exist with alert_brief: {expected_alert_brief}, "
-                                   f"found strat_alert: {strat_alert}, {log_file_path=}")
+                assert False, (f"Unexpected: strat_alert must not exist with alert_brief: {expected_alert_brief}, "
+                               f"found strat_alert: {strat_alert}, {log_file_path=}")
 
 
 @pytest.mark.log_book
@@ -209,7 +210,7 @@ def test_log_to_start_alert_through_strat_id(
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
 
-        check_alert_doesnt_exist_in_strat_alert(None, sample_brief, log_file_path, sample_detail)
+        check_alert_doesnt_exist_in_strat_alert(None, sample_brief, log_file_path)
     except Exception as e:
         raise e
     finally:
@@ -276,7 +277,7 @@ def test_log_to_start_alert_through_symbol_n_side_key(
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
 
-        check_alert_doesnt_exist_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
+        check_alert_doesnt_exist_in_strat_alert(active_strat, sample_brief, log_file_path)
 
 
 @pytest.mark.log_book
@@ -308,7 +309,7 @@ def test_log_to_portfolio_alert(
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
 
-    check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
+    check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path)
 
 
 @pytest.mark.log_book
@@ -330,8 +331,6 @@ def test_log_to_update_db(
 
     for active_strat, executor_http_client in active_strat_n_executor_list:
         log_file_path = STRAT_EXECUTOR / "log" / f"street_book_{active_strat.id}_logs_{frmt_date}.log"
-
-        # Positive test
 
         db_json_list = [
             {"strat_alert_count": random.randint(1, 100)},
@@ -414,12 +413,12 @@ def test_alert_with_same_severity_n_brief_is_always_updated(
                 if strat_alert.alert_brief == expected_alert_brief:
                     alert_count += 1
 
-                    assert strat_alert.alert_details.first == first_found_detail, \
-                        (f"Mismatched alert_details.first: expected: {first_found_detail}, "
-                         f"found: {strat_alert.alert_details.first=}")
-                    assert strat_alert.alert_details.latest == latest_found_detail, \
-                        (f"Mismatched alert_details.latest: expected: {latest_found_detail}, "
-                         f"found: {strat_alert.alert_details.latest=}")
+                    assert strat_alert.alert_meta.first_detail == first_found_detail, \
+                        (f"Mismatched strat_alert.alert_meta.first_detail: expected: {first_found_detail}, "
+                         f"found: {strat_alert.alert_meta.first_detail}")
+                    assert strat_alert.alert_meta.latest_detail == latest_found_detail, \
+                        (f"Mismatched strat_alert.alert_meta.latest_detail: expected: {latest_found_detail}, "
+                         f"found: {strat_alert.alert_meta.latest_detail}")
                     assert strat_alert.alert_count == log_count, \
                         (f"Mismatched alert_count: expected: {total_log_counts}, "
                          f"found {strat_alert.alert_count=} ")
@@ -655,6 +654,8 @@ def test_to_verify_portfolio_alert_cache_is_cleared_in_delete_portfolio_alert(
     verify_alert_not_in_portfolio_alert_cache(portfolio_alert)
 
 
+# @ failing: internal cache in tail executor is not removed when deleted - when obj is again created
+# it is expected to be created clean but has last obj data from tail executor
 @pytest.mark.log_book
 def test_start_alert_with_same_severity_n_brief_is_created_again_if_is_deleted(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
@@ -691,7 +692,7 @@ def test_start_alert_with_same_severity_n_brief_is_created_again_if_is_deleted(
 
         # deleting start_alert
         log_book_web_client.delete_strat_alert_client(strat_alert.id)
-        check_alert_doesnt_exist_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
+        check_alert_doesnt_exist_in_strat_alert(active_strat, sample_brief, log_file_path)
 
         # again adding same log - this time it must be again created
         log_str = get_log_line_str(log_lvl, sample_file_name,
@@ -701,6 +702,8 @@ def test_start_alert_with_same_severity_n_brief_is_created_again_if_is_deleted(
         check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
 
 
+# @ failing: internal cache in tail executor is not removed when deleted - when obj is again created
+# it is expected to be created clean but has last obj data from tail executor
 @pytest.mark.log_book
 def test_portfolio_alert_with_same_severity_n_brief_is_created_again_if_is_deleted(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
@@ -726,7 +729,7 @@ def test_portfolio_alert_with_same_severity_n_brief_is_created_again_if_is_delet
 
     # deleting start_alert
     log_book_web_client.delete_portfolio_alert_client(portfolio_alert.id)
-    check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
+    check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path)
 
     # again adding same log - this time it must be again created
     log_str = get_log_line_str(log_lvl, sample_file_name,
@@ -851,7 +854,7 @@ def test_log_with_suitable_log_lvl_are_added_to_alerts(clean_and_set_limits):
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
 
-    check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
+    check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path)
 
 
 @pytest.mark.log_book
@@ -932,7 +935,9 @@ def test_restart_tail_executor(
         log_book_web_client.log_book_restart_tail_query_client(log_file_path, restart_date_time)
         time.sleep(10)
 
-        strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
+        strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path,
+                                                        expected_alert_detail_first=sample_detail,
+                                                        expected_alert_detail_latest=sample_detail)
         assert strat_alert.alert_count == 2, \
             f"Mismatched: expected strat_alert.alert_count: 2, found {strat_alert.alert_count=}"
 
@@ -969,7 +974,7 @@ def test_tail_executor_restarts_if_tail_error_occurs(
 
     time.sleep(10)
 
-    portfolio_alert = check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
+    portfolio_alert = check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail, sample_detail)
     assert portfolio_alert.alert_count == 2, \
         f"Mismatched: expected portfolio_alert.alert_count: 2, found {portfolio_alert.alert_count=}"
 
@@ -1239,8 +1244,7 @@ def test_strat_alert_patch_all_failed_alerts_goes_to_portfolio_alert(
             add_log_to_file(log_file_path, log_str)
 
             # verifying strat_alert not exists
-            check_alert_doesnt_exist_in_strat_alert(active_strat, sample_brief, log_file_path,
-                                                    sample_detail, updated_sample_detail)
+            check_alert_doesnt_exist_in_strat_alert(active_strat, sample_brief, log_file_path)
 
             # verifying portfolio alert contains failed strat alert
             check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail, updated_sample_detail)
@@ -1287,7 +1291,7 @@ def test_portfolio_alert_patch_all_failed_alerts_goes_to_portfolio_fail_alert_lo
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
-        check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
+        check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path)
 
         # checking alert is present in portfolio_alert_fail_logs
         portfolio_alert_fail_logger_name = f"portfolio_alert_fail_logs_{frmt_date}.log"
@@ -1345,7 +1349,7 @@ def test_check_create_call_in_queue_handler_waits_if_server_is_down(
     log_file_path = STRAT_EXECUTOR / "log" / log_file_name
 
     tail_executor_log_file_name = \
-        f"tail_executor~street_book_perf_bench~{log_file_name.removesuffix('.log')}_logs_{frmt_date}.log"
+        f"tail_executor~street_book~{log_file_name.removesuffix('.log')}_logs_{frmt_date}.log"
     tail_executor_log_file = LOG_ANALYZER_DIR / "log" / "tail_executors" / tail_executor_log_file_name
 
     config_file_path = LOG_ANALYZER_DIR / "data" / f"config.yaml"
@@ -1561,7 +1565,7 @@ def check_perf_of_alerts(
             strat_alerts: List[StratAlertBaseModel] = log_book_web_client.get_all_strat_alert_client()
             for strat_alert in strat_alerts:
                 if strat_alert.alert_brief == expected_alert_brief:
-                    if strat_alert.alert_details.latest == sample_detail:
+                    if strat_alert.alert_meta.latest_detail == sample_detail:
                         print("-"*100)
                         print(f"Result: strat_alert created in "
                               f"{(DateTime.utcnow() - start_time).total_seconds()} secs")
@@ -1626,6 +1630,7 @@ def test_perf_of_db_updates(
                       f"{(DateTime.utcnow() - start_time).total_seconds()} secs")
                 print("-"*100)
                 break
+            time.sleep(1)
         else:
             assert False, (f"Can't find strat_view update with max_single_leg_notional: {total_updates} "
                            f"after {(DateTime.utcnow() - start_time).total_seconds()} secs")

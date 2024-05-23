@@ -9,7 +9,8 @@ import subprocess
 
 # project imports
 from FluxPythonUtils.scripts.utility_functions import (
-    except_n_log_alert, submitted_task_result, submit_task_with_first_completed_wait)
+    except_n_log_alert, submitted_task_result, submit_task_with_first_completed_wait,
+    handle_refresh_configurable_data_members)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_routes_callback import PhotoBookServiceRoutesCallback
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
@@ -29,6 +30,11 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
         self.service_up = False
         self.service_ready = False
         self.asyncio_loop = None
+        self.config_yaml_last_modified_timestamp = os.path.getmtime(config_yaml_path)
+        # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
+        self.config_key_to_data_member_name_dict: Dict[str, str] = {
+            "min_refresh_interval": "min_refresh_interval"
+        }
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
         self.pydantic_type_name_to_patch_queue_cache_dict: Dict[str, Queue] = {}
         self.max_fetch_from_queue = config_yaml_dict.get("max_fetch_from_patch_queue_for_server")
@@ -78,6 +84,13 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
                 else:
                     should_sleep = True
                     # any periodic refresh code goes here
+
+                    last_modified_timestamp = os.path.getmtime(config_yaml_path)
+                    if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                        self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                        handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                 str(config_yaml_path))
             else:
                 should_sleep = True
 

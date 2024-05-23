@@ -55,11 +55,10 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
         if self.simulation_mode:
             print(f"CRITICAL: tail executor for process: {process_name} running in simulation mode...")
             alert_brief: str = "PairStrat Log analyzer running in simulation mode"
+            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                            inspect.currentframe().f_lineno, DateTime.utcnow())
             self.send_portfolio_alerts(severity=self.get_severity("critical"), alert_brief=alert_brief,
-                                       component_path=self.component_file_path,
-                                       source_file_name=PurePath(__file__).name,
-                                       line_num=inspect.currentframe().f_lineno,
-                                       alert_create_date_time=DateTime.utcnow())
+                                       alert_meta=alert_meta)
 
         # running queue handling for pair_start_api_ops
         Thread(target=self._pair_strat_api_ops_queue_handler, daemon=True, name="db_queue_handler").start()
@@ -103,14 +102,19 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
                 source_file_name: str | None = None
                 line_num: int | None = None
                 alert_create_date_time: DateTime | None = None
+                first_detail = None
+                latest_detail = None
                 if alert_meta is not None:
                     component_path = alert_meta.component_file_path
                     source_file_name = alert_meta.source_file_name
                     line_num = alert_meta.line_num
                     alert_create_date_time = alert_meta.alert_create_date_time
-                self.send_portfolio_alerts(strat_alert_obj.severity, strat_alert_obj.alert_brief,
-                                           strat_alert_obj.alert_details, component_path,
-                                           source_file_name, line_num, alert_create_date_time)
+                    first_detail = alert_meta.first_detail
+                    latest_detail = alert_meta.latest_detail
+                alert_meta = get_alert_meta_obj(component_path, source_file_name,
+                                                line_num, alert_create_date_time,
+                                                first_detail, latest_detail)
+                self.send_portfolio_alerts(strat_alert_obj.severity, strat_alert_obj.alert_brief, alert_meta)
         except Exception as e:
             err_str_ = f"_handle_strat_alert_queue_err_handler failed, passed args: {args};;; exception: {e}"
             log_book_service_http_client.portfolio_alert_fail_logger_query_client(err_str_)
@@ -121,8 +125,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             strat_alert_dict = {
                 "strat_id": strat_alert.strat_id,
                 "severity": strat_alert.severity,
-                "alert_brief": strat_alert.alert_brief,
-                "alert_details": strat_alert.alert_details
+                "alert_brief": strat_alert.alert_brief
             }
             if strat_alert.alert_meta:
                 strat_alert_dict.update(alert_meta=strat_alert.alert_meta)
@@ -166,10 +169,9 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
 
         if severity is None:
             severity = self.get_severity("error")
-        self.send_portfolio_alerts(severity=severity, alert_brief=msg_brief,
-                                   alert_details=msg_detail, component_path=self.component_file_path,
-                                   source_file_name=log_source_file_name, line_num=line_num,
-                                   alert_create_date_time=log_date_time)
+        alert_meta = get_alert_meta_obj(self.component_file_path, log_source_file_name,
+                                        line_num, log_date_time, msg_detail)
+        self.send_portfolio_alerts(severity=severity, alert_brief=msg_brief, alert_meta=alert_meta)
 
     def _process_strat_alert_message_with_symbol_side(self, prefix: str, message: str, matched_text: str,
                                                       log_date_time: DateTime | None = None,
@@ -214,10 +216,9 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
                 self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
             # else not required: alert cache exists
 
-            component_path = self.component_file_path
-
-            self._send_strat_alerts(strat_id, severity, alert_brief, alert_details, component_path,
-                                    log_source_file_name, line_num, log_date_time)
+            alert_meta = get_alert_meta_obj(self.component_file_path, log_source_file_name,
+                                            line_num, log_date_time, alert_details)
+            self._send_strat_alerts(strat_id, severity, alert_brief, alert_meta)
         except Exception as e:
             self._handle_strat_alert_exception(message, e, severity, log_date_time, log_source_file_name, line_num)
 
@@ -268,41 +269,36 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
                                f"{pair_strat.pair_strat_params.strat_leg1.side}")
                 self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
 
-            component_path = self.component_file_path
-            self._send_strat_alerts(strat_id, severity, alert_brief, alert_details, component_path,
-                                    log_source_file_name, line_num, log_date_time)
+            alert_meta = get_alert_meta_obj(self.component_file_path, log_source_file_name,
+                                            line_num, log_date_time, alert_details)
+            self._send_strat_alerts(strat_id, severity, alert_brief, alert_meta)
         except Exception as e:
             self._handle_strat_alert_exception(message, e, severity, log_date_time, log_source_file_name, line_num)
 
     # strat lvl alert handling
-    def _send_strat_alerts(self, strat_id: int, severity: str, alert_brief: str,
-                           alert_details: AlertDetailOptional | str | None = None, component_path: str | None = None,
-                           source_file_name: str | None = None, line_num: int | None = None,
-                           alert_create_date_time: DateTime | None = None) -> None:
-        logging.debug(f"sending strat alert with {strat_id=}, {severity=}, "
-                      f"{alert_brief=}, {alert_details=}")
+    def _send_strat_alerts(self, strat_id: int, severity_str: str, alert_brief: str,
+                           alert_meta: AlertMeta | None = None) -> None:
+        logging.debug(f"sending strat alert with {strat_id=}, {severity_str=}, "
+                      f"{alert_brief=}, {alert_meta=}")
         try:
             if not self.service_up:
                 raise Exception("service up check failed. waiting for the service to start...")
             # else not required
 
-            if not alert_details:
-                alert_details = None
-            severity: Severity = get_severity_type_from_severity_str(severity_str=severity)
+            severity: Severity = get_severity_type_from_severity_str(severity_str=severity_str)
             alert_meta = get_alert_meta_obj(self.component_file_path, source_file_name,
                                             line_num, alert_create_date_time)
             create_or_update_alert(self.strat_alert_cache_dict_by_strat_id_dict[strat_id],
                                    self.strat_alert_queue, StratAlertBaseModel, PortfolioAlertBaseModel,
-                                   severity, alert_brief, alert_details, strat_id, alert_meta)
+                                   severity, alert_brief, strat_id, alert_meta)
         except Exception as e:
             err_msg: str = (f"_send_strat_alerts failed, exception: {e} received {strat_id=}, "
-                            f"{severity=}, {alert_brief=}, {alert_details=}")
+                            f"{severity_str=}, {alert_brief=}, {alert_meta=}")
             logging.exception(err_msg)
-            self.send_portfolio_alerts(severity=PhoneBookBaseLogBook.get_severity("error"),
-                                       alert_brief=alert_brief,
-                                       alert_details=err_msg, component_path=component_path,
-                                       source_file_name=source_file_name, line_num=line_num,
-                                       alert_create_date_time=alert_create_date_time)
+            alert_meta = get_alert_meta_obj(alert_meta.component_path, alert_meta.source_file_name,
+                                            alert_meta.line_num, alert_meta.alert_create_date_time, err_msg)
+            self.send_portfolio_alerts(severity=severity_str, alert_brief=alert_brief,
+                                       alert_meta=alert_meta)
 
     def _handle_reset_log_book_cache(self, matched_pattern):
         try:
@@ -329,21 +325,19 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
 
             for symbol_side in symbol_side_set:
                 self.strat_id_by_symbol_side_dict.pop(symbol_side, None)
-                logging.info(f"Removed {symbol_side = } from strat_id_by_symbol_side_dict if existed")
+                logging.info(f"Removed {symbol_side=} from strat_id_by_symbol_side_dict if existed")
             self.strat_alert_cache_dict_by_strat_id_dict.pop(strat_id, None)
-            logging.info(f"Removed {strat_id = } from strat_alert_cache_by_strat_id_dict if existed")
+            logging.info(f"Removed {strat_id=} from strat_alert_cache_by_strat_id_dict if existed")
 
         except Exception as e:
             err_msg: str = (f"_handle_reset_log_book_cache failed - cant clear cache"
-                            f"received {matched_pattern = }")
+                            f"received {matched_pattern=}")
             err_detail: str = f"exception: {e}, "
             logging.exception(f"{err_msg}{self.log_seperator}{err_detail}")
+            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                            inspect.currentframe().f_lineno, DateTime.utcnow(), err_detail)
             self.send_portfolio_alerts(severity=PhoneBookBaseLogBook.get_severity("error"),
-                                       alert_brief=err_msg, alert_details=err_detail,
-                                       component_path=self.component_file_path,
-                                       source_file_name=PurePath(__file__).name,
-                                       line_num=inspect.currentframe().f_lineno,
-                                       alert_create_date_time=DateTime.utcnow())
+                                       alert_brief=err_msg, alert_meta=alert_meta)
 
     def handle_pair_strat_matched_log_message(self, log_prefix: str, log_message: str,
                                               log_detail: StratLogDetail,
@@ -387,8 +381,8 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
         if error_dict is not None:
             component_path = self.component_file_path
             severity, alert_brief, alert_details = self._create_alert(error_dict)
-            self.send_portfolio_alerts(severity=severity, alert_brief=alert_brief, alert_details=alert_details,
-                                       component_path=component_path, source_file_name=log_source_file_name,
-                                       line_num=line_num, alert_create_date_time=log_date_time)
+            alert_meta = get_alert_meta_obj(component_path, log_source_file_name,
+                                            line_num, log_date_time, alert_details)
+            self.send_portfolio_alerts(severity=severity, alert_brief=alert_brief, alert_meta=alert_meta)
         # else not required: error pattern doesn't match, no alerts to send
 

@@ -56,6 +56,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         self.independent_message_list: List[protogen.Message] = []
         self.repeated_layout_msg_name_list: List[str] = []
         self.abbreviated_message_list: List[protogen.Message] = []
+        self.abb_msg_name_to_msg_names_used_in_abb_option_list_dict: Dict[str, List[str]] = {}
         self.current_message_is_dependent: bool | None = None  # True if dependent else false
         if (ui_layout_msg_name := os.getenv("UILAYOUT_MESSAGE_NAME")) is not None and len(ui_layout_msg_name):
             self.__ui_layout_msg_name = ui_layout_msg_name
@@ -111,7 +112,17 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                             dependent_message_name = dependent_message_name.split(":")[-1]
                         self.dependent_to_abbreviated_relation_msg_name_dict[dependent_message_name] = message.proto.name
                         self.abbreviated_message_list.append(message)
+
+                        msg_names_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(
+                            message)
+                        try:
+                            msg_names_used_in_abb_option_list.remove(dependent_message_name)
+                        except ValueError:
+                            pass
+                        self.abb_msg_name_to_msg_names_used_in_abb_option_list_dict[message.proto.name] = (
+                            msg_names_used_in_abb_option_list)
                         break
+
                 # else not required: Avoid if field doesn't contain abbreviated option
             else:
                 self.independent_message_list.append(message)
@@ -778,6 +789,26 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        },\n"
             output_str += f"        setSelected{message_name}Id: (state, action) => "+"{\n"
             output_str += f"            state.selected{message_name}Id = action.payload;\n"
+            for _, msg_names_used_in_abb_option_list in self.abb_msg_name_to_msg_names_used_in_abb_option_list_dict.items():
+                if message_name in msg_names_used_in_abb_option_list:
+                    output_str += "            if (action.payload) {\n"
+                    output_str += (f"                const storedObj = state.{message_name_camel_cased}Array.find(obj "
+                                   f"=> obj[DB_ID] === action.payload);\n")
+                    output_str += "                if (storedObj) {\n"
+                    output_str += f"                    state.{message_name_camel_cased} = storedObj;\n"
+                    output_str += f"                    state.modified{message_name} = addxpath(cloneDeep(storedObj));\n"
+                    output_str += "                } else {\n"
+                    output_str += (f"                    state.{message_name_camel_cased} = "
+                                   f"initialState.{message_name_camel_cased};\n")
+                    output_str += (f"                    state.modified{message_name} = "
+                                   f"initialState.modified{message_name};\n")
+                    output_str += "                }\n"
+                    output_str += "            } else {\n"
+                    output_str += (f"                state.{message_name_camel_cased} = "
+                                   f"initialState.{message_name_camel_cased};\n")
+                    output_str += (f"                state.modified{message_name} = "
+                                   f"initialState.{message_name_camel_cased};\n")
+                    output_str += "            }\n"
             if (not self.current_message_is_dependent and
                     self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
@@ -790,6 +821,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        },\n"
             output_str += f"        resetSelected{message_name}Id: (state) => "+"{\n"
             output_str += f"            state.selected{message_name}Id = initialState.selected{message_name}Id;\n"
+
             if self.current_message_is_dependent:
                 output_str += f"            state.{message_name_camel_cased} = initialState.{message_name_camel_cased};\n"
                 output_str += f"            state.modified{message_name} = initialState.modified{message_name};\n"

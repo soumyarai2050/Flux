@@ -29,14 +29,6 @@ namespace mobile_book_handler {
             int32_t last_barter_inserted_id;
             std::string last_barter_key;
             auto date_time = MobileBookPopulateRandomValues::get_utc_time();
-            r_last_barter_obj.set_arrival_time(date_time);
-            r_last_barter_obj.set_exch_time(date_time);
-            mr_last_barter_cache_handler_.update_or_create_last_barter_cache(r_last_barter_obj);
-            bsoncxx::builder::basic::document bson_doc{};
-            prepare_doc(r_last_barter_obj, bson_doc);
-            bool status = m_last_barter_db_codec_.insert(bson_doc, last_barter_key, last_barter_inserted_id);
-            assert(status);
-            mr_last_barter_websocket_server_.NewClientCallBack(r_last_barter_obj, -1);
 
             mobile_book::TopOfBook top_of_book_obj;
             top_of_book_obj.set_id(r_last_barter_obj.id());
@@ -47,10 +39,21 @@ namespace mobile_book_handler {
             top_of_book_obj.mutable_last_barter()->set_last_update_date_time(date_time);
             top_of_book_obj.add_market_barter_volume()->CopyFrom(r_last_barter_obj.market_barter_volume());
             top_of_book_obj.set_last_update_date_time(date_time);
+            r_last_barter_obj.set_arrival_time(date_time);
+            r_last_barter_obj.set_exch_time(date_time);
 
-            mr_top_of_book_cache_handler_.update_or_create_top_of_book_cache(top_of_book_obj, "");
+            mr_last_barter_cache_handler_.update_or_create_last_barter_cache(r_last_barter_obj);
+            mr_top_of_book_cache_handler_.update_or_create_top_of_book_cache(top_of_book_obj);
             notify_semaphore.release();
+
+            bsoncxx::builder::basic::document bson_doc{};
+            prepare_doc(r_last_barter_obj, bson_doc);
+            // std::unique_lock<std>
+            bool status = m_last_barter_db_codec_.insert(bson_doc, last_barter_key, last_barter_inserted_id);
+            assert(status);
+
             mr_top_of_book_handler_.insert_or_update_top_of_book(top_of_book_obj);
+            mr_last_barter_websocket_server_.NewClientCallBack(r_last_barter_obj, -1);
         }
 
     protected:

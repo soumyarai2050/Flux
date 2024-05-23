@@ -37,17 +37,17 @@ cd boost_1_81_0
 sudo ./b2 install
 ```
 
-[//]: # (## MongoC)
+## MongoC
 
-[//]: # (### MongoC is the C driver for MongoDB.)
+### MongoC is the C driver for MongoDB.
 
-[//]: # (```)
+```
 
-[//]: # (sudo apt install libbson-dev)
+sudo apt install libbson-dev
 
-[//]: # (sudo apt install libmongoc-dev)
+sudo apt install libmongoc-dev
 
-[//]: # (```)
+```
 
 ## Mongocxx
 ### Mongocxx is the official MongoDB C++ driver.
@@ -63,12 +63,12 @@ sudo cmake --build . --target install
 ## Quill
 ### Quill is a C++ logging library.
 ```
-git clone https://github.com/odygrd/quill.git
+`git clone https://github.com/odygrd/quill.git
 cd quill
 mkdir cmake_build
 cd cmake_build
 cmake ..
-sudo make install
+sudo make install`
 ```
 
 ## Protobuf
@@ -77,10 +77,10 @@ sudo make install
 git clone --recursive https://github.com/protocolbuffers/protobuf.git
 cd protobuf
 mkdir cmake-out
-git checkout v25.0
-cmake -S. -Bcmake-out -DCMAKE_INSTALL_PREFIX=/home/subham/cpp_libs/libs/protobuf_25.2 -DCMAKE_CXX_STANDARD=17 -Dprotobuf_ABSL_PROVIDER=module -DCMAKE_PREFIX_PATH=/home/subham/cpp_libs/libs/protobuf_25.2
-cd cmake-out
+git checkout v25.2
+cmake -S. -Bcmake-out -DCMAKE_INSTALL_PREFIX=/home/subham/cpp_libs/libs_13/protobuf_25.2 -DCMAKE_CXX_STANDARD=17 -Dprotobuf_ABSL_PROVIDER=module -DCMAKE_PREFIX_PATH=/home/subham/cpp_libs/libs_13/protobuf_25.2 -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+`cd cmake-out
 make -j8
-sudo make install
+sudo make install`
 ```
 

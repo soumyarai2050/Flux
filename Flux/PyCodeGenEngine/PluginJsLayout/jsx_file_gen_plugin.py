@@ -119,7 +119,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f", getAll{dependent_message_name}Background"
             output_str += "\n"
             output_str += "}" + f" from '../features/{dependent_message_name_camel_cased}Slice';\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                 dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
@@ -220,7 +220,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "const getAllWsWorker = new Worker(new URL('../workers/getAllWsHandler.js', " \
                           "import.meta.url));\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                 msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
                 for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
                     if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
@@ -667,7 +667,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    } = useSelector(state => " + f"state.{dependent_message_camel_cased});\n"
                 output_str += f"    const dependentLoading = useSelector(state => " \
                               f"state.{dependent_message_camel_cased}.loading);\n"
-                if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+                if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                     msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
                     for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
                         if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
@@ -710,7 +710,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const getWsDict = useRef({});\n"
                 output_str += "    const socketDict = useRef({});\n"
                 output_str += f"    const getAll{dependent_message}Dict = useRef(" + "{});\n"
-                if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+                if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                     msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
                     for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
                         if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
@@ -825,7 +825,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    itemsMetadataDict={{\n"
         output_str += (f"                        '{abb_dependent_message_name_snake_cased}': "
                        f"{dependent_msg_name_camel_cased}Array,\n")
-        if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+        if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
             for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
                 if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
@@ -838,7 +838,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += (f"                        '{abb_dependent_message_name_snake_cased}': "
                        f"getRepeatedWidgetModifiedArray({dependent_msg_name_camel_cased}Array, "
                        f"selected{dependent_msg_name}Id, modified{dependent_msg_name}),\n")
-        if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+        if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
             for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
                 if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
@@ -1084,7 +1084,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "    const columnOrders = widgetOption.column_orders;\n"
         output_str += "    const truncateDateTime = widgetOption.hasOwnProperty('truncate_date_time') ? " \
                       "widgetOption.truncate_date_time : false;\n\n"
-        if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+        if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             dependent_message = self.abbreviated_dependent_message_name
             dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
 
@@ -1426,15 +1426,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        {dependent_message_camel_cased}ArrayRef.current = " \
                           f"{dependent_message_camel_cased}Array;\n"
             output_str += "    }, " + f"[{dependent_message_camel_cased}Array])\n\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                        output_str += "    useEffect(() => {\n"
-                        output_str += (f"        {msg_name_used_in_abb_option_camel_cased}ArrayRef.current = "
-                                       f"{msg_name_used_in_abb_option_camel_cased}Array;\n")
-                        output_str += "    }, "+f"[{msg_name_used_in_abb_option_camel_cased}Array])\n\n"
+            msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+            for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    output_str += "    useEffect(() => {\n"
+                    output_str += (f"        {msg_name_used_in_abb_option_camel_cased}ArrayRef.current = "
+                                   f"{msg_name_used_in_abb_option_camel_cased}Array;\n")
+                    output_str += "    }, "+f"[{msg_name_used_in_abb_option_camel_cased}Array])\n\n"
 
             output_str += "    useEffect(() => {\n"
             output_str += f"        let loadedKeys = _.get(modified{message_name}, loadListFieldAttrs.key);\n"
@@ -1658,17 +1657,16 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           f"{abbreviated_dependent_msg_camel_cased}ArrayRef.current" + " });\n"
             output_str += f"                getAll{dependent_message}Dict.current = " + "{};\n"
             output_str += "            }\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                        output_str += f"            if (Object.keys(getAll{msg_name_used_in_abb_option}Dict.current).length > 0) "+"{\n"
-                        output_str += (f"                getAll{msg_name_used_in_abb_option}"+"WsWorker.postMessage({ getAllDict: "
-                                       f"cloneDeep(getAll{msg_name_used_in_abb_option}Dict.current), storedArray: "
-                                       f"{msg_name_used_in_abb_option_camel_cased}ArrayRef.current"+" });\n")
-                        output_str += f"                getAll{msg_name_used_in_abb_option}Dict.current ="+" {};\n"
-                        output_str += "            }\n"
+            msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+            for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                    msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                    output_str += f"            if (Object.keys(getAll{msg_name_used_in_abb_option}Dict.current).length > 0) "+"{\n"
+                    output_str += (f"                getAll{msg_name_used_in_abb_option}"+"WsWorker.postMessage({ getAllDict: "
+                                   f"cloneDeep(getAll{msg_name_used_in_abb_option}Dict.current), storedArray: "
+                                   f"{msg_name_used_in_abb_option_camel_cased}ArrayRef.current"+" });\n")
+                    output_str += f"                getAll{msg_name_used_in_abb_option}Dict.current ="+" {};\n"
+                    output_str += "            }\n"
             output_str += "        }\n"
             output_str += "    }, " + f"[])\n\n"
             output_str += "    useEffect(() => {\n"
@@ -1680,27 +1678,25 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           "ArrayWs({ data: updatedArray, collections: " \
                           f"dependentWidgetCollectionsDict['{abbreviated_dependent_msg_snake_cased}']" + " }));\n"
             output_str += "            }\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                        msg_name_used_in_abb_option_snake_cased = (
-                            convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
-                        output_str += f"            getAll{msg_name_used_in_abb_option}"+"WsWorker.onmessage = (e) => {\n"
-                        output_str += "                const [updatedArray] = e.data;\n"
-                        output_str += (f"                dispatch(set{msg_name_used_in_abb_option}"+
-                                       "ArrayWs({ data: updatedArray, "
-                                       f"collections: dependentWidgetCollectionsDict["
-                                       f"'{msg_name_used_in_abb_option_snake_cased}']" + " }));\n")
-                        output_str += "            }\n"
+            msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+            for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                    msg_name_used_in_abb_option_snake_cased = (
+                        convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
+                    output_str += f"            getAll{msg_name_used_in_abb_option}"+"WsWorker.onmessage = (e) => {\n"
+                    output_str += "                const [updatedArray] = e.data;\n"
+                    output_str += (f"                dispatch(set{msg_name_used_in_abb_option}"+
+                                   "ArrayWs({ data: updatedArray, "
+                                   f"collections: dependentWidgetCollectionsDict["
+                                   f"'{msg_name_used_in_abb_option_snake_cased}']" + " }));\n")
+                    output_str += "            }\n"
             output_str += "        }\n"
             output_str += "        return () => {\n"
             output_str += "            getAllWsWorker.terminate();\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                        output_str += f"            getAll{msg_name_used_in_abb_option}WsWorker.terminate();\n"
+            msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+            for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                    output_str += f"            getAll{msg_name_used_in_abb_option}WsWorker.terminate();\n"
             output_str += "        }\n"
             output_str += "    }, [getAllWsWorker])\n\n"
             output_str += "    useEffect(() => {\n"
@@ -1709,25 +1705,24 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            for (let id in socketDict.current) {\n"
             output_str += "                id *= 1;\n"
             output_str += "                let socket = socketDict.current[id];\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                output_str += "                if (isWebSocketAlive(socket)) socket.close();\n"
-                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-                if msg_used_in_abb_option_list:
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            dep_msg_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += (f"                let {dep_msg_camel_cased}Socket = "
-                                           f"{dep_msg_camel_cased}SocketDict.current[id];\n")
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            dep_msg_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += (f"                if (isWebSocketAlive({dep_msg_camel_cased}Socket)) "
-                                           f"{dep_msg_camel_cased}Socket.close();\n")
-                    output_str += "                delete socketDict.current[id];\n"
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            dep_msg_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += f"                delete {dep_msg_camel_cased}SocketDict.current[id];\n"
+            output_str += "                if (isWebSocketAlive(socket)) socket.close();\n"
+            msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+            if msg_used_in_abb_option_list:
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        dep_msg_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        output_str += (f"                let {dep_msg_camel_cased}Socket = "
+                                       f"{dep_msg_camel_cased}SocketDict.current[id];\n")
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        dep_msg_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        output_str += (f"                if (isWebSocketAlive({dep_msg_camel_cased}Socket)) "
+                                       f"{dep_msg_camel_cased}Socket.close();\n")
+                output_str += "                delete socketDict.current[id];\n"
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        dep_msg_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        output_str += f"                delete {dep_msg_camel_cased}SocketDict.current[id];\n"
             else:
                 output_str += "                if (socket) socket.close();\n"
                 output_str += "                delete socketDict.current[id];\n"
@@ -1743,25 +1738,22 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                return new Promise((resolve, reject) => {\n"
             output_str += "                    let socket = socketDict.current.hasOwnProperty(id) ? " \
                           "socketDict.current[id] : null;\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
-                if dependent_msg_list_from_another_proto:
-                    msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += (f"                    let {msg_name_used_in_abb_option_camel_cased}Socket = "
-                                           f"{msg_name_used_in_abb_option_camel_cased}SocketDict.current."
-                                           f"hasOwnProperty(id) ? {msg_name_used_in_abb_option_camel_cased}"
-                                           f"SocketDict.current[id] : null;\n")
-                    output_str += f"                    if (isWebSocketAlive(socket)"
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += f" && isWebSocketAlive({msg_name_used_in_abb_option_camel_cased}Socket)"
-                    output_str += ") {\n"
-                else:
-                    output_str += "                    if (isWebSocketAlive(socket)) {\n"
+            dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
+            if dependent_msg_list_from_another_proto:
+                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        output_str += (f"                    let {msg_name_used_in_abb_option_camel_cased}Socket = "
+                                       f"{msg_name_used_in_abb_option_camel_cased}SocketDict.current."
+                                       f"hasOwnProperty(id) ? {msg_name_used_in_abb_option_camel_cased}"
+                                       f"SocketDict.current[id] : null;\n")
+                output_str += f"                    if (isWebSocketAlive(socket)"
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        output_str += f" && isWebSocketAlive({msg_name_used_in_abb_option_camel_cased}Socket)"
+                output_str += ") {\n"
             else:
                 output_str += "                    if (isWebSocketAlive(socket)) {\n"
             output_str += "                        resolve();\n"
@@ -1771,52 +1763,51 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                        socketDict.current = { ...socketDict.current, [id]: socket };\n"
             output_str += "                        socket.onmessage = (event) => {\n"
             output_str += "                            let updatedObj = JSON.parse(event.data);\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
-                if dependent_msg_list_from_another_proto:
-                    output_str += (f"                            const "
-                                   f"{abbreviated_dependent_msg_camel_cased}Collections = "
-                                   f"dependentWidgetCollectionsDict['{abbreviated_dependent_msg_snake_cased}'];\n")
-                    output_str += (f"                            const isRunningCheckField = "
-                                   f"{abbreviated_dependent_msg_camel_cased}Collections."
-                                   "find(col => col.hasOwnProperty('server_running_status')).key;\n")
-                    msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            msg_name_used_in_abb_option_snake_cased = convert_camel_case_to_specific_case(msg_name_used_in_abb_option)
+            dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
+            if dependent_msg_list_from_another_proto:
+                output_str += (f"                            const "
+                               f"{abbreviated_dependent_msg_camel_cased}Collections = "
+                               f"dependentWidgetCollectionsDict['{abbreviated_dependent_msg_snake_cased}'];\n")
+                output_str += (f"                            const isRunningCheckField = "
+                               f"{abbreviated_dependent_msg_camel_cased}Collections."
+                               "find(col => col.hasOwnProperty('server_running_status')).key;\n")
+                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        msg_name_used_in_abb_option_snake_cased = convert_camel_case_to_specific_case(msg_name_used_in_abb_option)
 
-                            for msg in self.layout_msg_list:
-                                if msg.proto.name == msg_name_used_in_abb_option:
-                                    output_str += (f"                            const "
-                                                   f"{msg_name_used_in_abb_option_camel_cased}Schema "
-                                                   f"= schema['{msg_name_used_in_abb_option_snake_cased}'];\n")
-                                    break
-                            else:
+                        for msg in self.layout_msg_list:
+                            if msg.proto.name == msg_name_used_in_abb_option:
                                 output_str += (f"                            const "
                                                f"{msg_name_used_in_abb_option_camel_cased}Schema "
-                                               f"= schema[SCHEMA_DEFINITIONS_XPATH]['{msg_name_used_in_abb_option_snake_cased}'];\n")
+                                               f"= schema['{msg_name_used_in_abb_option_snake_cased}'];\n")
+                                break
+                        else:
                             output_str += (f"                            const "
-                                           f"{msg_name_used_in_abb_option_camel_cased}Url = "
-                                           f"getServerUrl({msg_name_used_in_abb_option_camel_cased}Schema, updatedObj, "
-                                           f"isRunningCheckField);\n")
-                            output_str += f"                            if ({msg_name_used_in_abb_option_camel_cased}Url)"+" {\n"
-                            output_str += (f"                                if (!isWebSocketAlive("
-                                           f"{msg_name_used_in_abb_option_camel_cased}Socket))")+" {\n"
-                            output_str += (f"                                    {msg_name_used_in_abb_option_camel_cased}Socket = " +
-                                           "new WebSocket(`${" + f"{msg_name_used_in_abb_option_camel_cased}Url.replace('http', 'ws')"+
-                                           "}/get"+f"-{msg_name_used_in_abb_option_snake_cased}-ws/$"+"{id}`);\n")
-                            output_str += (f"                                    {msg_name_used_in_abb_option_camel_cased}SocketDict."
-                                           f"current[id] = {msg_name_used_in_abb_option_camel_cased}Socket;\n")
-                            output_str += (f"                                    {msg_name_used_in_abb_option_camel_cased}Socket"
-                                           ".onmessage = (event) => {\n")
-                            output_str += ("                                        let updatedObj = "
-                                           "JSON.parse(event.data);\n")
-                            output_str += (f"                                        getAll{msg_name_used_in_abb_option}Dict"
-                                           ".current[updatedObj[DB_ID]] = updatedObj;\n")
-                            output_str += "                                    }\n"
-                            output_str += "                                }\n"
-                            output_str += "                            }\n"
+                                           f"{msg_name_used_in_abb_option_camel_cased}Schema "
+                                           f"= schema[SCHEMA_DEFINITIONS_XPATH]['{msg_name_used_in_abb_option_snake_cased}'];\n")
+                        output_str += (f"                            const "
+                                       f"{msg_name_used_in_abb_option_camel_cased}Url = "
+                                       f"getServerUrl({msg_name_used_in_abb_option_camel_cased}Schema, updatedObj, "
+                                       f"isRunningCheckField);\n")
+                        output_str += f"                            if ({msg_name_used_in_abb_option_camel_cased}Url)"+" {\n"
+                        output_str += (f"                                if (!isWebSocketAlive("
+                                       f"{msg_name_used_in_abb_option_camel_cased}Socket))")+" {\n"
+                        output_str += (f"                                    {msg_name_used_in_abb_option_camel_cased}Socket = " +
+                                       "new WebSocket(`${" + f"{msg_name_used_in_abb_option_camel_cased}Url.replace('http', 'ws')"+
+                                       "}/get"+f"-{msg_name_used_in_abb_option_snake_cased}-ws/$"+"{id}`);\n")
+                        output_str += (f"                                    {msg_name_used_in_abb_option_camel_cased}SocketDict."
+                                       f"current[id] = {msg_name_used_in_abb_option_camel_cased}Socket;\n")
+                        output_str += (f"                                    {msg_name_used_in_abb_option_camel_cased}Socket"
+                                       ".onmessage = (event) => {\n")
+                        output_str += ("                                        let updatedObj = "
+                                       "JSON.parse(event.data);\n")
+                        output_str += (f"                                        getAll{msg_name_used_in_abb_option}Dict"
+                                       ".current[updatedObj[DB_ID]] = updatedObj;\n")
+                        output_str += "                                    }\n"
+                        output_str += "                                }\n"
+                        output_str += "                            }\n"
             output_str += f"                            getAll{dependent_message}Dict.current[updatedObj[DB_ID]] " \
                           f"= updatedObj;\n"
             output_str += "                            resolve();\n"
@@ -1829,85 +1820,59 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    id *= 1;\n"
             output_str += "                    if (!loadedIds.includes(id)) {\n"
             output_str += "                        let socket = socketDict.current[id];\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-                if msg_used_in_abb_option_list:
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += (f"                        let {msg_name_used_in_abb_option_camel_cased}Socket = "
-                                           f"{msg_name_used_in_abb_option_camel_cased}SocketDict.current[id];\n")
-                    output_str += "                        if (isWebSocketAlive(socket)) socket.close();\n"
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += (f"                        if (isWebSocketAlive("
-                                           f"{msg_name_used_in_abb_option_camel_cased}Socket)) "
-                                           f"{msg_name_used_in_abb_option_camel_cased}Socket.close();\n")
-                    output_str += "                        delete socketDict.current[id];\n"
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += (f"                        delete {msg_name_used_in_abb_option_camel_cased}"
-                                           f"SocketDict.current[id];\n")
-                    output_str += "                    }\n"
-                    output_str += "                })\n"
-                    output_str += "                const socketPromises = loadedIds.map(id => createSocket(id));\n"
-                    output_str += "                await Promise.all(socketPromises);\n"
-                    output_str += "                runFlush.current = true;\n"
-                    output_str += "            }\n"
-                    output_str += "            createAllSockets();\n"
-                    output_str += "        }\n"
-                    output_str += "        return () => {\n"
-                    output_str += (f"            if (_.isEqual(active{dependent_message}List, "
-                                   f"prevActive{dependent_message}List.current) "
-                                   f"&& _.isEqual(oldActive{dependent_message}List, "
-                                   f"prevOldActive{dependent_message}List)) "+"{\n")
-                    output_str += ("                // no dependency change (except disableWs which is acceptable case "
-                                   "for all sockets close)\n")
-                    output_str += "                Object.keys(socketDict.current).forEach(id => {\n"
-                    output_str += "                    let socket = socketDict.current[id];\n"
-                    output_str += "                    if (isWebSocketAlive(socket)) socket.close();\n"
+            msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+            if msg_used_in_abb_option_list:
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        output_str += (f"                        let {msg_name_used_in_abb_option_camel_cased}Socket = "
+                                       f"{msg_name_used_in_abb_option_camel_cased}SocketDict.current[id];\n")
+                output_str += "                        if (isWebSocketAlive(socket)) socket.close();\n"
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        output_str += (f"                        if (isWebSocketAlive("
+                                       f"{msg_name_used_in_abb_option_camel_cased}Socket)) "
+                                       f"{msg_name_used_in_abb_option_camel_cased}Socket.close();\n")
+                output_str += "                        delete socketDict.current[id];\n"
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        output_str += (f"                        delete {msg_name_used_in_abb_option_camel_cased}"
+                                       f"SocketDict.current[id];\n")
+                output_str += "                    }\n"
+                output_str += "                })\n"
+                output_str += "                const socketPromises = loadedIds.map(id => createSocket(id));\n"
+                output_str += "                await Promise.all(socketPromises);\n"
+                output_str += "                runFlush.current = true;\n"
+                output_str += "            }\n"
+                output_str += "            createAllSockets();\n"
+                output_str += "        }\n"
+                output_str += "        return () => {\n"
+                output_str += (f"            if (_.isEqual(active{dependent_message}List, "
+                               f"prevActive{dependent_message}List.current) "
+                               f"&& _.isEqual(oldActive{dependent_message}List, "
+                               f"prevOldActive{dependent_message}List)) "+"{\n")
+                output_str += ("                // no dependency change (except disableWs which is acceptable case "
+                               "for all sockets close)\n")
+                output_str += "                Object.keys(socketDict.current).forEach(id => {\n"
+                output_str += "                    let socket = socketDict.current[id];\n"
+                output_str += "                    if (isWebSocketAlive(socket)) socket.close();\n"
 
-                    msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += (f"                    let {msg_name_used_in_abb_option_camel_cased}Socket = "
-                                           f"{msg_name_used_in_abb_option_camel_cased}SocketDict.current[id];\n")
-                            output_str += (f"                    if (isWebSocketAlive("
-                                           f"{msg_name_used_in_abb_option_camel_cased}Socket)) "
-                                           f"{msg_name_used_in_abb_option_camel_cased}Socket.close();\n")
-                    output_str += "                })\n"
-                    output_str += "            }\n"
-                    output_str += "        }\n"
-                    output_str += "    },"+(f" [active{dependent_message}List, oldActive{dependent_message}List, "
-                                            f"disableWs])\n\n")
-                else:
-                    output_str += "                        if (socket) socket.close();\n"
-                    output_str += "                        delete socketDict.current[id];\n"
-                    output_str += "                    }\n"
-                    output_str += "                })\n"
-                    output_str += "                const socketPromises = loadedIds.map(id => createSocket(id));\n"
-                    output_str += "                await Promise.all(socketPromises);\n"
-                    output_str += "                runFlush.current = true;\n"
-                    output_str += "            }\n"
-                    output_str += "            createAllSockets();\n"
-                    output_str += "        }\n"
-                    output_str += "        return () => {\n"
-                    output_str += (f"            if (_.isEqual(active{dependent_message}List, "
-                                   f"prevActive{dependent_message}List.current) "
-                                   f"&& _.isEqual(oldActive{dependent_message}List, "
-                                   f"prevOldActive{dependent_message}List)) " + "{\n")
-                    output_str += ("                // no dependency change (except disableWs which is acceptable case "
-                                   "for all sockets close)\n")
-                    output_str += "                Object.keys(socketDict.current).forEach(id => {\n"
-                    output_str += "                    let socket = socketDict.current[id];\n"
-                    output_str += "                    if (isWebSocketAlive(socket)) socket.close();\n"
-                    output_str += "                })\n"
-                    output_str += "            }\n"
-                    output_str += "        }\n"
-                    output_str += "    }" + f", [active{dependent_message}List, oldActive{dependent_message}List, disableWs])\n\n"
+                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        output_str += (f"                    let {msg_name_used_in_abb_option_camel_cased}Socket = "
+                                       f"{msg_name_used_in_abb_option_camel_cased}SocketDict.current[id];\n")
+                        output_str += (f"                    if (isWebSocketAlive("
+                                       f"{msg_name_used_in_abb_option_camel_cased}Socket)) "
+                                       f"{msg_name_used_in_abb_option_camel_cased}Socket.close();\n")
+                output_str += "                })\n"
+                output_str += "            }\n"
+                output_str += "        }\n"
+                output_str += "    },"+(f" [active{dependent_message}List, oldActive{dependent_message}List, "
+                                        f"disableWs])\n\n")
             else:
                 output_str += "                        if (socket) socket.close();\n"
                 output_str += "                        delete socketDict.current[id];\n"
@@ -2043,7 +2008,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onChangeMode = () => {\n"
             output_str += "        setMode(Modes.EDIT_MODE);\n"
             output_str += "    }\n\n"
-        output_str += "    const onSave = (e, modifiedObj = null) => {\n"
+        if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+            output_str += "    const onSave = (e, modifiedObj = null, source = null) => {\n"
+        else:
+            output_str += "    const onSave = (e, modifiedObj = null, source = null) => {\n"
         output_str += "        /* if save event is triggered from button (openPopup is true), " \
                       "open the confirm save dialog.\n"
         output_str += "         * if user local changes is present, open confirm save dialog for confirmation,\n"
@@ -2056,20 +2024,78 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type,
                            JsxFileGenPlugin.simple_abbreviated_type,
                            JsxFileGenPlugin.parent_abbreviated_type]:
-            output_str += "        if (!modifiedObj) {\n"
-            if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type]:
-                output_str += f"            modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
+            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+                abbreviated_dependent_msg_name = self.abbreviated_dependent_message_name
+                abbreviated_dependent_msg_camel_cased = convert_to_camel_case(abbreviated_dependent_msg_name)
+                abbreviated_dependent_msg_snake_cased = convert_camel_case_to_specific_case(
+                    abbreviated_dependent_msg_name)
+
+                output_str += "        let originalObj;\n"
+                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+                is_single_source = True
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        msg_name_used_in_abb_option_snake_cased = (
+                            convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
+                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        if is_single_source:    # using is_single_source to have put only in first loop
+                            output_str += f"        if (source === '{msg_name_used_in_abb_option_snake_cased}')"+" {\n"
+                        else:
+                            output_str += (
+                                    f"        else if (source === '{msg_name_used_in_abb_option_snake_cased}')"+" {\n")
+                        output_str += f"            originalObj = {msg_name_used_in_abb_option_camel_cased};\n"
+                        is_single_source = False
+                if not is_single_source:
+                    output_str += "        } else {\n"
+                    output_str += f"            originalObj = {abbreviated_dependent_msg_camel_cased}\n"
+                    output_str += "        }\n"
+                else:
+                    output_str += f"        originalObj = {abbreviated_dependent_msg_camel_cased}\n"
+                output_str += "        if (!modifiedObj) {\n"
+                is_single_source = True
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        msg_name_used_in_abb_option_snake_cased = (
+                            convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
+                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        if is_single_source:    # using is_single_source to have put only in first loop
+                            output_str += (f"            if (source === '{msg_name_used_in_abb_option_snake_cased}')" +
+                                           " {\n")
+                        else:
+                            output_str += (
+                                    f"            else if (source === '{msg_name_used_in_abb_option_snake_cased}')" +
+                                    " {\n")
+                        output_str += (f"                modifiedObj = clearxpath(cloneDeep("
+                                       f"modified{msg_name_used_in_abb_option}));\n")
+                        is_single_source = False
+                if not is_single_source:
+                    output_str += "            } else {\n"
+                    output_str += (f"                modifiedObj = clearxpath(cloneDeep("
+                                   f"modified{abbreviated_dependent_msg_name}));\n")
+                    output_str += "            }\n"
+                else:
+                    output_str += (f"            modifiedObj = clearxpath(cloneDeep("
+                                   f"modified{abbreviated_dependent_msg_name}));\n")
                 output_str += "        }\n"
-                output_str += (f"        const changesDiff = "
-                               f"compareJSONObjects({message_name_camel_cased}, modifiedObj);\n")
+                output_str += "        if (createMode) {\n"
+                output_str += "            delete modifiedObj[DB_ID];\n"
+                output_str += "        }\n"
+                output_str += "        const changesDiff = compareJSONObjects(originalObj, modifiedObj);\n"
             else:
-                output_str += f"            modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"
-                output_str += "            if (createMode) {\n"
-                output_str += "                delete modifiedObj[DB_ID];\n"
-                output_str += "            }\n"
-                output_str += "        }\n"
-                output_str += (f"        const changesDiff = "
-                               f"compareJSONObjects({dependent_message_camel_cased}, modifiedObj);\n")
+                output_str += "        if (!modifiedObj) {\n"
+                if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type]:
+                    output_str += f"            modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
+                    output_str += "        }\n"
+                    output_str += (f"        const changesDiff = "
+                                   f"compareJSONObjects({message_name_camel_cased}, modifiedObj);\n")
+                else:
+                    output_str += f"            modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"
+                    output_str += "            if (createMode) {\n"
+                    output_str += "                delete modifiedObj[DB_ID];\n"
+                    output_str += "            }\n"
+                    output_str += "        }\n"
+                    output_str += (f"        const changesDiff = "
+                                   f"compareJSONObjects({dependent_message_camel_cased}, modifiedObj);\n")
             output_str += "        dispatch(setActiveChanges(changesDiff));\n\n"
         output_str += "        if (e === null && modifiedObj) {\n"
         if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.abbreviated_dependent_type,
@@ -2166,7 +2192,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            [xpath]: value\n"
             output_str += "        };\n"
 
-        if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+        if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
             abbreviated_dependent_msg_name = self.abbreviated_dependent_message_name
             abbreviated_dependent_msg_camel_cased = convert_to_camel_case(abbreviated_dependent_msg_name)
@@ -2212,13 +2238,19 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        })\n"
         output_str += "        if (confirmSave) {\n"
         output_str += "            // on confirm save, force trigger update call without confirmation\n"
-        if layout_type == JsxFileGenPlugin.non_root_type:
+        if layout_type in [JsxFileGenPlugin.non_root_type, JsxFileGenPlugin.abbreviated_dependent_type]:
             output_str += "            onSave(null, modifiedObj);\n"
         else:
-            output_str += "            onConfirmSave(null, modifiedObj);\n"
+            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+                output_str += "            onConfirmSave(null, modifiedObj, source);\n"
+            else:
+                output_str += "            onConfirmSave(null, modifiedObj);\n"
         output_str += "        } else if (originalObj[DB_ID]) {\n"
         output_str += "            // not confirm save. if object already exists, open confirmation\n"
-        output_str += "            onSave(null, modifiedObj);\n"
+        if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+            output_str += "            onSave(null, modifiedObj, source);\n"
+        else:
+            output_str += "            onSave(null, modifiedObj);\n"
         output_str += "        }\n"
         output_str += "    }\n\n"
 
@@ -2471,12 +2503,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"            dispatch(setModified{message_name}(modifiedObj));\n"
             output_str += "        }\n"
             output_str += "    }\n\n"
-            output_str += "    const onConfirmSave = (e, modifiedObj = null) => {\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+            output_str += "    const onConfirmSave = (e, modifiedObj = null, source = null) => {\n"
+            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                 output_str += f"        let changesDiff;\n"
                 output_str += f"        let originalObj;\n"
+                output_str += "        if (source === null) {\n"
+                output_str += "            source = updateSource;\n"
+                output_str += "        }\n"
                 msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-
                 if self.abbreviated_dependent_message_name in msg_used_in_abb_option_list:
                     msg_used_in_abb_option_list.remove(self.abbreviated_dependent_message_name)
                 for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
@@ -2485,11 +2519,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
                     if msg_name_used_in_abb_option == msg_used_in_abb_option_list[0]:
                         output_str += (
-                                f"        if (updateSource === "
+                                f"        if (source === "
                                 f"'{msg_name_used_in_abb_option_snake_cased}') " + "{\n")
                     else:
                         output_str += (
-                                f"        else if (updateSource === "
+                                f"        else if (source === "
                                 f"'{msg_name_used_in_abb_option_snake_cased}') " + "{\n")
 
                     output_str += f"            originalObj = {msg_name_used_in_abb_option_camel_cased};\n"
@@ -2508,11 +2542,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
                     if msg_name_used_in_abb_option == msg_used_in_abb_option_list[0]:
                         output_str += (
-                                f"            if (updateSource === "
+                                f"            if (source === "
                                 f"'{msg_name_used_in_abb_option_snake_cased}') " + "{\n")
                     else:
                         output_str += (
-                                f"            else if (updateSource === "
+                                f"            else if (source === "
                                 f"'{msg_name_used_in_abb_option_snake_cased}') " + "{\n")
                     output_str += (f"                modifiedObj = clearxpath(cloneDeep("
                                    f"modified{msg_name_used_in_abb_option}));\n")
@@ -2542,11 +2576,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
                     if msg_name_used_in_abb_option == msg_name_list_used_in_abb_option[0]:
                         output_str += (
-                                f"                if (updateSource === "
+                                f"                if (source === "
                                 f"'{msg_name_used_in_abb_option_snake_cased}') "+"{\n")
                     else:
                         output_str += (
-                                f"                else if (updateSource === "
+                                f"                else if (source === "
                                 f"'{msg_name_used_in_abb_option_snake_cased}') "+"{\n")
 
                     model_is_from_another_project = False
@@ -2591,11 +2625,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
                     if msg_name_used_in_abb_option == msg_name_list_used_in_abb_option[0]:
                         output_str += (
-                                f"            if (updateSource === "
+                                f"            if (source === "
                                 f"'{msg_name_used_in_abb_option_snake_cased}') "+"{\n")
                     else:
                         output_str += (
-                                f"            else if (updateSource === "
+                                f"            else if (source === "
                                 f"'{msg_name_used_in_abb_option_snake_cased}') "+"{\n")
                     model_is_from_another_project = False
                     for file_name, message_list in self.proto_file_name_to_message_list_dict.items():
@@ -2651,7 +2685,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        dispatch(setDiscardedChanges({}));\n"
             output_str += "        dispatch(setMode(Modes.READ_MODE));\n"
             output_str += "        dispatch(setOpenConfirmSavePopup(false));\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                 output_str += "        setUpdateSource(null);\n"
             output_str += "    }\n\n"
             output_str += "    const onChange = (e, value) => {\n"
@@ -2668,7 +2702,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        let id = getIdFromAbbreviatedKey(abbreviated, searchValue);\n"
             output_str += f"        setSelected{self.abbreviated_dependent_message_name}Id(id);\n"
             output_str += "        setSearchValue('');\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                 output_str += f"        dispatch(getAll{self.abbreviated_dependent_message_name}Background())\n"
             output_str += "    }\n\n"
             output_str += "    const onUnload = (id) => {\n"

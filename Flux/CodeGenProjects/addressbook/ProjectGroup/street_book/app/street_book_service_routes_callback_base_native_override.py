@@ -20,10 +20,11 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
     get_symbol_side_snapshot_log_key, all_service_up_check, host, EXECUTOR_PROJECT_DATA_DIR,
     email_book_service_http_client, get_consumable_participation_qty,
     get_strat_brief_log_key, get_fills_journal_log_key, get_new_strat_limits, get_new_strat_status,
-    log_book_service_http_client, executor_config_yaml_dict,
+    log_book_service_http_client, executor_config_yaml_dict, main_config_yaml_path,
     EXECUTOR_PROJECT_SCRIPTS_DIR, post_book_service_http_client, MobileBookMutexManager)
 from FluxPythonUtils.scripts.utility_functions import (
-    avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger)
+    avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger,
+    handle_refresh_configurable_data_members)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
@@ -224,6 +225,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         self.web_client = None
         self.strat_cache: StratCache | None = None
 
+        self.config_yaml_last_modified_timestamp = os.path.getmtime(main_config_yaml_path)
+        # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
+        self.config_key_to_data_member_name_dict: Dict[str, str] = {
+            "min_refresh_interval": "min_refresh_interval"
+        }
         self.min_refresh_interval: int = parse_to_int(executor_config_yaml_dict.get("min_refresh_interval"))
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
@@ -520,6 +526,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             logging.error("periodic open chore check failed, periodic chore state checks will "
                                           "not be honored and retried in next periodic cycle"
                                           f";;;exception: {e}", exc_info=True)
+
+                    # Updating data-members synced with config file update
+                    last_modified_timestamp = os.path.getmtime(main_config_yaml_path)
+                    if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                        self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                        handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                 str(main_config_yaml_path))
             else:
                 should_sleep = True
 

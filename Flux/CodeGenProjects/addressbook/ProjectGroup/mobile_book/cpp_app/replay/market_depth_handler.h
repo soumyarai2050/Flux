@@ -39,9 +39,13 @@ namespace mobile_book_handler {
         }
 
         void handle_md_update(mobile_book::MarketDepth &r_market_depth_obj) {
+            LOG_INFO(quill::get_logger(), "inside: {}, symbol: {}, side: {}", __func__, r_market_depth_obj.symbol(),
+                mobile_book::TickType_Name(r_market_depth_obj.side()));
+            LOG_INFO(quill::get_logger(), "Calling: update_or_create_market_depth_cache, symbol: {}, side: {}",
+                r_market_depth_obj.symbol(), mobile_book::TickType_Name(r_market_depth_obj.side()));
             mr_market_depth_cache_handler_.update_or_create_market_depth_cache(r_market_depth_obj);
-            insert_or_update_market_depth(r_market_depth_obj);
-            mr_websocket_server_.NewClientCallBack(r_market_depth_obj, -1);
+            LOG_INFO(quill::get_logger(), "exit: update_or_create_market_depth_cache, symbol: {}, side: {}",
+                r_market_depth_obj.symbol(), mobile_book::TickType_Name(r_market_depth_obj.side()));
             auto date_time = MobileBookPopulateRandomValues::get_utc_time();
             if (r_market_depth_obj.position() == 0) {
                 mobile_book::TopOfBook top_of_book_obj;
@@ -58,11 +62,37 @@ namespace mobile_book_handler {
                     top_of_book_obj.mutable_ask_quote()->set_last_update_date_time(date_time);
                     top_of_book_obj.set_last_update_date_time(date_time);
                 } // else not required: TopOfBook only need ASK and BID
-                mr_top_of_book_cache_handler_.update_or_create_top_of_book_cache(top_of_book_obj, TickType_Name(r_market_depth_obj.side()));
+                LOG_INFO(quill::get_logger(), "Calling: update_or_create_top_of_book_cache, symbol: {}, side: {}",
+                r_market_depth_obj.symbol(), mobile_book::TickType_Name(r_market_depth_obj.side()));
+                mr_top_of_book_cache_handler_.update_or_create_top_of_book_cache(top_of_book_obj);
                 notify_semaphore.release();
+                LOG_INFO(quill::get_logger(), "exit: update_or_create_top_of_book_cache and semaphore released, "
+                                              "symbol: {}, side: {}", r_market_depth_obj.symbol(),
+                                              mobile_book::TickType_Name(r_market_depth_obj.side()));
+                LOG_INFO(quill::get_logger(), "Calling: insert_or_update_top_of_book, "
+                                              "symbol: {}, side: {}", r_market_depth_obj.symbol(),
+                                              mobile_book::TickType_Name(r_market_depth_obj.side()));
                 mr_top_of_book_handler_.insert_or_update_top_of_book(top_of_book_obj);
-
+                LOG_INFO(quill::get_logger(), "exit: insert_or_update_top_of_book, "
+                                              "symbol: {}, side: {}", r_market_depth_obj.symbol(),
+                                              mobile_book::TickType_Name(r_market_depth_obj.side()));
             } // else not required: for every symbol TopOfBook should be only 1
+            LOG_INFO(quill::get_logger(), "Calling: insert_or_update_market_depth, "
+                                              "symbol: {}, side: {}", r_market_depth_obj.symbol(),
+                                              mobile_book::TickType_Name(r_market_depth_obj.side()));
+            insert_or_update_market_depth(r_market_depth_obj);
+            LOG_INFO(quill::get_logger(), "exit: insert_or_update_market_depth, "
+                                              "symbol: {}, side: {}", r_market_depth_obj.symbol(),
+                                              mobile_book::TickType_Name(r_market_depth_obj.side()));
+            LOG_INFO(quill::get_logger(), "Calling: NewClientCallBack market_depth, "
+                                              "symbol: {}, side: {}", r_market_depth_obj.symbol(),
+                                              mobile_book::TickType_Name(r_market_depth_obj.side()));
+            mr_websocket_server_.NewClientCallBack(r_market_depth_obj, -1);
+            LOG_INFO(quill::get_logger(), "exit: NewClientCallBack market_depth, "
+                                              "symbol: {}, side: {}", r_market_depth_obj.symbol(),
+                                              mobile_book::TickType_Name(r_market_depth_obj.side()));
+            LOG_INFO(quill::get_logger(), "exit: {}, symbol: {}, side: {}", __func__, r_market_depth_obj.symbol(),
+                mobile_book::TickType_Name(r_market_depth_obj.side()));
         }
 
         void update_market_depth_cache_() {
