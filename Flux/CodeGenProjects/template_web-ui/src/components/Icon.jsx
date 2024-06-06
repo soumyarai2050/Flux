@@ -3,10 +3,15 @@ import { Avatar, Box, IconButton, ToggleButton, Tooltip } from '@mui/material';
 import classes from './Icon.module.css';
 
 export const Icon = (props) => {
+    let selectedClass = '';
+    if (props.selected) {
+        selectedClass = classes.icon_selected;
+    }
+    const classesStr = `${classes.icon} ${selectedClass}`
     return (
         <Tooltip title={props.title} disableInteractive>
             <IconButton
-                className={classes.icon}
+                className={classesStr}
                 disabled={props.disabled}
                 name={props.name}
                 size='small'

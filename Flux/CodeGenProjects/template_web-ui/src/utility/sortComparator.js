@@ -1,6 +1,7 @@
 export const SortType = {
-    SORT_TYPE_ASCENDING: 'asc',
-    SORT_TYPE_DESCENDING: 'desc',
+    SORT_TYPE_UNSPECIFIED: 'asc',
+    ASCENDING: 'asc',
+    DESCENDING: 'desc',
 }
 
 export class SortComparator {
@@ -15,10 +16,10 @@ export class SortComparator {
         const sortOrder = sortOrders[index];
         index += 1;
         let retVal;
-        if (sortOrder.sortType === SortType.SORT_TYPE_DESCENDING) {
-            retVal = SortComparator.descendingSort(a, b, sortOrder.orderBy);
+        if (sortOrder.sort_type === SortType.DESCENDING) {
+            retVal = SortComparator.descendingSort(a, b, sortOrder.order_by);
         } else { // order is asc
-            retVal = -SortComparator.descendingSort(a, b, sortOrder.orderBy);
+            retVal = -SortComparator.descendingSort(a, b, sortOrder.order_by);
         }
         if (retVal === 0) {
             retVal = SortComparator.comparator(a, b, sortOrders, index);

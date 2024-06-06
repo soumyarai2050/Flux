@@ -296,6 +296,98 @@ function Layout(props) {
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 
+    const onSortOrdersChange = useCallback((name, sortOrders, bindVal = null) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                if (bindVal || bindVal === 0) {
+                    bindVal = String(bindVal)
+                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
+                    if (widgetUIData) {
+                        widgetUIData.sort_orders = sortOrders;
+                        widgetUIData.bind_id_val = bindVal;
+                    } else {
+                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], sort_orders: sortOrders, bind_id_val: bindVal });
+                    }
+                } else {
+                    layout.widget_ui_data[0].sort_orders = sortOrders;
+                }
+            }
+            return layout
+        });
+        setLayoutsById();
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
+    const onJoinByChange = useCallback((name, joinBy, bindVal = null) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                if (bindVal || bindVal === 0) {
+                    bindVal = String(bindVal)
+                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
+                    if (widgetUIData) {
+                        widgetUIData.join_by = joinBy;
+                        widgetUIData.bind_id_val = bindVal;
+                    } else {
+                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], join_by: joinBy, bind_id_val: bindVal });
+                    }
+                } else {
+                    layout.widget_ui_data[0].join_by = joinBy;
+                }
+            }
+            return layout
+        });
+        setLayoutsById();
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
+    const onCenterJoinChange = useCallback((name, centerJoin, bindVal = null) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                if (bindVal || bindVal === 0) {
+                    bindVal = String(bindVal)
+                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
+                    if (widgetUIData) {
+                        widgetUIData.joined_at_center = centerJoin;
+                        widgetUIData.bind_id_val = bindVal;
+                    } else {
+                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], joined_at_center: centerJoin, bind_id_val: bindVal });
+                    }
+                } else {
+                    layout.widget_ui_data[0].joined_at_center = centerJoin;
+                }
+            }
+            return layout
+        });
+        setLayoutsById();
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
+    const onFlipChange = useCallback((name, flip, bindVal = null) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                if (bindVal || bindVal === 0) {
+                    bindVal = String(bindVal)
+                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
+                    if (widgetUIData) {
+                        widgetUIData.flip = flip;
+                        widgetUIData.bind_id_val = bindVal;
+                    } else {
+                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], flip: flip, bind_id_val: bindVal });
+                    }
+                } else {
+                    layout.widget_ui_data[0].flip = flip;
+                }
+            }
+            return layout
+        });
+        setLayoutsById();
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
     const onOverrideChange = useCallback((name, enableOverride, disableOverride, bindVal = null) => {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {

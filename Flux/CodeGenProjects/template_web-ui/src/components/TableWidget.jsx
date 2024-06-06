@@ -37,7 +37,7 @@ const TableWidget = (props) => {
     const [hide, setHide] = useState(true);
     const [rowsPerPage, setRowsPerPage] = useState(PageSizeCache.getPageSize(props.name));
     const [page, setPage] = useState(PageCache.getPage(props.name));
-    const [sortOrders, setSortOrders] = useState(SortOrderCache.getSortOrder(props.name));
+    const [sortOrders, setSortOrders] = useState(props.sortOrders ? props.sortOrders : []);
     const [openModalPopup, setOpenModalPopup] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const [toastMessage, setToastMessage] = useState(null);
@@ -55,6 +55,14 @@ const TableWidget = (props) => {
         let trees = generateRowTrees(cloneDeep(data), props.collections, props.xpath);
         setRowTrees(trees);
     }, [props.collections, data, props.xpath])
+
+    useEffect(() => {
+        if (props.sortOrders) {
+            setSortOrders(props.sortOrders);
+        } else {
+            setSortOrders([]);
+        }
+    }, [props.sortOrders])
 
     useEffect(() => {
         let commonKeyCollections = getCommonKeyCollections(rows, headCells, hide, false, props.widgetType === 'repeatedRoot' ? true : false);
@@ -84,12 +92,12 @@ const TableWidget = (props) => {
             updatedCells = updatedCells.filter(cell => !cell.hide);
         }
         updatedCells = updatedCells.filter(cell => {
-            if (commonkeys.filter(commonkey => commonkey.key === cell.key && commonkey.tableTitle === cell.tableTitle).length > 0 && props.mode !== Modes.EDIT_MODE) {
+            if (commonkeys.filter(commonkey => commonkey.key === cell.key && commonkey.tableTitle === cell.tableTitle && commonkey.sourceIndex === cell.sourceIndex).length > 0 && props.mode !== Modes.EDIT_MODE) {
                 return false;
             }
             return true;
         })
-        updatedCells = sortColumns(updatedCells, props.columnOrders);
+        updatedCells = sortColumns(updatedCells, props.columnOrders, props.groupBy, props.centerJoin, props.flip);
         return updatedCells;
     }
 
@@ -126,26 +134,28 @@ const TableWidget = (props) => {
     const handleRequestSort = (event, property, retainSortLevel = false) => {
         let updatedSortOrders = cloneDeep(sortOrders);
         if (!retainSortLevel) {
-            updatedSortOrders = updatedSortOrders.filter(o => o.orderBy === property);
+            updatedSortOrders = updatedSortOrders.filter(o => o.order_by === property);
         }
-        const sortOrder = updatedSortOrders.find(o => o.orderBy === property);
+        const sortOrder = updatedSortOrders.find(o => o.order_by === property);
         if (sortOrder) {
             // sort level already exists for this property
-            sortOrder.sortType = sortOrder.sortType === 'asc' ? 'desc' : 'asc';
+            sortOrder.sort_type = sortOrder.sort_type === 'asc' ? 'desc' : 'asc';
         } else {
             // add a new sort level
-            updatedSortOrders.push({ orderBy: property, sortType: 'asc' });
+            updatedSortOrders.push({ order_by: property, sort_type: 'asc' });
         }
         setSortOrders(updatedSortOrders);
-        SortOrderCache.setSortOrder(props.name, updatedSortOrders);
+        props.onSortOrdersChange(updatedSortOrders);
+        // SortOrderCache.setSortOrder(props.name, updatedSortOrders);
         setPage(0);
         PageCache.setPage(props.name, 0);
     }
 
     const handleRemoveSort = (property) => {
-        const updatedSortOrders = sortOrders.filter(o => o.orderBy !== property);
+        const updatedSortOrders = sortOrders.filter(o => o.order_by !== property);
         setSortOrders(updatedSortOrders);
-        SortOrderCache.setSortOrder(props.name, updatedSortOrders);
+        // SortOrderCache.setSortOrder(props.name, updatedSortOrders);
+        props.onSortOrdersChange(updatedSortOrders);
     }
 
     const onSave = () => {
@@ -191,40 +201,52 @@ const TableWidget = (props) => {
     }
 
     const onRowSelect = (e, rowId) => {
+        // event (e) is used to identify whether to select/unselect the row
         if (props.mode !== Modes.EDIT_MODE) {
-            let updatedSelectedRows;
             if (e.ctrlKey) {
-                if (selectedRows.find(row => row === rowId)) {
-                    // rowId already selected. unselect the row
-                    updatedSelectedRows = selectedRows.filter(row => row !== rowId);
-                } else {
-                    // new selected row. add it to selected array
-                    updatedSelectedRows = [...selectedRows, rowId];
+                setSelectedRows([]);
+                if (props.onSelectRow) {
+                    props.onSelectRow(null);
                 }
             } else {
-                updatedSelectedRows = [rowId];
-            }
-            setSelectedRows(updatedSelectedRows);
-            if (props.widgetType === 'repeatedRoot') {
-                if (updatedSelectedRows.length === 1) {
-                    props.onSelectRow(rowId);
-                } else {
+                setSelectedRows([rowId]);
+                if (props.onSelectRow) {
                     props.onSelectRow(null);
                 }
             }
+            // TODO: below condition is preventing the switch to be efficient
+            // if (!selectedRows.includes(rowId)) {
+                // setSelectedRows([rowId]);
+                // props.onSelectRow(rowId);
+            // }
         }
+        // TODO: multiple row select removed
+        // let updatedSelectedRows;
+        // if (e.ctrlKey) {
+        //     if (selectedRows.find(row => row === rowId)) {
+        //         // rowId already selected. unselect the row
+        //         updatedSelectedRows = selectedRows.filter(row => row !== rowId);
+        //     } else {
+        //         // new selected row. add it to selected array
+        //         updatedSelectedRows = [...selectedRows, rowId];
+        //     }
+        // } else {
+        //     updatedSelectedRows = [rowId];
+        // }
+        // setSelectedRows(updatedSelectedRows);
+        // if (props.widgetType === 'repeatedRoot') {
+        //     if (updatedSelectedRows.length === 1) {
+        //         props.onSelectRow(rowId);
+        //     } else {
+        //         props.onSelectRow(null);
+        //     }
+        // }
     }
 
-    const onRowDisselect = (e, rowId) => {
-        if (props.mode !== Modes.EDIT_MODE) {
-            const updatedSelectedRows = selectedRows.filter(row => row !== rowId);
-            setSelectedRows(updatedSelectedRows);
-            if (props.widgetType === 'repeatedRoot') {
-                if (updatedSelectedRows.length === 1) {
-                    props.onSelectRow(updatedSelectedRows[0]);
-                } else {
-                    props.onSelectRow(null);
-                }
+    const onRowDoubleClick = (e) => {
+        if (props.mode === Modes.READ_MODE) {
+            if (!e.target.closest('button')) {
+                props.headerProps.onChangeMode();
             }
         }
     }
@@ -319,7 +341,7 @@ const TableWidget = (props) => {
         setSettingsArcholEl(null);
     }
 
-    const onTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes) => {
+    const onTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes, dataSourceId, source = null) => {
         let updatedData;
         if (value === '') {
             value = null;
@@ -337,13 +359,17 @@ const TableWidget = (props) => {
         // let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
-        props.onUserChange(xpath, value);
+        const userChangeDict = {
+            [DB_ID]: dataSourceId, 
+            [xpath]: value
+        }
+        props.onUserChange(xpath, value, userChangeDict);
         if (props.onFormUpdate) {
             props.onFormUpdate(xpath, validationRes);
         }
     }, [data, props.onUpdate, props.onUserChange])
 
-    const onSelectItemChange = useCallback((e, dataxpath, xpath) => {
+    const onSelectItemChange = useCallback((e, dataxpath, xpath, dataSourceId, source = null) => {
         let updatedData;
         if (props.widgetType === 'repeatedRoot') {
             updatedData = cloneDeep(data.find(obj => obj[DB_ID] === selectedRows[0]));
@@ -353,10 +379,14 @@ const TableWidget = (props) => {
         // let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, e.target.value);
         props.onUpdate(updatedData);
-        props.onUserChange(xpath, e.target.value);
+        const userChangeDict = {
+            [DB_ID]: dataSourceId, 
+            [xpath]: e.target.value
+        }
+        props.onUserChange(xpath, e.target.value, userChangeDict);
     }, [data, props.onUpdate, props.onUserChange])
 
-    const onCheckboxChange = useCallback((e, dataxpath, xpath) => {
+    const onCheckboxChange = useCallback((e, dataxpath, xpath, dataSourceId, source = null) => {
         let updatedData;
         if (props.widgetType === 'repeatedRoot') {
             updatedData = cloneDeep(data.find(obj => obj[DB_ID] === selectedRows[0]));
@@ -366,10 +396,14 @@ const TableWidget = (props) => {
         // let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, e.target.checked);
         props.onUpdate(updatedData);
-        props.onUserChange(xpath, e.target.checked);
+        const userChangeDict = {
+            [DB_ID]: dataSourceId, 
+            [xpath]: e.target.checked
+        }
+        props.onUserChange(xpath, e.target.checked, userChangeDict);
     }, [data, props.onUpdate, props.onUserChange])
 
-    const onAutocompleteOptionChange = useCallback((e, value, dataxpath, xpath) => {
+    const onAutocompleteOptionChange = useCallback((e, value, dataxpath, xpath, dataSourceId, source = null) => {
         let updatedData;
         if (props.widgetType === 'repeatedRoot') {
             updatedData = cloneDeep(data.find(obj => obj[DB_ID] === selectedRows[0]));
@@ -379,10 +413,14 @@ const TableWidget = (props) => {
         // let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
-        props.onUserChange(xpath, value);
+        const userChangeDict = {
+            [DB_ID]: dataSourceId, 
+            [xpath]: value
+        }
+        props.onUserChange(xpath, value, userChangeDict);
     }, [data, props.onUpdate, props.onUserChange])
 
-    const onDateTimeChange = useCallback((dataxpath, xpath, value) => {
+    const onDateTimeChange = useCallback((dataxpath, xpath, value, dataSourceId, source = null) => {
         let updatedData;
         if (props.widgetType === 'repeatedRoot') {
             updatedData = cloneDeep(data.find(obj => obj[DB_ID] === selectedRows[0]));
@@ -392,17 +430,21 @@ const TableWidget = (props) => {
         // let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
-        props.onUserChange(xpath, value);
+        const userChangeDict = {
+            [DB_ID]: dataSourceId, 
+            [xpath]: value
+        }
+        props.onUserChange(xpath, value, userChangeDict);
     }, [data, props.onUpdate, props.onUserChange])
 
-    const onButtonClick = useCallback((e, action, xpath, value, source = null, confirmSave = false) => {
+    const onButtonClick = useCallback((e, action, xpath, value, dataSourceId, source = null, confirmSave = false) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
-            props.onButtonToggle(e, xpath, updatedData, source, confirmSave);
+            props.onButtonToggle(e, xpath, updatedData, dataSourceId, source, confirmSave);
         } else if (action === 'flux_trigger_strat') {
             let updatedData = flux_trigger_strat(value);
             if (updatedData) {
-                props.onButtonToggle(e, xpath, updatedData, source, confirmSave);
+                props.onButtonToggle(e, xpath, updatedData, dataSourceId, source, confirmSave);
             }
         }
     }, [flux_toggle, flux_trigger_strat, props.onButtonToggle])
@@ -576,16 +618,9 @@ const TableWidget = (props) => {
                             <TableBody>
                                 {getActiveRows(rows, page, rowsPerPage, sortOrders)
                                     .map((row, index) => {
-                                        let tableRowClass = '';
-                                        if (row['data-add']) {
-                                            tableRowClass = classes.add;
-                                        } else if (row['data-remove']) {
-                                            tableRowClass = classes.remove;
-                                        }
-
                                         let cells = getFilteredCells();
-                                        let selected = selectedRows.filter(id => id === row['data-id']).length > 0;
-                                        let rowKey = row['data-id'];
+                                        // let selected = selectedRows.filter(id => id === row[0]['data-id']).length > 0;
+                                        let rowKey = row[0]['data-id'];
                                         if (Number.isInteger(rowKey)) {
                                             rowKey = index;
                                         }
@@ -593,7 +628,7 @@ const TableWidget = (props) => {
                                         return (
                                             <Row
                                                 key={rowKey}
-                                                className={tableRowClass}
+                                                // className={tableRowClass}
                                                 cells={cells}
                                                 collections={props.collections}
                                                 data={props.data}
@@ -602,20 +637,23 @@ const TableWidget = (props) => {
                                                 onCheckboxChange={onCheckboxChange}
                                                 onDateTimeChange={onDateTimeChange}
                                                 onRowClick={onRowClick}
-                                                onRowDisselect={onRowDisselect}
+                                                onRowDoubleClick={onRowDoubleClick}
                                                 onRowSelect={onRowSelect}
                                                 onSelectItemChange={onSelectItemChange}
                                                 onTextChange={onTextChange}
                                                 onUpdate={onUpdate}
                                                 originalData={props.originalData}
                                                 row={row}
-                                                selected={selected}
+                                                selectedRows={selectedRows}
+                                                // selected={selected}
                                                 mode={props.mode}
                                                 onFormUpdate={props.onFormUpdate}
                                                 index={props.index}
                                                 forceUpdate={props.forceUpdate}
                                                 truncateDateTime={props.truncateDateTime}
                                                 widgetType={props.widgetType}
+                                                onForceSave={props.onForceSave}
+                                                // rowId={props.widgetType === 'root' ? props.index : row[0]['data-id']}
                                             />
                                         )
                                     })}

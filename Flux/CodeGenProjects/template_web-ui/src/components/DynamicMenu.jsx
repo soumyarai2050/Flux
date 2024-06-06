@@ -32,14 +32,14 @@ const DynamicMenu = (props) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     })
 
-    const onClick = (e, action, xpath, value, source = null, confirmSave = false) => {
+    const onClick = (e, action, xpath, value, dataSourceId, source = null, confirmSave = false) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
-            props.onButtonToggle(e, xpath, updatedData, source, confirmSave);
+            props.onButtonToggle(e, xpath, updatedData, dataSourceId, source, confirmSave);
         } else if (action === 'flux_trigger_strat') {
             let updatedData = flux_trigger_strat(value);
             if (updatedData) {
-                props.onButtonToggle(e, xpath, updatedData, source, confirmSave);
+                props.onButtonToggle(e, xpath, updatedData, dataSourceId, source, confirmSave);
             }
         }
     }

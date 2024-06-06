@@ -21,11 +21,11 @@ namespace mobile_book_cache {
 
                 FluxCppCore::PythonGIL gil;
 
-                PyObject* p_mobile_book_container_instance = nullptr;
-                PyObject* p_market_depth_instance = nullptr;
-                PyObject* p_set_func = nullptr;
-                PyObject* p_args = nullptr;
-                PyObject* p_mutex = nullptr;
+                PyObject* p_mobile_book_container_instance;
+                PyObject* p_market_depth_instance;
+                PyObject* p_set_func;
+                PyObject* p_args;
+                PyObject* p_mutex;
 
                 p_mobile_book_container_instance = FluxCppCore::AddOrGetContainerObj::get_mobile_book_container_instance(
                     kr_market_depth_obj.symbol());
@@ -53,12 +53,9 @@ namespace mobile_book_cache {
                             } else {
                                 const std::string time_str = PyUnicode_AsUTF8(PyObject_Str(PyObject_GetAttrString(
                                     p_market_depth_instance, exch_time_fld_name.c_str())));
-                                FluxCppCore::TimeComparison time = FluxCppCore::StringUtil::find_latest_time(
-                                    time_str, kr_market_depth_obj.exch_time());
                                 p_set_func = PyObject_GetAttrString(p_market_depth_instance, get_mutex_key.c_str());
                                 p_mutex = PyObject_CallObject(p_set_func, nullptr);
-                                if(time == FluxCppCore::TimeComparison::TIME2_LATER or
-                                    time == FluxCppCore::TimeComparison::BOTH_EQUAL) {
+                                if(kr_market_depth_obj.exch_time() >= FluxCppCore::parse_time(time_str)) {
                                     update_bid_market_depth_cache(
                                         kr_market_depth_obj, p_mobile_book_container_instance, p_mutex);
                                 }
@@ -77,12 +74,10 @@ namespace mobile_book_cache {
                                 const std::string time_str = PyUnicode_AsUTF8(
                                     PyObject_Str(PyObject_GetAttrString(
                                         p_market_depth_instance, exch_time_fld_name.c_str())));
-                                FluxCppCore::TimeComparison time = FluxCppCore::StringUtil::find_latest_time(
-                                    time_str, kr_market_depth_obj.exch_time());
+
                                 p_set_func = PyObject_GetAttrString(p_market_depth_instance, get_mutex_key.c_str());
                                 p_mutex = PyObject_CallObject(p_set_func, nullptr);
-                                if (time == FluxCppCore::TimeComparison::TIME2_LATER or
-                                    time == FluxCppCore::TimeComparison::BOTH_EQUAL) {
+                                if (kr_market_depth_obj.exch_time() >= FluxCppCore::parse_time(time_str)) {
                                     update_ask_market_depth_cache(kr_market_depth_obj,
                                         p_mobile_book_container_instance, p_mutex);
                                 }
@@ -169,14 +164,16 @@ namespace mobile_book_cache {
                         static_cast<Py_ssize_t>(kr_market_depth_obj.symbol().size()), nullptr));
                 assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_symbol, p_args)));
 
+                std::string exch_time = FluxCppCore::format_time(kr_market_depth_obj.exch_time());
                 p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
-                    PyUnicode_DecodeUTF8(kr_market_depth_obj.exch_time().c_str(),
-                        static_cast<Py_ssize_t>(kr_market_depth_obj.exch_time().size()), nullptr));
+                    PyUnicode_DecodeUTF8(exch_time.c_str(),
+                        static_cast<Py_ssize_t>(exch_time.size()), nullptr));
                 assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_exch_time, p_args)));
 
+                std::string arrival_time = FluxCppCore::format_time(kr_market_depth_obj.arrival_time());
                 p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
-                    PyUnicode_DecodeUTF8(kr_market_depth_obj.arrival_time().c_str(),
-                        static_cast<Py_ssize_t>(kr_market_depth_obj.arrival_time().size()), nullptr));
+                    PyUnicode_DecodeUTF8(arrival_time.c_str(),
+                        static_cast<Py_ssize_t>(arrival_time.size()), nullptr));
                 assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_arrival_time, p_args)));
 
                 p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
@@ -264,14 +261,16 @@ namespace mobile_book_cache {
                         static_cast<Py_ssize_t>(kr_market_depth_obj.symbol().size()), nullptr));
                 assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_symbol, p_args)));
 
+                std::string exch_time = FluxCppCore::format_time(kr_market_depth_obj.exch_time());
                 p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
-                    PyUnicode_DecodeUTF8(kr_market_depth_obj.exch_time().c_str(),
-                        static_cast<Py_ssize_t>(kr_market_depth_obj.exch_time().size()), nullptr));
+                    PyUnicode_DecodeUTF8(exch_time.c_str(),
+                        static_cast<Py_ssize_t>(exch_time.size()), nullptr));
                 assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_exch_time, p_args)));
 
+                std::string arrival_time = FluxCppCore::format_time(kr_market_depth_obj.arrival_time());
                 p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
-                    PyUnicode_DecodeUTF8(kr_market_depth_obj.arrival_time().c_str(),
-                        static_cast<Py_ssize_t>(kr_market_depth_obj.arrival_time().size()), nullptr));
+                    PyUnicode_DecodeUTF8(arrival_time.c_str(),
+                        static_cast<Py_ssize_t>(arrival_time.size()), nullptr));
                 assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_arrival_time, p_args)));
 
                 p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
@@ -362,10 +361,8 @@ namespace mobile_book_cache {
                         p_mutex = PyObject_CallObject(p_set_func, nullptr);
                         const std::string time_str = PyUnicode_AsUTF8(PyObject_Str(PyObject_GetAttrString(
                             p_last_barter_instance, exch_time_fld_name.c_str())));
-                        FluxCppCore::TimeComparison time = FluxCppCore::StringUtil::find_latest_time(
-                            time_str, kr_last_barter_obj.exch_time());
-                        if (time == FluxCppCore::TimeComparison::TIME2_LATER or
-                            time == FluxCppCore::TimeComparison::BOTH_EQUAL) {
+
+                        if (kr_last_barter_obj.exch_time() >= FluxCppCore::parse_time(time_str)) {
                             update_last_barter_cache(kr_last_barter_obj, p_mobile_book_container_instance, p_mutex);
                         }
                     }
@@ -445,15 +442,17 @@ namespace mobile_book_cache {
                 assert(Py_IsTrue(PyObject_CallObject(p_set_last_barter_exch_id, p_args)));
 
 
-                p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(kr_last_barter_obj.exch_time().c_str(),
+                std::string exch_time = FluxCppCore::format_time(kr_last_barter_obj.exch_time());
+                p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(exch_time.c_str(),
                                                               static_cast<Py_ssize_t>(
-                                                                  kr_last_barter_obj.exch_time().size()),
+                                                                  exch_time.size()),
                                                               nullptr));
                 assert(Py_IsTrue(PyObject_CallObject(p_set_last_barter_exch_time, p_args)));
 
-                p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(kr_last_barter_obj.arrival_time().c_str(),
+                std::string arrival_time = FluxCppCore::format_time(kr_last_barter_obj.arrival_time());
+                p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(arrival_time.c_str(),
                                                               static_cast<Py_ssize_t>(
-                                                                  kr_last_barter_obj.arrival_time().size()),
+                                                                  arrival_time.size()),
                                                               nullptr));
                 assert(Py_IsTrue(PyObject_CallObject(p_set_last_barter_arrival_time, p_args)));
 
@@ -527,8 +526,6 @@ namespace mobile_book_cache {
                         p_mutex = PyObject_CallObject(p_set_func, nullptr);
                         const std::string time_str = PyUnicode_AsUTF8(PyObject_Str(PyObject_GetAttrString(
                             p_top_of_book_instance, last_update_date_time_fld_name.c_str())));
-                        FluxCppCore::TimeComparison time = FluxCppCore::StringUtil::find_latest_time(time_str,
-                                kr_top_of_book.last_update_date_time());
 
                         if (kr_top_of_book.has_bid_quote()) {
 
@@ -540,8 +537,7 @@ namespace mobile_book_cache {
                             if (PyObject_CallObject(p_get_top_of_book_bid_quote, nullptr) == Py_None) {
                                 create_top_of_book_bid_quote(kr_top_of_book, p_mobile_book_container_instance);
                             } else {
-                                if (time == FluxCppCore::TimeComparison::TIME2_LATER or
-                                    time == FluxCppCore::TimeComparison::BOTH_EQUAL) {
+                                if (kr_top_of_book.last_update_date_time() >= FluxCppCore::parse_time(time_str)) {
                                     update_top_of_book_bid_quote(
                                         kr_top_of_book, p_mobile_book_container_instance, p_mutex);
                                 }
@@ -558,8 +554,7 @@ namespace mobile_book_cache {
                             if (PyObject_CallObject(p_get_top_of_book_ask_quote, nullptr) == Py_None) {
                                 create_top_of_book_ask_quote(kr_top_of_book, p_mobile_book_container_instance);
                             } else {
-                                if (time == FluxCppCore::TimeComparison::TIME2_LATER or
-                                    time == FluxCppCore::TimeComparison::BOTH_EQUAL) {
+                                if (kr_top_of_book.last_update_date_time() >= FluxCppCore::parse_time(time_str)) {
                                     update_top_of_book_ask_quote(
                                         kr_top_of_book, p_mobile_book_container_instance, p_mutex);
                                 }
@@ -575,8 +570,7 @@ namespace mobile_book_cache {
                             if (PyObject_CallObject(p_get_top_of_book_last_barter, nullptr) == Py_None) {
                                 create_top_of_book_last_barter(kr_top_of_book, p_mobile_book_container_instance);
                             } else {
-                                if (time == FluxCppCore::TimeComparison::TIME2_LATER or
-                                    time == FluxCppCore::TimeComparison::BOTH_EQUAL) {
+                                if (kr_top_of_book.last_update_date_time() >= FluxCppCore::parse_time(time_str)) {
                                     update_top_of_book_last_barter(
                                         kr_top_of_book, p_mobile_book_container_instance, p_mutex);
                                 }
@@ -662,9 +656,10 @@ namespace mobile_book_cache {
                 p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_book_obj.bid_quote().premium()));
                 assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_premium, p_args)));
 
+                std::string bid_quote_last_update_date_time = FluxCppCore::format_time(kr_top_book_obj.bid_quote().last_update_date_time());
                 p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(
-                        kr_top_book_obj.bid_quote().last_update_date_time().c_str(),
-                        static_cast<Py_ssize_t>(kr_top_book_obj.bid_quote().last_update_date_time().size()),
+                        bid_quote_last_update_date_time.c_str(),
+                        static_cast<Py_ssize_t>(bid_quote_last_update_date_time.size()),
                         nullptr));
                 assert(PyObject_IsTrue(PyObject_CallObject(
                     p_set_top_of_book_bid_quote_last_update_date_time, p_args)));
@@ -725,9 +720,10 @@ namespace mobile_book_cache {
                 p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_of_book_obj.ask_quote().premium()));
                 assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_premium, p_args)));
 
+                std::string ask_quote_last_update_date_time = FluxCppCore::format_time(kr_top_of_book_obj.ask_quote().last_update_date_time());
                 p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(
-                        kr_top_of_book_obj.ask_quote().last_update_date_time().c_str(),
-                        static_cast<Py_ssize_t>(kr_top_of_book_obj.ask_quote().last_update_date_time().size()),
+                        ask_quote_last_update_date_time.c_str(),
+                        static_cast<Py_ssize_t>(ask_quote_last_update_date_time.size()),
                         nullptr));
                 assert(PyObject_IsTrue(
                         PyObject_CallObject(p_set_top_of_book_ask_quote_last_update_date_time, p_args)));
@@ -784,9 +780,10 @@ namespace mobile_book_cache {
                 p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_of_book_obj.last_barter().premium()));
                 assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_premium, p_args)));
 
+                std::string last_barter_last_update_date_time = FluxCppCore::format_time(kr_top_of_book_obj.last_barter().last_update_date_time());
                 p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(
-                        kr_top_of_book_obj.last_barter().last_update_date_time().c_str(),
-                        static_cast<Py_ssize_t>(kr_top_of_book_obj.last_barter().last_update_date_time().size()),
+                        last_barter_last_update_date_time.c_str(),
+                        static_cast<Py_ssize_t>(last_barter_last_update_date_time.size()),
                         nullptr));
                 assert(PyObject_IsTrue(PyObject_CallObject(
                     p_set_top_of_book_last_barter_last_update_date_time, p_args)));
@@ -850,9 +847,10 @@ namespace mobile_book_cache {
                     }
                 }
 
-                p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(kr_top_of_book_obj.last_update_date_time().c_str(),
+                std::string last_update_date_time = FluxCppCore::format_time(kr_top_of_book_obj.last_update_date_time());
+                p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(last_update_date_time.c_str(),
                                                               static_cast<Py_ssize_t>(
-                                                                  kr_top_of_book_obj.last_update_date_time().size()),
+                                                                  last_update_date_time.size()),
                                                               nullptr));
 
                 assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_last_update_date_time, p_args)));

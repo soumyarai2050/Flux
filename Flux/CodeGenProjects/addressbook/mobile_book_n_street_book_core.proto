@@ -61,7 +61,7 @@ message TopOfBook {
   // total_bartering_security_size is not expected to change intra-day - log error critical if this is noticed to change intra-day
   optional int64 total_bartering_security_size = 6;
   repeated MarketBarterVolume market_barter_volume = 7;
-  optional string last_update_date_time = 8 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 8 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
 }
 
 message MarketDepth {
@@ -99,8 +99,8 @@ message MarketDepth {
   option (FluxMsgAggregateQueryVarName) = "cum_px_qty_aggregate_pipeline";
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
-  required string exch_time = 3 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
-  required string arrival_time = 4 [(FluxFldValIsDateTime) = true];
+  required int64 exch_time = 3 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
+  required int64 arrival_time = 4 [(FluxFldValIsDateTime) = true];
   required TickType side = 5 [(FluxFldPk) = "true"];
   optional float px = 6;
   optional int64 qty = 7;
@@ -141,8 +141,8 @@ message LastBarter {
 
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];
-  required string exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
-  required string arrival_time = 4 [(FluxFldValIsDateTime) = true];
+  required int64 exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required int64 arrival_time = 4 [(FluxFldValIsDateTime) = true];
   required float px = 5;
   required int64 qty = 6;
   optional float premium = 7;
@@ -162,8 +162,8 @@ message RawLastBarterHistory {
   };
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];
-  required string exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
-  required string arrival_time = 4 [(FluxFldValIsDateTime) = true];
+  required int64 exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required int64 arrival_time = 4 [(FluxFldValIsDateTime) = true];
   required float px = 5;
   required int64 qty = 6;
   optional float premium = 7;

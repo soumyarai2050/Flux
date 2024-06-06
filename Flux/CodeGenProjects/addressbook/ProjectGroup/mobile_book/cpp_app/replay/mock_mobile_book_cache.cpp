@@ -48,10 +48,11 @@ void initialize_database(const char *db_uri, const char *db_name, PyObject *port
     PyGILState_Release(gstate);
 }
 
-void create_or_update_md_n_tob(const int32_t id, const char *symbol, const char *exch_time,
-    const char *arrival_time, const int side, const int32_t position, const float px, const int64_t qty,
+void create_or_update_md_n_tob(const int32_t id, const char *symbol, [[maybe_unused]] const char *exch_time,
+    [[maybe_unused]] const char *arrival_time, const int side, const int32_t position, const float px, const int64_t qty,
     const char *market_maker, const bool is_smart_depth, const float cumulative_notional,
     const int64_t cumulative_qty, const float cumulative_avg_px) {
+
     mobile_book::TickType k_side;
     if (side == 1) {
         k_side = mobile_book::TickType::BID;
@@ -70,8 +71,8 @@ void create_or_update_md_n_tob(const int32_t id, const char *symbol, const char 
     mobile_book::MarketDepth market_depth;
     market_depth.set_id(id);
     market_depth.set_symbol(symbol);
-    market_depth.set_exch_time(exch_time);
-    market_depth.set_arrival_time(arrival_time);
+    market_depth.set_exch_time(FluxCppCore::get_utc_time_microseconds());
+    market_depth.set_arrival_time(FluxCppCore::get_utc_time_microseconds());
     market_depth.set_side(k_side);
     market_depth.set_px(px);
     market_depth.set_qty(qty);
@@ -87,7 +88,7 @@ void create_or_update_md_n_tob(const int32_t id, const char *symbol, const char 
 }
 
 void create_or_update_last_barter_n_tob(const int32_t id, const char *symbol, const char *exch_id,
-    const char *exch_time, const char *arrival_time, const float px, const int64_t qty, const float premium,
+    [[maybe_unused]] const char *exch_time, [[maybe_unused]] const char *arrival_time, const float px, const int64_t qty, const float premium,
     const char *market_barter_volume_id, const int64_t participation_period_last_barter_qty_sum,
     const int32_t applicable_period_seconds) {
     auto sp_mongo_db = MongoDBHandlerSingleton::get_instance();
@@ -100,8 +101,8 @@ void create_or_update_last_barter_n_tob(const int32_t id, const char *symbol, co
     last_barter.set_px(px);
     last_barter.set_qty(qty);
     last_barter.set_premium(premium);
-    last_barter.set_exch_time(exch_time);
-    last_barter.set_arrival_time(arrival_time);
+    last_barter.set_exch_time(FluxCppCore::get_utc_time_microseconds());
+    last_barter.set_arrival_time(FluxCppCore::get_utc_time_microseconds());
     last_barter.mutable_symbol_n_exch_id()->set_symbol(symbol);
     last_barter.mutable_symbol_n_exch_id()->set_exch_id(exch_id);
     last_barter.mutable_market_barter_volume()->set_id(market_barter_volume_id);

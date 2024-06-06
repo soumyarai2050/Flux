@@ -286,6 +286,8 @@ extend google.protobuf.FieldOptions
   optional bool FluxFldServerRunningStatus = 55274;
   optional string FluxFldColumnSize = 55275;  // Use this to set column size, supported: [small, medium, large]
   optional string FluxFldColumnDirection = 55276;  // Use this to set column direction, supported: [ltr, rtl]
+  optional bool FluxFldServerReadyStatus = 55277;
+  optional float FluxFldDiffThreshold = 55278;  // Use this to allow direct save if diff is below the threshold
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

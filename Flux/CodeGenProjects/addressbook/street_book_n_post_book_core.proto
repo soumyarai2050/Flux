@@ -81,7 +81,7 @@ message ChoreJournal{
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional ChoreBrief chore = 2;
-  optional string chore_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
+  optional int64 chore_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
   optional ChoreEventType chore_event = 4;
   optional int32 current_period_chore_count = 8 [ (FluxFldHelp) = "total new chore count within chore_rate(s) applicable_period_seconds"];
 }
@@ -145,15 +145,15 @@ message ChoreSnapshot{
   optional int64 cxled_qty = 17;
   optional float avg_cxled_px = 18;
   optional float cxled_notional = 19 [(FluxFldDisplayType) = "int"];
-  optional string create_date_time = 20 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
-  optional string last_update_date_time = 21 [(FluxFldValIsDateTime) = true];
+  optional int64 create_date_time = 20 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 21 [(FluxFldValIsDateTime) = true];
   optional int64 last_n_sec_total_qty = 22 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec chore qty
 }
 
 message PairSideBarteringBrief{
   required Security security = 1;
   required Side side = 2;
-  required string last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
+  required int64 last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
   optional float consumable_open_chores = 4 [(FluxFldHelp) = "max_open_chores_per_side - open_chores for this symbol side"];
   optional float consumable_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_single_leg_notional - filled_notional - open_notional"];
   optional float consumable_open_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_open_single_leg_notional - open_notional"];

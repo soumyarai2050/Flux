@@ -9,13 +9,13 @@ import classes from './Row.module.css';
 
 const Row = (props) => {
     const {
-        className,
+        // className,
         row,
         cells,
-        selected,
+        // selected,
         mode,
         onRowSelect,
-        onRowDisselect,
+        onRowDoubleClick,
         data,
         originalData,
         collections,
@@ -29,45 +29,46 @@ const Row = (props) => {
         onDateTimeChange,
     } = props
 
-    let rowClass = `${classes.row} ${className}`
-    let rowindex = row['data-id'];
+    let rowClass = classes.row;
+    let rowindex = row[0]['data-id'];
 
     return useMemo(() => (
         <TableRow
             className={rowClass}
             hover
-            selected={selected}
-            onDoubleClick={(e) => onRowDisselect(e, rowindex)}
-            onClick={(e) => onRowSelect(e, rowindex)}>
-
+            // selected={selected}
+            // onClick={(e) => onRowSelect(e, rowindex)}
+            onDoubleClick={onRowDoubleClick}>
             {cells.map((cell, i) => {
+                const cellRow = row[cell.sourceIndex];
+                let selected = props.selectedRows.includes(cellRow['data-id'])
                 let collection = collections.filter(c => c.tableTitle === cell.tableTitle)[0];
-                let xpath = row['xpath_' + cell.key];
+                let xpath = cellRow['xpath_' + cell.key];
                 if (cell.tableTitle && cell.tableTitle.indexOf('.') > -1) {
-                    xpath = row[cell.tableTitle.substring(0, cell.tableTitle.lastIndexOf('.')) + '.xpath_' + cell.key]
+                    xpath = cellRow[cell.tableTitle.substring(0, cell.tableTitle.lastIndexOf('.')) + '.xpath_' + cell.key]
                 }
 
                 let disabled = false;
-                if (row[cell.tableTitle] === undefined) {
+                if (cellRow[cell.tableTitle] === undefined) {
                     disabled = true;
                 } else if (mode === Modes.EDIT_MODE) {
-                    if (collection && collection.ormNoUpdate && !row['data-add']) {
+                    if (collection && collection.ormNoUpdate && !cellRow['data-add']) {
                         disabled = true;
-                    } else if (collection.uiUpdateOnly && row['data-add']) {
+                    } else if (collection.uiUpdateOnly && cellRow['data-add']) {
                         disabled = true;
-                    } else if (row['data-remove']) {
+                    } else if (cellRow['data-remove']) {
                         disabled = true;
                     }
                 }
 
                 let dataxpath = getDataxpath(data, xpath);
-                let dataAdd = row['data-add'] ? row['data-add'] : false;
-                let dataRemove = row['data-remove'] ? row['data-remove'] : false;
-                let value = row[cell.tableTitle];
+                let dataAdd = cellRow['data-add'] ? cellRow['data-add'] : false;
+                let dataRemove = cellRow['data-remove'] ? cellRow['data-remove'] : false;
+                let value = cellRow[cell.tableTitle];
                 let previousValue;
                 if (props.widgetType === 'repeatedRoot') {
-                    if (rowindex && selected) {
-                        const storedObj = originalData.find(obj => obj[DB_ID] === rowindex);
+                    if (cellRow && selected) {
+                        const storedObj = originalData.find(obj => obj[DB_ID] === cellRow['data-id']);
                         if (storedObj) {
                             previousValue = _.get(storedObj, xpath);
                         }
@@ -94,7 +95,7 @@ const Row = (props) => {
                         elaborateTitle={cell.tableTitle}
                         currentValue={value}
                         previousValue={previousValue}
-                        collection={collection}
+                        collection={cell}
                         xpath={xpath}
                         dataxpath={dataxpath}
                         dataAdd={dataAdd}
@@ -115,17 +116,20 @@ const Row = (props) => {
                         truncateDateTime={props.truncateDateTime}
                         widgetType={props.widgetType}
                         selected={selected}
+                        onForceSave={props.onForceSave}
+                        dataSourceId={props.widgetType === 'root' ? props.index : cellRow['data-id']}
+                        onRowSelect={onRowSelect}
                     />
                 )
             })}
         </TableRow>
     ), [
-        className,
+        // className,
         row,
-        selected,
+        // selected,
         mode,
         onRowSelect,
-        onRowDisselect,
+        onRowDoubleClick,
         data,
         originalData,
         collections,
@@ -141,17 +145,17 @@ const Row = (props) => {
 }
 
 Row.propTypes = {
-    className: PropTypes.string,
-    row: PropTypes.object.isRequired,
+    // className: PropTypes.string,
+    // row: PropTypes.object.isRequired,
     cells: PropTypes.array.isRequired,
-    selected: PropTypes.bool.isRequired,
+    // selected: PropTypes.bool.isRequired,
     mode: PropTypes.oneOf([Modes.READ_MODE, Modes.EDIT_MODE]).isRequired,
     data: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
     originalData: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
     collections: PropTypes.array.isRequired,
     onUpdate: PropTypes.func.isRequired,
     onRowSelect: PropTypes.func.isRequired,
-    onRowDisselect: PropTypes.func.isRequired,
+    onRowDoubleClick: PropTypes.func.isRequired,
     onRowClick: PropTypes.func.isRequired,
     onButtonClick: PropTypes.func.isRequired,
     onCheckboxChange: PropTypes.func.isRequired,

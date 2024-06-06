@@ -350,10 +350,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         else:
                             logging.debug("Service Marked Ready")
                 else:
-                    logging.warning(f"service is not up yet;;; {self.all_services_up = }, "
-                                    f"{static_data_service_state.ready = }, {self.usd_fx = }, "
-                                    f"{symbol_overview_for_symbol_exists = }, "
-                                    f"{self.bartering_data_manager = }")
+                    logging.warning(f"service is not up yet;;; {self.all_services_up=}, "
+                                    f"{static_data_service_state.ready=}, {self.usd_fx=}, "
+                                    f"{symbol_overview_for_symbol_exists=}, "
+                                    f"{self.bartering_data_manager=}")
                 if not self.all_services_up:
                     try:
                         if all_service_up_check(self.web_client):
@@ -1009,9 +1009,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         if (residual_notional := updated_strat_status.residual.residual_notional) is not None:
             if residual_notional > (max_residual := strat_limits.residual_restriction.max_residual):
-                alert_brief: str = (f"{residual_notional = } > {max_residual = } - "
+                alert_brief: str = (f"{residual_notional=} > {max_residual=} - "
                                     f"pausing this strat")
-                alert_details: str = f"{updated_strat_status = }, {strat_limits = }"
+                alert_details: str = f"{updated_strat_status=}, {strat_limits=}"
                 logging.critical(f"{alert_brief}, symbol_side_snapshot_key: "
                                  f"{get_symbol_side_snapshot_log_key(symbol_side_snapshot_)};;; {alert_details}")
                 pause_strat = True

@@ -6,6 +6,7 @@ from threading import Lock
 class SecurityRecordManager:
     static_data: ClassVar[Optional['SecurityRecordManager']] = None
     get_instance_mutex: ClassVar[Lock] = Lock()
+    can_opposite_side_barter: bool = False
 
     def __init__(self):
         self._security_float_by_ticker: Dict[str, float] | None = dict()
@@ -27,3 +28,6 @@ class SecurityRecordManager:
             return int(ticker_suffix) * 1_000_000
         else:
             logging.error(f"Invalid ticker: {ticker_suffix!r}, cannot get security float - must have int suffix")
+
+    def is_opposite_side_tradable(self, ticker: str):
+        return SecurityRecordManager.can_opposite_side_barter

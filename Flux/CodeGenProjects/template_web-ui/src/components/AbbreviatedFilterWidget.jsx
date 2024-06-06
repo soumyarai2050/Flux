@@ -11,7 +11,9 @@ import _, { cloneDeep } from 'lodash';
 import { DB_ID, Modes, DataTypes, ColorTypes, Layouts } from '../constants';
 import {
     getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId,
-    getCommonKeyCollections, getTableColumns, sortColumns
+    getCommonKeyCollections, getTableColumns, sortColumns,
+    getMaxRowSize,
+    getGroupedTableColumns
 } from '../utils';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { AlertErrorMessage } from './Alert';
@@ -34,6 +36,7 @@ function AbbreviatedFilterWidget(props) {
     const [rowsPerPage, setRowsPerPage] = useState(PageSizeCache.getPageSize(props.name));
     const [page, setPage] = useState(PageCache.getPage(props.name));
     const [rows, setRows] = useState([]);
+    const [groupedRows, setGroupedRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
     const [openSettings, setOpenSettings] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
@@ -43,6 +46,7 @@ function AbbreviatedFilterWidget(props) {
     const [clipboardText, setClipboardText] = useState(null);
     const [loading, setLoading] = useState(true);
     const [settingsArchorEl, setSettingsArcholEl] = useState();
+    const maxRowSize = useMemo(() => getMaxRowSize(activeRows), [activeRows]);
 
     useEffect(() => {
         setLoading(true);
@@ -68,16 +72,18 @@ function AbbreviatedFilterWidget(props) {
                 page,
                 pageSize: rowsPerPage,
                 sortOrders,
-                filters: props.filters
+                filters: props.filters,
+                joinBy: props.joinBy
             });
         }
-    }, [items, props.modifiedItemsMetadataDict, page, rowsPerPage, sortOrders, props.filters])
+    }, [items, props.modifiedItemsMetadataDict, page, rowsPerPage, sortOrders, props.filters, props.joinBy])
 
     useEffect(() => {
         if (window.Worker) {
             worker.onmessage = (e) => {
-                const [updatedRows, updatedActiveRows] = e.data;
+                const [updatedRows, updatedGroupedRows, updatedActiveRows] = e.data;
                 setRows(updatedRows);
+                setGroupedRows(updatedGroupedRows);
                 setActiveRows(updatedActiveRows);
                 setLoading(false);
             }
@@ -89,8 +95,9 @@ function AbbreviatedFilterWidget(props) {
 
     useEffect(() => {
         const tableColumns = getTableColumns(props.collections, Modes.READ_MODE, props.enableOverride, props.disableOverride, true);
-        setHeadCells(tableColumns);
-    }, [props.enableOverride, props.disableOverride])
+        const groupedTableColumns = getGroupedTableColumns(tableColumns, maxRowSize, groupedRows, props.joinBy, props.mode, true);
+        setHeadCells(groupedTableColumns);
+    }, [props.enableOverride, props.disableOverride, maxRowSize, groupedRows, props.joinBy, props.mode])
 
     useEffect(() => {
         if (props.mode === Modes.EDIT_MODE) {
@@ -102,7 +109,13 @@ function AbbreviatedFilterWidget(props) {
     }, [activeRows, headCells, props.mode])
 
     useEffect(() => {
-        let activeItems = activeRows.map(row => getAbbreviatedKeyFromId(items, props.abbreviated, row['data-id']));
+        const activeItems = [];
+        activeRows.map(row => {
+            row.forEach(subRow => {
+                const id = getAbbreviatedKeyFromId(items, props.abbreviated, subRow['data-id']);
+                activeItems.push(id);
+            })
+        });
         if (!_.isEqual(activeItems, props.activeItems)) {
             props.setOldActiveItems(props.activeItems);
             props.setActiveItems(activeItems);
@@ -115,14 +128,14 @@ function AbbreviatedFilterWidget(props) {
         }
     }, [items, props.setSelectedItem])
 
-    const onButtonClick = (e, action, xpath, value, source, confirmSave = false) => {
+    const onButtonClick = (e, action, xpath, value, dataSourceId, source, confirmSave = false) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
-            props.onButtonToggle(e, xpath, updatedData, source, confirmSave);
+            props.onButtonToggle(e, xpath, updatedData, dataSourceId, source, confirmSave);
         } else if (action === 'flux_trigger_strat') {
             let updatedData = flux_trigger_strat(value);
             if (updatedData) {
-                props.onButtonToggle(e, xpath, updatedData, source, confirmSave);
+                props.onButtonToggle(e, xpath, updatedData, dataSourceId, source, confirmSave);
             }
         }
     }
@@ -130,15 +143,15 @@ function AbbreviatedFilterWidget(props) {
     const handleRequestSort = (event, property, retainSortLevel = false) => {
         let updatedSortOrders = cloneDeep(sortOrders);
         if (!retainSortLevel) {
-            updatedSortOrders = updatedSortOrders.filter(o => o.orderBy === property);
+            updatedSortOrders = updatedSortOrders.filter(o => o.order_by === property);
         }
-        const sortOrder = updatedSortOrders.find(o => o.orderBy === property);
+        const sortOrder = updatedSortOrders.find(o => o.order_by === property);
         if (sortOrder) {
             // sort level already exists for this property
-            sortOrder.sortType = sortOrder.sortType === 'asc' ? 'desc' : 'asc';
+            sortOrder.sort_type = sortOrder.sort_type === 'asc' ? 'desc' : 'asc';
         } else {
             // add a new sort level
-            updatedSortOrders.push({orderBy: property, sortType: 'asc'});
+            updatedSortOrders.push({order_by: property, sort_type: 'asc'});
         }
         setSortOrders(updatedSortOrders);
         SortOrderCache.setSortOrder(props.name, updatedSortOrders);
@@ -147,14 +160,20 @@ function AbbreviatedFilterWidget(props) {
     }
 
     const handleRemoveSort = (property) => {
-        const updatedSortOrders = sortOrders.filter(o => o.orderBy !== property);
+        const updatedSortOrders = sortOrders.filter(o => o.order_by !== property);
         setSortOrders(updatedSortOrders);
         SortOrderCache.setSortOrder(props.name, updatedSortOrders);
     }
 
-    const onRowSelect = (id) => {
+    const onRowSelect = (e, id) => {
+        // event (e) is added to make the onRowSelect interface symmetric. 
+        // event is used to unselect the row, not implmented in collection view
         if (props.mode === Modes.READ_MODE) {
             props.onSelect(id);
+            // TODO: below condition is preventing the switch to be efficient
+            // if (props.selected !== id) {
+                // props.onSelect(id);
+            // }
         }
     }
 
@@ -190,6 +209,14 @@ function AbbreviatedFilterWidget(props) {
         const wb = utils.book_new();
         utils.book_append_sheet(wb, ws, "Sheet1");
         writeFileXLSX(wb, `${props.name}.xlsx`);
+    }
+
+    const onRowDoubleClick = (e) => {
+        if (props.mode === Modes.READ_MODE) {
+            if (!e.target.closest('button')) {
+                props.headerProps.onChangeMode();
+            }
+        }
     }
 
     const onSettingsItemChange = (e, key) => {
@@ -277,7 +304,7 @@ function AbbreviatedFilterWidget(props) {
         props.onColumnOrdersChange(columnOrders);
     }
 
-    const onTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes, source) => {
+    const onTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes, dataSourceId, source) => {
         if (value === '') {
             value = null;
         }
@@ -291,14 +318,18 @@ function AbbreviatedFilterWidget(props) {
             const updatedData = cloneDeep(data);
             _.set(updatedData, dataxpath, value);
             props.onUpdate(updatedData, source);
-            props.onUserChange(xpath, value, null, source);
+            const userChangeDict = {
+                [DB_ID]: dataSourceId, 
+                [xpath]: value
+            }
+            props.onUserChange(xpath, value, userChangeDict, source);
             if (props.onFormUpdate) {
                 props.onFormUpdate(xpath, validationRes);
             }
         }
     }, [props.onUpdate, props.onUserChange, props.modifiedItemsMetadataDict, props.selected])
 
-    const filteredHeadCells = sortColumns(headCells.filter(cell => commonKeys.filter(c => c.key === cell.key).length === 0), props.columnOrders, true);
+    const filteredHeadCells = sortColumns(headCells.filter(cell => commonKeys.filter(c => c.key === cell.key && c.sourceIndex === cell.sourceIndex).length === 0), props.columnOrders, props.joinBy && props.joinBy.length > 0, props.centerJoin, props.flip, true);
     const maxSequence = Math.max(...headCells.map(cell => cell.sequenceNumber));
 
     const dynamicMenu = (
@@ -430,14 +461,14 @@ function AbbreviatedFilterWidget(props) {
                             </Box>
                         )}
                         <Divider textAlign='left'><Chip label={props.loadListFieldAttrs.title} /></Divider>
-                        {rows && rows.length > 0 && (
+                        {groupedRows && groupedRows.length > 0 && (
                             <>
                                 <TableContainer className={classes.container}>
                                     <Table
                                         className={classes.table}
                                         size='medium'>
                                         <TableHead
-                                            prefixCells={1}
+                                            // prefixCells={1}
                                             // suffixCells={props.bufferListFieldAttrs.hide ? 0 : 1}
                                             headCells={filteredHeadCells}
                                             // mode={Modes.READ_MODE}
@@ -451,46 +482,51 @@ function AbbreviatedFilterWidget(props) {
                                         <TableBody>
                                             {
                                                 activeRows.map((row, index) => {
-                                                    let selected = row["data-id"] === props.selected;
-                                                    let alertBubbleCount = 0;
-                                                    let alertBubbleColor = ColorTypes.INFO;
-                                                    if (props.alertBubbleSource) {
-                                                        let alertBubbleData;
-                                                        const source = props.alertBubbleSource.split('.')[0];
-                                                        const bubbleSourcePath = props.alertBubbleSource.substring(props.alertBubbleSource.indexOf('.') + 1);
-                                                        if (props.linkedItemsMetadata) {
-                                                            alertBubbleData = props.linkedItemsMetadata.find(o => _.get(o, DB_ID) === row['data-id']);
-                                                        } else {
-                                                            alertBubbleData = props.modifiedItemsMetadataDict[source].find(meta => _.get(meta, DB_ID) === row['data-id']);
-                                                        }
-                                                        alertBubbleCount = getAlertBubbleCount(alertBubbleData, bubbleSourcePath);
-                                                        if (props.alertBubbleColorSource) {
-                                                            const bubbleColorSourcePath = props.alertBubbleColorSource.substring(props.alertBubbleColorSource.indexOf('.') + 1);
-                                                            alertBubbleColor = getAlertBubbleColor(alertBubbleData, props.itemCollectionsDict[source], bubbleSourcePath, bubbleColorSourcePath);
-                                                        }
-                                                    }
+                                                    // let selected = cellRow["data-id"] === props.selected;
+                                                    // let alertBubbleCount = 0;
+                                                    // let alertBubbleColor = ColorTypes.INFO;
+                                                    // if (props.alertBubbleSource) {
+                                                    //     let alertBubbleData;
+                                                    //     const source = props.alertBubbleSource.split('.')[0];
+                                                    //     const bubbleSourcePath = props.alertBubbleSource.substring(props.alertBubbleSource.indexOf('.') + 1);
+                                                    //     if (props.linkedItemsMetadata) {
+                                                    //         alertBubbleData = props.linkedItemsMetadata.find(o => _.get(o, DB_ID) === cellRow['data-id']);
+                                                    //     } else {
+                                                    //         alertBubbleData = props.modifiedItemsMetadataDict[source].find(meta => _.get(meta, DB_ID) === cellRow['data-id']);
+                                                    //     }
+                                                    //     alertBubbleCount = getAlertBubbleCount(alertBubbleData, bubbleSourcePath);
+                                                    //     if (props.alertBubbleColorSource) {
+                                                    //         const bubbleColorSourcePath = props.alertBubbleColorSource.substring(props.alertBubbleColorSource.indexOf('.') + 1);
+                                                    //         alertBubbleColor = getAlertBubbleColor(alertBubbleData, props.itemCollectionsDict[source], bubbleSourcePath, bubbleColorSourcePath);
+                                                    //     }
+                                                    // }
                                                     let disabled = false;
                                                     const storedMetadaDict = {};
-                                                    Object.keys(props.itemsMetadataDict).map((source) => {
-                                                        storedMetadaDict[source] = props.itemsMetadataDict[source].find(o => o[DB_ID] === row['data-id']);    
-                                                    })
-                                                    const buttonDisable = props.selected !== row["data-id"];
 
                                                     return (
                                                         <Fragment key={index}>
                                                             <TableRow
-                                                                className={props.mode === Modes.EDIT_MODE && !selected ? classes.row_disabled : classes.row}
-                                                                selected={selected}
-                                                                onClick={() => onRowSelect(row["data-id"])}>
-                                                                <TableCell className={classes.cell} sx={{ width: 10 }}>
+                                                                className={classes.row}
+                                                                // selected={selected}
+                                                                // onClick={() => onRowSelect(cellRow["data-id"])}
+                                                                onDoubleClick={onRowDoubleClick}>
+                                                                {/* <TableCell className={classes.cell} sx={{ width: 10 }}>
                                                                     {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
-                                                                </TableCell>
+                                                                </TableCell> */}
                                                                 {filteredHeadCells.map((cell, i) => {
                                                                     if (cell.hide) return;
+                                                                    let cellRow = row[cell.sourceIndex];
+                                                                    if (cellRow) {
+                                                                        Object.keys(props.itemsMetadataDict).map((source) => {
+                                                                            storedMetadaDict[source] = props.itemsMetadataDict[source].find(o => o[DB_ID] === cellRow?.['data-id']);    
+                                                                        })
+                                                                    }
+                                                                    let selected = cellRow ? cellRow["data-id"] === props.selected : false;
+                                                                    const buttonDisable = cellRow ? props.selected !== cellRow["data-id"] : false;
                                                                     // let mode = Modes.READ_MODE;
                                                                     let mode = props.headerProps.mode;
-                                                                    let rowindex = row["data-id"];
-                                                                    let collection = props.collections.filter(c => c.key === cell.key)[0];
+                                                                    let rowindex = cellRow ? cellRow["data-id"] : i;
+                                                                    let collection = props.collections.find(c => c.key === cell.key);
                                                                     if (collection.type === "progressBar") {
                                                                         collection = _.cloneDeep(collection);
                                                                         if (typeof (collection.min) === DataTypes.STRING) {
@@ -499,7 +535,7 @@ function AbbreviatedFilterWidget(props) {
                                                                             collection.minFieldName = min.split('.').pop();
                                                                             const metadataArray = props.modifiedItemsMetadataDict[source];
                                                                             if (metadataArray) {
-                                                                                const metadata = metadataArray.find(meta => _.get(meta, DB_ID) === row['data-id']);
+                                                                                const metadata = metadataArray.find(meta => _.get(meta, DB_ID) === cellRow['data-id']);
                                                                                 if (metadata) {
                                                                                     collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
                                                                                 }
@@ -510,8 +546,8 @@ function AbbreviatedFilterWidget(props) {
                                                                             const source = max.split('.')[0];
                                                                             collection.maxFieldName = max.split('.').pop();
                                                                             const metadataArray = props.modifiedItemsMetadataDict[source];
-                                                                            if (metadataArray) {
-                                                                                const metadata = metadataArray.find(meta => _.get(meta, DB_ID) === row['data-id']);
+                                                                            if (metadataArray && cellRow) {
+                                                                                const metadata = metadataArray.find(meta => _.get(meta, DB_ID) === cellRow['data-id']);
                                                                                 if (metadata) {
                                                                                     collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1));
                                                                                 }
@@ -519,7 +555,7 @@ function AbbreviatedFilterWidget(props) {
                                                                         }
                                                                     }
                                                                     let xpath = collection.xpath;
-                                                                    let value = row[collection.key];
+                                                                    let value = cellRow ? cellRow[collection.key] : undefined;
                                                                     let storedValue;
                                                                     if (xpath.indexOf('-') !== -1) {
                                                                         const storedValueArray = xpath.split('-').map(path => _.get(storedMetadaDict[collection.source], path))
@@ -539,7 +575,7 @@ function AbbreviatedFilterWidget(props) {
                                                                             elaborateTitle={cell.tableTitle}
                                                                             currentValue={value}
                                                                             previousValue={storedValue}
-                                                                            collection={collection}
+                                                                            collection={cell}
                                                                             xpath={xpath}
                                                                             dataxpath={xpath}
                                                                             dataAdd={false}
@@ -555,9 +591,13 @@ function AbbreviatedFilterWidget(props) {
                                                                             onSelectItemChange={() => { }}
                                                                             onAutocompleteOptionChange={() => { }}
                                                                             onDateTimeChange={() => { }}
-                                                                            forceUpdate={[DataTypes.STRING, DataTypes.NUMBER].includes(collection.type) ? new Boolean(true) : false}
+                                                                            forceUpdate={props.mode === Modes.READ_MODE}
                                                                             truncateDateTime={props.truncateDateTime}
                                                                             widgetType='abbreviatedFilter'
+                                                                            onForceSave={props.onForceSave}
+                                                                            onRowSelect={onRowSelect}
+                                                                            dataSourceId={cellRow ? cellRow['data-id'] : null}
+                                                                            nullCell={cellRow ? false : true}
                                                                         />
                                                                     )
                                                                 })}
@@ -576,11 +616,11 @@ function AbbreviatedFilterWidget(props) {
                                         </TableBody>
                                     </Table>
                                 </TableContainer>
-                                {rows.length > 6 &&
+                                {groupedRows.length > 6 &&
                                     <TablePagination
                                         rowsPerPageOptions={[25, 50]}
                                         component="div"
-                                        count={rows.length}
+                                        count={groupedRows.length}
                                         rowsPerPage={rowsPerPage}
                                         page={page}
                                         onPageChange={handleChangePage}

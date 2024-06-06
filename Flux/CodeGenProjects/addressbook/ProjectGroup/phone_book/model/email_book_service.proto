@@ -40,7 +40,7 @@ message PairStratParams{
   optional StratLeg strat_leg2 = 4 [(FluxFldElaborateTitle) = true, (FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id:EQT_List, sec_type=TICKER, side=server_populate", (FluxFldHelp) = "EQT Tickers"];
   optional int32 exch_response_max_seconds = 5 [default = 30, (FluxFldHide) = "True", (FluxFldServerPopulate) = true];
   // these are specific to CB-EQT strat - move to derived later
-  required float common_premium = 6 [(FluxFldNumberFormat) = "%"];
+  required float common_premium = 6 [(FluxFldNumberFormat) = "%", (FluxFldDiffThreshold) = 2];
   optional float hedge_ratio = 7 [default = 1];
 }
 
@@ -239,7 +239,7 @@ message PairStrat{
     required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     //An int64 may or may-not be date time. A datetime field must have FluxFldValIsDateTime option set to true
     // CodeGen to handle appropriate datetime generation if the FluxFldValIsDateTime option is set
-    optional string last_active_date_time = 2 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 2, (FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true];
+    optional int64 last_active_date_time = 2 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 2, (FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true];
     optional int32  frequency = 3 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 1, (FluxFldServerPopulate) = true];
     required PairStratParams pair_strat_params = 4;
     optional int64 pair_strat_params_update_seq_num = 7 [(FluxFldHide) = "True"];
@@ -248,8 +248,8 @@ message PairStrat{
     optional int64 top_of_book_port = 10 [(FluxFldHide) = "True"];
     optional int64 market_depth_port = 11 [(FluxFldHide) = "True"];
     optional int64 last_barter_port = 12 [(FluxFldHide) = "True"];
-    optional bool is_executor_running = 13 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
-    optional bool is_partially_running = 14 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true];
+    optional bool is_executor_running = 13 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerReadyStatus) = true];
+    optional bool is_partially_running = 14 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
     // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
     required StratState strat_state = 15 [default = StratState_SNOOZED, (FluxFldButton) = {
       unpressed_caption: "Activate",
@@ -285,7 +285,7 @@ message StratCollection{
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // leg1_sec_id-leg2_sec_id-leg1_side-uid
-  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:PairStrat.strat_state^Strat Notional:StratView.balance_notional^Premium Limit:PairStrat.pair_strat_params.common_premium^Avg Premium:StratView.average_premium^Mkt Premium:StratView.market_premium^Unload:StratView.unload_strat^Recycle:StratView.recycle_strat", (FluxFldAlertBubbleSource) = "StratView.strat_alert_count", (FluxFldAlertBubbleColor) = "StratView.strat_alert_aggregated_severity"];
+  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Id:PairStrat.id^Tickers:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id^Side:PairStrat.pair_strat_params.strat_leg1.side^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:PairStrat.strat_state^Strat Notional:StratView.balance_notional^Premium Limit:PairStrat.pair_strat_params.common_premium^Avg Premium:StratView.average_premium^Mkt Premium:StratView.market_premium^Unload:StratView.unload_strat^Recycle:StratView.recycle_strat", (FluxFldAlertBubbleSource) = "StratView.strat_alert_count", (FluxFldAlertBubbleColor) = "StratView.strat_alert_aggregated_severity"];
   //show 9 most recently used (weight:2) & 9 most frequently used (weight: 1)
   //Sort by type, merge by weight, FILTER OUT loaded
   repeated string buffered_strat_keys = 3;
@@ -321,7 +321,7 @@ message SampleModel{
     //Server generated unique Id
     required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     optional string sample = 2 [(FluxFldIndex) = true];
-    required string date = 3 [(FluxFldValIsDateTime) = true];
+    required int64 date = 3 [(FluxFldValIsDateTime) = true];
     required int32 num = 4;
     optional int32 cum_sum_of_num = 5;
 }
@@ -346,7 +346,7 @@ message SampleTSModel{
     //Server generated unique Id
     required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     optional string sample = 2  [(FluxFldValMetaField) = true];
-    required string date = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
+    required int64 date = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
 }
 
 // Sample TimeSeries Model - used in tests to check AggregateType_UpdateAggregate feature in time_series
@@ -368,7 +368,7 @@ message SampleTSModel1{
     //Server generated unique Id
     required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     optional string sample = 2  [(FluxFldValMetaField) = true];
-    required string date = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
+    required int64 date = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
     required int32 num = 4;
     optional int32 cum_sum_of_num = 5;
 }
@@ -381,7 +381,7 @@ message BarterBrief{
   required Side side = 3;
   required float px = 4;
   required int64 qty = 5;
-  optional string create_date_time = 7 [(FluxFldValIsDateTime) = true];
+  optional int64 create_date_time = 7 [(FluxFldValIsDateTime) = true];
   optional float computed_notional = 8 [(FluxFldDisplayType) = "int", (FluxFldHide) = "True"];
 }
 
@@ -433,6 +433,16 @@ message PairStratList {
 message LogSimulatorReloadConfig{
   option (FluxMsgJsonQuery) = {
     QueryName: "log_simulator_reload_config"
+  };
+  required bool resp = 1;
+}
+
+
+message IsOppositeSideTradable{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "update_is_opposite_side_tradable_val",
+    QueryParams: "update_val",
+    QueryParamsDataType: "bool"
   };
   required bool resp = 1;
 }

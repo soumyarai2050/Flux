@@ -1529,6 +1529,47 @@ def test_log_info_in_alerts(
     check_log_info_fields_in_alert(portfolio_alert, str(log_file_path), sample_file_name, line_no)
 
 
+def test_check_background_logs_alert_handling(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        market_depth_basemodel_list):
+    log_file_name = f"phone_book_background_logs.log"
+    log_file_path = PAIR_STRAT_ENGINE_DIR / "log" / log_file_name
+
+    if not os.path.exists(log_file_path):
+        with open(log_file_path, "w"):
+            pass
+    time.sleep(5)
+
+    # verifying tail executor for background logs
+    tail_process_grep_pattern = "tail_executor~phone_book_background_debug"
+    res = get_process_info_for_tail_executor(tail_process_grep_pattern, log_file_name)
+    if res is None:
+        assert False, \
+            f"tail executor process must exist for background logs"
+
+    # Sample Exception
+    log_str: List[str] = [
+        "Traceback (most recent call last):",
+        '  File "/home/scratches/scratch.py", line 1300, in <module>',
+        '    raise Exception("SAMPLE EXCEPTION")',
+        "Exception: SAMPLE EXCEPTION"
+    ]
+    for line in log_str:
+        add_log_to_file(log_file_path, line)
+
+    for _ in range(10):
+        portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
+        for portfolio_alert in portfolio_alerts:
+            if portfolio_alert.alert_brief == log_str[-1]:
+                break
+        else:
+            time.sleep(1)
+        break
+    else:
+        assert False, "Can't find alert containing error msg in brief"
+
+
 def check_perf_of_alerts(
         leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,

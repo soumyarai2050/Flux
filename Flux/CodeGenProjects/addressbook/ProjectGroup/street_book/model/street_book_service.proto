@@ -66,7 +66,7 @@ message SymbolSideSnapshot{
   optional int64 total_cxled_qty = 11;
   optional float avg_cxled_px = 12;
   optional float total_cxled_notional = 13 [(FluxFldDisplayType) = "int"];
-  optional string last_update_date_time = 14 [(FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 14 [(FluxFldValIsDateTime) = true];
   optional int32 chore_count = 15 [(FluxFldNoCommonKey) = true];
 }
 
@@ -122,7 +122,7 @@ message FillsJournal{
   optional string fill_symbol = 6 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional Side fill_side = 7;
   required string underlying_account = 8;
-  optional string fill_date_time = 9 [(FluxFldValIsDateTime) = true];
+  optional int64 fill_date_time = 9 [(FluxFldValIsDateTime) = true];
   required string fill_id = 10;
   optional int64 underlying_account_cumulative_fill_qty = 11[(FluxFldHide) = "True"]; // used by executor query at strat start
 }
@@ -208,7 +208,7 @@ message StratStatus{
   optional Residual residual = 28;
   optional float balance_notional = 29 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true];
   optional int64 strat_status_update_seq_num = 30 [(FluxFldHide) = "True"];
-  optional string last_update_date_time = 31 [(FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 31 [(FluxFldValIsDateTime) = true];
 }
 
 message StratLimits{

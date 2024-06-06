@@ -6,11 +6,13 @@ import { NumericFormat } from 'react-number-format';
 import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener, InputAdornment, IconButton } from '@mui/material';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { ContentCopy, Error } from '@mui/icons-material';
+import { useTheme } from '@mui/material/styles';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
     getHoverTextType, getValueFromReduxStoreFromXpath, floatToInt,
-    validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase, getReducerArrrayFromCollections
+    validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase, getReducerArrrayFromCollections,
+    getDataSourceColor
 } from '../utils';
 import { DataTypes, Modes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
@@ -21,6 +23,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import CopyToClipboard from './CopyToClipboard';
 import LinkText from './LinkText';
+import AlertBubble from './AlertBubble';
 dayjs.extend(utc);
 
 const Cell = (props) => {
@@ -31,11 +34,15 @@ const Cell = (props) => {
         dataxpath,
         disabled,
         dataRemove,
+        dataAdd,
         currentValue,
         previousValue,
-        buttonDisable
+        buttonDisable,
+        dataSourceId,
+        selected
     } = props;
 
+    const theme = useTheme();
     const collection = cloneDeep(props.collection);
     // const state = useSelector(state => state);
     const reducerArray = useMemo(() => getReducerArrrayFromCollections([props.collection]), [props.collection]);
@@ -106,39 +113,65 @@ const Cell = (props) => {
         }
     }, [currentValue, oldValue, timeoutRef, classes, props.highlightUpdate])
 
+    const onRowSelect = (e) => {
+        if (props.widgetType === 'root') {
+            props.onRowSelect(e, rowindex);
+        } else {
+            props.onRowSelect(e, dataSourceId);
+        }
+    }
+
     const handleTextChange = (e, type, xpath, value, dataxpath, validationRes) => {
         cursorPos.current = e.target.selectionStart;
         setInputValue(value);
         props.onTextChange(e, type, xpath, value, dataxpath, validationRes);
     }
 
-    const onFocusIn = useCallback(() => {
+    const onFocusIn = (e) => {
         if (mode === Modes.EDIT_MODE) {
             setActive(true);
         }
-    }, [mode])
+        onRowSelect(e);
+    }
 
     const onFocusOut = useCallback(() => {
         setActive(false);
     }, [])
 
-    const onOpenTooltip = useCallback(() => {
+    const onOpenTooltip = (e) => {
         setOpen(true);
-    }, [])
+        onRowSelect(e);
+    }
 
     const onCloseTooltip = useCallback(() => {
         setOpen(false);
     }, [])
 
+    const handleDiffThreshold = (storedValue, updatedValue) => {
+        if (collection.diffThreshold) {
+            if (typeof storedValue === DataTypes.NUMBER && typeof updatedValue === DataTypes.NUMBER) {
+                const diffPercentage = Math.abs(updatedValue - storedValue) * 100 / storedValue;
+                if (diffPercentage < collection.diffThreshold) {
+                    if (props.onForceSave) {
+                        props.onForceSave();
+                    }
+                }
+            }
+        }
+    }
+
     const onKeyDown = useCallback((e) => {
         if (e.keyCode === 13) {
             onFocusOut();
+            handleDiffThreshold(previousValue, currentValue);
         }
-    }, [])
+    }, [previousValue, currentValue])
 
     const copyHandler = (text) => {
         setClipboardText(text);
     }
+
+    const dataSourceColor = getDataSourceColor(theme, collection.sourceIndex, collection.joinKey, collection.commonGroupKey);
 
     let type = DataTypes.STRING;
     let enumValues = [];
@@ -157,7 +190,7 @@ const Cell = (props) => {
         } else if (type === DataTypes.ENUM) {
             value = value ? value : null;
         } else if (type === DataTypes.NUMBER) {
-            value = value ? value : value === 0 ? 0 : value;
+            value = (value || value === 0) ? value : '';
             if (collection.displayType === DataTypes.INTEGER) {
                 if (value !== '') {
                     value = floatToInt(value);
@@ -173,16 +206,31 @@ const Cell = (props) => {
             // if (mode === Modes.EDIT_MODE) {
             //     value = inputValue ? inputValue : inputValue;
             // }
+        } else if (collection.abbreviated === 'JSON') {
+            if (typeof value === DataTypes.OBJECT) {
+                value = JSON.stringify(value);
+            }
         }
     }
     let color = getColorTypeFromValue(collection, currentValue);
     let tableCellColorClass = classes[color];
-    let tableCellRemove = dataRemove ? classes.remove : '';
+    let tableCellRemove = dataRemove ? classes.remove : dataAdd ? classes.add : '';
     let disabledClass = disabled ? classes.disabled : '';
     if (props.ignoreDisable) {
         disabledClass = "";
     }
     let textAlign = collection.textAlign ? collection.textAlign : 'center';
+    let selectedClass = '';
+    if (selected && !(collection.joinKey || collection.commonGroupKey)) {
+        selectedClass = classes.cell_selected;
+    }
+
+    if (props.nullCell) {
+        const classesStr = `${classes.cell} ${disabledClass}`;
+        return (
+            <TableCell className={classesStr} size='small' />
+        )
+    }
 
     if (disabled) {
         if (value === null) {
@@ -193,7 +241,19 @@ const Cell = (props) => {
         if (typeof value === DataTypes.NUMBER) {
             value = value.toLocaleString();
         }
-        return <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`} align={textAlign} size='medium' data-xpath={xpath} data-dataxpath={dataxpath}>{value}{numberSuffix}</TableCell>
+        const classesStr = `${classes.cell} ${selectedClass} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`;
+        return (
+            <TableCell
+                className={classesStr}
+                sx={{backgroundColor: dataSourceColor}}
+                align={textAlign}
+                size='small'
+                data-xpath={xpath}
+                onClick={(e) => onRowSelect(e)}
+                data-dataxpath={dataxpath}>
+                {value}{numberSuffix}
+            </TableCell>
+        )
     }
     const placeholder = collection.placeholder ? collection.placeholder : !required ? 'optional' : null;
 
@@ -220,8 +280,18 @@ const Cell = (props) => {
                 }
             }
 
+            const classesStr = `${classes.cell_input_field} ${selectedClass}`;
+
             return (
-                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell
+                    className={classesStr}
+                    sx={{backgroundColor: dataSourceColor}}
+                    align='center'
+                    size='small'
+                    onKeyDown={onKeyDown}
+                    onBlur={onFocusOut}
+                    onClick={(e) => onRowSelect(e)}
+                    onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Autocomplete
                         id={collection.key}
                         options={collection.options}
@@ -239,7 +309,7 @@ const Cell = (props) => {
                         value={collection.value}
                         onBlur={onFocusOut}
                         autoFocus
-                        onChange={(e, v) => props.onAutocompleteOptionChange(e, v, dataxpath, xpath, collection.source)}
+                        onChange={(e, v) => props.onAutocompleteOptionChange(e, v, dataxpath, xpath, dataSourceId, collection.source)}
                         renderInput={(params) => (
                             <TextField
                                 {...params}
@@ -257,8 +327,16 @@ const Cell = (props) => {
             )
         } else if (type === DataTypes.BOOLEAN) {
             validationError.current = validateConstraints(collection, value);
+            const classesStr = `${classes.cell_input_field} ${selectedClass}`;
             return (
-                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell
+                    className={classesStr}
+                    sx={{backgroundColor: dataSourceColor}}
+                    align='center'
+                    size='small'
+                    onKeyDown={onKeyDown}
+                    onClick={(e) => onRowSelect(e)}
+                    onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Checkbox
                         id={collection.key}
                         name={collection.key}
@@ -268,7 +346,7 @@ const Cell = (props) => {
                         checked={value}
                         disabled={disabled}
                         error={validationError.current}
-                        onChange={(e) => props.onCheckboxChange(e, dataxpath, xpath)}
+                        onChange={(e) => props.onCheckboxChange(e, dataxpath, xpath, dataSourceId, collection.source)}
                         autoFocus
                     />
                 </TableCell >
@@ -278,14 +356,22 @@ const Cell = (props) => {
             const endAdornment = validationError.current ? (
                 <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
             ) : null;
+            const classesStr = `${classes.cell_input_field} ${selectedClass}`;
             return (
-                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell
+                    className={classesStr}
+                    sx={{backgroundColor: dataSourceColor}}
+                    align='center'
+                    size='small'
+                    onKeyDown={onKeyDown}
+                    onClick={(e) => onRowSelect(e)}
+                    onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Select
                         id={collection.key}
                         name={collection.key}
                         className={classes.select}
                         value={value}
-                        onChange={(e) => props.onSelectItemChange(e, dataxpath, xpath, collection.source)}
+                        onChange={(e) => props.onSelectItemChange(e, dataxpath, xpath, dataSourceId, collection.source)}
                         size='small'
                         endAdornment={endAdornment}
                         error={validationError.current !== null}
@@ -295,8 +381,7 @@ const Cell = (props) => {
                         // onOpen={onFocusIn}
                         onClose={onFocusOut}
                         // ref={inputRef}
-                        autoFocus
-                    >
+                        autoFocus>
                         {enumValues.map((val) => {
                             return (
                                 <MenuItem key={val} value={val}>
@@ -347,9 +432,18 @@ const Cell = (props) => {
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
             } : {};
+            const classesStr = `${classes.cell_input_field} ${selectedClass}`;
 
             return (
-                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell
+                    className={classesStr}
+                    sx={{backgroundColor: dataSourceColor}}
+                    align='center'
+                    size='small'
+                    onKeyDown={onKeyDown}
+                    onBlur={onFocusOut}
+                    onClick={(e) => onRowSelect(e)}
+                    onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <NumericFormat
                         className={classes.text_field}
                         customInput={TextField}
@@ -362,7 +456,7 @@ const Cell = (props) => {
                         disabled={disabled}
                         thousandSeparator=','
                         onValueChange={(values, sourceInfo) => props.onTextChange(sourceInfo.event, type, xpath, values.value, dataxpath,
-                            validateConstraints(collection, values.value, min, max), collection.source)}
+                            validateConstraints(collection, values.value, min, max), dataSourceId, collection.source)}
                         variant='outlined'
                         decimalScale={decimalScale}
                         placeholder={placeholder}
@@ -386,8 +480,16 @@ const Cell = (props) => {
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
             } : {};
+            const classesStr = `${classes.cell_input_field} ${selectedClass}`;
             return (
-                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell
+                    className={classesStr}
+                    sx={{backgroundColor: dataSourceColor}}
+                    align='center'
+                    size='small'
+                    onKeyDown={onKeyDown}
+                    onClick={(e) => onRowSelect(e)}
+                    onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DateTimePicker
                             id={collection.key}
@@ -401,7 +503,7 @@ const Cell = (props) => {
                             required={required}
                             inputFormat="DD-MM-YYYY HH:mm:ss"
                             InputProps={inputProps}
-                            onChange={(newValue) => props.onDateTimeChange(dataxpath, xpath, new Date(newValue).toISOString(), collection.source)}
+                            onChange={(newValue) => props.onDateTimeChange(dataxpath, xpath, new Date(newValue).toISOString(), dataSourceId, collection.source)}
                             inputProps={{
                                 style: { padding: '6px 10px' },
                                 dataxpath: dataxpath,
@@ -420,8 +522,17 @@ const Cell = (props) => {
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
             } : {};
+            const classesStr = `${classes.cell_input_field} ${selectedClass}`;
             return (
-                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell
+                    className={classesStr}
+                    sx={{backgroundColor: dataSourceColor}}
+                    align='center'
+                    size='small'
+                    onKeyDown={onKeyDown}
+                    onBlur={onFocusOut}
+                    onClick={(e) => onRowSelect(e)}
+                    onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <TextField
                         className={classes.text_field}
                         id={collection.key}
@@ -435,7 +546,7 @@ const Cell = (props) => {
                         // ref={inputRef}
                         placeholder={placeholder}
                         onChange={(e) => handleTextChange(e, type, xpath, e.target.value, dataxpath,
-                            validateConstraints(collection, e.target.value), collection.source)}
+                            validateConstraints(collection, e.target.value), dataSourceId, collection.source)}
                         variant='outlined'
                         InputProps={inputProps}
                         inputProps={{
@@ -452,6 +563,9 @@ const Cell = (props) => {
 
     // components in read-only mode
     const classesArray = [classes.cell];
+    if (selected) {
+        classesArray.push(selectedClass);
+    }
 
     // add column size class if column size is set
     if (collection.columnSize && classes[`column_size_${collection.columnSize}`]) {
@@ -462,11 +576,33 @@ const Cell = (props) => {
         classesArray.push(classes[`column_direction_${collection.columnDirection}`])
     }
 
+    if (type === 'alert_bubble') {
+        const classesStr = classesArray.join(' ');
+        const bubbleCount = value[0];
+        const bubbleColor = value[1];
+        return (
+            <TableCell
+                className={classesStr}
+                sx={{backgroundColor: dataSourceColor}}
+                // sx={{ width: 20 }}
+                align='center'
+                size='small'
+                onClick={(e) => onRowSelect(e)}>
+                {bubbleCount > 0 && <AlertBubble content={bubbleCount} color={bubbleColor} />}
+            </TableCell >
+        )
+    }
+
     // read-only checkbox component
     if (type === DataTypes.BOOLEAN) {
         const classesStr = classesArray.join(' ');
         return (
-            <TableCell className={classesStr} align='center' size='small' onClick={onFocusIn}>
+            <TableCell
+                className={classesStr}
+                sx={{backgroundColor: dataSourceColor}}
+                align='center'
+                size='small'
+                onClick={onFocusIn}>
                 <Checkbox
                     className={classes.checkbox}
                     disabled
@@ -487,7 +623,13 @@ const Cell = (props) => {
             }
             const classesStr = classesArray.join(' ');
             return (
-                <TableCell className={classesStr} align='center' size='small' />
+                <TableCell
+                    className={classesStr}
+                    sx={{backgroundColor: dataSourceColor}}
+                    align='center'
+                    size='small'
+                    onClick={(e) => onRowSelect(e)}
+                />
             )
         }
 
@@ -518,7 +660,12 @@ const Cell = (props) => {
         const classesStr = classesArray.join(' ');
 
         return (
-            <TableCell className={classesStr} align='center' size='small'>
+            <TableCell
+                className={classesStr}
+                sx={{backgroundColor: dataSourceColor}}
+                align='center'
+                size='small'
+                onClick={(e) => onRowSelect(e)}>
                 <ValueBasedToggleButton
                     size={size}
                     shape={shape}
@@ -528,6 +675,7 @@ const Cell = (props) => {
                     xpath={dataxpath}
                     disabled={!!(dataRemove || disabled || buttonDisable || isDisabledValue)}
                     action={collection.button.action}
+                    dataSourceId={dataSourceId}
                     source={collection.source}
                     onClick={props.onButtonClick}
                     iconName={collection.button.button_icon_name}
@@ -545,7 +693,12 @@ const Cell = (props) => {
             const classesStr = classesArray.join(' ');
 
             return (
-                <TableCell className={classesStr} size='small' />
+                <TableCell
+                    className={classesStr}
+                    sx={{backgroundColor: dataSourceColor}}
+                    size='small'
+                    onClick={(e) => onRowSelect(e)}
+                />
             )
         }
 
@@ -565,7 +718,12 @@ const Cell = (props) => {
         const classesStr = classesArray.join(' ');
 
         return (
-            <TableCell className={classesStr} align='center' size='small'>
+            <TableCell
+                className={classesStr}
+                sx={{backgroundColor: dataSourceColor}}
+                align='center'
+                size='small'
+                onClick={(e) => onRowSelect(e)}>
                 <ValueBasedProgressBarWithHover
                     inlineTable={true}
                     collection={collection}
@@ -599,7 +757,12 @@ const Cell = (props) => {
             const classesStr = classesArray.join(' ');
 
             return (
-                <TableCell className={classesStr} align='center' size='small' onClick={onOpenTooltip}>
+                <TableCell 
+                    className={classesStr} 
+                    sx={{backgroundColor: dataSourceColor}}
+                    align='center' 
+                    size='small' 
+                    onClick={onOpenTooltip}>
                     <AbbreviatedJson open={open} onClose={onCloseTooltip} src={updatedData} />
                 </TableCell >
             )
@@ -626,7 +789,12 @@ const Cell = (props) => {
             const classesStr = classesArray.join(' ');
 
             return (
-                <TableCell className={classesStr} align='center' size='small' onClick={onOpenTooltip}>
+                <TableCell 
+                    className={classesStr} 
+                    sx={{backgroundColor: dataSourceColor}}
+                    align='center' 
+                    size='small' 
+                    onClick={onOpenTooltip}>
                     <CopyToClipboard text={clipboardText} copy={clipboardText !== null} />
                     <ClickAwayListener onClickAway={onCloseTooltip}>
                         <div className={classes.abbreviated_json_cell}>
@@ -672,9 +840,9 @@ const Cell = (props) => {
         text = linkText ? dayjs.utc(linkText).format('HH:mm:ss.SSS') : null;
     }
     let dataModified = previousValue !== currentValue;
-    if (tableCellColorClass) {
-        classesArray.push(tableCellColorClass);
-    }
+    // if (tableCellColorClass) {
+    //     classesArray.push(tableCellColorClass);
+    // }
     if (disabledClass) {
         classesArray.push(disabledClass);
     }
@@ -688,12 +856,21 @@ const Cell = (props) => {
 
         const classesStr = classesArray.join(' ');
         return (
-            <TableCell className={classesStr} align={textAlign} size='small' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
-                {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
-                {value ? <span className={classes.modified}>{value}{numberSuffix}</span> : <span className={classes.modified}>{value}</span>}
-                {validationError.current && (
-                    <Tooltip sx={{ marginLeft: '20px' }} title={validationError.current} disableInteractive><Error color='error' /></Tooltip>
-                )}
+            <TableCell 
+                className={classesStr}
+                sx={{backgroundColor: dataSourceColor}} 
+                align={textAlign} 
+                size='small' 
+                onClick={onFocusIn} 
+                data-xpath={xpath} 
+                data-dataxpath={dataxpath}>
+                <div className={tableCellColorClass}>
+                    {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
+                    {value ? <span className={classes.modified}>{value}{numberSuffix}</span> : <span className={classes.modified}>{value}</span>}
+                    {validationError.current && (
+                        <Tooltip sx={{ marginLeft: '20px' }} title={validationError.current} disableInteractive><Error color='error' /></Tooltip>
+                    )}
+                </div>
             </TableCell>
         )
     } else {
@@ -705,12 +882,21 @@ const Cell = (props) => {
         }
         const classesStr = classesArray.join(' ');
         return (
-            <TableCell className={classesStr} align={textAlign} size='small' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
-                {collection.displayType === 'time' ? <LinkText text={text} linkText={linkText} /> :
-                    value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
-                {validationError.current && (
-                    <Tooltip title={validationError.current} sx={{ marginLeft: '20px' }} disableInteractive><Error color='error' /></Tooltip>
-                )}
+            <TableCell 
+                className={classesStr} 
+                sx={{backgroundColor: dataSourceColor}}
+                align={textAlign} 
+                size='small' 
+                onClick={onFocusIn} 
+                data-xpath={xpath} 
+                data-dataxpath={dataxpath}>
+                <div className={tableCellColorClass}>
+                    {collection.displayType === 'time' ? <LinkText text={text} linkText={linkText} /> :
+                        value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
+                    {validationError.current && (
+                        <Tooltip title={validationError.current} sx={{ marginLeft: '20px' }} disableInteractive><Error color='error' /></Tooltip>
+                    )}
+                </div>
             </TableCell>
         )
     }
@@ -720,7 +906,7 @@ Cell.propTypes = {
     mode: PropTypes.oneOf([Modes.READ_MODE, Modes.EDIT_MODE]).isRequired,
     rowindex: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     name: PropTypes.string.isRequired,
-    elaborateTitle: PropTypes.string.isRequired,
+    // elaborateTitle: PropTypes.string.isRequired,
     currentValue: PropTypes.any,
     previousValue: PropTypes.any,
     collection: PropTypes.object.isRequired,

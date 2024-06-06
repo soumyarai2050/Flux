@@ -104,6 +104,11 @@ message ColumnOrder {
   required int32 sequence = 2;
 }
 
+message SortOrder {
+  required string order_by = 1;
+  required string sort_type = 2;
+}
+
 message WidgetUIData{
   // layout type
   optional UILayouts view_layout = 1;
@@ -115,6 +120,10 @@ message WidgetUIData{
   // for UI to store the bounded id value
   optional string bind_id_val = 7;
   repeated ColumnOrder column_orders = 8;
+  repeated SortOrder sort_orders = 9;
+  repeated string join_by = 10;
+  optional bool joined_at_center = 11 [default = false];  // if set, all join keys are at center
+  optional bool flip = 12 [default = false];  // if set, column orders are reversed
 }
 
 message UIButton{

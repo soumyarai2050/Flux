@@ -4,6 +4,7 @@
 ui_port: "3050"
 
 # server specific configs
+market_depth_levels: 10
 server_host: "127.0.0.1"
 main_server_beanie_port: "8040"
 main_server_cache_port: "8035"

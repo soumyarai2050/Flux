@@ -9,8 +9,13 @@ find_package(Python REQUIRED COMPONENTS Development)
 
 set(libabsl_ROOT_PATH  /home/subham/cpp_libs/libs_13/protobuf_25.2/lib)
 set(ABSL_INCLUDE_DIR /home/subham/cpp_libs/libs_13/protobuf_25.2/include)
+
+set(CPP_YAML_INCLUDE_DIR /home/subham/cpp_libs/libs_13/cpp_yaml/include/)
+set(CPP_YAML_LIB /home/subham/cpp_libs/libs_13/cpp_yaml/lib/libyaml-cpp.so)
+
 set(protobuf_lib ${libabsl_ROOT_PATH}/libprotobuf.a)
 set(lib_utf ${libabsl_ROOT_PATH}/libutf8_validity.a)
+
 set(protobuf_ABSL_USED_TARGETS ${libabsl_ROOT_PATH}/libabsl_log_severity.a ${libabsl_ROOT_PATH}/libabsl_raw_logging_internal.a
         ${libabsl_ROOT_PATH}/libabsl_bad_optional_access.a ${libabsl_ROOT_PATH}/libabsl_die_if_null.a
         ${libabsl_ROOT_PATH}/libabsl_hash.a ${libabsl_ROOT_PATH}/libabsl_bad_variant_access.a
@@ -87,7 +92,7 @@ message(WARNING ${BSON_INCLUDE_DIR})
 
 include_directories(${MONGO_INCLUDE_DIR} ${BSON_THIRD_PARTY_INCLUDE_DIR} ${BSON_INCLUDE_DIR} ${Boost_INCLUDE_DIRS}
         ${Protobuf_INCLUDE_DIRS} ${ABSL_INCLUDE_DIR} ${CppCodec} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
-        /home/subham/cpp_libs/libs_13/quill/include /usr/include/python3.12)
+        /home/subham/cpp_libs/libs_13/quill/include /usr/include/python3.12 ${CPP_YAML_INCLUDE_DIR})
 
 set(MD_MODEL ../../generated/CppProto2)
 # protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/mobile_book_service.proto)
@@ -118,6 +123,7 @@ target_link_libraries(marketdataprovider
         ${protobuf_ABSL_USED_TARGETS}
         /home/subham/cpp_libs/libs_13/quill/lib/libquill.a
         ${Boost_INCLUDE_LIBS_TARGET}
+        ${CPP_YAML_LIB}
 )
 
 # Add compile options to the shared library
@@ -137,6 +143,7 @@ target_link_libraries(mobile_book_exec
         ${protobuf_ABSL_USED_TARGETS}
         /home/subham/cpp_libs/libs_13/quill/lib/libquill.a
         ${Boost_INCLUDE_LIBS_TARGET}
+        ${CPP_YAML_LIB}
         )
 
 # Link the shared library to the executable

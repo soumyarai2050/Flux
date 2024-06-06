@@ -55,7 +55,7 @@ sudo apt install libmongoc-dev
 curl -OL https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.10.1/mongo-cxx-driver-r3.10.1.tar.gz
 tar -xzf mongo-cxx-driver-r3.10.1.tar.gz
 cd mongo-cxx-driver-r3.10.1/build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DMONGOCXX_OVERRIDE_DEFAULT_INSTALL_PREFIX=OFF -DCMAKE_INSTALL_PREFIX=/usr/local
+cmake .. -DCMAKE_BUILD_TYPE=Release -DMONGOCXX_OVERRIDE_DEFAULT_INSTALL_PREFIX=OFF `-DCMAKE_INSTALL_PREFIX=/usr/local`
 cmake --build .
 sudo cmake --build . --target install
 ```
@@ -84,3 +84,14 @@ make -j8
 sudo make install`
 ```
 
+## yaml-cpp Installation
+
+```
+git clone https://github.com/jbeder/yaml-cpp.git
+cd yaml-cpp 
+mkdir build
+cd build
+cmake -DYAML_BUILD_SHARED_LIBS=on -DCMAKE_PREFIX_PATH=/home/subham/cpp_libs/libs_13/ ..
+make -j8
+sudo make install
+```

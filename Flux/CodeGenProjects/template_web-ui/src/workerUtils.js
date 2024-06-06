@@ -1,16 +1,23 @@
 import _, { cloneDeep } from 'lodash';
-import { DB_ID, DataTypes, SeverityType } from './constants';
+import { ColorTypes, DB_ID, DataTypes, SeverityType } from './constants';
 import { SortComparator } from './utility/sortComparator';
 
 const FLOAT_POINT_PRECISION = 2;
 
-export function applyFilter(arr, filters = []) {
+export function applyFilter(arr, filters = [], grouped = false) {
     if (arr && arr.length > 0) {
         let updatedArr = cloneDeep(arr);
         const filterDict = getFilterDict(filters);
         Object.keys(filterDict).forEach(key => {
             let values = filterDict[key].split(',').map(val => val.trim()).filter(val => val !== '');
-            updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
+            if (grouped) {
+                updatedArr = updatedArr.filter(a => {
+                    a = a.filter(obj => values.includes(String(_.get(obj, key))));
+                    return a.length === 0;
+                })
+            } else {
+                updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
+            }
         })
         return updatedArr;
     }
@@ -116,7 +123,7 @@ export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation
         itemProps: list of abbreviated dependent fields and their attributes
         abbreviation: abbreviation syntax
     */
-    const rows = [];
+    let rows = [];
     if (items) {
         items.map((item, i) => {
             let row = {};
@@ -126,7 +133,14 @@ export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation
             itemProps.forEach(c => {
                 let value;
                 let metadata = itemsDataDict[c.source].find(meta => _.get(meta, DB_ID) === id);
-                if (c.xpath.indexOf("-") !== -1) {
+                if (c.type === 'alert_bubble') {
+                    let color = ColorTypes.DEFAULT;
+                    if (c.colorSource) {
+                        const severityType = _.get(metadata, c.colorSource);
+                        color = getColorTypeFromValue(c.colorCollection, severityType);
+                    }
+                    value = [_.get(metadata, c.xpath), color];
+                } else if (c.xpath.indexOf("-") !== -1) {
                     value = c.xpath.split("-").map(xpath => {
                         let collection = c.subCollections.filter(col => col.tableTitle === xpath)[0];
                         let val = _.get(metadata, xpath);
@@ -161,8 +175,20 @@ export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation
                 row[c.key] = value;
             })
             rows.push(row);
+            return;
         })
     }
+    // if (groupBy) {
+    //     rows = Object.values(_.groupBy(rows, item => {
+    //         const groupKeys = [];
+    //         groupBy.forEach(groupingField => {
+    //             groupKeys.push(_.get(item, groupingField));
+    //         })
+    //         return groupKeys.join('_');
+    //     }));
+    // } else {
+    //     rows = rows.map(row => [row]);
+    // }
     return rows;
 }
 
@@ -172,6 +198,7 @@ export function getActiveRows(rows, page, pageSize, sortOrders) {
 }
 
 export function getIdFromAbbreviatedKey(abbreviated, abbreviatedKey) {
+    abbreviated = abbreviated.split('^')[0];
     let abbreviatedSplit = abbreviated.split('-');
     let idIndex = -1;
     abbreviatedSplit.map((text, index) => {
@@ -269,4 +296,45 @@ export function sortAlertArray(alertArray) {
         }
     })
     return alertArray;
+}
+
+export function getColorTypeFromValue(collection, value, separator = '-') {
+    let color = ColorTypes.DEFAULT;
+    if (collection && collection.color) {
+        const colorSplit = collection.color.split(',').map(valueColor => valueColor.trim());
+        const valueColorMap = {};
+        colorSplit.forEach(valueColor => {
+            const [val, colorType] = valueColor.split('=');
+            valueColorMap[val] = colorType;
+        })
+        let v = value;
+        if (collection.xpath.split('-').length > 1) {
+            for (let i = 0; i < collection.xpath.split('-').length; i++) {
+                v = value.split(separator)[i];
+                if (valueColorMap.hasOwnProperty(v)) {
+                    const color = ColorTypes[valueColorMap[v]];
+                    return color;
+                }
+            }
+        } else if (valueColorMap.hasOwnProperty(v)) {
+            const color = ColorTypes[valueColorMap[v]];
+            return color;
+        }
+    }
+    return color;
+}
+
+export function getGroupedTableRows(tableRows, groupBy) {
+    if (groupBy && groupBy.length > 0) {
+        tableRows = Object.values(_.groupBy(tableRows, item => {
+            const groupKeys = [];
+            groupBy.forEach(groupingField => {
+                groupKeys.push(_.get(item, groupingField));
+            })
+            return groupKeys.join('_');
+        }));
+    } else {
+        tableRows = tableRows.map(row => [row]);
+    }
+    return tableRows;
 }

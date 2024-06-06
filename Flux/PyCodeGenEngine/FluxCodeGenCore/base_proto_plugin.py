@@ -145,6 +145,8 @@ class BaseProtoPlugin(ABC):
     flux_msg_executor_options: ClassVar[str] = "FluxMsgExecutorOptions"
     flux_fld_projections: ClassVar[str] = "FluxFldProjections"
     flux_fld_server_running_status: ClassVar[str] = "FluxFldServerRunningStatus"
+    flux_fld_server_ready_status: ClassVar[str] = "FluxFldServerReadyStatus"
+    flux_fld_diff_threshold: ClassVar[str] = "FluxFldDiffThreshold"
     executor_option_is_websocket_model_field: ClassVar[str] = "IsWebSocketModel"
     executor_option_enable_notify_all_field: ClassVar[str] = "EnableNotifyAll"
     executor_option_is_top_lvl_model_field: ClassVar[str] = "IsTopLvlModel"

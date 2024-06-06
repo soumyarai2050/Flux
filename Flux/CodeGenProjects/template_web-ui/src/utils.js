@@ -9,9 +9,10 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import * as workerUtils from './workerUtils';
 import { AlertCache } from './utility/alertCache';
+import { Theme } from './theme';
 export const { applyFilter, applyGetAllWebsocketUpdate, floatToInt, getAbbreviatedRows,
     getActiveRows, getFilterDict, getIdFromAbbreviatedKey, getLocalizedValueAndSuffix,
-    roundNumber, stableSort, sortAlertArray
+    roundNumber, stableSort, sortAlertArray, getColorTypeFromValue, getGroupedTableRows
 } = workerUtils;
 dayjs.extend(utc);
 
@@ -84,10 +85,12 @@ const fieldProps = [
     { propertyName: "projections", usageName: "projections" },
     { propertyName: "mapping_projection_query_field", usageName: "mapping_projection_query_field" },
     { propertyName: "server_running_status", usageName: "server_running_status" },
+    { propertyName: "server_ready_status", usageName: "server_ready_status" },
     { propertyName: "mapping_underlying_meta_field", usageName: "mapping_underlying_meta_field" },
     { propertyName: "mapping_src", usageName: "mapping_src" },
     { propertyName: "column_size", usageName: "columnSize" },
     { propertyName: "column_direction", usageName: "columnDirection" },
+    { propertyName: "diff_threshold", usageName: "diffThreshold" },
 ]
 
 // properties supported explicitly on the array types
@@ -387,7 +390,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
                 collections.push(collection);
             }
             if (collection.abbreviated === 'JSON') {
-                const sc = createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
+                const sc = createCollections(schema, record, callerProps, [], sequence, updatedxpath, elaborateTitle);
                 collection.subCollections = cloneDeep(sc);
             } else {
                 createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
@@ -447,7 +450,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
                 collections.push(collection);
             }
             if (collection.abbreviated === 'JSON') {
-                const sc = createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
+                const sc = createCollections(schema, record, callerProps, [], sequence, updatedxpath, elaborateTitle);
                 collection.subCollections = cloneDeep(sc);
             } else {
                 createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle, metaId);
@@ -1421,31 +1424,7 @@ export function getAlertBubbleCount(data, bubbleSourcePath) {
     return bubbleCount;
 }
 
-export function getColorTypeFromValue(collection, value, separator = '-') {
-    let color = ColorTypes.DEFAULT;
-    if (collection && collection.color) {
-        const colorSplit = collection.color.split(',').map(valueColor => valueColor.trim());
-        const valueColorMap = {};
-        colorSplit.forEach(valueColor => {
-            const [val, colorType] = valueColor.split('=');
-            valueColorMap[val] = colorType;
-        })
-        let v = value;
-        if (collection.xpath.split('-').length > 1) {
-            for(let i=0; i<collection.xpath.split('-').length; i++) {
-                v = value.split(separator)[i];
-                if (valueColorMap.hasOwnProperty(v)) {
-                    const color = ColorTypes[valueColorMap[v]];
-                    return color;
-                }
-            }
-        } else if (valueColorMap.hasOwnProperty(v)) {
-            const color = ColorTypes[valueColorMap[v]];
-            return color;
-        }
-    }
-    return color;
-}
+
 
 export function getColorTypeFromPercentage(collection, percentage) {
     let color = ColorTypes.DEFAULT;
@@ -1578,7 +1557,7 @@ export function hasxpath(data, xpath) {
 }
 
 export function getTableColumns(collections, mode, enableOverride = [], disableOverride = [], collectionView = false, repeatedView = false) {
-    let columns = collections
+    let tableColumns = collections
         .map(collection => Object.assign({}, collection))
         .map(collection => {
             let fieldName = collection.tableTitle;
@@ -1607,10 +1586,87 @@ export function getTableColumns(collections, mode, enableOverride = [], disableO
                 return true;
             } else if (collection.type === 'progressBar') {
                 return true;
+            } else if (collection.type === 'alert_bubble') {
+                return true;
             }
             return false;
         })
-    return columns;
+
+    return tableColumns;
+}
+
+export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], mode, collectionView = false) {
+    let tableColumns = []
+    let maxSequence = 0;
+    columns.forEach(column => {
+        if (column.sequenceNumber > maxSequence) {
+            maxSequence = column.sequenceNumber;
+        }
+    })
+    for (let i = 0; i < maxRowSize; i++) {
+        const updatedColumns = columns.map(column => {
+            column = Object.assign({}, column);
+            column.sourceIndex = i;
+            column.sequenceNumber = column.sequenceNumber + i * maxSequence;
+            return column;
+        })
+        tableColumns = [...tableColumns, ...updatedColumns];
+    }
+    if (mode === Modes.READ_MODE && groupBy && groupBy.length > 0) {
+        const commonColumns = [];
+        columns.forEach(column => {
+            if (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble') {
+                return;
+            }
+            let fieldName = column.tableTitle;
+            if (collectionView) {
+                fieldName = column.key;
+            }
+            let found = true;
+            for (let i = 0; i < rows.length; i++) {
+                const groupedRow = rows[i];
+                const firstValue = groupedRow[0][fieldName];
+                let matched = true;
+                for (let j = 1; j < groupedRow.length; j++) {
+                    if (groupedRow[j][fieldName] !== firstValue) {
+                        matched = false;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+                commonColumns.push(fieldName);
+            }
+        })
+        tableColumns = tableColumns.filter(column => {
+            let fieldName = column.tableTitle;
+            if (collectionView) {
+                fieldName = column.key;
+            }
+            if (!(commonColumns.includes(fieldName) && column.sourceIndex !== 0)) {
+                return true;
+            }
+            return false;
+        })
+        tableColumns = tableColumns.map(column => {
+            let fieldName = column.tableTitle;
+            if (collectionView) {
+                fieldName = column.key;
+            }
+            if (commonColumns.includes(fieldName)) {
+                column.commonGroupKey = true;
+            }
+            if (groupBy.includes(fieldName)) {
+                column.joinKey = true;
+            }
+            return column;
+        })
+    }
+    return tableColumns;
 }
 
 export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false, repeatedView = false) {
@@ -1621,7 +1677,25 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
     if (rows.length === 1 && (collectionView || repeatedView)) {
         const hasButtonType = tableColumns.find(obj => obj.type === 'button');
         if (hasButtonType) {
-            return [];
+            tableColumns.forEach(column => {
+                if (hide && column.hide) return;
+                let fieldName = column.tableTitle;
+                if (collectionView) {
+                    if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
+                        return;
+                    }
+                    fieldName = column.key;
+                }
+                const value = rows[0][column.sourceIndex][fieldName];
+                if (!column.noCommonKey) {
+                    if (value === null || value === undefined) {
+                        commonKeyCollections.push(column);
+                    } else if (value === 0 && !column.displayZero) {
+                        commonKeyCollections.push(column);
+                    }
+                }
+            })
+            return commonKeyCollections;
         }
     }
     if (rows.length > 0) {
@@ -1629,35 +1703,44 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
             if (hide && column.hide) return;
             let fieldName = column.tableTitle;
             if (collectionView) {
-                if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar')) {
+                if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
                     return;
                 }
                 fieldName = column.key;
             }
             let found = true;
+            // const value = rows[0][column.sourceIndex]?.[fieldName];
+            // for (let i = 1; i < rows.length; i++) {
             for (let i = 0; i < rows.length - 1; i++) {
-                if (!_.isEqual(rows[i][fieldName], rows[i + 1][fieldName])) {
-                    const values = [rows[i][fieldName], rows[i + 1][fieldName]];
-                    for (let i = 0; i < values.length; i++) {
-                        let val = values[i];
-                        if (val) {
-                            if (typeof val === DataTypes.STRING) {
-                                val = val.trim();
+                if (rows[i][column.sourceIndex] && rows[i+1][column.sourceIndex]) {
+                    if (!_.isEqual(rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName])) {
+                        const values = [rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName]];
+                        for (let i = 0; i < values.length; i++) {
+                            let val = values[i];
+                            if (val) {
+                                if (typeof val === DataTypes.STRING) {
+                                    val = val.trim();
+                                }
                             }
-                        }
-                        if (![null, undefined, ''].includes(val)) {
-                            found = false;
-                            break;
+                            if (![null, undefined, ''].includes(val)) {
+                                found = false;
+                                break;
+                            }
                         }
                     }
                 }
+
+                // if (rows[i][column.sourceIndex]?.[fieldName] !== value) {
+                //     found = false;
+                // }
+
                 if (!found) {
                     break;
                 }
             }
             if (found) {
                 let collection = column;
-                collection.value = rows[0][fieldName];
+                collection.value = rows[0][column.sourceIndex]?.[fieldName];
                 commonKeyCollections.push(collection);
             }
             return column;
@@ -3146,13 +3229,17 @@ export function updatePartitionFldSchema(schema, chartObj) {
     return updatedSchema;
 }
 
-export function getServerUrl(widgetSchema, linkedObj, runningField, schemaName, requestType) {
+export function getServerUrl(widgetSchema, linkedObj, runningField, readyField, schemaName, requestType) {
     if (widgetSchema.connection_details) {
         const connectionDetails = widgetSchema.connection_details;
         const { host, port, project_name } = connectionDetails;
         // set url only if linkedObj running field is set to true for dynamic as well as static
         if (widgetSchema.widget_ui_data_element?.depending_proto_model_name) {
-            if (linkedObj && Object.keys(linkedObj).length && _.get(linkedObj, runningField)) {
+            let checkField = readyField;
+            if (widgetSchema.widget_ui_data_element?.is_repeated) {
+                checkField = runningField;
+            }
+            if (linkedObj && Object.keys(linkedObj).length && _.get(linkedObj, checkField)) {
                 if (connectionDetails.dynamic_url) {
                     const hostxpath = host.substring(host.indexOf('.') + 1);
                     let portxpath = port.substring(port.indexOf('.') + 1);
@@ -3179,8 +3266,32 @@ export function getServerUrl(widgetSchema, linkedObj, runningField, schemaName, 
     return null;
 }
 
-export function getAbbreviatedCollections(widgetCollectionsDict, abbreviated) {
+export function getAbbreviatedCollections(widgetCollectionsDict, loadListFieldAttrs) {
+    const abbreviated = loadListFieldAttrs.abbreviated;
     const abbreviatedCollections = [];
+    let sequenceNumber = 1;
+    if (loadListFieldAttrs.alertBubbleSource) {
+        let collection = {};
+        collection.key = '';
+        collection.title = '';
+        collection.elaborateTitle = false;
+        collection.sequenceNumber = sequenceNumber;
+        collection.type = 'alert_bubble'
+        // source to fetch value of bubble
+        const bubbleSource = loadListFieldAttrs.alertBubbleSource;
+        collection.alertBubbleSource = bubbleSource;
+        collection.source = bubbleSource.split('.')[0];
+        collection.xpath = bubbleSource.substring(bubbleSource.indexOf('.') + 1);
+        // source to fetch color of bubble
+        const bubbleColorSource = loadListFieldAttrs.alertBubbleColor;
+        if (bubbleColorSource) {
+            const colorSource = bubbleColorSource.substring(bubbleColorSource.indexOf('.') + 1);
+            collection.colorSource = colorSource
+            collection.colorCollection = widgetCollectionsDict[collection.source].find(col => col.tableTitle === colorSource);
+        }
+        abbreviatedCollections.push(collection);
+        sequenceNumber += 1;
+    }
     abbreviated.split('^').forEach((titlePathPair, index) => {
         let title;
         let source;
@@ -3219,7 +3330,7 @@ export function getAbbreviatedCollections(widgetCollectionsDict, abbreviated) {
                 })
             })
             // create a custom collection object
-            collection.sequenceNumber = index + 1;
+            collection.sequenceNumber = sequenceNumber;
             collection.source = widgetName;
             collection.rootLevel = false;
             collection.key = title;
@@ -3236,6 +3347,7 @@ export function getAbbreviatedCollections(widgetCollectionsDict, abbreviated) {
                 collection.type = DataTypes.STRING;
             }
             abbreviatedCollections.push(collection);
+            sequenceNumber += 1;
         } else {
             throw new Error('no collection (field attributes) found for the field with xpath ' + source);
         }
@@ -3269,7 +3381,31 @@ export function snakeToCamel(snakeCase) {
     });
 }
 
-export function sortColumns(collections, columnOrders, isCollectionType = false) {
+export function sortColumns(collections, columnOrders, groupBy = false, center = false, flip = false, isCollectionType = false) {
+    function handleEqualSequence(seqA, seqB, orderA, orderB, isReverse = false) {
+        if (orderA && orderB) {
+            if (orderA.sequence < orderB.sequence) {
+                if (isReverse) return 1;
+                return -1;
+            }
+            if (isReverse) return -1;
+            return 1;
+        } else if (orderA) {
+            if (orderA.sequence <= seqB) {
+                if (isReverse) return 1;
+                return -1;
+            }
+            if (isReverse) return -1;
+            return 1;
+        } else if (orderB) {
+            if (orderB.sequence <= seqA) {
+                if (isReverse) return -1;
+                return 1;
+            }
+            if (isReverse) return 1;
+            return -1;
+        }
+    }
     collections.sort(function (a, b) {
         let seqA = a.sequenceNumber;
         let seqB = b.sequenceNumber;
@@ -3289,20 +3425,57 @@ export function sortColumns(collections, columnOrders, isCollectionType = false)
                 seqB = orderB.sequence;
             }
         }
-        if (seqA < seqB) return -1;
-        else if (seqA === seqB) {
-            if (orderA && orderB) {
-                if (orderA.sequence < orderB.sequence) return -1;
-                return 1;
-            } else if (orderA) {
-                if (orderA.sequence <= seqB) return -1;
-                return 1;
-            } else if (orderB) {
-                if (orderB.sequence <= seqA) return 1;
+        if (groupBy) {
+            if (center && a.sourceIndex === 0 && b.sourceIndex === 0) {
+                if (a.joinKey && b.joinKey) {
+                    if (seqA < seqB) return -1;
+                    else if (seqB < seqA) return 1;
+                    else return handleEqualSequence(seqA, seqB, orderA, orderB);  // seqA === seqB
+                } else if (a.joinKey) {
+                    return 1;
+                } else if (b.joinKey) {
+                    return -1
+                } else if (a.commonGroupKey && b.commonGroupKey) {
+                    if (seqA < seqB) return -1;
+                    else if (seqB < seqA) return 1;
+                    else return handleEqualSequence(seqA, seqB, orderA, orderB);  // seqA === seqB
+                } else if (a.commonGroupKey) {
+                    return 1;
+                } else if (b.commonGroupKey) {
+                    return -1
+                } else if (seqA < seqB) {
+                    return -1;
+                } else if (seqB < seqA) {
+                    return 1
+                } else return handleEqualSequence(seqA, seqB, orderA, orderB);  // seqA === seqB
+            }
+            else if (a.joinKey && b.joinKey) {
+                if (seqA < seqB) return -1;
+                else if (seqB < seqA) return 1;
+                else return handleEqualSequence(seqA, seqB, orderA, orderB);  // seqA === seqB
+            } else if (a.joinKey) {
                 return -1;
+            } else if (b.joinKey) {
+                return 1;
+            } else if (a.commonGroupKey && b.commonGroupKey) {
+                if (seqA < seqB) return -1;
+                else if (seqB < seqA) return 1;
+                else return handleEqualSequence(seqA, seqB, orderA, orderB);  // seqA === seqB
+            } else if (a.commonGroupKey) {
+                return -1;
+            } else if (b.commonGroupKey) {
+                return 1;
+            } else if (flip) {
+                if (a.sourceIndex === b.sourceIndex && a.sourceIndex > 0) {
+                    if (seqA < seqB) return 1;
+                    else if (seqB < seqA) return -1;
+                    else return handleEqualSequence(seqA, seqB, orderA, orderB, true);  // seqA === seqB with flip
+                }
             }
         }
-        return 1;
+        if (seqA < seqB) return -1;
+        else if (seqB < seqA) return 1;
+        else return handleEqualSequence(seqA, seqB, orderA, orderB);  // seqA === seqB
     })
     return collections;
 }
@@ -3344,4 +3517,83 @@ export function getRepeatedWidgetModifiedArray(storedArray, selectedId, updatedO
         }
     }
     return updatedArray;
+}
+
+export function getMaxRowSize(rows) {
+    let maxSize = 1;
+    for (let i = 0; i < rows.length; i++) {
+        if (rows[i].length > maxSize) {
+            maxSize = rows[i].length;
+        }
+    }
+    return maxSize;
+}
+
+export function getDataSourceColor(theme, dataSourceIndex, joinKey = false, commonGroupKey = false) {
+    if (joinKey) {
+        return theme.palette.primary.dark;
+    } else if (commonGroupKey) {
+        return theme.palette.primary.light;
+    }
+    const baseColor = theme.palette.background.primary;
+    let stepSize;
+    if (theme.palette.mode === Theme.DARK) {
+        stepSize = 20;
+    } else {
+        stepSize = -20;
+    }
+    const updatedColor = getColorByIndex(baseColor, dataSourceIndex, stepSize);
+    return updatedColor;
+}
+
+function getColorByIndex(baseColor, index, stepSize) {
+    // Ensure index is non-negative
+    if (index < 0) {
+        throw new Error('Index must be non-negative');
+    }
+
+    // Ensure baseColor is in the format '#RRGGBB'
+    if (!/^#[0-9A-F]{6}$/i.test(baseColor)) {
+        throw new Error('Invalid base color format');
+    }
+
+    // Extract RGB components
+    const red = parseInt(baseColor.substring(1, 3), 16);
+    const green = parseInt(baseColor.substring(3, 5), 16);
+    const blue = parseInt(baseColor.substring(5, 7), 16);
+
+    const stepIndex = index / 3;
+    const stepModulo = index % 3;
+
+    let updatedRed;
+    let updatedGreen;
+    let updatedBlue;
+    if (stepSize >= 0) {
+        updatedRed = Math.min(red + (stepSize * stepIndex), 255);
+        updatedGreen = Math.min(green + (stepSize * stepIndex), 255);
+        updatedBlue = Math.min(blue + (stepSize * stepIndex), 255);
+
+        if (stepModulo === 1) {
+            updatedGreen = Math.min(updatedGreen + (stepSize * 1), 255);
+        } else if (stepModulo === 2) {
+            updatedBlue = Math.min(updatedBlue + (stepSize * 1), 255);
+        }
+    } else {  //  step size is negative
+        updatedRed = Math.max(red + (stepSize * stepIndex), 0);
+        updatedGreen = Math.max(green + (stepSize * stepIndex), 0);
+        updatedBlue = Math.max(blue + (stepSize * stepIndex), 0);
+
+        if (stepModulo === 1) {
+            updatedGreen = Math.max(updatedGreen + (stepSize * 1), 0);
+        } else if (stepModulo === 2) {
+            updatedBlue = Math.max(updatedBlue + (stepSize * 1), 0);
+        }
+    }
+    updatedRed = Math.floor(updatedRed);
+    updatedGreen = Math.floor(updatedGreen);
+    updatedBlue = Math.floor(updatedBlue);
+
+    // Convert reduced RGB components back to hexadecimal
+    const finalColor = `#${updatedRed.toString(16).padStart(2, '0')}${updatedGreen.toString(16).padStart(2, '0')}${updatedBlue.toString(16).padStart(2, '0')}`;
+    return finalColor;
 }

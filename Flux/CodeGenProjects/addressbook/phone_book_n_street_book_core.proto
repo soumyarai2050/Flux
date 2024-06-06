@@ -16,5 +16,5 @@ message AdminControl {
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required CommandType command_type = 2;
-  optional string datetime = 3 [(FluxFldValIsDateTime) = true];
+  optional int64 datetime = 3 [(FluxFldValIsDateTime) = true];
 }

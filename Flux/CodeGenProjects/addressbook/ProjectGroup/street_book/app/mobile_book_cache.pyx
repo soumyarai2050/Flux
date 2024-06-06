@@ -1,11 +1,23 @@
 # mobile_book_cache.pyx
-import copy
 
+# standard imports
+import copy
 from libc.stdint cimport int64_t, int32_t
 from cython cimport bint
 from pendulum import DateTime
 from datetime import timedelta
 import logging
+from pathlib import PurePath
+
+# project imports
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
+    executor_config_yaml_dict)
+
+
+market_depth_levels = executor_config_yaml_dict.get("market_depth_levels")
+if market_depth_levels is None:
+    market_depth_levels = 10    # default value
+
 
 cdef extern from "<Python.h>":
     ctypedef struct PyObject:
@@ -297,8 +309,8 @@ cdef class MobileBookContainer:
 
     def __init__(self, str symbol):
         self.symbol = symbol
-        self.bid_market_depths = [None]*10
-        self.ask_market_depths = [None]*10
+        self.bid_market_depths = [None]*market_depth_levels
+        self.ask_market_depths = [None]*market_depth_levels
 
     cpdef bint set_top_of_book(
             self, _id, symbol, bid_quote_px=None, bid_quote_qty=None, bid_quote_premium=None,

@@ -135,6 +135,10 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += "            onFiltersChange={onFiltersChange}\n"
             output_str += "            onColumnOrdersChange={onColumnOrdersChange}\n"
             output_str += "            scrollLock={scrollLock." + f"{message_name_case_styled}" + "}\n"
+            output_str += "            onSortOrdersChange={onSortOrdersChange}\n"
+            output_str += "            onJoinByChange={onJoinByChange}\n"
+            output_str += "            onCenterJoinChange={onCenterJoinChange}\n"
+            output_str += "            onFlipChange={onFlipChange}\n"
             output_str += f'        />\n'
             output_str += f'    </Paper>\n'
             output_str += '}\n'

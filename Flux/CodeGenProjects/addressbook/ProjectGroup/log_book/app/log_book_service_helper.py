@@ -505,8 +505,11 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
     Handles strat alerts if strat id is passed else handles portfolio alerts
     """
 
-    cache_key = get_alert_cache_key(severity, alert_brief, alert_meta.component_file_path,
-                                    alert_meta.source_file_name, alert_meta.line_num)
+    if alert_meta:
+        cache_key = get_alert_cache_key(severity, alert_brief, alert_meta.component_file_path,
+                                        alert_meta.source_file_name, alert_meta.line_num)
+    else:
+        cache_key = get_alert_cache_key(severity, alert_brief)
     stored_alert = alerts_cache_dict.get(cache_key)
 
     if stored_alert is not None:

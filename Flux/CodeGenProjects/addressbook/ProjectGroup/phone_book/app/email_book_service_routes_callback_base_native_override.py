@@ -27,6 +27,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     get_new_portfolio_limits, get_new_chore_limits, CURRENT_PROJECT_DATA_DIR, is_ongoing_strat,
     get_strat_key_from_pair_strat, get_id_from_strat_key, get_new_strat_view_obj,
     get_single_exact_match_strat_from_symbol_n_side, get_reset_log_book_cache_wrapper_pattern)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
@@ -196,6 +197,8 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         """
 
         error_prefix = "_app_launch_pre_thread_func: "
+        static_data_service_state: ServiceState = ServiceState(
+            error_prefix=error_prefix + "static_data_service failed, exception: ")
         service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
         should_sleep: bool = False
         while True:
@@ -205,7 +208,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
 
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
-                if self.service_up:
+                if self.service_up and static_data_service_state.ready:
                     if not self.service_ready:
                         # running all existing executor
                         self.service_ready = True
@@ -215,7 +218,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                     print(f"INFO: phone_book service is ready: {datetime.datetime.now().time()}")
                 else:
                     logging.warning(f"_app_launch_pre_thread_func: service not ready yet;;; "
-                                    f"{self.service_up=}")
+                                    f"{self.service_up=}, {static_data_service_state.ready=}")
                 if not self.service_up:
                     try:
                         if is_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
@@ -244,6 +247,28 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                     should_sleep = True
                     # any periodic refresh code goes here
 
+                    # service loop: manage all sub-services within their private try-catch to allow high level
+                    # service to remain partially operational even if some sub-service is not available for any reason
+                    if not static_data_service_state.ready:
+                        try:
+                            self.static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
+                            if self.static_data is not None:
+                                static_data_service_state.ready = True
+                                logging.debug("Marked static_data_service_state.ready True")
+                                # we just got static data - no need to sleep - force no sleep
+                                should_sleep = False
+                            else:
+                                raise Exception("self.static_data init to None, unexpected!!")
+                        except Exception as e:
+                            static_data_service_state.handle_exception(e)
+                    else:
+                        # refresh static data periodically (maybe more in future)
+                        try:
+                            self.static_data_periodic_refresh()
+                        except Exception as e:
+                            static_data_service_state.handle_exception(e)
+                            static_data_service_state.ready = False  # forces re-init in next iteration
+
                     # Checking and Restarting crashed executors
                     self.run_crashed_executors()
 
@@ -255,6 +280,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                                                                  str(config_yaml_path))
             else:
                 should_sleep = True
+
+    def static_data_periodic_refresh(self):
+        pass
 
     def run_crashed_executors(self) -> None:
         # coro needs public method
@@ -641,8 +669,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         # starting executor server for current pair strat
         await self._start_executor_server(pair_strat_obj)
 
-    @staticmethod
-    async def _apply_checks_n_log_error(pair_strat: PairStrat):
+    async def _apply_checks_n_log_error(self, pair_strat: PairStrat):
         """
         implement any strat management checks here (create / update strats)
         """
@@ -650,8 +677,11 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         # that means if one strat is ongoing with s1-sd1 and s2-sd2 symbol-side pair legs then param pair_strat
         # must not have same symbol-side pair legs else HTTP exception is raised
         ongoing_pair_strat: PairStrat = \
-            await (get_single_exact_match_strat_from_symbol_n_side(pair_strat.pair_strat_params.strat_leg1.sec.sec_id, pair_strat.pair_strat_params.strat_leg1.side))
+            await (get_single_exact_match_strat_from_symbol_n_side(pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
+                                                                   pair_strat.pair_strat_params.strat_leg1.side))
 
+        leg1_side: Side
+        leg2_side: Side
         leg1_symbol, leg1_side = (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
                                   pair_strat.pair_strat_params.strat_leg1.side)
         leg2_symbol, leg2_side = (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
@@ -674,33 +704,47 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         # not be any strat activated today with s1-sd2 and s2-sd1 symbol-side pair legs, if it is found then this
         # strat can't be activated
 
-        first_matched_strat_lock_file_path_list: List[str] = (
-            glob.glob(str(CURRENT_PROJECT_DATA_DIR /
+        leg1_side: str = leg1_side.value
+        leg2_side: str = leg2_side.value
+        first_matched_strat_lock_file_path_list: List[str] = []
+        if not self.static_data.is_opposite_side_tradable(leg1_symbol):
+            first_matched_strat_lock_file_path_list = (
+                glob.glob(str(CURRENT_PROJECT_DATA_DIR /
                           f"{leg1_symbol}_{leg2_side}_*_{DateTime.date(DateTime.utcnow())}.json.lock")))
+        second_matched_strat_lock_file_path_list: List[str] = []
+        if not self.static_data.is_opposite_side_tradable(leg2_symbol):
+            second_matched_strat_lock_file_path_list = (
+                glob.glob(str(CURRENT_PROJECT_DATA_DIR /
+                              f"{leg2_symbol}_{leg1_side}_*_{DateTime.date(DateTime.utcnow())}.json.lock")))
 
-        sec_matched_strat_lock_file_path_list: List[str] = (
-            glob.glob(str(CURRENT_PROJECT_DATA_DIR /
-                          f"{leg2_symbol}_{leg1_side}_*_{DateTime.date(DateTime.utcnow())}.json.lock")))
-
-        # checking both legs - If first_matched_strat_lock_file_path_list and sec_matched_strat_lock_file_path_list
+        # checking both legs - If first_matched_strat_lock_file_path_list and second_matched_strat_lock_file_path_list
         # have file names having same pair_strat_id with today's date along with required symbol-side pair
         for matched_strat_file_path in first_matched_strat_lock_file_path_list:
             suffix_pattern = matched_strat_file_path[(matched_strat_file_path.index(leg2_side) + len(leg2_side)):]
-            for sec_matched_strat_lock_file_path in sec_matched_strat_lock_file_path_list:
+            for sec_matched_strat_lock_file_path in second_matched_strat_lock_file_path_list:
                 if sec_matched_strat_lock_file_path.endswith(suffix_pattern):
                     err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides"
                                 " - can't activate this strat today")
                     logging.error(err_str_)
                     raise HTTPException(status_code=400, detail=err_str_)
 
-    @staticmethod
-    def get_lock_file_names_from_pair_strat(pair_strat: PairStrat) -> Tuple[PurePath, PurePath]:
-        return ((CURRENT_PROJECT_DATA_DIR / f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}_"
-                                            f"{pair_strat.pair_strat_params.strat_leg1.side}_{pair_strat.id}_"
-                                            f"{DateTime.date(DateTime.utcnow())}.json.lock"),
-                (CURRENT_PROJECT_DATA_DIR / f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}_"
-                                            f"{pair_strat.pair_strat_params.strat_leg2.side}_{pair_strat.id}_"
-                                            f"{DateTime.date(DateTime.utcnow())}.json.lock"))
+    def get_lock_file_names_from_pair_strat(self, pair_strat: PairStrat) -> Tuple[PurePath | None, PurePath | None]:
+        leg1_sec_id: str = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+        leg1_log_file_path: str | None = None
+        if not self.static_data.is_opposite_side_tradable(leg1_sec_id):
+            leg1_log_file_path = (CURRENT_PROJECT_DATA_DIR / f"{leg1_sec_id}_"
+                                                             f"{pair_strat.pair_strat_params.strat_leg1.side.value}_"
+                                                             f"{pair_strat.id}_{DateTime.date(DateTime.utcnow())}"
+                                                             f".json.lock")
+
+        leg2_sec_id: str = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+        leg2_log_file_path: str | None = None
+        if not self.static_data.is_opposite_side_tradable(leg2_sec_id):
+            leg2_log_file_path = (CURRENT_PROJECT_DATA_DIR / f"{leg2_sec_id}_"
+                                                             f"{pair_strat.pair_strat_params.strat_leg2.side.value}_"
+                                                             f"{pair_strat.id}_{DateTime.date(DateTime.utcnow())}"
+                                                             f".json.lock")
+        return leg1_log_file_path, leg2_log_file_path
 
     async def _update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat,
                                      updated_pair_strat_obj: PairStrat) -> bool | None:
@@ -714,10 +758,12 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
             if stored_pair_strat_obj.strat_state == StratState.StratState_READY:
                 leg1_lock_file_path, leg2_lock_file_path = (
                     self.get_lock_file_names_from_pair_strat(updated_pair_strat_obj))
-                with open(leg1_lock_file_path, "w") as fl:  # creating empty file
-                    pass
-                with open(leg2_lock_file_path, "w") as fl:  # creating empty file
-                    pass
+                if leg1_lock_file_path:
+                    with open(leg1_lock_file_path, "w") as fl:  # creating empty file
+                        pass
+                if leg2_lock_file_path:
+                    with open(leg2_lock_file_path, "w") as fl:  # creating empty file
+                        pass
             # else not required: create strat lock file only if moving the strat state from
             # StratState_READY to StratState_ACTIVE
         if updated_pair_strat_obj.strat_state == StratState.StratState_DONE:
@@ -755,10 +801,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
 
         res = await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
-        if not res:
-            logging.debug(f"Alerts updated by _update_strat_status_pre, symbol_side_key: "
-                          f"{get_symbol_side_key([(stored_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id, stored_pair_strat_obj.pair_strat_params.strat_leg1.side)])};;; "
-                          f"{updated_pair_strat_obj=}")
 
         # updating port_to_executor_http_client_dict with this port if not present
         self._update_port_to_executor_http_client_dict_from_updated_pair_strat(updated_pair_strat_obj)
@@ -780,10 +822,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                                                          updated_pair_strat_obj_dict)
         updated_pair_strat_obj = PairStratOptional(**updated_pydantic_obj_dict)
         res = await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
-        if not res:
-            logging.debug(f"Alerts updated by _update_strat_status_pre, symbol_side_key: "
-                          f"{get_symbol_side_key([(stored_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id, stored_pair_strat_obj.pair_strat_params.strat_leg1.side)])};;; "
-                          f"{updated_pair_strat_obj=}")
         updated_pair_strat_obj_dict = jsonable_encoder(updated_pair_strat_obj, by_alias=True, exclude_none=True)
 
         # updating port_to_executor_http_client_dict with this port if not present
@@ -1138,10 +1176,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
         checks if ongoing strat is found with sec_id and side in any leg from all strats, else returns
         pair_strat if non-ongoing but single match is found with sec_id and side in any leg else returns None
         """
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_routes import \
-            underlying_read_pair_strat_http
         read_pair_strat_filter = get_ongoing_or_all_pair_strats_by_sec_id(sec_id, side)
-        pair_strats: List[PairStrat] = await underlying_read_pair_strat_http(read_pair_strat_filter)
+        pair_strats: List[PairStrat] = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
+                                              underlying_read_pair_strat_http(read_pair_strat_filter))
         if len(pair_strats) == 1:
             # if single match is found then either it is ongoing from multiple same matched strats or it is single
             # non-ongoing strat - both are accepted
@@ -1162,9 +1199,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
                 for pair_strat_ in pair_strat_list:
                     leg1_lock_file_path, leg2_lock_file_path = (
                         self.get_lock_file_names_from_pair_strat(pair_strat_))
-                    if os.path.exists(leg1_lock_file_path):
+                    if leg1_lock_file_path and os.path.exists(leg1_lock_file_path):
                         os.remove(leg1_lock_file_path)
-                    if os.path.exists(leg2_lock_file_path):
+                    if leg2_lock_file_path and os.path.exists(leg2_lock_file_path):
                         os.remove(leg2_lock_file_path)
             case CommandType.RESET_STATE:
                 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_beanie_database \
@@ -1213,6 +1250,11 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(EmailBookServiceRoutesCal
     async def log_simulator_reload_config_query_pre(
             self, log_simulator_reload_config_class_type: Type[LogSimulatorReloadConfig]):
         self.bartering_link.reload_portfolio_configs()
+        return []
+
+    async def update_is_opposite_side_tradable_val_query_pre(
+            self, is_opposite_side_tradable_class_type: Type[IsOppositeSideTradable], update_val: bool):
+        SecurityRecordManager.can_opposite_side_barter = update_val
         return []
 
     async def partial_update_system_control_pre(self, stored_system_control_obj: SystemControl,

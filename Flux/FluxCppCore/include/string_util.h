@@ -7,12 +7,60 @@
 
 namespace FluxCppCore {
 
-    enum class TimeComparison {
-        TIME1_LATER,
-        TIME2_LATER,
-        BOTH_EQUAL
-    };
+    inline int64_t get_utc_time_microseconds() {
+        // Get the current time
+        auto now = std::chrono::system_clock::now();
+        // Get the current time as microseconds since the epoch
+        auto now_as_us = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
+        return static_cast<int64_t>(now_as_us.count());
+    }
 
+    inline std::string format_time(int64_t timestamp_ms) {
+        // Convert milliseconds to microseconds
+        auto timestamp_us = std::chrono::microseconds(timestamp_ms * 1000);
+        // Convert the provided timestamp to system_clock time_point
+        auto now = std::chrono::system_clock::time_point(timestamp_us);
+        // Convert to time_t for use with gmtime
+        auto now_as_time_t = std::chrono::system_clock::to_time_t(now);
+        // Convert to tm for use with put_time
+        std::tm* now_as_tm = std::localtime(&now_as_time_t);
+        // Get the current time as microseconds since the epoch
+        auto now_as_us = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
+        // The number of microseconds that have passed since the last second
+        auto us = now_as_us.count() % 1000000;
+        // Create a stream and output the formatted time
+        std::ostringstream oss;
+        oss << std::put_time(now_as_tm, "%Y-%m-%d %H:%M:%S") << '.' << std::setfill('0') << std::setw(6) << us << "+00:00";
+        return oss.str();
+    }
+
+    inline int64_t parse_time(const std::string& time_str) {
+        // Create a stringstream to parse the string
+        std::istringstream iss(time_str);
+        // Create tm struct to store parsed time
+        std::tm tm = {};
+        // Parse the string into tm struct
+        iss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+        // Check if parsing succeeded
+        if (iss.fail()) {
+            throw std::runtime_error("Failed to parse time string");
+        }
+        // Convert tm to time_t
+        auto time_t = std::mktime(&tm);
+        // Convert time_t to microseconds since epoch
+        auto timestamp_us = std::chrono::system_clock::from_time_t(time_t);
+
+        // Extract microseconds from the time string
+        char dot;
+        int microseconds;
+        if (iss >> dot >> microseconds) {
+            // Add microseconds to timestamp
+            timestamp_us += std::chrono::microseconds(microseconds);
+        }
+
+        // Return timestamp in microseconds
+        return std::chrono::duration_cast<std::chrono::microseconds>(timestamp_us.time_since_epoch()).count() / 1000;
+    }
 
     class StringUtil {
     public:
@@ -89,19 +137,6 @@ namespace FluxCppCore {
 
             return bsoncxx::types::b_date(duration_since_epoch);
         }
-
-
-
-        static TimeComparison find_latest_time(const std::string& time1_str, const std::string& time2_str) {
-            if (time1_str > time2_str) {
-                return TimeComparison::TIME1_LATER;
-            } else if (time2_str > time1_str) {
-                return TimeComparison::TIME2_LATER;
-            } else {
-                return TimeComparison::BOTH_EQUAL;
-            }
-        }
-
 
     };
 }

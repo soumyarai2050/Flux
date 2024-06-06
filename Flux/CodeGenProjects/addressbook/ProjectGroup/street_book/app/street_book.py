@@ -1332,11 +1332,11 @@ class StreetBook:
                         pass
                     else:
                         logging.error(f"can't proceed, strat_brief found None for strat-cache: "
-                                      f"{self.strat_cache.get_key()};;; [ {self.strat_cache = } ]")
+                                      f"{self.strat_cache.get_key()};;; [ {self.strat_cache=} ]")
                         continue  # go next run - we don't stop processing for one faulty strat_cache
                 else:
                     logging.error(f"can't proceed! strat_brief_tuple: {strat_brief_tuple} not found for strat-cache: "
-                                  f"{self.strat_cache.get_key()};;; [ {self.strat_cache = } ]")
+                                  f"{self.strat_cache.get_key()};;; [ {self.strat_cache=} ]")
                     continue  # go next run - we don't stop processing for one faulty strat_cache
 
                 chore_limits: ChoreLimitsBaseModel | None = None

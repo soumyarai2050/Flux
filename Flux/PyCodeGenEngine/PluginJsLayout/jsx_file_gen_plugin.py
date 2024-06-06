@@ -53,9 +53,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == JsxFileGenPlugin.root_type:
             output_str += "import { Add } from '@mui/icons-material';\n"
         elif layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
-            output_str += "import { Add, Delete } from '@mui/icons-material';\n"
-            output_str += "import { Divider, List, ListItem, ListItemButton, ListItemText, Chip, Box } " \
-                          "from '@mui/material';\n"
+            output_str += "import { Add, Delete, JoinInner, SwapHoriz, VerticalAlignCenter } from '@mui/icons-material';\n"
+            output_str += ("import { Divider, List, ListItem, ListItemButton, ListItemText, Chip, Box, Popover, "
+                           "MenuItem, FormControlLabel, Checkbox } from '@mui/material';\n")
         output_str += "/* redux CRUD and additional helper actions */\n"
         output_str += "import {\n"
         message_name = message.proto.name
@@ -175,15 +175,24 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "    addxpath, getTableColumns, getTableRows, getCommonKeyCollections, applyFilter, " \
                           "removeRedundantFieldsFromRows, getWidgetOptionById, getWidgetTitle, \n"
-            output_str += "    getServerUrl, getRepeatedWidgetModifiedArray, clearxpath, compareJSONObjects\n"
+            output_str += "    getServerUrl, getRepeatedWidgetModifiedArray, clearxpath, compareJSONObjects, \n"
+            output_str += "    getMaxRowSize,\n"
+            output_str += "    getGroupedTableRows,\n"
+            output_str += "    getGroupedTableColumns\n"
         elif layout_type == JsxFileGenPlugin.root_type:
             output_str += "    generateObjectFromSchema, addxpath, clearxpath, getObjectWithLeastId,\n"
             output_str += "    getTableColumns, getTableRows, getCommonKeyCollections, compareJSONObjects, " \
-                          "getWidgetOptionById, getWidgetTitle, getServerUrl, applyFilter\n"
+                          "getWidgetOptionById, getWidgetTitle, getServerUrl, applyFilter,\n"
+            output_str += "    getMaxRowSize,\n"
+            output_str += "    getGroupedTableRows,\n"
+            output_str += "    getGroupedTableColumns\n"
         elif layout_type == JsxFileGenPlugin.non_root_type or \
                 layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
             output_str += "    getTableColumns, getTableRows, getCommonKeyCollections, lowerFirstLetter, clearxpath, " \
-                          "compareJSONObjects, getWidgetOptionById, getWidgetTitle, applyFilter\n"
+                          "compareJSONObjects, getWidgetOptionById, getWidgetTitle, applyFilter,\n"
+            output_str += "    getMaxRowSize,\n"
+            output_str += "    getGroupedTableRows,\n"
+            output_str += "    getGroupedTableColumns\n"
         else:  # abbreviated filter type
             output_str += "    generateObjectFromSchema, addxpath, clearxpath, getObjectWithLeastId, " \
                           "compareJSONObjects,\n"
@@ -214,7 +223,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup, FormValidation } " \
                               "from '../components/Popup';\n"
         output_str += "import { FullScreenModalOptional } from '../components/Modal';\n"
-        output_str += "import { Fullscreen, CloseFullscreen } from '@mui/icons-material';\n"
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += ("import { Fullscreen, CloseFullscreen, VerticalAlignBottom, VerticalAlignCenter, "
+                           "SwapHoriz, JoinInner } from '@mui/icons-material';\n")
+            output_str += "import { Checkbox, FormControlLabel, MenuItem, Popover } from '@mui/material';\n"
+        else:
+            output_str += "import { Fullscreen, CloseFullscreen } from '@mui/icons-material';\n"
         output_str += "import { cleanAllCache } from '../utility/attributeCache';\n"
         output_str += "import { Icon } from '../components/Icon';\n\n"
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
@@ -245,9 +259,42 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += '            disabled={mode !== Modes.EDIT_MODE}\n'
             output_str += '            filters={props.filters}\n'
             output_str += '            onFiltersChange={props.onFiltersChange}\n'
-            output_str += '            onButtonToggle={onButtonToggle}\n'
-            output_str += '        >\n'
-            output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
+            output_str += '            onButtonToggle={onButtonToggle}>\n'
+            output_str += ("            <Icon name='Join' title='Join' onClick={onJoinOpen}>"
+                           "<JoinInner fontSize='small' /></Icon>\n")
+            output_str += "            <Popover\n"
+            output_str += "                id={`${props.name}_join`}\n"
+            output_str += "                open={openJoin}\n"
+            output_str += "                anchorEl={joinArchorEl}\n"
+            output_str += "                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}\n"
+            output_str += "                onClose={onJoinClose}>\n"
+            output_str += "                {collections.map((col, index) => {\n"
+            output_str += "                    return (\n"
+            output_str += "                        <MenuItem key={index} dense={true}>\n"
+            output_str += "                            <FormControlLabel\n"
+            output_str += "                                sx={{ display: 'flex', flex: 1 }}\n"
+            output_str += "                                size='small'\n"
+            output_str += "                                label={col.elaborateTitle ? col.tableTitle : col.key}\n"
+            output_str += "                                control={\n"
+            output_str += "                                    <Checkbox\n"
+            output_str += "                                        size='small'\n"
+            output_str += "                                        checked={joinBy.includes(col.tableTitle)}\n"
+            output_str += "                                        onChange={(e) => onJoinChange(e, col.tableTitle)}\n"
+            output_str += "                                    />\n"
+            output_str += "                                }\n"
+            output_str += "                            />\n"
+            output_str += "                        </MenuItem>\n"
+            output_str += "                    )\n"
+            output_str += "                })}\n"
+            output_str += "            </Popover>\n"
+            output_str += ("            {joinBy && joinBy.length > 0 && <Icon name={centerJoinText} title="
+                           "{centerJoinText} selected={centerJoin} onClick={onToggleCenterJoin}><VerticalAlignCenter "
+                           "fontSize='small' /></Icon>}\n")
+            output_str += ("            {joinBy && joinBy.length > 0 && <Icon name={flipText} title={flipText} "
+                           "selected={flip} onClick={onToggleFlip}><SwapHoriz fontSize='small' /></Icon>}\n")
+            output_str += ("            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}>"
+                           "<CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' "
+                           "onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n")
             output_str += "        </DynamicMenu>\n"
             output_str += '    )\n\n'
             output_str += "    let cleanedRows = [];\n"
@@ -377,8 +424,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                    index={selected" + f"{root_msg_name}Id" + "}\n"
         output_str += "                    scrollLock={props.scrollLock}\n"
         output_str += "                    collections={collections}\n"
-        output_str += "                    rows={rows}\n"
-        output_str += "                    tableColumns={tableColumns}\n"
+        output_str += "                    rows={groupedRows}\n"
+        output_str += "                    tableColumns={groupedTableColumns}\n"
         output_str += "                    commonKeyCollections={commonKeyCollections}\n"
         output_str += "                    mode={mode}\n"
         output_str += "                    onUpdate={onUpdate}\n"
@@ -396,6 +443,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    truncateDateTime={truncateDateTime}\n"
         output_str += "                    columnOrders={columnOrders}\n"
         output_str += "                    onColumnOrdersChange={onColumnOrdersChange}\n"
+        output_str += "                    sortOrders={sortOrders}\n"
+        output_str += "                    onSortOrdersChange={onSortOrdersChange}\n"
+        output_str += "                    onForceSave={onForceSave}\n"
         if layout_type != JsxFileGenPlugin.repeated_root_type:
             output_str += "                    forceUpdate={forceUpdate}\n"
         if layout_type in [JsxFileGenPlugin.repeated_root_type, JsxFileGenPlugin.root_type]:
@@ -415,6 +465,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         elif layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "                    onSelectRow={onSelectRow}\n"
             output_str += "                    widgetType='repeatedRoot'\n"
+            output_str += "                    groupBy={joinBy && joinBy.length > 0}\n"
+            output_str += "                    centerJoin={centerJoin}\n"
+            output_str += "                    flip={flip}\n"
         output_str += "                />\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "            ) : widgetOption.view_layout === Layouts.PIVOT_TABLE ? (\n"
@@ -551,6 +604,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const currentSchema = useMemo(() => schema[props.name], []);\n"
                 output_str += "    /* local react states */\n"
                 output_str += "    const [maximize, setMaximize] = useState(false);\n"
+                output_str += "    const [forceSave, setForceSave] = useState(false);\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
                 if widget_ui_option_value.get(
                         JsxFileGenPlugin.widget_ui_option_depends_on_model_name_for_port_field):
@@ -559,6 +613,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [openConfirmSavePopup, setOpenConfirmSavePopup] = useState(false);\n"
                 output_str += "    const [openFormValidationPopup, setOpenFormValidationPopup] = useState(false);\n"
                 output_str += "    const [disableWs, setDisableWs] = useState(false);\n"
+                output_str += "    const [openJoin, setOpenJoin] = useState(false);\n"
+                output_str += "    const [joinArchorEl, setJoinArcholEl] = useState();\n"
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                     message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
                 other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
@@ -623,6 +679,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const currentSchema = useMemo(() => schema[props.name], []);\n"
                 output_str += "    /* local react states */\n"
                 output_str += "    const [maximize, setMaximize] = useState(false);\n"
+                output_str += "    const [forceSave, setForceSave] = useState(false);\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
                 output_str += "    const [formValidation, setFormValidation] = useState({});\n"
                 if not option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
@@ -650,6 +707,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
                 output_str += "    const currentSchema = useMemo(() => schema[props.name], []);\n"
                 output_str += "    const [maximize, setMaximize] = useState(false);\n"
+                output_str += "    const [forceSave, setForceSave] = useState(false);\n"
             case JsxFileGenPlugin.simple_abbreviated_type | JsxFileGenPlugin.parent_abbreviated_type:
                 output_str += "    /* states from redux store */\n"
                 output_str += "    const {\n"
@@ -695,16 +753,15 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const currentSchema = useMemo(() => schema[props.name], []);\n"
                 output_str += "    /* local react states */\n"
                 output_str += "    const [maximize, setMaximize] = useState(false);\n"
+                output_str += "    const [forceSave, setForceSave] = useState(false);\n"
                 output_str += "    const [searchValue, setSearchValue] = useState('');\n"
                 if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
                     output_str += "    const [openCollectionSwitchPopup, setOpenCollectionSwitchPopup] = " \
                                   "useState(false);\n"
-                output_str += f"    const [active{dependent_message}List, setActive{dependent_message}List] = " \
-                              f"useState([]);\n"
-                output_str += f"    const [oldActive{dependent_message}List, setOldActive{dependent_message}List] = " \
-                              f"useState(active{dependent_message}List);\n"
-                output_str += f"    const prevActive{dependent_message}List = useRef([]);\n"
-                output_str += f"    const prevOldActive{dependent_message}List = useRef([]);\n"
+                output_str += "    const [activeItemList, setActiveItemList] = useState([]);\n"
+                output_str += "    const [prevActiveItemList, setPrevActiveItemList] = useState(activeItemList);\n"
+                output_str += "    const [openJoin, setOpenJoin] = useState(false);\n"
+                output_str += "    const [joinArchorEl, setJoinArcholEl] = useState();\n"
                 output_str += "    const [disableWs, setDisableWs] = useState(false);\n"
                 output_str += "    const getAllWsDict = useRef({});\n"
                 output_str += "    const getWsDict = useRef({});\n"
@@ -747,7 +804,42 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        createMenu = <Icon title='Create' name='Create' " \
                       "onClick={onCreate}><Add fontSize='small' /></Icon>;\n"
         output_str += "    }\n"
-        output_str += "    let menu = <>{maximizeMenu}{createMenu}</>;\n"
+        output_str += "    let menu = (\n"
+        output_str += "        <>\n"
+        output_str += "            <Icon name='Join' title='Join' onClick={onJoinOpen}><JoinInner fontSize='small' /></Icon>\n"
+        output_str += "            <Popover\n"
+        output_str += "                id={`${props.name}_join`}\n"
+        output_str += "                open={openJoin}\n"
+        output_str += "                anchorEl={joinArchorEl}\n"
+        output_str += "                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}\n"
+        output_str += "                onClose={onJoinClose}>\n"
+        output_str += "                {itemCollections.map((col, index) => {\n"
+        output_str += "                    return (\n"
+        output_str += "                        <MenuItem key={index} dense={true}>\n"
+        output_str += "                            <FormControlLabel\n"
+        output_str += "                                sx={{ display: 'flex', flex: 1 }}\n"
+        output_str += "                                size='small'\n"
+        output_str += "                                label={col.key}\n"
+        output_str += "                                control={\n"
+        output_str += "                                    <Checkbox\n"
+        output_str += "                                        size='small'\n"
+        output_str += "                                        checked={joinBy.includes(col.key)}\n"
+        output_str += "                                        onChange={(e) => onJoinChange(e, col.key)}\n"
+        output_str += "                                    />\n"
+        output_str += "                                }\n"
+        output_str += "                            />\n"
+        output_str += "                        </MenuItem>\n"
+        output_str += "                    )\n"
+        output_str += "                })}\n"
+        output_str += "            </Popover>\n"
+        output_str += ("            {joinBy && joinBy.length > 0 && <Icon name={centerJoinText} title={centerJoinText} "
+                       "selected={centerJoin} onClick={onToggleCenterJoin}><VerticalAlignCenter fontSize='small' "
+                       "/></Icon>}\n")
+        output_str += ("            {joinBy && joinBy.length > 0 && <Icon name={flipText} title={flipText} "
+                       "selected={flip} onClick={onToggleFlip}><SwapHoriz fontSize='small' /></Icon>}\n")
+        output_str += "            {maximizeMenu}\n"
+        output_str += "            {createMenu}\n"
+        output_str += "        </>);\n"
         output_str += "    return (\n"
         output_str += "        <FullScreenModalOptional\n"
         output_str += "            id={props.name}\n"
@@ -807,9 +899,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    loadListFieldAttrs={loadListFieldAttrs}\n"
         output_str += "                    items={_.get(" + f"{message_name_camel_cased}" + ", loadListFieldAttrs.key) ? " \
                                                                                             "_.get(" + f"{message_name_camel_cased}" + ", loadListFieldAttrs.key) : []}\n"
-        output_str += "                    activeItems={active" + f"{dependent_msg_name}List" + "}\n"
-        output_str += "                    setActiveItems={setActive" + f"{dependent_msg_name}List" + "}\n"
-        output_str += "                    setOldActiveItems={setOldActive" + f"{dependent_msg_name}List" + "}\n"
+        output_str += "                    activeItems={activeItemList}\n"
+        output_str += "                    setActiveItems={setActiveItemList}\n"
+        output_str += "                    setOldActiveItems={setPrevActiveItemList}\n"
         output_str += "                    selected={selected" + f"{dependent_msg_name}" + "Id}\n"
         output_str += "                    setSelectedItem={setSelectedItem}\n"
         output_str += "                    onSelect={onSelect}\n"
@@ -872,8 +964,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    dependentLoading={dependentLoading}\n"
         output_str += "                    columnOrders={columnOrders}\n"
         output_str += "                    onColumnOrdersChange={onColumnOrdersChange}\n"
+        output_str += "                    sortOrders={sortOrders}\n"
+        output_str += "                    onSortOrdersChange={onSortOrdersChange}\n"
         output_str += "                    onUpdate={onUpdate}\n"
         output_str += "                    onUserChange={onUserChange}\n"
+        output_str += "                    onForceSave={onForceSave}\n"
+        output_str += "                    joinBy={joinBy}\n"
+        output_str += "                    centerJoin={centerJoin}\n"
+        output_str += "                    flip={flip}\n"
         output_str += "                />\n"
         output_str += "            )}\n"
         output_str += "            <FormValidation\n"
@@ -1014,6 +1112,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                f"selected{message_name}Id, modified{message_name});\n")
                 output_str += ("    let rows = getTableRows(collections, mode, originalData, "
                                "modifiedData, null, true);\n")
+                output_str += "    const joinBy = widgetOption.join_by ? widgetOption.join_by : [];\n"
+                output_str += "    const centerJoin = widgetOption.joined_at_center;\n"
+                output_str += "    const flip = widgetOption.flip;\n"
+                output_str += "    let groupedRows = getGroupedTableRows(rows, joinBy);\n"
             case JsxFileGenPlugin.root_type | JsxFileGenPlugin.abbreviated_dependent_type:
                 output_str += f"    const widgetOption = getWidgetOptionById(props.options, selected{message_name}Id, " \
                               f"currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld'));\n"
@@ -1022,6 +1124,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"    let rows = getTableRows(collections, mode, {message_name_camel_cased}, " \
                               f"modified{message_name});\n"
                 output_str += "    rows = applyFilter(rows, props.filters);\n"
+                output_str += "    let groupedRows = getGroupedTableRows(rows, []);\n"
             case JsxFileGenPlugin.non_root_type:
                 root_message_name = self.root_message.proto.name
                 root_message_name_camel_cased = convert_to_camel_case(root_message_name)
@@ -1049,6 +1152,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"    let rows = getTableRows(collections, mode, {root_message_name_camel_cased}, " \
                               f"modified{root_message_name}, currentSchemaXpath);\n"
                 output_str += "    rows = applyFilter(rows, props.filters);\n"
+                output_str += "    let groupedRows = getGroupedTableRows(rows, []);\n"
             case JsxFileGenPlugin.simple_abbreviated_type | JsxFileGenPlugin.parent_abbreviated_type:
                 output_str += "    const widgetOption = useMemo(() => {\n"
                 output_str += f"        return getWidgetOptionById(props.options, selected{message_name}Id,\n"
@@ -1079,9 +1183,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                               "dependentWidgets[0]]);\n"
                 output_str += "    }\n"
                 output_str += "    const itemCollections = useMemo(() => {\n"
-                output_str += "        return getAbbreviatedCollections(dependentWidgetCollectionsDict, abbreviated);\n"
+                output_str += ("        return getAbbreviatedCollections("
+                               "dependentWidgetCollectionsDict, loadListFieldAttrs);\n")
                 output_str += "    }, [dependentWidgetCollectionsDict])\n"
+                output_str += "    const joinBy = widgetOption.join_by ? widgetOption.join_by : [];\n"
+                output_str += "    const centerJoin = widgetOption.joined_at_center;\n"
+                output_str += "    const flip = widgetOption.flip;\n"
         output_str += "    const columnOrders = widgetOption.column_orders;\n"
+        output_str += "    const sortOrders = widgetOption.sort_orders;\n"
         output_str += "    const truncateDateTime = widgetOption.hasOwnProperty('truncate_date_time') ? " \
                       "widgetOption.truncate_date_time : false;\n\n"
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
@@ -1111,13 +1220,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += "    }, [])\n\n"
 
             if dependent_msg_list_from_another_proto:
-                output_str += "    useEffect(() => {\n"
-                output_str += f"        prevActive{dependent_message}List.current = active{dependent_message}List;\n"
-                output_str += "    }, " + f"[active{dependent_message}List])\n\n"
-                output_str += "    useEffect(() => {\n"
-                output_str += f"        prevOldActive{dependent_message}List.current = oldActive{dependent_message}List;\n"
-                output_str += "    }, " + f"[oldActive{dependent_message}List])\n\n"
-
                 output_str += "    useEffect(() => {\n"
                 for dep_msg_name in dependent_msg_list_from_another_proto:
                     output_str += f"        dispatch(setSelected{dep_msg_name}Id(selected{dependent_message}Id));\n"
@@ -1156,7 +1258,23 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += ", false, true"
             output_str += ");\n"
             if layout_type in [JsxFileGenPlugin.repeated_root_type]:
-                output_str += "    const commonKeyCollections = getCommonKeyCollections(rows, tableColumns, true, false, true);\n\n"
+                output_str += "    const maxRowSize = getMaxRowSize(groupedRows);\n"
+                output_str += ("    const groupedTableColumns = getGroupedTableColumns(tableColumns, maxRowSize, "
+                               "groupedRows, joinBy, mode);\n")
+                output_str += ("    const commonKeyCollections = getCommonKeyCollections(groupedRows, "
+                               "groupedTableColumns, true, false, true);\n\n")
+            elif layout_type == JsxFileGenPlugin.root_type:
+                output_str += "    const maxRowSize = getMaxRowSize(groupedRows);\n"
+                output_str += ("    const groupedTableColumns = getGroupedTableColumns(tableColumns, maxRowSize, "
+                               "groupedRows, [], mode);\n")
+                output_str += ("    const commonKeyCollections = getCommonKeyCollections("
+                               "groupedRows, groupedTableColumns);\n\n")
+            elif layout_type == JsxFileGenPlugin.non_root_type:
+                output_str += "    const maxRowSize = getMaxRowSize(groupedRows);\n"
+                output_str += ("    const groupedTableColumns = getGroupedTableColumns(tableColumns, "
+                               "maxRowSize, groupedRows, [], mode);\n")
+                output_str += ("    const commonKeyCollections = getCommonKeyCollections(groupedRows, "
+                               "groupedTableColumns);\n\n")
             else:
                 output_str += "    const commonKeyCollections = getCommonKeyCollections(rows, tableColumns);\n\n"
 
@@ -1187,8 +1305,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         output_str += (f"            const isRunningCheckField = "
                                        f"{other_file_dependent_msg_name_camel_cased}Collections.find("
                                        "col => col.hasOwnProperty('server_running_status')).key;\n")
+                        output_str += (f"            const isReadyCheckField = "
+                                       f"{other_file_dependent_msg_name_camel_cased}Collections.find("
+                                       "col => col.hasOwnProperty('server_ready_status')).key;\n")
                         output_str += ("            const serverUrl = getServerUrl(currentSchema, "
-                                       f"{other_file_dependent_msg_name_camel_cased}, isRunningCheckField")
+                                       f"{other_file_dependent_msg_name_camel_cased}, isRunningCheckField, "
+                                       f"isReadyCheckField")
                         if option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_model_name_for_port_field):
                             output_str += ", props.name, 'http'"
                         output_str += ");\n"
@@ -1196,6 +1318,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         if option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_model_name_for_port_field):
                             output_str += ("            const wsUrl = getServerUrl(currentSchema, "
                                            f"{other_file_dependent_msg_name_camel_cased}, isRunningCheckField, "
+                                           f"isReadyCheckField, "
                                            f"props.name, 'ws');\n")
                             output_str += "            setWsUrl(wsUrl);\n"
                     else:
@@ -1364,7 +1487,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"            let object = getObjectWithLeastId({message_name_camel_cased}Array);\n"
             output_str += f"            dispatch(setSelected{message_name}Id(object[DB_ID]));\n"
             dependent_message = self.abbreviated_dependent_message_name
-            output_str += f"            setActive{dependent_message}List([]);\n"
+            output_str += f"            setActiveItemList([]);\n"
             output_str += "        }\n"
             output_str += "    }" + f", [{message_name_camel_cased}Array])\n\n"
 
@@ -1496,8 +1619,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += "    useEffect(() => {\n"
                     output_str += "        if (window.Worker) {\n"
                     output_str += "            getAllWsWorker.onmessage = (e) => {\n"
-                    output_str += "                const[updatedArray] = e.data;\n"
-                    output_str += f"                dispatch(set{message_name}ArrayWs(" + "{data: updatedArray}));\n"
+                    output_str += "                const [updatedArray] = e.data;\n"
+                    output_str += f"                dispatch(set{message_name}ArrayWs(" + "{ data: updatedArray }));\n"
                     output_str += "            }\n"
                     output_str += "        }\n"
                     output_str += "        return () => {\n"
@@ -1727,11 +1850,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                if (socket) socket.close();\n"
                 output_str += "                delete socketDict.current[id];\n"
             output_str += "            }\n"
-            output_str += "        }" + f" else if (active{dependent_message}List && !_.isEqual(active{dependent_message}List, " \
-                          f"oldActive{dependent_message}List)) " + "{\n"
+            output_str += "        }" + f" else if (activeItemList || !_.isEqual(activeItemList, prevActiveItemList)) " + "{\n"
             output_str += f"            runFlush.current = false;\n"
             output_str += f"            const updated{dependent_message}List = " \
-                          f"active{dependent_message}List.filter(key => key !== undefined);\n"
+                          f"activeItemList.filter(key => key !== undefined);\n"
             output_str += f"            const loadedIds = updated{dependent_message}List.map(key => " \
                           f"getIdFromAbbreviatedKey(abbreviated, key));\n"
             output_str += "            const createSocket = async (id) => {\n"
@@ -1771,6 +1893,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += (f"                            const isRunningCheckField = "
                                f"{abbreviated_dependent_msg_camel_cased}Collections."
                                "find(col => col.hasOwnProperty('server_running_status')).key;\n")
+                output_str += (f"                            const isReadyCheckField = "
+                               f"{abbreviated_dependent_msg_camel_cased}Collections."
+                               "find(col => col.hasOwnProperty('server_ready_status')).key;\n")
                 msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
                 for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
                     if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
@@ -1790,7 +1915,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         output_str += (f"                            const "
                                        f"{msg_name_used_in_abb_option_camel_cased}Url = "
                                        f"getServerUrl({msg_name_used_in_abb_option_camel_cased}Schema, updatedObj, "
-                                       f"isRunningCheckField);\n")
+                                       f"isRunningCheckField, isReadyCheckField);\n")
                         output_str += f"                            if ({msg_name_used_in_abb_option_camel_cased}Url)"+" {\n"
                         output_str += (f"                                if (!isWebSocketAlive("
                                        f"{msg_name_used_in_abb_option_camel_cased}Socket))")+" {\n"
@@ -1849,10 +1974,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "            createAllSockets();\n"
                 output_str += "        }\n"
                 output_str += "        return () => {\n"
-                output_str += (f"            if (_.isEqual(active{dependent_message}List, "
-                               f"prevActive{dependent_message}List.current) "
-                               f"&& _.isEqual(oldActive{dependent_message}List, "
-                               f"prevOldActive{dependent_message}List)) "+"{\n")
+                output_str += (f"            if (_.isEqual(activeItemList, prevActiveItemList)) "+"{\n")
                 output_str += ("                // no dependency change (except disableWs which is acceptable case "
                                "for all sockets close)\n")
                 output_str += "                Object.keys(socketDict.current).forEach(id => {\n"
@@ -1871,8 +1993,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                })\n"
                 output_str += "            }\n"
                 output_str += "        }\n"
-                output_str += "    },"+(f" [active{dependent_message}List, oldActive{dependent_message}List, "
-                                        f"disableWs])\n\n")
+                output_str += "    },"+(f" [activeItemList, prevActiveItemList, disableWs])\n\n")
             else:
                 output_str += "                        if (socket) socket.close();\n"
                 output_str += "                        delete socketDict.current[id];\n"
@@ -1885,10 +2006,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "            createAllSockets();\n"
                 output_str += "        }\n"
                 output_str += "        return () => {\n"
-                output_str += (f"            if (_.isEqual(active{dependent_message}List, "
-                               f"prevActive{dependent_message}List.current) "
-                               f"&& _.isEqual(oldActive{dependent_message}List, "
-                               f"prevOldActive{dependent_message}List)) " + "{\n")
+                output_str += (f"            if (_.isEqual(activeItemList, prevActiveItemList)) "+"{\n")
                 output_str += ("                // no dependency change (except disableWs which is acceptable case "
                                "for all sockets close)\n")
                 output_str += "                Object.keys(socketDict.current).forEach(id => {\n"
@@ -1897,7 +2015,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                })\n"
                 output_str += "            }\n"
                 output_str += "        }\n"
-                output_str += "    }" + f", [active{dependent_message}List, oldActive{dependent_message}List, disableWs])\n\n"
+                output_str += "    }" + f", [activeItemList, prevActiveItemList, disableWs])\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += f"        const intervalId = setInterval(flush{dependent_message}GetAllWs, 250);\n"
             output_str += "        return () => {\n"
@@ -1905,6 +2023,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        }\n"
             output_str += "    }, [])\n\n"
 
+        output_str += "    useEffect(() => {\n"
+        output_str += "        if (forceSave) {\n"
+        output_str += "            onSave(null, null, null, true);\n"
+        output_str += "        }\n"
+        output_str += "    }, [forceSave])\n\n"
         output_str += "    /* if loading, render the skeleton view */\n"
         output_str += "    if (loading) {\n"
         output_str += "        return (\n"
@@ -1925,6 +2048,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        )\n"
         output_str += "    }\n\n"
 
+        output_str += "    const onForceSave = () => {\n"
+        output_str += "        setForceSave(true);\n"
+        output_str += "    }\n\n"
         output_str += "    const onMaximize = () => {\n"
         output_str += "        setMaximize(true);\n"
         output_str += "    }\n\n"
@@ -1981,6 +2107,20 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "            props.onColumnOrdersChange(props.name, orders);\n"
         output_str += "        }\n"
         output_str += "    }\n\n"
+        output_str += "    const onSortOrdersChange = (orders) => {\n"
+        output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+        output_str += "            props.onSortOrdersChange(props.name, orders, "
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += "null);\n"
+        elif layout_type == JsxFileGenPlugin.non_root_type:
+            output_str += f"selected{root_message_name}Id);\n"
+        else:
+            output_str += f"selected{message_name}Id);\n"
+        output_str += "        } else {\n"
+        output_str += "            props.onSortOrdersChange(props.name, orders);\n"
+        output_str += "        }\n"
+        output_str += "    }\n\n"
+
 
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "    /* required fields (loaded & buffered) not found. render error view */\n"
@@ -2008,10 +2148,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onChangeMode = () => {\n"
             output_str += "        setMode(Modes.EDIT_MODE);\n"
             output_str += "    }\n\n"
-        if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
-            output_str += "    const onSave = (e, modifiedObj = null, source = null) => {\n"
-        else:
-            output_str += "    const onSave = (e, modifiedObj = null, source = null) => {\n"
+        output_str += "    const onSave = (e, modifiedObj = null, source = null, forceSave = false) => {\n"
         output_str += "        /* if save event is triggered from button (openPopup is true), " \
                       "open the confirm save dialog.\n"
         output_str += "         * if user local changes is present, open confirm save dialog for confirmation,\n"
@@ -2097,6 +2234,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += (f"        const changesDiff = "
                                    f"compareJSONObjects({dependent_message_camel_cased}, modifiedObj);\n")
             output_str += "        dispatch(setActiveChanges(changesDiff));\n\n"
+        output_str += "        if (forceSave) {\n"
+        if layout_type != JsxFileGenPlugin.non_root_type:
+            output_str += "            if (Object.keys(changesDiff).filter(key => key !== DB_ID).length === 1) {\n"
+            output_str += "                onConfirmSave(null, null, null, true);\n"
+            output_str += "            }\n"
+        output_str += "            setForceSave(false);\n"
+        output_str += "            return;\n"
+        output_str += "        }\n"
         output_str += "        if (e === null && modifiedObj) {\n"
         if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.abbreviated_dependent_type,
                            JsxFileGenPlugin.repeated_root_type]:
@@ -2145,7 +2290,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onUpdate = (updatedData) => {\n"
             output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
             output_str += "    }\n\n"
-        output_str += "    const onButtonToggle = (e, xpath, value, source = null, confirmSave = false) => {\n"
+        output_str += ("    const onButtonToggle = (e, xpath, value, dataSourceId, source = null, "
+                       "confirmSave = false) => {\n")
         output_str += "        if (Object.keys(userChanges).length > 0) {\n"
         if layout_type == JsxFileGenPlugin.non_root_type:
             output_str += "            confirmSave = false;\n"
@@ -2170,7 +2316,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            }\n"
             output_str += "            confirmSave = false;\n"
             output_str += "        }\n"
-            output_str += "        let selectedId;\n"
+            output_str += "        let selectedId = dataSourceId;\n"
             output_str += "        let originalObj;\n"
             output_str += "        let modifiedObj;\n"
         elif layout_type in [JsxFileGenPlugin.abbreviated_dependent_type,
@@ -2199,7 +2345,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             abbreviated_dependent_msg_snake_cased = convert_camel_case_to_specific_case(abbreviated_dependent_msg_name)
 
             output_str += f"        if (source === '{abbreviated_dependent_msg_snake_cased}') "+"{\n"
-            output_str += f"            selectedId = selected{abbreviated_dependent_msg_name}Id;\n"
             output_str += f"            originalObj = {abbreviated_dependent_msg_camel_cased};\n"
             output_str += f"            modifiedObj = modified{abbreviated_dependent_msg_name};\n"
 
@@ -2210,7 +2355,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         convert_camel_case_to_specific_case(msg_name_used_in_abb_option))
                     msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
                     output_str += "        } "+f"else if (source === '{msg_name_used_in_abb_option_snake_cased}') "+"{\n"
-                    output_str += f"            selectedId = selected{msg_name_used_in_abb_option}Id;\n"
                     output_str += f"            originalObj = {msg_name_used_in_abb_option_camel_cased};\n"
                     output_str += f"            modifiedObj = modified{msg_name_used_in_abb_option};\n"
             output_str += "        }\n"
@@ -2330,11 +2474,16 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        reloadStates();\n"
             output_str += "        cleanAllCache(props.name);\n"
             output_str += "    }\n\n"
-            output_str += "    const onConfirmSave = (e, modifiedObj = null) => {\n"
+            output_str += "    const onConfirmSave = (e, modifiedObj = null, forceSave = false) => {\n"
             output_str += f"        let changesDiff;\n"
             output_str += "        if (!modifiedObj) {\n"
             output_str += f"            modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
-            output_str += f"            changesDiff = activeChanges\n"
+            output_str += "            if (forceSave) {\n"
+            output_str += (f"                changesDiff = compareJSONObjects("
+                           f"{message_name_camel_cased}, modifiedObj);\n")
+            output_str += "            } else {\n"
+            output_str += "                changesDiff = activeChanges\n"
+            output_str += "            }\n"
             output_str += "        } else {\n"
             output_str += (f"            changesDiff = compareJSONObjects("
                            f"{message_name_camel_cased}, modifiedObj);\n")
@@ -2391,6 +2540,53 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onSelectRow = (rowId) => {\n"
             output_str += f"        dispatch(setSelected{message_name}Id(rowId));\n"
             output_str += "    }\n\n"
+            output_str += "    const onToggleCenterJoin = () => {\n"
+            output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+            output_str += "            props.onCenterJoinChange(props.name, !centerJoin, null);\n"
+            output_str += "        } else {\n"
+            output_str += "            props.onCenterJoinChange(props.name, !centerJoin);\n"
+            output_str += "        }\n"
+            output_str += "    }\n\n"
+            output_str += "    const onToggleFlip = () => {\n"
+            output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+            output_str += "            props.onFlipChange(props.name, !flip, null);\n"
+            output_str += "        } else {\n"
+            output_str += "            props.onFlipChange(props.name, !flip);\n"
+            output_str += "        }\n"
+            output_str += "    }\n\n"
+            output_str += "    const onJoinOpen = (e) => {\n"
+            output_str += "        setOpenJoin(true);\n"
+            output_str += "        setJoinArcholEl(e.currentTarget);\n"
+            output_str += "    }\n\n"
+            output_str += "    const onJoinClose = () => {\n"
+            output_str += "        setOpenJoin(false);\n"
+            output_str += "        setJoinArcholEl(null);\n"
+            output_str += "    }\n\n"
+            output_str += "    const onJoinChange = (e, column) => {\n"
+            output_str += "        if (e.target.checked) {\n"
+            output_str += "            const updatedJoinBy = [...joinBy, column];\n"
+            output_str += "            if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+            output_str += "                props.onJoinByChange(props.name, updatedJoinBy, null);\n"
+            output_str += "            } else {\n"
+            output_str += "                props.onJoinByChange(props.name, updatedJoinBy);\n"
+            output_str += "            }\n"
+            output_str += "        } else {\n"
+            output_str += "            const updatedJoinBy = joinBy.filter(joinColumn => joinColumn !== column);\n"
+            output_str += "            if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+            output_str += "                props.onJoinByChange(props.name, updatedJoinBy, null);\n"
+            output_str += "            } else {\n"
+            output_str += "                props.onJoinByChange(props.name, updatedJoinBy);\n"
+            output_str += "            }\n"
+            output_str += "        }\n"
+            output_str += "    }\n\n"
+            output_str += "    let centerJoinText = 'Move to Center';\n"
+            output_str += "    if (centerJoin) {\n"
+            output_str += "        centerJoinText = 'Move to Left';\n"
+            output_str += "    }\n"
+            output_str += "    let flipText = 'Flip';\n"
+            output_str += "    if (flip) {\n"
+            output_str += "        flipText = 'Flip Back';\n"
+            output_str += "    }\n\n"
 
         elif layout_type == JsxFileGenPlugin.root_type:
             output_str += "    const reloadStates = () => {\n"
@@ -2430,11 +2626,16 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        dispatch(setModified{message_name}(updatedObj));\n"
             output_str += "        setMode(Modes.EDIT_MODE);\n"
             output_str += "    }\n\n"
-            output_str += "    const onConfirmSave = (e, modifiedObj = null) => {\n"
+            output_str += "    const onConfirmSave = (e, modifiedObj = null, forceSave = false) => {\n"
             output_str += f"        let changesDiff;\n"
             output_str += "        if (!modifiedObj) {\n"
             output_str += f"            modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
-            output_str += f"            changesDiff = activeChanges\n"
+            output_str += "            if (forceSave) {\n"
+            output_str += (f"               changesDiff = compareJSONObjects("
+                           f"{message_name_camel_cased}, modifiedObj);\n")
+            output_str += "            } else {\n"
+            output_str += "                changesDiff = activeChanges\n"
+            output_str += "            }\n"
             output_str += "        } else {\n"
             output_str += (f"            changesDiff = compareJSONObjects("
                            f"{message_name_camel_cased}, modifiedObj);\n")
@@ -2503,7 +2704,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"            dispatch(setModified{message_name}(modifiedObj));\n"
             output_str += "        }\n"
             output_str += "    }\n\n"
-            output_str += "    const onConfirmSave = (e, modifiedObj = null, source = null) => {\n"
+            output_str += "    const onConfirmSave = (e, modifiedObj = null, source = null, forceSave = false) => {\n"
             if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                 output_str += f"        let changesDiff;\n"
                 output_str += f"        let originalObj;\n"
@@ -2558,7 +2759,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 else:
                     output_str += (f"            modifiedObj = clearxpath(cloneDeep("
                                    f"modified{self.abbreviated_dependent_message_name}));\n")
-                output_str += "            changesDiff = activeChanges;\n"
+                output_str += "            if (forceSave) {\n"
+                output_str += "                changesDiff = compareJSONObjects(originalObj, modifiedObj);\n"
+                output_str += "            } else {\n"
+                output_str += "                changesDiff = activeChanges\n"
+                output_str += "            }\n"
                 output_str += "        } else {\n"
                 output_str += "            changesDiff = compareJSONObjects(originalObj, modifiedObj);\n"
                 output_str += "        }\n"
@@ -2797,6 +3002,53 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                            f"selected{abbreviated_dependent_msg_name}Id "+"};\n")
             output_str += "        }\n"
             output_str += "        dispatch(setUserChanges(updatedData));\n"
+            output_str += "    }\n\n"
+            output_str += "    const onToggleCenterJoin = () => {\n"
+            output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+            output_str += "            props.onCenterJoinChange(props.name, !centerJoin, null);\n"
+            output_str += "        } else {\n"
+            output_str += "            props.onCenterJoinChange(props.name, !centerJoin);\n"
+            output_str += "        }\n"
+            output_str += "    }\n\n"
+            output_str += "    const onToggleFlip = () => {\n"
+            output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+            output_str += "            props.onFlipChange(props.name, !flip, null);\n"
+            output_str += "        } else {\n"
+            output_str += "            props.onFlipChange(props.name, !flip);\n"
+            output_str += "        }\n"
+            output_str += "    }\n\n"
+            output_str += "    const onJoinOpen = (e) => {\n"
+            output_str += "        setOpenJoin(true);\n"
+            output_str += "        setJoinArcholEl(e.currentTarget);\n"
+            output_str += "    }\n\n"
+            output_str += "    const onJoinClose = () => {\n"
+            output_str += "        setOpenJoin(false);\n"
+            output_str += "        setJoinArcholEl(null);\n"
+            output_str += "    }\n\n"
+            output_str += "    const onJoinChange = (e, column) => {\n"
+            output_str += "        if (e.target.checked) {\n"
+            output_str += "            const updatedJoinBy = [...joinBy, column];\n"
+            output_str += "            if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+            output_str += "                props.onJoinByChange(props.name, updatedJoinBy, null);\n"
+            output_str += "            } else {\n"
+            output_str += "                props.onJoinByChange(props.name, updatedJoinBy);\n"
+            output_str += "            }\n"
+            output_str += "        } else {\n"
+            output_str += "            const updatedJoinBy = joinBy.filter(joinColumn => joinColumn !== column);\n"
+            output_str += "            if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+            output_str += "                props.onJoinByChange(props.name, updatedJoinBy, null);\n"
+            output_str += "            } else {\n"
+            output_str += "                props.onJoinByChange(props.name, updatedJoinBy);\n"
+            output_str += "            }\n"
+            output_str += "        }\n"
+            output_str += "    }\n\n"
+            output_str += "    let centerJoinText = 'Move to Center';\n"
+            output_str += "    if (centerJoin) {\n"
+            output_str += "        centerJoinText = 'Move to Left';\n"
+            output_str += "    }\n"
+            output_str += "    let flipText = 'Flip';\n"
+            output_str += "    if (flip) {\n"
+            output_str += "        flipText = 'Flip Back';\n"
             output_str += "    }\n\n"
 
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type or \

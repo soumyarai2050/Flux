@@ -483,15 +483,54 @@ def update_expected_strat_brief_for_sell(expected_chore_snapshot_obj: ChoreSnaps
                                           expected_other_leg_symbol_side_snapshot.total_fill_notional))
 
 
-def check_strat_view_computes(strat_view_id: int, strat_status_obj: StratStatusBaseModel,
-                              strat_limits_obj: StratLimitsBaseModel) -> None:
-    strat_view = photo_book_web_client.get_strat_view_client(strat_view_id)
-    assert strat_view.balance_notional == strat_status_obj.balance_notional, \
-        (f"Mismatched StratView.balance_notional: expected: {strat_status_obj.balance_notional}, "
-         f"received: {strat_view.balance_notional}")
-    assert strat_view.max_single_leg_notional == strat_limits_obj.max_open_single_leg_notional, \
-        (f"Mismatched StratView.max_single_leg_notional: expected: {strat_limits_obj.max_open_single_leg_notional}, "
-         f"received: {strat_view.max_single_leg_notional}")
+def check_strat_view_computes(strat_view_id: int, executor_http_client) -> None:
+    start_time = DateTime.utcnow()
+    for i in range(10):
+        strat_view = photo_book_web_client.get_strat_view_client(strat_view_id)
+        strat_status_obj = get_strat_status(executor_http_client)
+        strat_limits_obj = get_strat_limits(executor_http_client)
+        both_checks_passed = 0
+        if strat_view.balance_notional == strat_status_obj.balance_notional:
+            both_checks_passed += 1
+        if strat_view.max_single_leg_notional == strat_limits_obj.max_open_single_leg_notional:
+            both_checks_passed += 1
+        if both_checks_passed == 2:
+            delta_sec = (DateTime.utcnow() - start_time).total_seconds()
+            print(f"RESULT: Took {delta_sec} seconds to match both balance_notional and max_single_leg_notional in "
+                  f"strat view")
+            break
+        time.sleep(1)
+    else:
+        strat_view = photo_book_web_client.get_strat_view_client(strat_view_id)
+        strat_status_obj = get_strat_status(executor_http_client)
+        strat_limits_obj = get_strat_limits(executor_http_client)
+        delta_sec = (DateTime.utcnow() - start_time).total_seconds()
+        assert strat_view.balance_notional == strat_status_obj.balance_notional, \
+            (f"Mismatched StratView.balance_notional: expected: {strat_status_obj.balance_notional}, "
+             f"received: {strat_view.balance_notional} in {delta_sec} seconds")
+        assert strat_view.max_single_leg_notional == strat_limits_obj.max_open_single_leg_notional, \
+            (f"Mismatched StratView.max_single_leg_notional: expected: {strat_limits_obj.max_open_single_leg_notional}, "
+             f"received: {strat_view.max_single_leg_notional} in {delta_sec} seconds")
+
+
+def get_strat_status(executor_web_client):
+    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
+    if len(strat_status_obj_list) == 1:
+        strat_status_obj = strat_status_obj_list[0]
+        return strat_status_obj
+    else:
+        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
+                       f"strat_status_list: {strat_status_obj_list}")
+
+
+def get_strat_limits(executor_web_client):
+    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
+    if len(strat_limits_obj_list) == 1:
+        strat_limits_obj = strat_limits_obj_list[0]
+        return strat_limits_obj
+    else:
+        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
+                       f"strat_limits_list: {strat_limits_obj_list}")
 
 
 def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
@@ -574,18 +613,13 @@ def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
         f"Mismatched: expected strat_brief {expected_strat_brief_obj}, received strat_brief {strat_brief}"
 
     # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
+    strat_limits_obj = get_strat_limits(executor_web_client)
+    expected_strat_limits.id = strat_limits_obj.id
+    expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
+    expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
 
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
-    else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+    assert strat_limits_obj == expected_strat_limits, \
+        f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
 
     expected_strat_status.total_buy_qty += expected_chore_snapshot_obj.chore_brief.qty
     expected_strat_status.total_chore_qty += expected_chore_snapshot_obj.chore_brief.qty
@@ -613,21 +647,16 @@ def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
         expected_strat_status.balance_notional = \
             expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.id = strat_status_obj.id
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
-    else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+    strat_status_obj = get_strat_status(executor_web_client)
+    expected_strat_status.id = strat_status_obj.id
+    expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
+    expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
+    expected_strat_status.average_premium = strat_status_obj.average_premium
+    assert strat_status_obj == expected_strat_status, \
+        f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
 
     # checking strat_view
-    check_strat_view_computes(pair_strat_.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(pair_strat_.id, executor_web_client)
 
 
 def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_id: str, symbol: str,
@@ -764,7 +793,7 @@ def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
 
 
 def placed_buy_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
@@ -909,7 +938,7 @@ def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
 
 
 def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
@@ -1050,7 +1079,7 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
 
 
 def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
@@ -1191,7 +1220,7 @@ def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
 
 
 def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, expected_chore_id: str, symbol: str,
@@ -1317,7 +1346,7 @@ def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, exp
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
 
 
 def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore_id: str,
@@ -1443,7 +1472,7 @@ def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(pair_strat_.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(pair_strat_.id, executor_web_client)
 
 
 def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_chore_id: str,
@@ -1571,7 +1600,7 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
 
 
 def placed_sell_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
@@ -1710,7 +1739,7 @@ def check_fill_receive_for_placed_sell_chore_before_buys(
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
 
 
 def check_fill_receive_for_placed_sell_chore_after_all_buys(
@@ -1836,7 +1865,7 @@ def check_fill_receive_for_placed_sell_chore_after_all_buys(
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
 
 
 def check_cxl_receive_for_placed_sell_chore_after_all_buys(
@@ -1978,7 +2007,7 @@ def check_cxl_receive_for_placed_sell_chore_after_all_buys(
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
 
 
 def check_cxl_receive_for_placed_buy_chore_after_all_sells(
@@ -2117,7 +2146,7 @@ def check_cxl_receive_for_placed_buy_chore_after_all_sells(
                        f"strat_status_list: {strat_status_obj_list}")
 
     # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, strat_status_obj, strat_limits_obj)
+    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
 
 
 class TopOfBookSide(StrEnum):
@@ -2460,11 +2489,13 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
     start_time = DateTime.utcnow()
     for _ in range(10):
         strat_view = photo_book_web_client.get_strat_view_client(updated_pair_strat.id)
+        strat_status_obj = get_strat_status(executor_web_client)
+        strat_limits_obj = get_strat_limits(executor_web_client)
         max_single_leg_notional_passed = False
         balance_notional_passed = False
-        if strat_view.max_single_leg_notional == updated_strat_limits.max_single_leg_notional:
+        if strat_view.max_single_leg_notional == strat_limits_obj.max_single_leg_notional:
             max_single_leg_notional_passed = True
-        if strat_view.balance_notional == strat_status.balance_notional:
+        if strat_view.balance_notional == strat_status_obj.balance_notional:
             balance_notional_passed = True
 
         if max_single_leg_notional_passed and balance_notional_passed:
@@ -2474,12 +2505,16 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
         time.sleep(1)
     else:
         strat_view = photo_book_web_client.get_strat_view_client(updated_pair_strat.id)
-        assert strat_view.max_single_leg_notional == updated_strat_limits.max_single_leg_notional, \
-            (f"Mismatched max_single_leg_notional in strat_view: expected: {updated_strat_limits.max_single_leg_notional}, "
-             f"received: {strat_view.max_single_leg_notional}")
-        assert strat_view.balance_notional == strat_status.balance_notional, \
-            (f"Mismatched balance_notional in strat_view: expected: {strat_status.balance_notional}, "
-             f"received: {strat_view.balance_notional}")
+        strat_status_obj = get_strat_status(executor_web_client)
+        strat_limits_obj = get_strat_limits(executor_web_client)
+        assert strat_view.max_single_leg_notional == strat_limits_obj.max_single_leg_notional, \
+            (f"Mismatched max_single_leg_notional in strat_view: expected: {strat_limits_obj.max_single_leg_notional}, "
+             f"received: {strat_view.max_single_leg_notional} even after "
+             f"{(start_time-DateTime.utcnow()).total_seconds()} secs")
+        assert strat_view.balance_notional == strat_status_obj.balance_notional, \
+            (f"Mismatched balance_notional in strat_view: expected: {strat_status_obj.balance_notional}, "
+             f"received: {strat_view.balance_notional} even after "
+             f"{(start_time-DateTime.utcnow()).total_seconds()} secs")
 
     # checking is_running_state of executor
     updated_pair_strat = email_book_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id)
@@ -3409,7 +3444,6 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
                                expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
                                pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
                                expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
-                               expected_portfolio_status_: PortfolioStatusBaseModel,
                                last_barter_fixture_list: List[Dict],
                                symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                market_depth_basemodel_list: List[MarketDepthBaseModel],

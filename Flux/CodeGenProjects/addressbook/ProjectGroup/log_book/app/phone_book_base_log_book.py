@@ -373,12 +373,12 @@ class PhoneBookBaseLogBook(AppLogBook):
             self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
                                        alert_meta=alert_meta)
 
-    def notify_tail_error_in_log_service(self, brief_msg_str: str, detail_msg_str: str,
+    def notify_tail_event_in_log_service(self, severity: str, brief_msg_str: str, detail_msg_str: str,
                                          source_file_name: str, line_num: int,
                                          alert_create_date_time: DateTime):
         alert_meta = get_alert_meta_obj(self.component_file_path, source_file_name,
                                         line_num, alert_create_date_time, detail_msg_str)
-        self.send_portfolio_alerts(severity=self.get_severity("warning"), alert_brief=brief_msg_str,
+        self.send_portfolio_alerts(severity=self.get_severity(severity), alert_brief=brief_msg_str,
                                    alert_meta=alert_meta)
 
     def notify_error(self, error_msg: str, source_name: str, line_num: int, log_create_date_time: DateTime):

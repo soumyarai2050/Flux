@@ -1528,6 +1528,339 @@ def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
 
 
 @pytest.mark.nightly
+def test_same_pair_parallel_run(static_data_, clean_and_set_limits, pair_securities_with_sides_,
+                                buy_chore_, sell_chore_, buy_fill_journal_,
+                                sell_fill_journal_, expected_buy_chore_snapshot_,
+                                expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+                                pair_strat_, expected_strat_limits_, expected_strat_status_,
+                                expected_strat_brief_, expected_portfolio_status_,
+                                last_barter_fixture_list, symbol_overview_obj_list,
+                                market_depth_basemodel_list, expected_chore_limits_,
+                                expected_portfolio_limits_, max_loop_count_per_side,
+                                leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    try:
+        # making opposite side tradable in running phone_book
+        email_book_service_native_web_client.update_is_opposite_side_tradable_val_query_client(True)
+    
+        overall_buy_notional = 0
+        overall_sell_notional = 0
+        overall_buy_fill_notional = 0
+        overall_sell_fill_notional = 0
+
+        total_strats = 10
+        leg1_symbol = "CB_Sec_1"
+        leg2_symbol = "EQT_Sec_1"
+
+        buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        time.sleep(2)
+
+        sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+                                           leg1_side=Side.SELL, leg2_side=Side.BUY)
+        time.sleep(2)
+
+        pair_strat_to_test_callable_list = [
+            (buy_sell_pair_strat, handle_test_buy_sell_chore),
+            (sell_buy_pair_strat, handle_test_sell_buy_chore)
+        ]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_to_test_callable_list)) as executor:
+            results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
+                                       max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
+                                       copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
+                                       copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                       copy.deepcopy(expected_sell_chore_snapshot_),
+                                       copy.deepcopy(expected_symbol_side_snapshot_), create_pair_strat,
+                                       copy.deepcopy(expected_strat_limits_),
+                                       copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                       copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
+                                       copy.deepcopy(market_depth_basemodel_list), False)
+                       for create_pair_strat, test_callable in pair_strat_to_test_callable_list]
+
+            for future in concurrent.futures.as_completed(results):
+                if future.exception() is not None:
+                    raise future.exception()
+                else:
+                    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
+                    overall_buy_notional += strat_buy_notional
+                    overall_sell_notional += strat_sell_notional
+                    overall_buy_fill_notional += strat_buy_fill_notional
+                    overall_sell_fill_notional += strat_sell_fill_notional
+
+        expected_portfolio_status_.overall_buy_notional = overall_buy_notional
+        expected_portfolio_status_.overall_sell_notional = overall_sell_notional
+        expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
+        expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
+        verify_portfolio_status(expected_portfolio_status_)
+    except Exception as e:
+        raise e
+    finally:
+        email_book_service_native_web_client.update_is_opposite_side_tradable_val_query_client(False)
+
+
+@pytest.mark.nightly
+def test_same_pair_parallel_run_both_side_in_pair(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    try:
+        # making opposite side tradable in running phone_book
+        email_book_service_native_web_client.update_is_opposite_side_tradable_val_query_client(True)
+        
+        overall_buy_notional = 0
+        overall_sell_notional = 0
+        overall_buy_fill_notional = 0
+        overall_sell_fill_notional = 0
+
+        total_strats = 10
+        leg1_symbol = "CB_Sec_1"
+        leg2_symbol = "EQT_Sec_1"
+
+        buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        time.sleep(2)
+
+        sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+                                           leg1_side=Side.SELL, leg2_side=Side.BUY)
+        time.sleep(2)
+
+        pair_strat_to_test_callable_list = [
+            (buy_sell_pair_strat, handle_test_buy_sell_pair_chore),
+            (sell_buy_pair_strat, handle_test_sell_buy_pair_chore)
+        ]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_to_test_callable_list)) as executor:
+            results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
+                                       max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
+                                       copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
+                                       copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                       copy.deepcopy(expected_sell_chore_snapshot_),
+                                       copy.deepcopy(expected_symbol_side_snapshot_), create_pair_strat,
+                                       copy.deepcopy(expected_strat_limits_),
+                                       copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                       copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
+                                       copy.deepcopy(market_depth_basemodel_list), False)
+                       for create_pair_strat, test_callable in pair_strat_to_test_callable_list]
+
+            for future in concurrent.futures.as_completed(results):
+                if future.exception() is not None:
+                    raise future.exception()
+                else:
+                    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
+                    overall_buy_notional += strat_buy_notional
+                    overall_sell_notional += strat_sell_notional
+                    overall_buy_fill_notional += strat_buy_fill_notional
+                    overall_sell_fill_notional += strat_sell_fill_notional
+
+        expected_portfolio_status_.overall_buy_notional = overall_buy_notional
+        expected_portfolio_status_.overall_sell_notional = overall_sell_notional
+        expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
+        expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
+        verify_portfolio_status(expected_portfolio_status_)
+    except Exception as e:
+        raise e
+    finally:
+        email_book_service_native_web_client.update_is_opposite_side_tradable_val_query_client(False)
+
+
+@pytest.mark.nightly
+def test_same_n_opposite_strats_in_combination1(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    try:
+        # making opposite side tradable in running phone_book
+        email_book_service_native_web_client.update_is_opposite_side_tradable_val_query_client(True)
+
+        overall_buy_notional = 0
+        overall_sell_notional = 0
+        overall_buy_fill_notional = 0
+        overall_sell_fill_notional = 0
+
+        total_strats = 10
+        pair_strat_to_test_callable_list = []
+        for i in range(1, 5):
+            if i < 3:
+                # round-trip strat pair - total 2
+                leg1_symbol = f"CB_Sec_{i}"
+                leg2_symbol = f"EQT_Sec_{i}"
+
+                buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+                time.sleep(2)
+
+                sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+                                                   leg1_side=Side.SELL, leg2_side=Side.BUY)
+                time.sleep(2)
+
+                pair_strat_to_test_callable_list.extend([
+                    (leg1_symbol, leg2_symbol, buy_sell_pair_strat, handle_test_buy_sell_pair_chore),
+                    (leg1_symbol, leg2_symbol, sell_buy_pair_strat, handle_test_sell_buy_pair_chore)
+                ])
+            elif i < 4:
+                # premium buy-sell strat - total 1
+                leg1_symbol = f"CB_Sec_{i}"
+                leg2_symbol = f"EQT_Sec_{i}"
+
+                buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+                time.sleep(2)
+                pair_strat_to_test_callable_list.append((leg1_symbol, leg2_symbol, buy_sell_pair_strat,
+                                                         handle_test_buy_sell_pair_chore))
+            else:
+                # premium sell-buy strat - total 1
+                leg1_symbol = f"CB_Sec_{i}"
+                leg2_symbol = f"EQT_Sec_{i}"
+
+                sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+                                                   leg1_side=Side.SELL, leg2_side=Side.BUY)
+                time.sleep(2)
+                pair_strat_to_test_callable_list.append((leg1_symbol, leg2_symbol, sell_buy_pair_strat,
+                                                         handle_test_sell_buy_pair_chore))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_to_test_callable_list)) as executor:
+            results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
+                                       max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
+                                       copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
+                                       copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                       copy.deepcopy(expected_sell_chore_snapshot_),
+                                       copy.deepcopy(expected_symbol_side_snapshot_), create_pair_strat,
+                                       copy.deepcopy(expected_strat_limits_),
+                                       copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                       copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
+                                       copy.deepcopy(market_depth_basemodel_list), False)
+                       for leg1_symbol, leg2_symbol, create_pair_strat, test_callable in
+                       pair_strat_to_test_callable_list]
+
+            for future in concurrent.futures.as_completed(results):
+                if future.exception() is not None:
+                    raise future.exception()
+                else:
+                    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
+                    overall_buy_notional += strat_buy_notional
+                    overall_sell_notional += strat_sell_notional
+                    overall_buy_fill_notional += strat_buy_fill_notional
+                    overall_sell_fill_notional += strat_sell_fill_notional
+
+        expected_portfolio_status_.overall_buy_notional = overall_buy_notional
+        expected_portfolio_status_.overall_sell_notional = overall_sell_notional
+        expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
+        expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
+        verify_portfolio_status(expected_portfolio_status_)
+    except Exception as e:
+        raise e
+    finally:
+        email_book_service_native_web_client.update_is_opposite_side_tradable_val_query_client(False)
+
+
+@pytest.mark.nightly
+def test_same_n_opposite_strats_in_combination2(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    try:
+        # making opposite side tradable in running phone_book
+        email_book_service_native_web_client.update_is_opposite_side_tradable_val_query_client(True)
+
+        overall_buy_notional = 0
+        overall_sell_notional = 0
+        overall_buy_fill_notional = 0
+        overall_sell_fill_notional = 0
+
+        total_strats = 10
+        pair_strat_to_test_callable_list = []
+        # round-trip strat pair - total 2
+        leg1_symbol = f"CB_Sec_1"
+        leg2_symbol = f"EQT_Sec_1"
+
+        buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        time.sleep(2)
+
+        sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+                                           leg1_side=Side.SELL, leg2_side=Side.BUY)
+        time.sleep(2)
+        pair_strat_to_test_callable_list.extend([
+            (leg1_symbol, leg2_symbol, buy_sell_pair_strat, handle_test_buy_sell_pair_chore),
+            (leg1_symbol, leg2_symbol, sell_buy_pair_strat, handle_test_sell_buy_pair_chore)
+        ])
+
+        pair_strat_data_for_ready = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        time.sleep(2)
+
+        leg1_symbol = f"CB_Sec_2"
+        leg2_symbol = f"EQT_Sec_2"
+
+        buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        time.sleep(2)
+        pair_strat_to_test_callable_list.extend([
+            (leg1_symbol, leg2_symbol, buy_sell_pair_strat, handle_test_buy_sell_pair_chore)
+        ])
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_to_test_callable_list)) as executor:
+            results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
+                                       max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
+                                       copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
+                                       copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                       copy.deepcopy(expected_sell_chore_snapshot_),
+                                       copy.deepcopy(expected_symbol_side_snapshot_), create_pair_strat,
+                                       copy.deepcopy(expected_strat_limits_),
+                                       copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                       copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
+                                       copy.deepcopy(market_depth_basemodel_list), False)
+                       for leg1_symbol, leg2_symbol, create_pair_strat, test_callable in
+                       pair_strat_to_test_callable_list]
+
+            ready_strat_result = [executor.submit(move_snoozed_pair_strat_to_ready_n_then_active, pair_strat_data_for_ready,
+                                            copy.deepcopy(market_depth_basemodel_list),
+                                            copy.deepcopy(symbol_overview_obj_list),
+                                            copy.deepcopy(expected_strat_limits_),
+                                            copy.deepcopy(expected_strat_status_), True)]
+
+            for future in concurrent.futures.as_completed(results):
+                if future.exception() is not None:
+                    raise future.exception()
+                else:
+                    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
+                    overall_buy_notional += strat_buy_notional
+                    overall_sell_notional += strat_sell_notional
+                    overall_buy_fill_notional += strat_buy_fill_notional
+                    overall_sell_fill_notional += strat_sell_fill_notional
+
+            for future in concurrent.futures.as_completed(results):
+                if future.exception() is not None:
+                    raise future.exception()
+            else:
+                future.result()
+
+        expected_portfolio_status_.overall_buy_notional = overall_buy_notional
+        expected_portfolio_status_.overall_sell_notional = overall_sell_notional
+        expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
+        expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
+        verify_portfolio_status(expected_portfolio_status_)
+    except Exception as e:
+        raise e
+    finally:
+        email_book_service_native_web_client.update_is_opposite_side_tradable_val_query_client(False)
+
+
+@pytest.mark.nightly
 def test_sell_buy_chore_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
                                             buy_chore_, sell_chore_, buy_fill_journal_,
                                             sell_fill_journal_, expected_buy_chore_snapshot_,
@@ -1565,7 +1898,6 @@ def test_sell_buy_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                    copy.deepcopy(expected_symbol_side_snapshot_), pair_strat_list[idx],
                                    copy.deepcopy(expected_strat_limits_),
                                    copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
-                                   copy.deepcopy(expected_portfolio_status_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
                    for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
@@ -5849,8 +6181,9 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
 
         portfolio_alerts.append(alert)
         log_book_web_client.handle_portfolio_alerts_from_tail_executor_query_client(
-            [{"severity": alert.severity, "alert_brief": alert.alert_brief,
-              "alert_details": alert.alert_details}])
+            jsonable_encoder([{"severity": alert.severity, "alert_brief": alert.alert_brief,
+                               "alert_meta": AlertMetaOptional(first_detail="Sample detail")}],
+                             exclude_none=True, by_alias=True))
 
     # sorting alert list for this test comparison
     portfolio_alerts.sort(key=lambda x: x.last_update_analyzer_time, reverse=False)
@@ -12104,7 +12437,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
             if side == Side.BUY:
                 buy_filled_qty = filled_qty
 
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            # Placing Amend req chore and checking computes
             if side == Side.BUY:
                 amend_px = px + 1
                 amend_qty = qty + 10

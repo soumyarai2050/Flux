@@ -84,7 +84,7 @@ message InventoryRequest {
     optional string requestor = 2;
     optional StratType strat_type = 3;
     optional InventorySource inventory_source = 4;
-    optional string update_time = 5 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true];
+    optional int64 update_time = 5 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true];
     optional int64 qty = 6 [(FluxFldServerPopulate) = true];
     optional float max_rate = 7 [(FluxFldNumberFormat) = "%"];
     optional float usd_notional = 8 [(FluxFldDisplayType) = "int"];
@@ -95,7 +95,7 @@ message InventoryCSVRequest {
     optional string user = 1;
     optional string strategy = 2;
     required string ric = 3;
-    optional string update_time = 4 [(FluxFldValIsDateTime) = true];
+    optional int64 update_time = 4 [(FluxFldValIsDateTime) = true];
     optional int64 quantity = 5 [(FluxFldServerPopulate) = true];
     optional float max_fee = 6 [(FluxFldNumberFormat) = "%"];
     optional string note = 7;

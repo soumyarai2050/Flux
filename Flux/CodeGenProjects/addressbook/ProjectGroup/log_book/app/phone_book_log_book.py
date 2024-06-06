@@ -55,7 +55,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
         if self.simulation_mode:
             print(f"CRITICAL: tail executor for process: {process_name} running in simulation mode...")
             alert_brief: str = "PairStrat Log analyzer running in simulation mode"
-            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+            alert_meta = get_alert_meta_obj(PurePath(__file__).name, PurePath(__file__).name,
                                             inspect.currentframe().f_lineno, DateTime.utcnow())
             self.send_portfolio_alerts(severity=self.get_severity("critical"), alert_brief=alert_brief,
                                        alert_meta=alert_meta)
@@ -254,20 +254,6 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             severity, alert_brief, alert_details = self._create_alert(error_dict=error_dict)
 
             strat_id = pair_strat_id
-            if self.strat_alert_cache_dict_by_strat_id_dict.get(strat_id) is None:
-                try:
-                    pair_strat: PairStratBaseModel = email_book_service_http_client.get_pair_strat_client(strat_id)
-                except Exception as e:
-                    raise Exception(f"get_pair_strat_client failed: Can't find pair_start with id: {strat_id}")
-                else:
-                    if not pair_strat.is_executor_running:
-                        raise Exception(f"StartExecutor Server not running for pair_strat: {pair_strat}")
-
-                update_strat_alert_cache(strat_id, self.strat_alert_cache_dict_by_strat_id_dict,
-                                         log_book_service_http_client.filtered_strat_alert_by_strat_id_query_client)
-                symbol_side = (f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}-"
-                               f"{pair_strat.pair_strat_params.strat_leg1.side}")
-                self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
 
             alert_meta = get_alert_meta_obj(self.component_file_path, log_source_file_name,
                                             line_num, log_date_time, alert_details)
@@ -285,9 +271,22 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
                 raise Exception("service up check failed. waiting for the service to start...")
             # else not required
 
+            if self.strat_alert_cache_dict_by_strat_id_dict.get(strat_id) is None:
+                try:
+                    pair_strat: PairStratBaseModel = email_book_service_http_client.get_pair_strat_client(strat_id)
+                except Exception as e:
+                    raise Exception(f"get_pair_strat_client failed: Can't find pair_start with id: {strat_id}")
+                else:
+                    if not pair_strat.is_executor_running:
+                        raise Exception(f"StartExecutor Server not running for pair_strat: {pair_strat}")
+
+                update_strat_alert_cache(strat_id, self.strat_alert_cache_dict_by_strat_id_dict,
+                                         log_book_service_http_client.filtered_strat_alert_by_strat_id_query_client)
+                symbol_side = (f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}-"
+                               f"{pair_strat.pair_strat_params.strat_leg1.side}")
+                self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
+
             severity: Severity = get_severity_type_from_severity_str(severity_str=severity_str)
-            alert_meta = get_alert_meta_obj(self.component_file_path, source_file_name,
-                                            line_num, alert_create_date_time)
             create_or_update_alert(self.strat_alert_cache_dict_by_strat_id_dict[strat_id],
                                    self.strat_alert_queue, StratAlertBaseModel, PortfolioAlertBaseModel,
                                    severity, alert_brief, strat_id, alert_meta)
@@ -295,7 +294,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             err_msg: str = (f"_send_strat_alerts failed, exception: {e} received {strat_id=}, "
                             f"{severity_str=}, {alert_brief=}, {alert_meta=}")
             logging.exception(err_msg)
-            alert_meta = get_alert_meta_obj(alert_meta.component_path, alert_meta.source_file_name,
+            alert_meta = get_alert_meta_obj(alert_meta.component_file_path, alert_meta.source_file_name,
                                             alert_meta.line_num, alert_meta.alert_create_date_time, err_msg)
             self.send_portfolio_alerts(severity=severity_str, alert_brief=alert_brief,
                                        alert_meta=alert_meta)
@@ -384,5 +383,9 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             alert_meta = get_alert_meta_obj(component_path, log_source_file_name,
                                             line_num, log_date_time, alert_details)
             self.send_portfolio_alerts(severity=severity, alert_brief=alert_brief, alert_meta=alert_meta)
-        # else not required: error pattern doesn't match, no alerts to send
+        else:
+            # if some log has reached here it is definitely some alert required log line since we tail with grep and
+            # this log matched that grep - most likely its some unconventional log like background log
+            alert_brief = f"{log_prefix}{log_message}"
+            self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief)
 

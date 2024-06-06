@@ -3,6 +3,10 @@
     margin-left: 2px !important;
 }
 
+.icon_selected {
+    color: var(--blue-accent-400) !important;
+}
+
 .toggle_icon {
     padding: 2px !important;
     border-radius: 5px;

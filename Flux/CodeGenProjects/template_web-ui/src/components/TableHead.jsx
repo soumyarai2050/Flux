@@ -55,7 +55,7 @@ const CustomHeadCell = (props) => {
                         tableHeadColor = theme.palette.text[color];
                     }
                     const cellKey = props.collectionView ? cell.key : cell.tableTitle;
-                    const sortOrder = sortOrders.find(o => o.orderBy === cellKey);
+                    const sortOrder = sortOrders.find(o => o.order_by === cellKey);
                     return (
                         <TableCell
                             key={index}
@@ -63,7 +63,7 @@ const CustomHeadCell = (props) => {
                             sx={{ color: `${tableHeadColor} !important` }}
                             align='center'
                             padding='normal'
-                            sortDirection={sortOrder ? sortOrder.sortType : false}>
+                            sortDirection={sortOrder ? sortOrder.sort_type : false}>
                             {props.copyColumnHandler && (
                                 <Tooltip title="Click to copy column" disableInteractive>
                                     <IconButton className={classes.icon} size='small' onClick={() => props.copyColumnHandler(cellKey)}>
@@ -73,13 +73,13 @@ const CustomHeadCell = (props) => {
                             )}
                             <TableSortLabel
                                 active={sortOrder !== undefined}
-                                direction={sortOrder ? sortOrder.sortType : 'asc'}
+                                direction={sortOrder ? sortOrder.sort_type : 'asc'}
                                 onClick={createSortHandler(cellKey)}
                                 onDoubleClick={() => removeSortHandler(cellKey)}>
                                 {cell.elaborateTitle ? cell.tableTitle : cell.title ? cell.title : cell.key}
-                                {sortOrder && sortOrder.orderBy === cellKey ? (
+                                {sortOrder && sortOrder.order_by === cellKey ? (
                                     <Box component="span" sx={visuallyHidden}>
-                                        {sortOrder.sortType === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                                        {sortOrder.sort_type === 'desc' ? 'sorted descending' : 'sorted ascending'}
                                     </Box>
                                 ) : null}
                             </TableSortLabel>

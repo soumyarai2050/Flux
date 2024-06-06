@@ -1,5 +1,6 @@
 #pragma once
 
+#include <market_data_max_id_handler.h>
 #include <mongocxx/exception/query_exception.hpp>
 
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppCodec/market_data_mongo_db_codec.h"
@@ -44,17 +45,17 @@ namespace FluxCppCore {
             bson_doc_list.reserve(size);
             r_new_generated_id_list_out.reserve(size);
             prepare_list_doc(kr_root_model_list_obj, bson_doc_list);
-            for (int i = 0; i < bson_doc_list.size(); ++i) {
+            for (size_t i = 0; i < bson_doc_list.size(); ++i) {
                 r_new_generated_id_list_out.push_back(get_next_insert_id());
                 update_id_in_document(bson_doc_list[i], r_new_generated_id_list_out[i]);
             }
             auto insert_results = m_mongo_db_collection.insert_many(bson_doc_list);
-            for (int i = 0; i < bson_doc_list.size(); ++i) {
+            for (size_t i = 0; i < bson_doc_list.size(); ++i) {
                 auto inserted_id = insert_results->inserted_ids().at(i).get_int32().value;
                 m_root_model_key_to_db_id[kr_root_model_key_list[i]] = r_new_generated_id_list_out[i];
             }
 
-            if (insert_results->inserted_count() == bson_doc_list.size()) {
+            if (insert_results->inserted_count() == static_cast<int32_t>(bson_doc_list.size())) {
                 return true;
             } else {
                 return false;
@@ -134,19 +135,8 @@ namespace FluxCppCore {
 
         bool process_element(const bsoncxx::document::element &element, bsoncxx::builder::basic::document &new_doc) {
             if (element.type() == bsoncxx::type::k_date) {
-                auto date_value = element.get_date();
-                auto duration_since_epoch = std::chrono::duration_cast<std::chrono::microseconds>(date_value.value);
-
-                std::chrono::system_clock::time_point tp(duration_since_epoch);
-
-                std::time_t tt = std::chrono::system_clock::to_time_t(tp);
-                std::tm *gmt = std::gmtime(&tt);
-
-                char date_str[256];
-                std::strftime(date_str, sizeof(date_str), "%Y-%m-%dT%H:%M:%S", gmt);
-                std::string iso_date_str = std::string(date_str) + "+00:00";
-
-                new_doc.append(bsoncxx::builder::basic::kvp(element.key(), iso_date_str));
+                auto date_value = element.get_date().to_int64();
+                new_doc.append(bsoncxx::builder::basic::kvp(element.key(), date_value));
             } else if (element.type() == bsoncxx::type::k_document) {
                 bsoncxx::builder::basic::document inner_doc;
                 for (const auto& inner_element : element.get_document().view()) {
@@ -354,6 +344,20 @@ namespace FluxCppCore {
             return m_root_model_key_to_db_id.size();
         }
 
+        int32_t get_max_id_from_collection() {
+
+            auto sort_doc = bsoncxx::builder::stream::document{} << "_id" << -1 << bsoncxx::builder::stream::finalize;
+            mongocxx::options::find opts{};
+            opts.sort(sort_doc.view());
+            opts.limit(1); // Limit to only fetch one document
+            auto cursor = m_mongo_db_collection.find({}, opts);
+            for (auto&& doc : cursor) {
+                // Get the ID of the last document
+                 m_max_id_ = doc["_id"].get_int32().value;
+            }
+            return m_max_id_;
+        }
+
         std::unordered_map<std::string, int32_t> m_root_model_key_to_db_id;
 
     protected:
@@ -410,11 +414,13 @@ namespace FluxCppCore {
             r_bson_doc.append(kvp("_id", new_generated_id));
         }
 
-        static int32_t get_next_insert_id() {
-            static std::mutex max_id_mutex;
+        int32_t get_next_insert_id() {
+            std::mutex max_id_mutex;
             std::lock_guard<std::mutex> lk(max_id_mutex);
-            c_cur_unused_max_id++;
-            return c_cur_unused_max_id -1 ;
+            if (m_max_id_ == 1) {
+                m_max_id_ = get_max_id_from_collection();
+            }
+            return ++m_max_id_;
         }
 
         std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db;
@@ -422,6 +428,7 @@ namespace FluxCppCore {
         RootModelType root_model_type_;
         static inline int32_t c_cur_unused_max_id = 1;
         quill::Logger* m_p_logger_;
+        int32_t m_max_id_{1};
     };
 
 

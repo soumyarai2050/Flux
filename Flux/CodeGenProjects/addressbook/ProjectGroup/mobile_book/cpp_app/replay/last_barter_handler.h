@@ -28,16 +28,19 @@ namespace mobile_book_handler {
         void handle_last_barter_update(mobile_book::LastBarter &r_last_barter_obj) {
             int32_t last_barter_inserted_id;
             std::string last_barter_key;
-            auto date_time = MobileBookPopulateRandomValues::get_utc_time();
+            auto date_time = FluxCppCore::get_utc_time_microseconds();
 
+            r_last_barter_obj.set_id(MobileBookMaxIdHandler::c_last_barter_max_id_handler.get_next_id());
             mobile_book::TopOfBook top_of_book_obj;
-            top_of_book_obj.set_id(r_last_barter_obj.id());
+            top_of_book_obj.set_id(MobileBookMaxIdHandler::c_top_of_book_max_id_handler.get_next_id());
             top_of_book_obj.set_symbol(r_last_barter_obj.symbol_n_exch_id().symbol());
             top_of_book_obj.mutable_last_barter()->set_px(r_last_barter_obj.px());
             top_of_book_obj.mutable_last_barter()->set_qty(r_last_barter_obj.qty());
             top_of_book_obj.mutable_last_barter()->set_premium(last_barter_obj.premium());
             top_of_book_obj.mutable_last_barter()->set_last_update_date_time(date_time);
-            top_of_book_obj.add_market_barter_volume()->CopyFrom(r_last_barter_obj.market_barter_volume());
+            if (r_last_barter_obj.has_market_barter_volume()) {
+                top_of_book_obj.add_market_barter_volume()->CopyFrom(r_last_barter_obj.market_barter_volume());
+            }
             top_of_book_obj.set_last_update_date_time(date_time);
             r_last_barter_obj.set_arrival_time(date_time);
             r_last_barter_obj.set_exch_time(date_time);

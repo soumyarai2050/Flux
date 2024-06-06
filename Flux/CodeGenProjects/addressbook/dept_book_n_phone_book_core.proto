@@ -101,7 +101,7 @@ message FxSymbolOverview{
   optional float high = 11;
   optional float low = 12;
   optional int64 volume = 13;
-  optional string last_update_date_time = 14 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 14 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
   optional bool force_publish = 15 [(FluxFldHide) = "True"];
 }
 

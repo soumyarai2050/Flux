@@ -76,7 +76,8 @@ const lightThemeComponents = {
         styleOverrides: {
             root: {
                 '&:nth-of-type(even)': {
-                    backgroundColor: cssVar('--grey-100'),
+                    // backgroundColor: cssVar('--grey-100'),
+                    opacity: 0.85
                 },
                 '&.Mui-selected': {
                     backgroundColor: cssVar('--blue-100'),
@@ -162,7 +163,8 @@ const darkThemeComponents = {
         styleOverrides: {
             root: {
                 '&:nth-of-type(even)': {
-                    backgroundColor: cssVar('--grey-800'),
+                    // backgroundColor: cssVar('--grey-800'),
+                    opacity: 0.85
                 },
                 '&.Mui-selected': {
                     backgroundColor: cssVar('--indigo-300'),
@@ -182,6 +184,13 @@ const darkThemeComponents = {
                         backgroundColor: cssVar('--indigo-400'),
                     }
                 },
+            },
+        },
+    },
+    MuiLinearProgress: {
+        styleOverrides: {
+            root: {
+                backgroundColor: cssVar('--grey-800'),
             },
         },
     },
