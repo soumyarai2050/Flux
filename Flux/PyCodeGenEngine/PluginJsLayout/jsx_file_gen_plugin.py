@@ -1115,7 +1115,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const joinBy = widgetOption.join_by ? widgetOption.join_by : [];\n"
                 output_str += "    const centerJoin = widgetOption.joined_at_center;\n"
                 output_str += "    const flip = widgetOption.flip;\n"
-                output_str += "    let groupedRows = getGroupedTableRows(rows, joinBy);\n"
             case JsxFileGenPlugin.root_type | JsxFileGenPlugin.abbreviated_dependent_type:
                 output_str += f"    const widgetOption = getWidgetOptionById(props.options, selected{message_name}Id, " \
                               f"currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld'));\n"
@@ -1124,7 +1123,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"    let rows = getTableRows(collections, mode, {message_name_camel_cased}, " \
                               f"modified{message_name});\n"
                 output_str += "    rows = applyFilter(rows, props.filters);\n"
-                output_str += "    let groupedRows = getGroupedTableRows(rows, []);\n"
             case JsxFileGenPlugin.non_root_type:
                 root_message_name = self.root_message.proto.name
                 root_message_name_camel_cased = convert_to_camel_case(root_message_name)
@@ -1152,7 +1150,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"    let rows = getTableRows(collections, mode, {root_message_name_camel_cased}, " \
                               f"modified{root_message_name}, currentSchemaXpath);\n"
                 output_str += "    rows = applyFilter(rows, props.filters);\n"
-                output_str += "    let groupedRows = getGroupedTableRows(rows, []);\n"
             case JsxFileGenPlugin.simple_abbreviated_type | JsxFileGenPlugin.parent_abbreviated_type:
                 output_str += "    const widgetOption = useMemo(() => {\n"
                 output_str += f"        return getWidgetOptionById(props.options, selected{message_name}Id,\n"
@@ -1191,6 +1188,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const flip = widgetOption.flip;\n"
         output_str += "    const columnOrders = widgetOption.column_orders;\n"
         output_str += "    const sortOrders = widgetOption.sort_orders;\n"
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += "    let groupedRows = getGroupedTableRows(rows, joinBy, sortOrders);\n"
+        elif layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type:
+            output_str += "    let groupedRows = getGroupedTableRows(rows, []);\n"
+        # else not required
         output_str += "    const truncateDateTime = widgetOption.hasOwnProperty('truncate_date_time') ? " \
                       "widgetOption.truncate_date_time : false;\n\n"
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:

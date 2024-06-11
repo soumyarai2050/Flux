@@ -476,6 +476,23 @@ message BarterSimulatorProcessAmendREJ{
   required bool resp = 1;
 }
 
+message BarterSimulatorProcessLapse{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_process_lapse",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str",
+    QueryParams: "qty",
+    QueryParamsDataType: "int | None = None",
+  };
+  required bool resp = 1;
+}
+
 message BarterSimulatorReloadConfig{
   option (FluxMsgJsonQuery) = {
     QueryName: "barter_simulator_reload_config"

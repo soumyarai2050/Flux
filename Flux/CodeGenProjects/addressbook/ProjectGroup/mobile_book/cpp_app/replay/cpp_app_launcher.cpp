@@ -10,19 +10,15 @@
 extern "C" void cpp_app_launcher() {
 
     std::thread cpp_app_launcher_thread([&] {
-        quill::start();
+        // quill::start();
         std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db = MongoDBHandlerSingleton::get_instance();
-        mobile_book_cache::MarketDepthCache marketDepthCache;
-        mobile_book_cache::TopOfBookCache topOfBookCache;
-        mobile_book_cache::LastBarterCache lastBarterCache;
         mobile_book_handler::TopOfBookHandler top_of_book_handler(sp_mongo_db, top_of_book_websocket_server);
         mobile_book_handler::MarketDepthHandler market_depth_handler(sp_mongo_db, market_depth_websocket_server,
-            top_of_book_handler, marketDepthCache, topOfBookCache);
+            top_of_book_handler);
         mobile_book_handler::LastBarterHandler last_barter_handler(sp_mongo_db, last_barter_websocket_server,
-            top_of_book_handler, lastBarterCache, topOfBookCache);
+            top_of_book_handler);
         mobile_book_handler::HistoryManager historyManager(sp_mongo_db, last_barter_handler, market_depth_handler);
         historyManager.replay();
-        // websocket_cleanup();
     });
 
     cpp_app_launcher_thread.detach();

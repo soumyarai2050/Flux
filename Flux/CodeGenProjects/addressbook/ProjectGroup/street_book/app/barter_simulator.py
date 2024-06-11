@@ -404,6 +404,21 @@ class BarterSimulator(BarteringLinkBase):
         await underlying_create_chore_journal_http(chore_journal)
 
     @classmethod
+    async def place_lapse_chore(self, chore_id: str, side: Side, bartering_sec_id: str, system_sec_id: str,
+                                underlying_account: str | None = "bartering-account", qty: int | None = None):
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+            underlying_create_chore_journal_http)
+        security = Security(sec_id=system_sec_id, sec_type=SecurityType.TICKER)
+        # query chore
+        chore_brief = ChoreBrief(chore_id=chore_id, security=security, side=side, qty=qty,
+                                 underlying_account=underlying_account)
+        msg = f"SIM:LAPSE for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}, {qty=}"
+        add_to_texts(chore_brief, msg)
+        chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+                                     chore_event=ChoreEventType.OE_LAPSE)
+        await underlying_create_chore_journal_http(chore_journal)
+
+    @classmethod
     async def is_kill_switch_enabled(cls) -> bool:
         logging.info("Called BarteringLink.is_kill_switch_enabled from BarterSimulator")
         return False

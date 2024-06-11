@@ -38,4 +38,6 @@ extern "C" void create_or_update_last_barter_n_tob(const int32_t id, const char*
                                                  const char* market_barter_volume_id = "", const int64_t participation_period_last_barter_qty_sum = 0,
                                                  const int32_t applicable_period_seconds = 0);
 
+extern "C" void add_symbols_to_the_cache_container();
+
 extern "C" void websocket_cleanup();

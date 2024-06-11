@@ -27,7 +27,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
     post_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import (
-    MobileBookContainer, TopOfBook, MarketDepth, LastBarter, MarketBarterVolume, add_container_obj_for_symbol)
+    MobileBookContainer, TopOfBook, MarketDepth, LastBarter, MarketBarterVolume, add_container_obj_for_symbol, get_mobile_book_container)
 
 
 class MobileBookContainerCache(BaseModel):
@@ -1029,6 +1029,13 @@ class StreetBook:
                           f"{[str(tob) for tob in top_of_books]}")
         return chore_placed
 
+    def _both_side_tob_has_data(self, leg_1_tob: TopOfBook, leg_2_tob: TopOfBook) -> bool:
+        if leg_1_tob is not None and leg_2_tob is not None:
+            with (MobileBookMutexManager(self.mobile_book_provider, leg_1_tob, leg_2_tob)):
+                if leg_1_tob.last_update_date_time is not None and leg_2_tob.last_update_date_time is not None:
+                    return True
+        return False
+
     def _get_tob_symbol(self, tob: TopOfBook) -> str:
         with MobileBookMutexManager(self.mobile_book_provider, tob):
             return tob.symbol
@@ -1092,7 +1099,7 @@ class StreetBook:
             self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book(
                 self._top_of_books_update_date_time))
 
-        if leg_1_top_of_book and leg_2_top_of_book:
+        if self._both_side_tob_has_data(leg_1_top_of_book, leg_2_top_of_book):
             top_of_books = [leg_1_top_of_book, leg_2_top_of_book]
 
             latest_update_date_time: DateTime | None = None

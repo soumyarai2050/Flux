@@ -33,7 +33,7 @@ sudo update-alternatives --config gcc
 wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.gz
 tar -xf boost_1_81_0.tar.gz
 cd boost_1_81_0
-./bootstrap.sh --prefix=/home/subham/cpp_libs/libs_12/boost
+./bootstrap.sh --prefix=/home/$USER/cpp_libs/libs_12/boost
 sudo ./b2 install
 ```
 
@@ -55,7 +55,7 @@ sudo apt install libmongoc-dev
 curl -OL https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.10.1/mongo-cxx-driver-r3.10.1.tar.gz
 tar -xzf mongo-cxx-driver-r3.10.1.tar.gz
 cd mongo-cxx-driver-r3.10.1/build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DMONGOCXX_OVERRIDE_DEFAULT_INSTALL_PREFIX=OFF `-DCMAKE_INSTALL_PREFIX=/usr/local`
+cmake .. -DCMAKE_BUILD_TYPE=Release -DMONGOCXX_OVERRIDE_DEFAULT_INSTALL_PREFIX=OFF `-DCMAKE_INSTALL_PREFIX=/home/$USER/cpp_libs/`
 cmake --build .
 sudo cmake --build . --target install
 ```
@@ -67,7 +67,7 @@ sudo cmake --build . --target install
 cd quill
 mkdir cmake_build
 cd cmake_build
-cmake ..
+cmake .. -DCMAKE_INSTALL_PREFIX=/home/$USER/cpp_libs/
 sudo make install`
 ```
 
@@ -78,7 +78,7 @@ git clone --recursive https://github.com/protocolbuffers/protobuf.git
 cd protobuf
 mkdir cmake-out
 git checkout v25.2
-cmake -S. -Bcmake-out -DCMAKE_INSTALL_PREFIX=/home/subham/cpp_libs/libs_13/protobuf_25.2 -DCMAKE_CXX_STANDARD=17 -Dprotobuf_ABSL_PROVIDER=module -DCMAKE_PREFIX_PATH=/home/subham/cpp_libs/libs_13/protobuf_25.2 -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+cmake -S. -Bcmake-out -DCMAKE_INSTALL_PREFIX=/home/$USER/cpp_libs/libs_13/protobuf_25.2 -DCMAKE_CXX_STANDARD=17 -Dprotobuf_ABSL_PROVIDER=module -DCMAKE_PREFIX_PATH=/home/subham/cpp_libs/libs_13/protobuf_25.2 -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 `cd cmake-out
 make -j8
 sudo make install`
@@ -91,7 +91,7 @@ git clone https://github.com/jbeder/yaml-cpp.git
 cd yaml-cpp 
 mkdir build
 cd build
-cmake -DYAML_BUILD_SHARED_LIBS=on -DCMAKE_PREFIX_PATH=/home/subham/cpp_libs/libs_13/ ..
+cmake -DYAML_BUILD_SHARED_LIBS=on -DCMAKE_INSTALL_PREFIX=/home/$USER/cpp_libs/ ..
 make -j8
 sudo make install
 ```

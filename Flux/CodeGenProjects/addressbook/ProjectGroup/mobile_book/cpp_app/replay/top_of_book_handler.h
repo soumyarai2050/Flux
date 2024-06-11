@@ -10,11 +10,10 @@
 namespace mobile_book_handler {
 
     class TopOfBookHandler {
-
     public:
         explicit TopOfBookHandler(std::shared_ptr<FluxCppCore::MongoDBHandler> &mongo_db,
                                   MobileBookTopOfBookWebSocketServer<mobile_book::TopOfBook> &r_websocket_server_,
-                                  quill::Logger* p_logger = quill::get_logger()) :
+                                  quill::Logger* p_logger = GetLogger()) :
                                   m_sp_mongo_db_(mongo_db), mr_websocket_server_(r_websocket_server_),
                                   m_top_of_book_db_codec_(mongo_db, p_logger), mp_logger_(p_logger) {
 
@@ -22,12 +21,15 @@ namespace mobile_book_handler {
         }
 
         void insert_or_update_top_of_book(const mobile_book::TopOfBook &kr_top_of_book_obj) {
-            int32_t db_id;
+            int32_t db_id{-1};
             std::string top_of_book_key;
+            LOG_INFO(GetLogger(), "Top_of_book obj: {}", kr_top_of_book_obj.DebugString());
             bool stat = m_top_of_book_db_codec_.insert_or_update(kr_top_of_book_obj, db_id);
+            LOG_DEBUG(GetLogger(), "TopOfBookHandler inserty_or_update done db_id [{}]", db_id);
             assert(stat);
             MobileBookKeyHandler::get_key_out(kr_top_of_book_obj, top_of_book_key);
             db_id = m_top_of_book_db_codec_.m_root_model_key_to_db_id[top_of_book_key];
+            LOG_DEBUG(GetLogger(), "TopOfBookHandler inserty_or_update done db_id [{}]", db_id);
             mobile_book::TopOfBook ws_top_of_book_obj;
             m_top_of_book_db_codec_.get_data_by_id_from_collection(ws_top_of_book_obj, db_id);
             mr_websocket_server_.NewClientCallBack(ws_top_of_book_obj, -1);
@@ -48,6 +50,9 @@ namespace mobile_book_handler {
             for (int i = 0; i < top_of_book_documents.top_of_book_size(); ++i) {
                 m_top_of_book_db_codec_.m_root_model_key_to_db_id[keys.at(i)] =
                         top_of_book_documents.top_of_book(i).id();
+            }
+            for (auto const&[k, v] :  m_top_of_book_db_codec_.m_root_model_key_to_db_id) {
+                LOG_INFO(GetLogger(), "symbol[{}]->id[{}]", k, v);
             }
         }
     };

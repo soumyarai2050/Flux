@@ -1625,12 +1625,22 @@ export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], 
             let found = true;
             for (let i = 0; i < rows.length; i++) {
                 const groupedRow = rows[i];
-                const firstValue = groupedRow[0][fieldName];
+                let firstValue = null;
+                for (let j = 0; j< groupedRow.length; j++) {
+                    const value = groupedRow[j][fieldName];
+                    if (!(value === null || value === undefined || value === '')) {
+                        firstValue = value;
+                        break;
+                    }
+                }
                 let matched = true;
                 for (let j = 1; j < groupedRow.length; j++) {
-                    if (groupedRow[j][fieldName] !== firstValue) {
-                        matched = false;
-                        break;
+                    const value = groupedRow[j][fieldName];
+                    if (!(value === null || value === undefined || value === '')) {
+                        if (value !== firstValue) {
+                            matched = false;
+                            break;
+                        }
                     }
                 }
                 if (!matched) {
@@ -1709,26 +1719,41 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
                 fieldName = column.key;
             }
             let found = true;
+            let firstValue = null;
+            for (let i = 0; i < rows.length; i++) {
+                const value = rows[i][column.sourceIndex]?.[fieldName];
+                if (!(value === null || value === undefined || value === '')) {
+                    firstValue = value;
+                    break;
+                }
+            }
             // const value = rows[0][column.sourceIndex]?.[fieldName];
             // for (let i = 1; i < rows.length; i++) {
-            for (let i = 0; i < rows.length - 1; i++) {
-                if (rows[i][column.sourceIndex] && rows[i+1][column.sourceIndex]) {
-                    if (!_.isEqual(rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName])) {
-                        const values = [rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName]];
-                        for (let i = 0; i < values.length; i++) {
-                            let val = values[i];
-                            if (val) {
-                                if (typeof val === DataTypes.STRING) {
-                                    val = val.trim();
-                                }
-                            }
-                            if (![null, undefined, ''].includes(val)) {
-                                found = false;
-                                break;
-                            }
-                        }
+            for (let i = 0; i < rows.length; i++) {
+                const value = rows[i][column.sourceIndex]?.[fieldName];
+                if (!(value === null || value === undefined || value === '')) {
+                    if (value !== firstValue) {
+                        found = false;
+                        break;
                     }
                 }
+                // if (rows[i][column.sourceIndex] && rows[i+1][column.sourceIndex]) {
+                //     if (!_.isEqual(rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName])) {
+                //         const values = [rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName]];
+                //         for (let i = 0; i < values.length; i++) {
+                //             let val = values[i];
+                //             if (val) {
+                //                 if (typeof val === DataTypes.STRING) {
+                //                     val = val.trim();
+                //                 }
+                //             }
+                //             if (![null, undefined, ''].includes(val)) {
+                //                 found = false;
+                //                 break;
+                //             }
+                //         }
+                //     }
+                // }
 
                 // if (rows[i][column.sourceIndex]?.[fieldName] !== value) {
                 //     found = false;
@@ -3597,3 +3622,21 @@ function getColorByIndex(baseColor, index, stepSize) {
     const finalColor = `#${updatedRed.toString(16).padStart(2, '0')}${updatedGreen.toString(16).padStart(2, '0')}${updatedBlue.toString(16).padStart(2, '0')}`;
     return finalColor;
 }
+
+export function getBufferAbbreviatedOptionLabel(bufferOption, bufferListFieldAttrs, loadListFieldAttrs, storedArray) {
+    if (!bufferListFieldAttrs.abbreviated) {
+        return bufferOption;
+    }
+    const id = getIdFromAbbreviatedKey(loadListFieldAttrs.abbreviated, bufferOption);
+    const storedObj = storedArray.find(obj => obj[DB_ID] === id);
+    if (storedObj) {
+        let abbreviatedSplit = bufferListFieldAttrs.abbreviated.split('^')[0].split(':')[1].split('-');
+        abbreviatedSplit = abbreviatedSplit.map(xpath => xpath.substring(xpath.indexOf('.') + 1));
+        const values = [];
+        abbreviatedSplit.forEach(xpath => {
+            values.push(_.get(storedObj, xpath));
+        })
+        return values.join('-');
+    }
+    return bufferOption;
+} 

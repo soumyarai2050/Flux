@@ -288,7 +288,7 @@ message StratCollection{
   repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Id:PairStrat.id^Tickers:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id^Side:PairStrat.pair_strat_params.strat_leg1.side^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:PairStrat.strat_state^Strat Notional:StratView.balance_notional^Premium Limit:PairStrat.pair_strat_params.common_premium^Avg Premium:StratView.average_premium^Mkt Premium:StratView.market_premium^Unload:StratView.unload_strat^Recycle:StratView.recycle_strat", (FluxFldAlertBubbleSource) = "StratView.strat_alert_count", (FluxFldAlertBubbleColor) = "StratView.strat_alert_aggregated_severity"];
   //show 9 most recently used (weight:2) & 9 most frequently used (weight: 1)
   //Sort by type, merge by weight, FILTER OUT loaded
-  repeated string buffered_strat_keys = 3;
+  repeated string buffered_strat_keys = 3 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id"];
 }
 
 message DismissFilterPortfolioLimitBroker{

@@ -359,7 +359,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
     def handle_get_all_out_str(self, message: protogen.Message, message_name_camel_cased: str) -> str:
         message_name = message.proto.name
         output_str = f"        [getAll{message_name}.pending]: (state) => "+"{\n"
-        output_str += f"            state.loading = true;\n"
+        if message_name != self.__ui_layout_msg_name:
+            output_str += f"            state.loading = true;\n"
         output_str += f"            state.error = null;\n"
         option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
             message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
@@ -416,25 +417,29 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
 
     def handle_get_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
         output_str = f"        [get{message_name}.pending]: (state) => " + "{\n"
-        output_str += f"            state.loading = true;\n"
+        if message_name != self.__ui_layout_msg_name:
+            output_str += f"            state.loading = true;\n"
         output_str += f"            state.error = null;\n"
         output_str += "        },\n"
         output_str += f"        [get{message_name}.fulfilled]: (state, action) => " + "{\n"
         output_str += f"            state.{message_name_camel_cased} = action.payload;\n"
         output_str += f"            state.modified{message_name} = action.payload;\n"
         output_str += f"            state.selected{message_name}Id = state.{message_name_camel_cased}[DB_ID];\n"
-        output_str += f"            state.loading = false;\n"
+        if message_name != self.__ui_layout_msg_name:
+            output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [get{message_name}.rejected]: (state, action) => " + "{\n"
         output_str += "            let { code, message, detail, status } = action.payload;\n"
         output_str += "            state.error = { code, message, detail, status };\n"
-        output_str += "            state.loading = false;\n"
+        if message_name != self.__ui_layout_msg_name:
+            output_str += "            state.loading = false;\n"
         output_str += "        },\n"
         return output_str
 
     def handle_create_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
         output_str = f"        [create{message_name}.pending]: (state) => " + "{\n"
-        output_str += f"            state.loading = true;\n"
+        if message_name != self.__ui_layout_msg_name:
+            output_str += f"            state.loading = true;\n"
         output_str += f"            state.error = null;\n"
         output_str += "        },\n"
         output_str += f"        [create{message_name}.fulfilled]: (state, action) => " + "{\n"
@@ -454,13 +459,15 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                               f"[...state.{message_name_camel_cased}Array, action.payload];\n"
             elif not self.current_message_is_dependent and message_name != self.__ui_layout_msg_name:
                 output_str += f"            state.selected{message_name}Id = action.payload[DB_ID];\n"
-        output_str += f"            state.loading = false;\n"
+        if message_name != self.__ui_layout_msg_name:
+            output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [create{message_name}.rejected]: (state, action) => " + "{\n"
         output_str += f"            let updatedData = clearxpath(cloneDeep(state.modified{message_name}));\n"
         output_str += "            let { code, message, detail, status } = action.payload;\n"
         output_str += "            state.error = { code, message, detail, status, payload: updatedData };\n"
-        output_str += "            state.loading = false;\n"
+        if message_name != self.__ui_layout_msg_name:
+            output_str += "            state.loading = false;\n"
         output_str += f"            state.modified{message_name} = " \
                       f"addxpath(cloneDeep(state.{message_name_camel_cased}));\n"
         output_str += "        },\n"
@@ -480,13 +487,15 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            }\n"
         output_str += f"            state.{message_name_camel_cased} = action.payload;\n"
         output_str += f"            state.modified{message_name} = action.payload;\n"
-        output_str += f"            state.loading = false;\n"
+        if message_name != self.__ui_layout_msg_name:
+            output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [update{message_name}.rejected]: (state, action) => " + "{\n"
         output_str += f"            let updatedData = clearxpath(cloneDeep(state.modified{message_name}));\n"
         output_str += "            let { code, message, detail, status } = action.payload;\n"
         output_str += "            state.error = { code, message, detail, status, payload: updatedData };\n"
-        output_str += f"            state.loading = false;\n"
+        if message_name != self.__ui_layout_msg_name:
+            output_str += f"            state.loading = false;\n"
         output_str += f"            state.modified{message_name} = " \
                       f"addxpath(cloneDeep(state.{message_name_camel_cased}));\n"
         option_value_dict_list = \

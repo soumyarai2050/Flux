@@ -37,8 +37,8 @@ cdef class MarketBarterVolume:
     cdef public int64_t participation_period_last_barter_qty_sum
     cdef public int32_t applicable_period_seconds
 
-    def __init__(self, _id, participation_period_last_barter_qty_sum=None, applicable_period_seconds=None):
-        self._id = _id
+    def __init__(self, _id=None, participation_period_last_barter_qty_sum=None, applicable_period_seconds=None):
+        self._id = _id if _id is not None else ""
         if participation_period_last_barter_qty_sum is None:
             participation_period_last_barter_qty_sum = 0
         self.participation_period_last_barter_qty_sum = participation_period_last_barter_qty_sum
@@ -124,9 +124,9 @@ cdef class MarketDepth:
     def __cinit__(self):
         self.m_mutex = new mutex()
 
-    def __init__(self, _id, symbol, exch_time, arrival_time, side, position, px=None, qty=None,
-                 market_maker=None, is_smart_depth=None, cumulative_notional=None, cumulative_qty=None,
-                 cumulative_avg_px=None):
+    def __init__(self, _id, symbol, exch_time=None, arrival_time=None, side=None, position=None, px=None, qty=None,
+                 market_maker=None, is_smart_depth=None, cumulative_notional=None,
+                 cumulative_qty=None, cumulative_avg_px=None):
         self._id = _id
         self.symbol = symbol
         self.exch_time = exch_time
@@ -136,7 +136,7 @@ cdef class MarketDepth:
         self.qty = qty if qty is not None else 0
         self.position = position
         self.market_maker = market_maker if market_maker is not None else ""
-        self.is_smart_depth = 1 if is_smart_depth else 0
+        self.is_smart_depth = is_smart_depth if is_smart_depth else 0
         self.cumulative_notional = cumulative_notional if cumulative_notional is not None else 0.0
         self.cumulative_qty = cumulative_qty if cumulative_qty is not None else 0
         self.cumulative_avg_px = cumulative_avg_px if cumulative_avg_px is not None else 0.0
@@ -155,9 +155,9 @@ cdef class SymbolNExchId:
     cdef public str symbol
     cdef public str exch_id
 
-    def __init__(self, symbol, exch_id):
-        self.symbol = symbol
-        self.exch_id = exch_id
+    def __init__(self, symbol=None, exch_id=None):
+        self.symbol = symbol if symbol is not None else ""
+        self.exch_id = exch_id if exch_id is not None else ""
 
 
 cpdef enum TickType:
@@ -280,15 +280,19 @@ cdef class LastBarter:
     def __cinit__(self):
         self.m_mutex = new mutex()
 
-    def __init__(self, _id, symbol_n_exch_id, exch_time, arrival_time, px, qty, premium, market_barter_volume):
+    def __init__(self, _id, symbol_n_exch_id=None, exch_time=None, arrival_time=None, px=None, qty=None,
+                 premium=None, market_barter_volume=None):
         self._id = _id
         self.symbol_n_exch_id = symbol_n_exch_id
         self.exch_time = exch_time
         self.arrival_time = arrival_time
-        self.px = px
-        self.qty = qty
-        self.premium = premium
+        print("PY: After arrival in lastBarter constructor")
+        self.px = px if px is not None else 0.0
+        self.qty = qty if qty is not None else 0
+        self.premium = premium if premium is not None else 0
+        print("PY: After premium in lastBarter constructor")
         self.market_barter_volume = market_barter_volume
+        print("PY:  ======================  returning from lastBarter constructor")
 
     def __dealloc__(self):
         del self.m_mutex
@@ -528,14 +532,17 @@ cdef class MobileBookContainer:
         print(print_str)
         logging.info(print_str)
 
-    cpdef bint set_last_barter(self, _id, symbol, exch_id, exch_time, arrival_time, px, qty,
-                             premium, market_barter_volume):
+    cpdef bint set_last_barter(self, _id, str symbol, exch_id=None, exch_time=None, arrival_time=None, px=None, qty=None,
+                             premium=None, MarketBarterVolume market_barter_volume=None):
         if self.last_barter is None:
+            print(f"PY: id: {_id}, symbol: {symbol}")
             symbol_n_exch_id = SymbolNExchId(symbol, exch_id)
             self.last_barter = LastBarter(_id, symbol_n_exch_id, exch_time, arrival_time, px,
                                         qty, premium, market_barter_volume)
-            print(f"PY: Created LastBarter with market_barter_vol: {market_barter_volume._id, market_barter_volume.participation_period_last_barter_qty_sum, market_barter_volume.applicable_period_seconds}")
+            print(f"self.last_barter [{self.last_barter}]")
+            # print(f"PY: Created LastBarter with market_barter_vol: {market_barter_volume._id, market_barter_volume.participation_period_last_barter_qty_sum, market_barter_volume.applicable_period_seconds}")
             return True
+        print(f"PY: LastBarter is already present in the container with symbol: {symbol}")
         return False
 
     cpdef bint set_last_barter_symbol(self, str symbol):
@@ -638,22 +645,24 @@ cdef class MobileBookContainer:
         # if found otherwise then avoiding this update and logging error
         if position != 0:
             market_depth_up_position = self.ask_market_depths[position - 1]
-            if market_depth_up_position is not None and px < market_depth_up_position.px:
-                logging.error(f"Unexpected: px passed must be greater than above (position-1) ask market_depth's px"
-                              f"but found otherwise - ignoring this update, up position px: "
-                              f"{market_depth_up_position.px}, passed px: {px}")
-                return False
+            if market_depth_up_position.px != 0.0:
+                if market_depth_up_position is not None and px < market_depth_up_position.px:
+                    logging.error(f"Unexpected: px passed must be greater than above (position-1) ask market_depth's px"
+                                  f"but found otherwise - ignoring this update, up position px: "
+                                  f"{market_depth_up_position.px}, passed px: {px}")
+                    return False
         # else not required: Can't have market depth up position 0
 
         # Checking if passed px is less than px of market depth below current position
         # if found otherwise then avoiding this update and logging error
         if position != 9:
             market_depth_below_position = self.ask_market_depths[position + 1]
-            if market_depth_below_position is not None and px > market_depth_below_position.px:
-                logging.error(f"Unexpected: px passed must be less than below (position+1) ask market_depth's px"
-                              f"but found otherwise - ignoring this update, below position px: "
-                              f"{market_depth_below_position.px}, passed px: {px}")
-                return False
+            if market_depth_below_position.px != 0.0:
+                if market_depth_below_position is not None and px > market_depth_below_position.px:
+                    logging.error(f"Unexpected: px passed must be less than below (position+1) ask market_depth's px"
+                                  f"but found otherwise - ignoring this update, below position px: "
+                                  f"{market_depth_below_position.px}, passed px: {px}")
+                    return False
         # else not required: Can't have market depth after position 9
         return True
 
@@ -682,12 +691,14 @@ cdef class MobileBookContainer:
                 return False
         return True
 
-    cpdef bint set_bid_market_depth(self, _id, symbol, exch_time, arrival_time, side, position, px=None, qty=None,
-                                    market_maker=None, is_smart_depth=None, cumulative_notional=None,
-                                    cumulative_qty=None, cumulative_avg_px=None):
+    cpdef bint set_bid_market_depth(self, _id, symbol, exch_time=None, arrival_time=None, side=None, position=None,
+                                    px=None, qty=None, market_maker=None, is_smart_depth=None,
+                                    cumulative_notional=None, cumulative_qty=None, cumulative_avg_px=None):
         if self.check_no_market_depth_already_exists_on_position_and_has_allowed_px(
                 self.bid_market_depths, _id, symbol, exch_time, arrival_time, side, px, qty, position,
                 market_maker, is_smart_depth, cumulative_notional, cumulative_qty, cumulative_avg_px):
+            if side is None:
+                side="BID"
             self.bid_market_depths[position] = (
                 MarketDepth(_id, symbol, exch_time, arrival_time, side, position, px, qty,
                             market_maker, is_smart_depth, cumulative_notional,
@@ -695,12 +706,14 @@ cdef class MobileBookContainer:
             return True
         return False
 
-    cpdef bint set_ask_market_depth(self, _id, symbol, exch_time, arrival_time, side, position, px=None, qty=None,
-                                    market_maker=None, is_smart_depth=None, cumulative_notional=None,
-                                    cumulative_qty=None, cumulative_avg_px=None):
+    cpdef bint set_ask_market_depth(self, _id, symbol, exch_time=None, arrival_time=None, side=None, position=None,
+                                    px=None, qty=None, market_maker=None, is_smart_depth=None,
+                                    cumulative_notional=None, cumulative_qty=None, cumulative_avg_px=None):
         if self.check_no_market_depth_already_exists_on_position_and_has_allowed_px(
                 self.ask_market_depths, _id, symbol, exch_time, arrival_time, side, px, qty, position,
                 market_maker, is_smart_depth, cumulative_notional, cumulative_qty, cumulative_avg_px):
+            if side is None:
+                side="ASK"
             self.ask_market_depths[position] = (
                 MarketDepth(_id, symbol, exch_time, arrival_time, side, position, px, qty,
                             market_maker, is_smart_depth, cumulative_notional,
@@ -758,14 +771,15 @@ cdef class MobileBookContainer:
             return True
         return False
 
-    cpdef bint set_bid_market_depth_side(self, int32_t position, TickType side):
+    cpdef bint set_bid_market_depth_side(self, int32_t position, str side):
         market_depth = self.bid_market_depths[position]
         if market_depth is not None:
+            print(f"PY: side: - {side}")
             market_depth.side = TickType.BID if side == "BID" else TickType.ASK
             return True
         return False
 
-    cpdef bint set_ask_market_depth_side(self, int32_t position, TickType side):
+    cpdef bint set_ask_market_depth_side(self, int32_t position, str side):
         market_depth = self.ask_market_depths[position]
         if market_depth is not None:
             market_depth.side = TickType.BID if side == "BID" else TickType.ASK

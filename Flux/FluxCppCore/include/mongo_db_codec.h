@@ -17,7 +17,7 @@ namespace FluxCppCore {
 
     public:
         explicit MongoDBCodec(std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db_,
-                              quill::Logger *p_logger = quill::get_logger())
+                              quill::Logger *p_logger = GetLogger())
                               :m_sp_mongo_db(std::move(sp_mongo_db_)),
                               m_mongo_db_collection(m_sp_mongo_db->market_data_service_db[get_root_model_name()]),
                               m_p_logger_(p_logger) {}
@@ -26,6 +26,7 @@ namespace FluxCppCore {
                     int32_t &r_new_generated_id_out) {
             r_new_generated_id_out = get_next_insert_id();
             update_id_in_document(r_bson_doc, r_new_generated_id_out);
+            LOG_DEBUG(GetLogger(), "bson_doc: {}", bsoncxx::to_json(r_bson_doc));
             try {
                 auto insert_result = m_mongo_db_collection.insert_one(r_bson_doc.view());
                 auto inserted_id = insert_result->inserted_id().get_int32().value;
@@ -80,6 +81,7 @@ namespace FluxCppCore {
             if (found == m_root_model_key_to_db_id.end()) {
                 // Key does not exist, so it's a new object. Insert it into the database
                 prepare_doc(kr_root_model_obj, bson_doc);
+
                 status = insert(bson_doc, r_root_model_key_in_n_out, r_new_generated_id_out);
 
             } else {
@@ -406,6 +408,7 @@ namespace FluxCppCore {
                 MarketDataKeyHandler::get_key_out(kr_root_model_obj, root_model_key_out);
                 return true;
             } else {
+				LOG_ERROR(GetLogger(), "kr_root_model_obj is not initialized: {}", kr_root_model_obj.DebugString());
                 return false; // false otherwise
             }
         }
@@ -417,7 +420,7 @@ namespace FluxCppCore {
         int32_t get_next_insert_id() {
             std::mutex max_id_mutex;
             std::lock_guard<std::mutex> lk(max_id_mutex);
-            if (m_max_id_ == 1) {
+            if (m_max_id_ == 0) {
                 m_max_id_ = get_max_id_from_collection();
             }
             return ++m_max_id_;
@@ -428,7 +431,7 @@ namespace FluxCppCore {
         RootModelType root_model_type_;
         static inline int32_t c_cur_unused_max_id = 1;
         quill::Logger* m_p_logger_;
-        int32_t m_max_id_{1};
+        int32_t m_max_id_{0};
     };
 
 

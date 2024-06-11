@@ -267,7 +267,7 @@ export function applyGetAllWebsocketUpdate(storedArray, updatedObj, uiLimit, isA
                         } else {
                             updatedArray.pop();
                         }
-                    } 
+                    }
                     updatedArray.splice(0, 0, updatedObj);
                     return updatedArray;
                 }
@@ -324,7 +324,7 @@ export function getColorTypeFromValue(collection, value, separator = '-') {
     return color;
 }
 
-export function getGroupedTableRows(tableRows, groupBy) {
+export function getGroupedTableRows(tableRows, groupBy, joinSortOrders = null) {
     if (groupBy && groupBy.length > 0) {
         tableRows = Object.values(_.groupBy(tableRows, item => {
             const groupKeys = [];
@@ -333,6 +333,9 @@ export function getGroupedTableRows(tableRows, groupBy) {
             })
             return groupKeys.join('_');
         }));
+        if (joinSortOrders && joinSortOrders.length > 0) {
+            tableRows = tableRows.map(rows => stableSort(rows, SortComparator.getInstance(joinSortOrders)));
+        }
     } else {
         tableRows = tableRows.map(row => [row]);
     }

@@ -211,7 +211,7 @@ const TableWidget = (props) => {
             } else {
                 setSelectedRows([rowId]);
                 if (props.onSelectRow) {
-                    props.onSelectRow(null);
+                    props.onSelectRow(rowId);
                 }
             }
             // TODO: below condition is preventing the switch to be efficient

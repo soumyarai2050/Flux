@@ -31,7 +31,7 @@ namespace FluxCppCore {
                                  const int32_t k_web_socket_server_port = stoi(market_data_handler::port),
                                  const std::chrono::seconds k_read_timeout =
                                  std::chrono::seconds(market_data_handler::connection_timeout),
-                                 quill::Logger *p_logger = quill::get_logger()) :
+                                 quill::Logger *p_logger = GetLogger()) :
         m_user_data(user_data), km_host_(k_host), km_port_(k_web_socket_server_port),
         km_read_timeout_seconds(std::chrono::duration_cast<std::chrono::seconds>(k_read_timeout).count()),
         m_timer_(m_io_context_, km_read_timeout_seconds), mp_logger(p_logger) {

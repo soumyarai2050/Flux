@@ -1,10 +1,10 @@
 #pragma once
 
-#include "quill/Quill.h"
 
 #include "../../FluxCppCore/include/web_socket_client.h"
 #include "../../FluxCppCore/include/base_web_client.h"
 #include "RandomDataGen.h"
+#include "logger.h"
 
 
 namespace mobile_book_handler {
@@ -35,7 +35,7 @@ namespace mobile_book_handler {
 
     void get_bar_data_update() {
         using CallbackType = decltype(call_back)*;  // Define the callback type
-        auto logger = quill::get_logger();
+        auto logger = GetLogger();
         const std::string host = "127.0.0.1";
         const int32_t port = 8040;
         const int32_t read_time_out = 120;

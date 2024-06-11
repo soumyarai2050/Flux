@@ -7,6 +7,7 @@
 #include "market_data_service.pb.h"
 #include "market_data_constants.h"
 #include "string_util.h"
+#include "logger.h"
 
 namespace FluxCppCore {
 
@@ -26,6 +27,7 @@ namespace FluxCppCore {
         PyGILState_STATE py_gil_;
 
     };
+
 
     struct MessageTypeToPythonArgs {
 
@@ -108,7 +110,7 @@ namespace FluxCppCore {
             std::string last_update_date_time = format_time(kr_top_of_book_obj.last_update_date_time());
             if (kr_top_of_book_obj.has_bid_quote()) {
                 std::string bid_quote_last_update_date_time = format_time(kr_top_of_book_obj.bid_quote().last_update_date_time());
-                LOG_INFO(quill::get_logger(), "Bid Quote: {}, total_trading_security_size: {}",
+                LOG_INFO(GetLogger(), "Bid Quote: {}, total_trading_security_size: {}",
                     kr_top_of_book_obj.bid_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
                 p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
                             PyUnicode_DecodeUTF8(kr_top_of_book_obj.symbol().c_str(),
@@ -130,7 +132,7 @@ namespace FluxCppCore {
 
             if (kr_top_of_book_obj.has_ask_quote()) {
                 std::string ask_quote_last_update_date_time = format_time(kr_top_of_book_obj.ask_quote().last_update_date_time());
-                LOG_INFO(quill::get_logger(), "Ask Quote: {}, total_trading_security_size: {}",
+                LOG_INFO(GetLogger(), "Ask Quote: {}, total_trading_security_size: {}",
                     kr_top_of_book_obj.ask_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
                 p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
                             PyUnicode_DecodeUTF8(kr_top_of_book_obj.symbol().c_str(),
@@ -153,7 +155,7 @@ namespace FluxCppCore {
 
             if (kr_top_of_book_obj.has_last_trade()) {
                 std::string last_trade_last_update_date_time = format_time(kr_top_of_book_obj.last_trade().last_update_date_time());
-                LOG_INFO(quill::get_logger(), "Last Trade: {}, total_trading_security_size: {}",
+                LOG_INFO(GetLogger(), "Last Trade: {}, total_trading_security_size: {}",
                     kr_top_of_book_obj.ask_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
                 p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
                             PyUnicode_DecodeUTF8(kr_top_of_book_obj.symbol().c_str(),
@@ -196,43 +198,6 @@ namespace FluxCppCore {
         }
     };
 
-    struct AddOrGetContainerObj {
-
-        static void add_container_obj_for_symbol(const std::string &kr_symbol) {
-            PyObject* p_module = nullptr;
-            PyObject* p_add_container_obj_for_symbol_func_ = nullptr;
-            PyObject* p_args = nullptr;
-
-            p_module = PyImport_ImportModule(market_data_handler::market_data_cache_module_name.c_str());
-            assert(p_module != nullptr && "Failed to import module");
-
-            p_add_container_obj_for_symbol_func_ = PyObject_GetAttrString(p_module, market_data_handler::add_container_obj_for_symbol_key.c_str());
-            p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(kr_symbol.c_str(), static_cast<Py_ssize_t>(kr_symbol.size()), nullptr));
-            PyObject_CallObject(p_add_container_obj_for_symbol_func_, p_args);
-        }
-
-        static PyObject* get_market_data_container_instance(const std::string &kr_symbol) {
-            PyObject* p_market_data_container_class = nullptr;
-            PyObject* p_market_data_container_instance = nullptr;
-            PyObject* p_args = nullptr;
-            PyObject* mp_module_ = nullptr;
-            // TODO: avoid calling PyImport_ImportModule multiple times make member variable
-            mp_module_ = PyImport_ImportModule(market_data_handler::market_data_cache_module_name.c_str());
-
-            // TODO: avoid calling PyObject_GetAttrString multiple times make member variable
-            p_market_data_container_class = PyObject_GetAttrString(mp_module_, market_data_handler::get_market_data_container_key.c_str());
-            assert(p_market_data_container_class != nullptr);
-
-            p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(kr_symbol.c_str(), static_cast<Py_ssize_t>(kr_symbol.size()), nullptr));
-            p_market_data_container_instance = PyObject_CallObject(p_market_data_container_class, p_args);
-            if (p_market_data_container_instance == Py_None) {
-                return nullptr;
-            } else {
-                return p_market_data_container_instance;
-            }
-        }
-
-    };
 
 
 }

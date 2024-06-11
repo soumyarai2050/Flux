@@ -241,6 +241,9 @@ def expected_buy_chore_snapshot_(pair_securities_with_sides_):
         "cxled_qty": 0,
         "avg_cxled_px": 0,
         "cxled_notional": 0,
+        "last_lapsed_qty": 0,
+        "total_lapsed_qty": 0,
+        "total_lapsed_post_unack_amend": 0,
         "last_update_date_time": DateTime.utcnow(),
         "create_date_time": DateTime.utcnow(),
         "chore_status": "OE_UNACK"
@@ -317,6 +320,9 @@ def expected_sell_chore_snapshot_(pair_securities_with_sides_):
         "cxled_qty": 0,
         "avg_cxled_px": 0,
         "cxled_notional": 0,
+        "last_lapsed_qty": 0,
+        "total_lapsed_qty": 0,
+        "total_lapsed_post_unack_amend": 0,
         "last_update_date_time": DateTime.utcnow(),
         "create_date_time": DateTime.utcnow(),
         "chore_status": "OE_UNACK"

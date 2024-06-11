@@ -1,12 +1,13 @@
 #pragma once
 
-#include "../../../../../../FluxCppCore/include/mongo_db_handler.h"
-#include "last_barter_handler.h"
-#include "market_depth_handler.h"
 #include <chrono>
 #include <numeric>
 #include <quill/Quill.h>
 
+#include "../../../../../../FluxCppCore/include/mongo_db_handler.h"
+#include "last_barter_handler.h"
+#include "market_depth_handler.h"
+#include "logger.h"
 
 namespace mobile_book_handler {
 
@@ -15,7 +16,7 @@ namespace mobile_book_handler {
         explicit HistoryManager(std::shared_ptr<FluxCppCore::MongoDBHandler> &mongo_db_,
                                 LastBarterHandler &r_last_barter_handler,
                                 MarketDepthHandler &r_market_depth_handler,
-                                quill::Logger *logger = quill::get_logger()) :
+                                quill::Logger *logger = GetLogger()) :
                                 m_sp_mongo_db_(std::move(mongo_db_)), mr_last_barter_handler(r_last_barter_handler),
                                 mr_market_depth_handler(r_market_depth_handler), m_p_logger_(logger),
                                 m_market_depth_history_db_codec_(m_sp_mongo_db_),
@@ -57,7 +58,7 @@ namespace mobile_book_handler {
                     time_el_.push_back(elapsed_time_ms);
                     if (time_el_.size() == 20) {
                         auto sum = std::accumulate(time_el_.begin(), time_el_.end(), 0);
-                        LOG_INFO(quill::get_logger(), "Sum of total time: {}", sum);
+                        LOG_INFO(m_p_logger_, "Sum of total time: {}", sum);
                     }
                     ++market_depth_index;
                     market_depth.Clear();

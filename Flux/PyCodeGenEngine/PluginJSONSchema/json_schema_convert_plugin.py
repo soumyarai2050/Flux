@@ -229,7 +229,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     self.__json_non_layout_message_list.append(message)
                 # else not required: avoiding repetition
 
-            if self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_json_root):
+            if (self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_json_root) or
+                    self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_json_root_time_series)):
                 self.__root_msg_list.append(message)
 
             self.__load_dependency_messages_and_enums_in_dicts(message)

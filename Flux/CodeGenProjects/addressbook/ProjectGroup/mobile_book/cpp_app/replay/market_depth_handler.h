@@ -1,16 +1,14 @@
 #pragma once
 
-#include "quill/Quill.h"
 
 #include "../../../../../../FluxCppCore/include/mongo_db_handler.h"
-#include "../../generated/CppUtilGen/mobile_book_constants.h"
 #include "../../generated/CppUtilGen/mobile_book_key_handler.h"
 #include "../../../../../../FluxCppCore/include/mongo_db_codec.h"
 #include "../../generated/CppUtilGen/mobile_book_web_socket_server.h"
-#include "../../generated/CppUtilGen/mobile_book_populate_random_values.h"
 #include "cpp_app_semaphore.h"
 #include "top_of_book_handler.h"
 #include "mobile_book_cache.h"
+#include "queue_handler.h"
 #include "utility_functions.h"
 
 
@@ -21,12 +19,10 @@ namespace mobile_book_handler {
     public:
         explicit MarketDepthHandler(std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db_,
                                     MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> &r_websocket_server_,
-                                    mobile_book_handler::TopOfBookHandler &r_top_of_book_handler,
-                                    mobile_book_cache::MarketDepthCache &r_market_depth_cache_handler,
-                                    mobile_book_cache::TopOfBookCache &r_top_of_book_cache_handler) :
+                                    mobile_book_handler::TopOfBookHandler &r_top_of_book_handler) :
         m_sp_mongo_db_(std::move(sp_mongo_db_)), mr_websocket_server_(r_websocket_server_),
-        mr_top_of_book_handler_(r_top_of_book_handler), mr_market_depth_cache_handler_(r_market_depth_cache_handler),
-        mr_top_of_book_cache_handler_(r_top_of_book_cache_handler), m_market_depth_db_codec_(m_sp_mongo_db_) {
+        mr_top_of_book_handler_(r_top_of_book_handler), m_market_depth_db_codec_(m_sp_mongo_db_),
+        m_db_n_ws_handler_thread_{[this]{handle_db_n_ws_update();}} {
 
             update_market_depth_cache_();
         }
@@ -38,42 +34,118 @@ namespace mobile_book_handler {
         }
 
         void handle_md_update(mobile_book::MarketDepth &r_market_depth_obj) {
-            r_market_depth_obj.set_id(MobileBookMaxIdHandler::c_market_depth_max_id_handler.get_next_id());
-            mr_market_depth_cache_handler_.update_or_create_market_depth_cache(r_market_depth_obj);
+
             auto date_time = FluxCppCore::get_utc_time_microseconds();
+            if (!r_market_depth_obj.has_arrival_time() and !r_market_depth_obj.has_exch_time()) {
+                r_market_depth_obj.set_arrival_time(date_time);
+                r_market_depth_obj.set_exch_time(date_time);
+            }
+
             if (r_market_depth_obj.position() == 0) {
                 mobile_book::TopOfBook top_of_book_obj;
-                top_of_book_obj.set_id(r_market_depth_obj.id());
-                top_of_book_obj.set_symbol(r_market_depth_obj.symbol());
+                create_top_of_book_from_md(r_market_depth_obj, top_of_book_obj);
                 if (r_market_depth_obj.side() == mobile_book::TickType::BID) {
-                    top_of_book_obj.mutable_bid_quote()->set_px(r_market_depth_obj.px());
-                    top_of_book_obj.mutable_bid_quote()->set_qty(r_market_depth_obj.qty());
-                    top_of_book_obj.mutable_bid_quote()->set_last_update_date_time(date_time);
-                    top_of_book_obj.set_last_update_date_time(date_time);
+                    if (m_market_depth_obj_.exch_time() <= r_market_depth_obj.exch_time() and
+                        m_top_of_book_obj_.last_update_date_time() <= top_of_book_obj.last_update_date_time()) {
+
+                        void* p_md_mutex = market_cache::MarketDepthCache::get_bid_md_mutex_from_depth(
+                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
+                        void*  p_tob_mutex = market_cache::TopOfBookCache::get_top_of_book_mutex(top_of_book_obj.symbol());
+                        auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
+                        auto top_of_book_mutex = static_cast<std::mutex*>(p_tob_mutex);
+                        auto lock_status = std::try_lock(*md_mutex, *top_of_book_mutex);
+                        if (lock_status == ALL_LOCKS_AVAILABE_) {
+                            std::lock_guard<std::mutex> lock_md_mutex(*md_mutex, std::adopt_lock);
+                            std::lock_guard<std::mutex> lock_top_of_book_mutex(*top_of_book_mutex, std::adopt_lock);
+                            market_cache::MarketDepthCache::update_bid_market_depth_cache(r_market_depth_obj);
+                            mobile_book_handler::market_cache::TopOfBookCache::update_top_of_book_cache(top_of_book_obj);
+                        }
+                    }
                 } else if (r_market_depth_obj.side() == mobile_book::TickType::ASK) {
-                    top_of_book_obj.mutable_ask_quote()->set_px(r_market_depth_obj.px());
-                    top_of_book_obj.mutable_ask_quote()->set_qty(r_market_depth_obj.qty());
-                    top_of_book_obj.mutable_ask_quote()->set_last_update_date_time(date_time);
-                    top_of_book_obj.set_last_update_date_time(date_time);
+                    if (m_market_depth_obj_.exch_time() <= r_market_depth_obj.exch_time() and
+                        m_top_of_book_obj_.last_update_date_time() <= top_of_book_obj.last_update_date_time()) {
+
+                        void* p_md_mutex = market_cache::MarketDepthCache::get_ask_md_mutex_from_depth(
+                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
+                        void*  p_tob_mutex = market_cache::TopOfBookCache::get_top_of_book_mutex(top_of_book_obj.symbol());
+                        auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
+                        auto top_of_book_mutex = static_cast<std::mutex*>(p_tob_mutex);
+                        auto lock_status = std::try_lock(*md_mutex, *top_of_book_mutex);
+                        if (lock_status == ALL_LOCKS_AVAILABE_) {
+                            std::lock_guard<std::mutex> lock_md_mutex(*md_mutex, std::adopt_lock);
+                            std::lock_guard<std::mutex> lock_top_of_book_mutex(*top_of_book_mutex, std::adopt_lock);
+                            market_cache::MarketDepthCache::update_bid_market_depth_cache(r_market_depth_obj);
+                            mobile_book_handler::market_cache::TopOfBookCache::update_top_of_book_cache(top_of_book_obj);
+                        }
+
+                        m_market_depth_obj_.Clear();
+                        m_top_of_book_obj_.Clear();
+                        m_top_of_book_obj_.CopyFrom(top_of_book_obj);
+                        m_market_depth_obj_.CopyFrom(r_market_depth_obj);
+                    }
+
                 } // else not required: TopOfBook only need ASK and BID
-
-                mr_top_of_book_cache_handler_.update_or_create_top_of_book_cache(top_of_book_obj);
                 notify_semaphore.release();
-                mr_top_of_book_handler_.insert_or_update_top_of_book(top_of_book_obj);
-            } // else not required: for every symbol TopOfBook should be only 1
 
-            insert_or_update_market_depth(r_market_depth_obj);
-            mr_websocket_server_.NewClientCallBack(r_market_depth_obj, -1);
+            } else {
+                if (r_market_depth_obj.side() == mobile_book::TickType::BID) {
 
+                    if (m_market_depth_obj_.exch_time() <= r_market_depth_obj.exch_time()) {
+
+                        void* p_md_mutex = market_cache::MarketDepthCache::get_bid_md_mutex_from_depth(
+                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
+                        auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
+                        std::unique_lock<std::mutex> lock_md_mutex(*md_mutex, std::try_to_lock_t{});
+                        if (lock_md_mutex.owns_lock()) {
+                            market_cache::MarketDepthCache::update_bid_market_depth_cache(r_market_depth_obj);
+                        }
+                    }
+                } else {
+                    if (m_market_depth_obj_.exch_time() <= r_market_depth_obj.exch_time()) {
+                        void* p_md_mutex = market_cache::MarketDepthCache::get_ask_md_mutex_from_depth(
+                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
+                        auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
+                        std::unique_lock<std::mutex> lock_md_mutex(*md_mutex, std::try_to_lock_t{});
+                        if (lock_md_mutex.owns_lock()) {
+                            market_cache::MarketDepthCache::update_ask_market_depth_cache(r_market_depth_obj);
+                        }
+                    }
+                }
+            }
+
+            m_monitor_.push(r_market_depth_obj);
+
+        }
+
+        void handle_db_n_ws_update() {
+            mobile_book::TopOfBook top_of_book;
+            mobile_book::MarketDepth market_depth;
+
+            while (1) {
+                if (m_monitor_.pop(market_depth)) {
+                    insert_or_update_market_depth(market_depth);
+                    if (market_depth.position() == 0) {
+                        create_top_of_book_from_md(market_depth, top_of_book);
+                        mr_top_of_book_handler_.insert_or_update_top_of_book(top_of_book);
+                    }
+
+                    mr_websocket_server_.NewClientCallBack(market_depth, -1);
+                    market_depth.Clear();
+                    top_of_book.Clear();
+                }
+            }
         }
 
     protected:
         std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db_;
         MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> &mr_websocket_server_;
         TopOfBookHandler &mr_top_of_book_handler_;
-        mobile_book_cache::MarketDepthCache &mr_market_depth_cache_handler_;
-        mobile_book_cache::TopOfBookCache &mr_top_of_book_cache_handler_;
         FluxCppCore::MongoDBCodec<mobile_book::MarketDepth, mobile_book::MarketDepthList> m_market_depth_db_codec_;
+        Monitor<mobile_book::MarketDepth> m_monitor_{};
+        std::jthread m_db_n_ws_handler_thread_;
+        const int8_t ALL_LOCKS_AVAILABE_{-1};
+        mobile_book::MarketDepth m_market_depth_obj_{};
+        mobile_book::TopOfBook m_top_of_book_obj_{};
 
         void update_market_depth_cache_() {
             mobile_book::MarketDepthList market_depth_documents;
@@ -83,6 +155,22 @@ namespace mobile_book_handler {
             for (int i = 0; i < market_depth_documents.market_depth_size(); ++i) {
                 m_market_depth_db_codec_.m_root_model_key_to_db_id[keys.at(i)] =
                         market_depth_documents.market_depth(i).id();
+            }
+        }
+
+        static void create_top_of_book_from_md(const mobile_book::MarketDepth &kr_market_depth_obj, mobile_book::TopOfBook &r_top_of_book_obj_out) {
+
+            r_top_of_book_obj_out.set_id(kr_market_depth_obj.id());
+            r_top_of_book_obj_out.set_symbol(kr_market_depth_obj.symbol());
+            r_top_of_book_obj_out.set_last_update_date_time(kr_market_depth_obj.exch_time());
+            if (kr_market_depth_obj.side() == mobile_book::TickType::BID) {
+                r_top_of_book_obj_out.mutable_bid_quote()->set_px(kr_market_depth_obj.px());
+                r_top_of_book_obj_out.mutable_bid_quote()->set_qty(kr_market_depth_obj.qty());
+                r_top_of_book_obj_out.mutable_bid_quote()->set_last_update_date_time(kr_market_depth_obj.exch_time());
+            } else if (kr_market_depth_obj.side() == mobile_book::TickType::ASK) {
+                r_top_of_book_obj_out.mutable_ask_quote()->set_px(kr_market_depth_obj.px());
+                r_top_of_book_obj_out.mutable_ask_quote()->set_qty(kr_market_depth_obj.qty());
+                r_top_of_book_obj_out.mutable_ask_quote()->set_last_update_date_time(kr_market_depth_obj.exch_time());
             }
         }
     };

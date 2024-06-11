@@ -2363,7 +2363,7 @@ def create_strat(leg1_symbol, leg2_symbol, expected_pair_strat_obj, leg1_side=No
 
 def move_snoozed_pair_strat_to_ready_n_then_active(
         stored_pair_strat_basemodel, market_depth_basemodel_list,
-        symbol_overview_obj_list, expected_strat_limits, expected_strat_status):
+        symbol_overview_obj_list, expected_strat_limits, expected_strat_status, only_make_ready: bool = False):
     if stored_pair_strat_basemodel.pair_strat_params.strat_leg1.side == Side.BUY:
         buy_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id
         sell_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg2.sec.sec_id
@@ -2510,11 +2510,11 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
         assert strat_view.max_single_leg_notional == strat_limits_obj.max_single_leg_notional, \
             (f"Mismatched max_single_leg_notional in strat_view: expected: {strat_limits_obj.max_single_leg_notional}, "
              f"received: {strat_view.max_single_leg_notional} even after "
-             f"{(start_time-DateTime.utcnow()).total_seconds()} secs")
+             f"{(DateTime.utcnow()-start_time).total_seconds()} secs")
         assert strat_view.balance_notional == strat_status_obj.balance_notional, \
             (f"Mismatched balance_notional in strat_view: expected: {strat_status_obj.balance_notional}, "
              f"received: {strat_view.balance_notional} even after "
-             f"{(start_time-DateTime.utcnow()).total_seconds()} secs")
+             f"{(DateTime.utcnow()-start_time).total_seconds()} secs")
 
     # checking is_running_state of executor
     updated_pair_strat = email_book_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id)
@@ -2525,6 +2525,9 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
         (f"StratState Mismatched, expected StratState: {StratState.StratState_READY}, "
          f"received pair_strat's strat_state: {updated_pair_strat.strat_state}")
     print(f"StratStatus updated to READY state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
+    if only_make_ready:
+        return updated_pair_strat, executor_web_client
 
     # activating strat
     pair_strat = PairStratBaseModel(_id=stored_pair_strat_basemodel.id, strat_state=StratState.StratState_ACTIVE)

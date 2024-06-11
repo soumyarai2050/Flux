@@ -18,6 +18,7 @@ import { Icon, ToggleIcon } from './Icon';
 import classes from './Layout.module.css';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
+import { useQueryParams } from '../hooks';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -44,6 +45,7 @@ const defaultLayoutsById = defaultLayouts.reduce((dict, obj) => {
 }, {});
 
 function Layout(props) {
+    const queryParams = useQueryParams();
     /* redux states */
     const { uiLayoutArray, uiLayout, loading } = useSelector(state => state.uiLayout);
     /* local react states */
@@ -104,46 +106,46 @@ function Layout(props) {
         }
     }, [])
 
-    useEffect(() => {
-        /* check for stored layout in cookie/session storage. if present and layout exists, set the layout
-         * else clear the cookie/session storage
-        */
-        if (!loading) {
-            const cookie = sessionStorage.getItem(COOKIE_NAME);
-            if (cookie) {
-                const layoutId = parseInt(cookie);
-                const layout = uiLayoutArray.find(layout => layout[DB_ID] === layoutId);
-                if (layout) {
-                    dispatch(setSelectedUILayoutId(layoutId));
-                    dispatch(setUILayout(layout));
-                } else {
-                    // clear the storage if layout does not exist
-                    sessionStorage.removeItem(COOKIE_NAME);
-                    dispatch(setSelectedUILayoutId(null));
-                    dispatch(setUILayout({}));
-                }
-            }
-        }
-    }, [uiLayoutArray])
+    // useEffect(() => {
+    //     /* check for stored layout in cookie/session storage. if present and layout exists, set the layout
+    //      * else clear the cookie/session storage
+    //     */
+    //     if (!loading) {
+    //         const cookie = sessionStorage.getItem(COOKIE_NAME);
+    //         if (cookie) {
+    //             const layoutId = parseInt(cookie);
+    //             const layout = uiLayoutArray.find(layout => layout[DB_ID] === layoutId);
+    //             if (layout) {
+    //                 dispatch(setSelectedUILayoutId(layoutId));
+    //                 dispatch(setUILayout(layout));
+    //             } else {
+    //                 // clear the storage if layout does not exist
+    //                 sessionStorage.removeItem(COOKIE_NAME);
+    //                 dispatch(setSelectedUILayoutId(null));
+    //                 dispatch(setUILayout({}));
+    //             }
+    //         }
+    //     }
+    // }, [uiLayoutArray])
 
-    useEffect(() => {
-        /* set layouts, cookie and profile id of active layout if exists */
-        if (uiLayout.widget_ui_data_elements) {
-            layoutsRef.current = cloneDeep(uiLayout.widget_ui_data_elements);
-            setLayoutsById();
-            setUpdateCounter(prevCounter => prevCounter + 1);
-            setProfileId(uiLayout.profile_id);
-            const cookie = sessionStorage.getItem(COOKIE_NAME);
-            if (cookie) {
-                const layoutId = parseInt(cookie);
-                if (layoutId !== uiLayout[DB_ID]) {
-                    sessionStorage.setItem(COOKIE_NAME, uiLayout[DB_ID]);
-                }
-            } else {
-                sessionStorage.setItem(COOKIE_NAME, uiLayout[DB_ID]);
-            }
-        }
-    }, [uiLayout])
+    // useEffect(() => {
+    //     /* set layouts, cookie and profile id of active layout if exists */
+    //     if (uiLayout.widget_ui_data_elements) {
+    //         layoutsRef.current = cloneDeep(uiLayout.widget_ui_data_elements);
+    //         setLayoutsById();
+    //         setUpdateCounter(prevCounter => prevCounter + 1);
+    //         setProfileId(uiLayout.profile_id);
+    //         const cookie = sessionStorage.getItem(COOKIE_NAME);
+    //         if (cookie) {
+    //             const layoutId = parseInt(cookie);
+    //             if (layoutId !== uiLayout[DB_ID]) {
+    //                 sessionStorage.setItem(COOKIE_NAME, uiLayout[DB_ID]);
+    //             }
+    //         } else {
+    //             sessionStorage.setItem(COOKIE_NAME, uiLayout[DB_ID]);
+    //         }
+    //     }
+    // }, [uiLayout])
 
     const onToggleDrag = () => {
         setDraggable(draggable => !draggable);
@@ -165,6 +167,7 @@ function Layout(props) {
             updatedLayout = { profile_id: profileId, widget_ui_data_elements: layoutsRef.current };
             dispatch(createUILayout(updatedLayout));
         }
+        sessionStorage.setItem(COOKIE_NAME, profileId);
         // close save layout popup
         setOpenSaveLayout(false);
     }
@@ -173,8 +176,13 @@ function Layout(props) {
         /* set the active layout on load */
         const layout = uiLayoutArray.find(layout => layout[DB_ID] === searchValue[DB_ID]);
         if (layout) {
+            layoutsRef.current = layout.widget_ui_data_elements;
+            setLayoutsById();
+            setUpdateCounter(prevCounter => prevCounter + 1);
             dispatch(setUILayout(layout));
             dispatch(setSelectedUILayoutId(layout[DB_ID]));
+            setProfileId(layout.profile_id);
+            sessionStorage.setItem(COOKIE_NAME, layout.profile_id);
         }
         setSearchValue(null);
         // close load layout popup
@@ -482,7 +490,38 @@ function Layout(props) {
     }
 
     const storedCookie = sessionStorage.getItem(COOKIE_NAME);
-    if (storedCookie && !uiLayout.widget_ui_data_elements) {
+    const queryLayout = queryParams?.layout;
+    if (loading) {
+        return (
+            <Box className="app">
+                <HashLoader />
+            </Box>
+        )
+    } else if (!loading && !uiLayout.widget_ui_data_elements) {
+        if (queryLayout && uiLayoutArray.find(layout => layout.profile_id === queryLayout)) {
+            const storedLayout = uiLayoutArray.find(layout => layout.profile_id === queryLayout);
+            layoutsRef.current = storedLayout.widget_ui_data_elements;
+            setLayoutsById();
+            setUpdateCounter(prevCounter => prevCounter + 1);
+            dispatch(setUILayout(storedLayout));
+            dispatch(setSelectedUILayoutId(storedLayout[DB_ID]));
+            setProfileId(storedLayout.profile_id);
+        } else if (storedCookie && uiLayoutArray.find(layout => layout.profile_id === storedCookie)) {
+            const storedLayout = uiLayoutArray.find(layout => layout.profile_id === storedCookie);
+            layoutsRef.current = storedLayout.widget_ui_data_elements;
+            setLayoutsById();
+            setUpdateCounter(prevCounter => prevCounter + 1);
+            dispatch(setUILayout(storedLayout));
+            dispatch(setSelectedUILayoutId(storedLayout[DB_ID]));
+            setProfileId(storedLayout.profile_id);
+        } else {
+            if (storedCookie) {
+                sessionStorage.removeItem(COOKIE_NAME);
+            }
+            dispatch(setUILayout({widget_ui_data_elements: layoutsRef.current}));
+            dispatch(setSelectedUILayoutId(null));
+            setProfileId('');
+        }
         return (
             <Box className="app">
                 <HashLoader />

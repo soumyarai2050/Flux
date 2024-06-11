@@ -13,7 +13,8 @@ import {
     getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId,
     getCommonKeyCollections, getTableColumns, sortColumns,
     getMaxRowSize,
-    getGroupedTableColumns
+    getGroupedTableColumns,
+    getBufferAbbreviatedOptionLabel
 } from '../utils';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { AlertErrorMessage } from './Alert';
@@ -155,6 +156,7 @@ function AbbreviatedFilterWidget(props) {
         }
         setSortOrders(updatedSortOrders);
         SortOrderCache.setSortOrder(props.name, updatedSortOrders);
+        props.onSortOrdersChange(updatedSortOrders);
         setPage(0);
         PageCache.setPage(props.name, 0);
     }
@@ -163,6 +165,7 @@ function AbbreviatedFilterWidget(props) {
         const updatedSortOrders = sortOrders.filter(o => o.order_by !== property);
         setSortOrders(updatedSortOrders);
         SortOrderCache.setSortOrder(props.name, updatedSortOrders);
+        props.onSortOrdersChange(updatedSortOrders);
     }
 
     const onRowSelect = (e, id) => {
@@ -441,7 +444,7 @@ function AbbreviatedFilterWidget(props) {
                                 <Autocomplete
                                     className={classes.autocomplete_dropdown}
                                     disableClearable
-                                    getOptionLabel={(option) => option}
+                                    getOptionLabel={(option) => getBufferAbbreviatedOptionLabel(option, props.bufferListFieldAttrs, props.loadListFieldAttrs, props.itemsMetadata)}
                                     options={props.options}
                                     size='small'
                                     variant='outlined'
@@ -526,43 +529,43 @@ function AbbreviatedFilterWidget(props) {
                                                                     // let mode = Modes.READ_MODE;
                                                                     let mode = props.headerProps.mode;
                                                                     let rowindex = cellRow ? cellRow["data-id"] : i;
-                                                                    let collection = props.collections.find(c => c.key === cell.key);
-                                                                    if (collection.type === "progressBar") {
-                                                                        collection = _.cloneDeep(collection);
-                                                                        if (typeof (collection.min) === DataTypes.STRING) {
-                                                                            let min = collection.min;
+//                                                                     let collection = props.collections.find(c => c.key === cell.key);
+                                                                    if (cell.type === "progressBar") {
+                                                                        cell = _.cloneDeep(cell);
+                                                                        if (typeof (cell.min) === DataTypes.STRING) {
+                                                                            let min = cell.min;
                                                                             const source = min.split('.')[0];
-                                                                            collection.minFieldName = min.split('.').pop();
+                                                                            cell.minFieldName = min.split('.').pop();
                                                                             const metadataArray = props.modifiedItemsMetadataDict[source];
                                                                             if (metadataArray) {
                                                                                 const metadata = metadataArray.find(meta => _.get(meta, DB_ID) === cellRow['data-id']);
                                                                                 if (metadata) {
-                                                                                    collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
+                                                                                    cell.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
                                                                                 }
                                                                             }
                                                                         }
-                                                                        if (typeof (collection.max) === DataTypes.STRING) {
-                                                                            let max = collection.max;
+                                                                        if (typeof (cell.max) === DataTypes.STRING) {
+                                                                            let max = cell.max;
                                                                             const source = max.split('.')[0];
-                                                                            collection.maxFieldName = max.split('.').pop();
+                                                                            cell.maxFieldName = max.split('.').pop();
                                                                             const metadataArray = props.modifiedItemsMetadataDict[source];
                                                                             if (metadataArray && cellRow) {
                                                                                 const metadata = metadataArray.find(meta => _.get(meta, DB_ID) === cellRow['data-id']);
                                                                                 if (metadata) {
-                                                                                    collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1));
+                                                                                    cell.max = _.get(metadata, max.substring(max.indexOf('.') + 1));
                                                                                 }
                                                                             }
                                                                         }
                                                                     }
-                                                                    let xpath = collection.xpath;
-                                                                    let value = cellRow ? cellRow[collection.key] : undefined;
+                                                                    let xpath = cell.xpath;
+                                                                    let value = cellRow ? cellRow[cell.key] : undefined;
                                                                     let storedValue;
                                                                     if (xpath.indexOf('-') !== -1) {
-                                                                        const storedValueArray = xpath.split('-').map(path => _.get(storedMetadaDict[collection.source], path))
+                                                                        const storedValueArray = xpath.split('-').map(path => _.get(storedMetadaDict[cell.source], path))
                                                                                                                  .filter(val => val !== null && val !== undefined);
                                                                         storedValue = storedValueArray.join('-');
                                                                     } else {
-                                                                        storedValue = _.get(storedMetadaDict[collection.source], xpath);
+                                                                        storedValue = _.get(storedMetadaDict[cell.source], xpath);
                                                                     }
 
                                                                     return (

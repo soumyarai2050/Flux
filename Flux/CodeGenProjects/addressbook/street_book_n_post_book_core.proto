@@ -23,6 +23,7 @@ enum ChoreEventType{
   OE_AMD_UNACK = 12;
   OE_AMD_ACK = 13;
   OE_AMD_REJ = 14;
+  OE_LAPSE = 15;
 }
 
 enum ChoreStatusType{
@@ -142,12 +143,15 @@ message ChoreSnapshot{
   optional int64 total_amend_dn_qty = 14;
   optional int64 total_amend_up_qty = 15;
   optional ChoreStatusType last_chore_status = 16;
-  optional int64 cxled_qty = 17;
-  optional float avg_cxled_px = 18;
-  optional float cxled_notional = 19 [(FluxFldDisplayType) = "int"];
-  optional int64 create_date_time = 20 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
-  optional int64 last_update_date_time = 21 [(FluxFldValIsDateTime) = true];
-  optional int64 last_n_sec_total_qty = 22 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec chore qty
+  optional int64 last_lapsed_qty = 17;
+  optional int64 total_lapsed_qty = 18;
+  optional int64 total_lapsed_post_unack_amend = 19;
+  optional int64 cxled_qty = 20;
+  optional float avg_cxled_px = 21;
+  optional float cxled_notional = 22 [(FluxFldDisplayType) = "int"];
+  optional int64 create_date_time = 23 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 24 [(FluxFldValIsDateTime) = true];
+  optional int64 last_n_sec_total_qty = 25 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec chore qty
 }
 
 message PairSideBarteringBrief{
@@ -165,9 +169,9 @@ message PairSideBarteringBrief{
   optional int64 residual_qty = 15 [(FluxFldHelp) = "For DOD chore: Any un-filled qty (which is chore qty - fill qty)"];
   // Another hybrid total_bartering_security_size (refer total_bartering_security_size description to understand handling of such hybrids)
   optional float indicative_consumable_residual = 11 [(FluxFldHelp) = "max_residual - ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px))"];
-  optional float all_bkr_cxlled_qty = 12 [(FluxFldHelp) = "sum of all bkr cancels for this leg"];
+  optional int64 all_bkr_cxlled_qty = 12 [(FluxFldHelp) = "sum of all bkr cancels for this leg"];
   optional float open_notional = 13 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "(symbol specific total qty * symbol_avg_px) - fill notional - (cxlled/rejected qty * symbol_avg_px)"];
-  optional float open_qty = 14 [(FluxFldHelp) = "sum of all open chore qty for this leg: reduce if chore is filled / rejected / cancelled (symbol side snapshot based compute)"];
+  optional int64 open_qty = 14 [(FluxFldHelp) = "sum of all open chore qty for this leg: reduce if chore is filled / rejected / cancelled (symbol side snapshot based compute)"];
 }
 
 message StratBrief{
