@@ -17,7 +17,9 @@ namespace FluxCppCore {
 
                 if (cp_module == nullptr) {
                     cp_module = PyImport_ImportModule(mobile_book_handler::mobile_book_cache_module_name.c_str());
-                    assert(cp_module != nullptr && "Failed to import module");
+                    if (cp_module == nullptr) {
+                        PyErr_Print();
+                    }
                 }
 
                 PyObject* p_add_container_obj_for_symbol_func_ = PyObject_GetAttrString(
@@ -35,7 +37,9 @@ namespace FluxCppCore {
 
             if (cp_module == nullptr) {
                 cp_module = PyImport_ImportModule(mobile_book_handler::mobile_book_cache_module_name.c_str());
-                assert(cp_module != nullptr);
+                if (cp_module == nullptr) {
+                    PyErr_Print();
+                }
             }
 
             p_mobile_book_container_class = PyObject_GetAttrString(cp_module, mobile_book_handler::get_mobile_book_container_key.c_str());

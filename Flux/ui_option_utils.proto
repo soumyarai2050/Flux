@@ -93,6 +93,7 @@ message WidgetUIDataElement {
   optional bool depends_on_model_name_for_port = 20 [default=false];
   repeated OverrideDefaultCRUD override_default_crud = 21;
   optional bool is_model_alert_type = 22;
+  repeated SortOrder join_sort_orders = 23;
 }
 
 message WidgetUIOption {
@@ -124,6 +125,8 @@ message WidgetUIData{
   repeated string join_by = 10;
   optional bool joined_at_center = 11 [default = false];  // if set, all join keys are at center
   optional bool flip = 12 [default = false];  // if set, column orders are reversed
+  repeated string show_less = 13;
+  repeated string data_source_colors = 14;
 }
 
 message UIButton{
@@ -136,6 +139,7 @@ message UIButton{
   optional string action = 8;
   required string pressed_value_as_text = 9;
   optional string button_icon_name = 10;
+  optional bool allow_force_update = 11 [default = false];  // if true, double click will trigger update without confirmation
 }
 
 message UIProgressBar{

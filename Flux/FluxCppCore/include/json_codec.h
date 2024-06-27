@@ -4,7 +4,6 @@
 #include <google/protobuf/util/json_util.h>
 #include <absl/status/status.h>
 
-#include "quill/Quill.h"
 #include "string_util.h"
 #include "logger.h"
 

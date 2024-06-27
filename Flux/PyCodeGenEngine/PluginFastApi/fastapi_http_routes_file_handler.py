@@ -614,6 +614,39 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                         int_field_list.append(field.proto.name)
         return int_field_list
 
+    def __handle_str_int_val_callable_variables_set(
+            self, temp_field_name_dict: Dict, last_field_name: str,
+            indent_count: int, is_recurr_call: bool = False):
+        fields = temp_field_name_dict.keys()
+
+        output_str = ""
+        if fields and is_recurr_call:
+            output_str += " " * (
+                    indent_count * 4) + f'if {last_field_name} is not None:\n'
+            indent_count += 1
+        for field in fields:
+            if not (field[0] == "[" and field[-1] == "]"):
+                val = last_field_name + "__" + field
+                output_str += " " * (
+                        indent_count * 4) + f'{val} = {last_field_name}.get("{field}")\n'
+                if not temp_field_name_dict[field]:     # if is last node
+                    output_str += " " * (
+                            indent_count * 4) + f'if {val} is not None and isinstance({val}, str):\n'
+                    indent_count += 1
+                    output_str += " " * (
+                            indent_count * 4) + f'{last_field_name}["{field}"] = parse_to_int({val})\n'
+                    indent_count -= 1
+        if fields and is_recurr_call:
+            indent_count -= 1
+
+        for field in fields:
+            if not (field[0] == "[" and field[-1] == "]"):
+                last_field_name_ = last_field_name + "__" + field
+                output_str += self.__handle_str_int_val_callable_variables_set(
+                                temp_field_name_dict[field], last_field_name_, indent_count,
+                                is_recurr_call=True)
+        return output_str
+
     def _handle_str_int_val_callable_generation(self, message: protogen.Message) -> str:
         if message in self._msg_already_generated_str_formatted_int_fields_handler_list:
             # if handler function is already generated for this model for either patch or patch_all then
@@ -629,36 +662,63 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         if int_field_list:
             output_str += (f"def handle_str_formatted_int_fields_in_{message_name_camel_cased}_"
                            f"json({message_name_camel_cased}_update_req_json: Dict) -> None:\n")
+
+            temp_field_name_dict: Dict = {}
+            last_field_name = f"{message_name_camel_cased}_update_req_json"
+            temp_field_name_dict[last_field_name] = {}
+            for int_field in int_field_list:
+                int_fields_dot_sep_list: List[str] = int_field.split(".")
+
+                temp_dict = temp_field_name_dict[last_field_name]
+                for index, field in enumerate(int_fields_dot_sep_list):
+                    if field not in temp_dict:
+                        temp_dict[field] = {}
+                    temp_dict = temp_dict[field]
+
+            output_str += "\n"
+
+            indent_count = 1
+            output_str += self.__handle_str_int_val_callable_variables_set(
+                            temp_field_name_dict[last_field_name], last_field_name, indent_count)
+            output_str += "\n"
+
             for int_field in int_field_list:
                 int_fields_dot_sep_list: List[str] = int_field.split(".")
                 indent_count = 1
                 last_field_name = f"{message_name_camel_cased}_update_req_json"
-                for index, field in enumerate(int_fields_dot_sep_list):
-                    if field == int_fields_dot_sep_list[-1]:
-                        output_str += " " * (
-                                    indent_count * 4) + f'{field} = {last_field_name}.get("{field}")\n'
-                        output_str += (" " * (indent_count*4) +
-                                       f"if {field} is not None and isinstance({field}, str):\n")
-                        indent_count += 1
-                        output_str += (" " * (indent_count*4) +
-                                       f'{last_field_name}["{field}"] = parse_to_int({field})\n')
-                        output_str += "\n"
-                    else:
-                        if field[0] == "[" and field[-1] == "]":
-                            field = field[1:-1]  # removing [] from field name added to identify as list type
+
+                _has_repeated_fields: bool = False
+                for field in int_fields_dot_sep_list:
+                    if field.startswith("[") and field.endswith("]"):
+                        _has_repeated_fields = True
+
+                if _has_repeated_fields:
+                    for index, field in enumerate(int_fields_dot_sep_list):
+                        if field == int_fields_dot_sep_list[-1]:
                             output_str += " " * (
-                                    indent_count * 4) + f'{field} = {last_field_name}.get("{field}")\n'
-                            output_str += " " * (indent_count * 4) + f"if {field}:\n"
+                                        indent_count * 4) + f'{field} = {last_field_name}.get("{field}")\n'
+                            output_str += (" " * (indent_count*4) +
+                                           f"if {field} is not None and isinstance({field}, str):\n")
                             indent_count += 1
-                            output_str += " " * (indent_count * 4) + f"for {field}_ in {field}:\n"
-                            indent_count += 1
-                            last_field_name = f"{field}_"
+                            output_str += (" " * (indent_count*4) +
+                                           f'{last_field_name}["{field}"] = parse_to_int({field})\n')
+                            output_str += "\n"
                         else:
-                            output_str += " " * (
-                                    indent_count * 4) + f'{field} = {last_field_name}.get("{field}")\n'
-                            output_str += " " * (indent_count*4) + f"if {field} is not None:\n"
-                            indent_count += 1
-                            last_field_name = field
+                            if field[0] == "[" and field[-1] == "]":
+                                field = field[1:-1]  # removing [] from field name added to identify as list type
+                                output_str += " " * (
+                                        indent_count * 4) + f'{field} = {last_field_name}.get("{field}")\n'
+                                output_str += " " * (indent_count * 4) + f"if {field}:\n"
+                                indent_count += 1
+                                output_str += " " * (indent_count * 4) + f"for {field}_ in {field}:\n"
+                                indent_count += 1
+                                last_field_name = f"{field}_"
+                            else:
+                                output_str += " " * (
+                                        indent_count * 4) + f'{field} = {last_field_name}.get("{field}")\n'
+                                output_str += " " * (indent_count*4) + f"if {field} is not None:\n"
+                                indent_count += 1
+                                last_field_name = field
 
             # adding msg to cache to be checked for another call from patch or patch_all to avoid
             # duplicate function creation

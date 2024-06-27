@@ -407,7 +407,17 @@ def get_open_chore_snapshots_for_symbol(symbol: str):
                                 "chore_brief.security.sec_id": symbol
                             },
                             {
-                                "chore_status": "OE_AMD"
+                                "chore_status": "OE_AMD_DN_UNACKED"
+                            }
+                        ]
+                    },
+                    {
+                        "$and": [
+                            {
+                                "chore_brief.security.sec_id": symbol
+                            },
+                            {
+                                "chore_status": "OE_AMD_UP_UNACKED"
                             }
                         ]
                     }

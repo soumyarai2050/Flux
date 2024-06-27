@@ -671,9 +671,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += f"            state.{message_name_camel_cased}Array = data;\n"
                 else:
                     output_str += f"            const dict = action.payload;\n"
-                    output_str += f"            const updatedArray = state.{message_name_camel_cased}Array;\n"
+                    output_str += f"            let updatedArray = state.{message_name_camel_cased}Array;\n"
                     output_str += "            _.values(dict).forEach(v => {\n"
-                    output_str += "                applyGetAllWebsocketUpdate(updatedArray, v);\n"
+                    output_str += "                updatedArray = applyGetAllWebsocketUpdate(updatedArray, v);\n"
                     output_str += "            })\n"
                     output_str += f"            state.{message_name_camel_cased}Array = updatedArray;\n"
                 output_str += f"            if (state.selected{message_name}Id) " + "{\n"

@@ -139,6 +139,8 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += "            onJoinByChange={onJoinByChange}\n"
             output_str += "            onCenterJoinChange={onCenterJoinChange}\n"
             output_str += "            onFlipChange={onFlipChange}\n"
+            output_str += "            onShowLessChange={onShowLessChange}\n"
+            output_str += "            onDataSourceColorsChange={onDataSourceColorsChange}\n"
             output_str += f'        />\n'
             output_str += f'    </Paper>\n'
             output_str += '}\n'

@@ -49,6 +49,7 @@ const CustomHeadCell = (props) => {
                     if (cell.key.startsWith('xpath_') || cell.hide) {
                         return;
                     }
+                    // if (cell.showLess) return;
                     let tableHeadColor = theme.palette.text.primary;
                     if (cell.nameColor) {
                         const color = cell.nameColor.toLowerCase();

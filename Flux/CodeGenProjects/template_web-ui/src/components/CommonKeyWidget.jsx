@@ -96,7 +96,7 @@ const CommonKey = (props) => {
         } else if (collection.type === DataTypes.STRING && !isValidJsonString(updatedData)) {
             let tooltipText = "";
             if (updatedData !== null && updatedData !== undefined) {
-                let lines = updatedData.split("\n");
+                let lines = updatedData.replace(/\\n/g, '\n').split('\n');
                 tooltipText = (
                     <>
                         {lines.map((line, idx) => (

@@ -78,6 +78,10 @@ code {
   display: inline-block !important;
 }
 
+.react-json-view .string-value {
+  overflow-wrap: anywhere;
+}
+
 .react-json-view {
   /* background-color: var(--grey-200) !important; */
   padding: 5px;

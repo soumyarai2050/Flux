@@ -220,12 +220,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup, FormValidation, " \
                               "CollectionSwitchPopup } from '../components/Popup';\n"
             else:
-                output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup, FormValidation } " \
+                output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup, FormValidation, DataSourceHexColorPopup } " \
                               "from '../components/Popup';\n"
         output_str += "import { FullScreenModalOptional } from '../components/Modal';\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += ("import { Fullscreen, CloseFullscreen, VerticalAlignBottom, VerticalAlignCenter, "
-                           "SwapHoriz, JoinInner } from '@mui/icons-material';\n")
+                           "SwapHoriz, JoinInner, ColorLens } from '@mui/icons-material';\n")
             output_str += "import { Checkbox, FormControlLabel, MenuItem, Popover } from '@mui/material';\n"
         else:
             output_str += "import { Fullscreen, CloseFullscreen } from '@mui/icons-material';\n"
@@ -292,6 +292,16 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                            "fontSize='small' /></Icon>}\n")
             output_str += ("            {joinBy && joinBy.length > 0 && <Icon name={flipText} title={flipText} "
                            "selected={flip} onClick={onToggleFlip}><SwapHoriz fontSize='small' /></Icon>}\n")
+            output_str += ("            {joinBy && joinBy.length > 0 && <Icon name='Data Source Hex Color' "
+                           "title='Data Source Hex Color' selected={openDataSourceDialog} "
+                           "onClick={() => setOpenDataSourceDialog(true)}><ColorLens fontSize='small' /></Icon>}\n")
+            output_str += "            <DataSourceHexColorPopup\n"
+            output_str += "                open={openDataSourceDialog}\n"
+            output_str += "                onClose={() => setOpenDataSourceDialog(false)}\n"
+            output_str += "                maxRowSize={maxRowSize}\n"
+            output_str += "                dataSourceColors={dataSourceColors}\n"
+            output_str += "                onSave={onDataSourceColorsChange}\n"
+            output_str += "            />\n"
             output_str += ("            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}>"
                            "<CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' "
                            "onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n")
@@ -446,6 +456,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    sortOrders={sortOrders}\n"
         output_str += "                    onSortOrdersChange={onSortOrdersChange}\n"
         output_str += "                    onForceSave={onForceSave}\n"
+        output_str += "                    showLess={showLess}\n"
+        output_str += "                    onShowLessChange={onShowLessChange}\n"
         if layout_type != JsxFileGenPlugin.repeated_root_type:
             output_str += "                    forceUpdate={forceUpdate}\n"
         if layout_type in [JsxFileGenPlugin.repeated_root_type, JsxFileGenPlugin.root_type]:
@@ -468,6 +480,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    groupBy={joinBy && joinBy.length > 0}\n"
             output_str += "                    centerJoin={centerJoin}\n"
             output_str += "                    flip={flip}\n"
+            output_str += "                    dataSourceColors={dataSourceColors}\n"
         output_str += "                />\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "            ) : widgetOption.view_layout === Layouts.PIVOT_TABLE ? (\n"
@@ -615,6 +628,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [disableWs, setDisableWs] = useState(false);\n"
                 output_str += "    const [openJoin, setOpenJoin] = useState(false);\n"
                 output_str += "    const [joinArchorEl, setJoinArcholEl] = useState();\n"
+                output_str += "    const [openDataSourceDialog, setOpenDataSourceDialog] = useState(false)\n"
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                     message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
                 other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
@@ -972,6 +986,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    joinBy={joinBy}\n"
         output_str += "                    centerJoin={centerJoin}\n"
         output_str += "                    flip={flip}\n"
+        output_str += "                    joinSortOrders={joinSortOrders}\n"
+        output_str += "                    showLess={showLess}\n"
+        output_str += "                    onShowLessChange={onShowLessChange}\n"
+        output_str += "                    dataSourceColors={dataSourceColors}\n"
+        output_str += "                    onDataSourceColorsChange={onDataSourceColorsChange}\n"
         output_str += "                />\n"
         output_str += "            )}\n"
         output_str += "            <FormValidation\n"
@@ -1188,11 +1207,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const flip = widgetOption.flip;\n"
         output_str += "    const columnOrders = widgetOption.column_orders;\n"
         output_str += "    const sortOrders = widgetOption.sort_orders;\n"
+        output_str += "    const joinSortOrders = currentSchema.widget_ui_data_element.join_sort_orders;\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "    let groupedRows = getGroupedTableRows(rows, joinBy, sortOrders);\n"
+            output_str += "    let groupedRows = getGroupedTableRows(rows, joinBy, joinSortOrders);\n"
         elif layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type:
             output_str += "    let groupedRows = getGroupedTableRows(rows, []);\n"
         # else not required
+        output_str += "    const showLess = widgetOption.show_less ? widgetOption.show_less : [];\n"
+        output_str += "    const dataSourceColors = widgetOption.data_source_colors ? widgetOption.data_source_colors : [];\n"
         output_str += "    const truncateDateTime = widgetOption.hasOwnProperty('truncate_date_time') ? " \
                       "widgetOption.truncate_date_time : false;\n\n"
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
@@ -1255,7 +1277,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
         if layout_type not in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "    const tableColumns = getTableColumns(collections, mode, widgetOption.enable_override, " \
-                          "widgetOption.disable_override"
+                          "widgetOption.disable_override, showLess"
             if layout_type == JsxFileGenPlugin.repeated_root_type:
                 output_str += ", false, true"
             output_str += ");\n"
@@ -2122,7 +2144,32 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "            props.onSortOrdersChange(props.name, orders);\n"
         output_str += "        }\n"
         output_str += "    }\n\n"
-
+        output_str += "    const onShowLessChange = (updatedShowLess) => {\n"
+        output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+        output_str += "            props.onShowLessChange(props.name, updatedShowLess, "
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += "null);\n"
+        elif layout_type == JsxFileGenPlugin.non_root_type:
+            output_str += f"selected{root_message_name}Id);\n"
+        else:
+            output_str += f"selected{message_name}Id);\n"
+        output_str += "        } else {\n"
+        output_str += "            props.onShowLessChange(props.name, updatedShowLess);\n"
+        output_str += "        }\n"
+        output_str += "    }\n\n"
+        output_str += "    const onDataSourceColorsChange = (updatedColors) => {\n"
+        output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+        output_str += "            props.onDataSourceColorsChange(props.name, updatedColors, "
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += "null);\n"
+        elif layout_type == JsxFileGenPlugin.non_root_type:
+            output_str += f"selected{root_message_name}Id);\n"
+        else:
+            output_str += f"selected{message_name}Id);\n"
+        output_str += "        } else {\n"
+        output_str += "            props.onDataSourceColorsChange(props.name, updatedColors);\n"
+        output_str += "        }\n"
+        output_str += "    }\n\n"
 
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "    /* required fields (loaded & buffered) not found. render error view */\n"

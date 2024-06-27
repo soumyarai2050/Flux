@@ -1424,8 +1424,6 @@ export function getAlertBubbleCount(data, bubbleSourcePath) {
     return bubbleCount;
 }
 
-
-
 export function getColorTypeFromPercentage(collection, percentage) {
     let color = ColorTypes.DEFAULT;
     if (collection && collection.color) {
@@ -1556,7 +1554,7 @@ export function hasxpath(data, xpath) {
     return false;
 }
 
-export function getTableColumns(collections, mode, enableOverride = [], disableOverride = [], collectionView = false, repeatedView = false) {
+export function getTableColumns(collections, mode, enableOverride = [], disableOverride = [], showLess = [], collectionView = false, repeatedView = false) {
     let tableColumns = collections
         .map(collection => Object.assign({}, collection))
         .map(collection => {
@@ -1569,6 +1567,9 @@ export function getTableColumns(collections, mode, enableOverride = [], disableO
             }
             if (disableOverride.includes(fieldName)) {
                 collection.hide = false;
+            }
+            if (showLess.includes(fieldName)) {
+                collection.showLess = true;
             }
             if (repeatedView) {
                 collection.rootLevel = false;
@@ -1626,8 +1627,8 @@ export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], 
             for (let i = 0; i < rows.length; i++) {
                 const groupedRow = rows[i];
                 let firstValue = null;
-                for (let j = 0; j< groupedRow.length; j++) {
-                    const value = groupedRow[j][fieldName];
+                for (let j = 0; j< maxRowSize; j++) {
+                    const value = groupedRow?.[j]?.[fieldName];
                     if (!(value === null || value === undefined || value === '')) {
                         firstValue = value;
                         break;
@@ -1696,7 +1697,7 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
                     }
                     fieldName = column.key;
                 }
-                const value = rows[0][column.sourceIndex][fieldName];
+                const value = rows[0][column.sourceIndex]?.[fieldName];
                 if (!column.noCommonKey) {
                     if (value === null || value === undefined) {
                         commonKeyCollections.push(column);
@@ -1731,12 +1732,16 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
             // for (let i = 1; i < rows.length; i++) {
             for (let i = 0; i < rows.length; i++) {
                 const value = rows[i][column.sourceIndex]?.[fieldName];
-                if (!(value === null || value === undefined || value === '')) {
-                    if (value !== firstValue) {
-                        found = false;
-                        break;
-                    }
+                if (value !== firstValue && firstValue !== null) {
+                    found = false;
+                    break;
                 }
+                // if (!(value === null || value === undefined || value === '')) {
+                //     if (value !== firstValue) {
+                //         found = false;
+                //         break;
+                //     }
+                // }
                 // if (rows[i][column.sourceIndex] && rows[i+1][column.sourceIndex]) {
                 //     if (!_.isEqual(rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName])) {
                 //         const values = [rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName]];
@@ -1765,7 +1770,7 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
             }
             if (found) {
                 let collection = column;
-                collection.value = rows[0][column.sourceIndex]?.[fieldName];
+                collection.value = firstValue;
                 commonKeyCollections.push(collection);
             }
             return column;
@@ -3495,7 +3500,15 @@ export function sortColumns(collections, columnOrders, groupBy = false, center =
                     if (seqA < seqB) return 1;
                     else if (seqB < seqA) return -1;
                     else return handleEqualSequence(seqA, seqB, orderA, orderB, true);  // seqA === seqB with flip
+                } else if (a.sourceIndex < b.sourceIndex) {
+                    return -1;
+                } else if (b.sourceIndex < a.sourceIndex) {
+                    return 1;
                 }
+            } else if (a.sourceIndex < b.sourceIndex) {
+                return -1;
+            } else if (b.sourceIndex < a.sourceIndex) {
+                return 1;
             }
         }
         if (seqA < seqB) return -1;
@@ -3554,13 +3567,38 @@ export function getMaxRowSize(rows) {
     return maxSize;
 }
 
-export function getDataSourceColor(theme, dataSourceIndex, joinKey = false, commonGroupKey = false) {
+export function getDataSourceColor(theme, dataSourceIndex, joinKey = false, commonGroupKey = false, overrideColor = null) {
     if (joinKey) {
         return theme.palette.primary.dark;
     } else if (commonGroupKey) {
         return theme.palette.primary.light;
     }
-    const baseColor = theme.palette.background.primary;
+    if (overrideColor && overrideColor.startsWith('#')) {
+        console.log(overrideColor);
+        let updatedOverrideColor = overrideColor;
+        if (overrideColor.length === 4) {
+            updatedOverrideColor = '#';
+            for (let i=1; i < overrideColor.length; i++) {
+                updatedOverrideColor += `${overrideColor[i]}${overrideColor[i]}`;
+            }
+        }
+        if (!/^#[0-9A-F]{6}$/i.test(updatedOverrideColor)) {
+            throw new Error('Invalid base color format');
+        } else {
+            return updatedOverrideColor;
+        }
+    }
+    let baseColor = theme.palette.background.primary;
+    if (typeof baseColor === DataTypes.STRING) {
+        baseColor = baseColor.toUpperCase();
+        if (baseColor.length === 4) {
+            let updatedBaseColor = '#';
+            for (let i=1; i < baseColor.length; i++) {
+                updatedBaseColor += `${baseColor[i]}${baseColor[i]}`;
+            }
+            baseColor = updatedBaseColor;
+        }
+    }
     let stepSize;
     if (theme.palette.mode === Theme.DARK) {
         stepSize = 20;

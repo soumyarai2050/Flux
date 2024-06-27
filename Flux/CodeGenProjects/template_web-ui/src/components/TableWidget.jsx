@@ -21,6 +21,7 @@ import { AlertErrorMessage } from './Alert';
 import classes from './TableWidget.module.css';
 import CopyToClipboard from './CopyToClipboard';
 import { PageCache, PageSizeCache, SortOrderCache } from '../utility/attributeCache';
+import ValueBasedToggleButton from './ValueBasedToggleButton';
 
 const TableWidget = (props) => {
     const [rowTrees, setRowTrees] = useState([]);
@@ -43,6 +44,9 @@ const TableWidget = (props) => {
     const [toastMessage, setToastMessage] = useState(null);
     const [clipboardText, setClipboardText] = useState(null);
     const [userChanges, setUserChanges] = useState({});
+    const [openVisibilityMenu, setOpenVisibilityMenu] = useState(false);
+    const [showMore, setShowMore] = useState(false);
+    const [visibilityMenuArchorEl, setVisibilityMenuAnchorEl] = useState();
 
     useEffect(() => {
         setData(props.data);
@@ -90,6 +94,9 @@ const TableWidget = (props) => {
         let updatedCells = cloneDeep(headCells);
         if (hide) {
             updatedCells = updatedCells.filter(cell => !cell.hide);
+        }
+        if (!showMore) {
+            updatedCells = updatedCells.filter(cell => !cell.showLess);
         }
         updatedCells = updatedCells.filter(cell => {
             if (commonkeys.filter(commonkey => commonkey.key === cell.key && commonkey.tableTitle === cell.tableTitle && commonkey.sourceIndex === cell.sourceIndex).length > 0 && props.mode !== Modes.EDIT_MODE) {
@@ -297,8 +304,10 @@ const TableWidget = (props) => {
         setUserChanges(updatedData);
     }
 
-    const onSettingsItemChange = (e, key) => {
-        let hide = !e.target.checked;
+    const onSettingsItemChange = (e, action, key, value, dataSourceId, source) => {
+    // const onSettingsItemChange = (e, key) => {
+        // let hide = !e.target.checked;
+        let hide = value;
         if (hide) {
             setSelectAll(false);
         }
@@ -329,6 +338,29 @@ const TableWidget = (props) => {
             }
         }
         props.onOverrideChange(enableOverride, disableOverride);
+    }
+
+    const onShowLessChange = (e, action, key, value, dataSourceId, source) => {
+        let less = value;
+        let updatedHeadCells = headCells.map(cell => cell.key === key ? { ...cell, showLess: less } : cell)
+        setHeadCells(updatedHeadCells);
+        let collection = props.collections.filter(c => c.key === key)[0];
+        const showLessArray = cloneDeep(props.showLess);
+        if (less) {
+            if (collection.showLess !== less) {
+                if (!showLessArray.includes(key)) {
+                    showLessArray.push(key);
+                }
+            }
+        } else {
+            let index = showLessArray.indexOf(key);
+            if (index !== -1) {
+                showLessArray.splice(index, 1);
+            }
+        }
+        if (props.onShowLessChange) {
+            props.onShowLessChange(showLessArray);
+        }
     }
 
     const onSettingsOpen = (e) => {
@@ -456,7 +488,12 @@ const TableWidget = (props) => {
         const res = await axios.get(`${url}/get-all-${props.name}`);
         const storedData = widgetType === 'root' && res.data.length > 0 ? res.data[0] : res.data;
         let originalRows = getTableRowsFromData(props.collections, storedData, props.xpath);
-        originalRows.forEach(row => {
+        originalRows.forEach(row => {;
+            Object.entries(row).forEach(([k, v]) => {
+                if (v !== null && typeof v === DataTypes.OBJECT) {
+                    row[k] = JSON.stringify(v)
+                }
+            })
             delete row['data-id'];
         })
         const ws = utils.json_to_sheet(originalRows);
@@ -500,16 +537,70 @@ const TableWidget = (props) => {
         props.onColumnOrdersChange(columnOrders);
     }
 
+    const onVisibilityMenuOpen = (e) => {
+        setOpenVisibilityMenu(true);
+        setVisibilityMenuAnchorEl(e.currentTarget);
+    }
+
+    const onVisibilityMenuClose = () => {
+        setOpenVisibilityMenu(false);
+        setVisibilityMenuAnchorEl(null);
+    }
+
     const maxSequence = Math.max(...headCells.map(cell => cell.sequenceNumber));
+
+    const visibilityMenu = (
+        <>
+            <Icon
+                className={classes.icon}
+                name='Visibility'
+                title='Visibility'
+                onClick={onVisibilityMenuOpen}>
+                <Visibility fontSize='small' />
+            </Icon>
+            <Popover
+                id={`${props.name}_visibility_menu`}
+                open={openVisibilityMenu}
+                anchorEl={visibilityMenuArchorEl}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                onClose={onVisibilityMenuClose}>
+                <MenuItem dense={true}>
+                    <FormControlLabel size='small'
+                        label='Show hidden fields'
+                        control={
+                            <Checkbox
+                                size='small'
+                                checked={!hide}
+                                onChange={() => setHide(!hide)}
+                            />
+                        }
+                    />
+                </MenuItem>
+                <MenuItem dense={true}>
+                    <FormControlLabel size='small'
+                        label='Show More'
+                        control={
+                            <Checkbox
+                                size='small'
+                                checked={showMore}
+                                onChange={() => setShowMore(!showMore)}
+                            />
+                        }
+                    />
+                </MenuItem>
+            </Popover>
+        </>
+    )
 
     let menu = (
         <Fragment>
             {props.headerProps.menu}
-            {hide ? (
+            {visibilityMenu}
+            {/* {hide ? (
                 <Icon className={classes.icon} name="Show" title='Show hidden fields' onClick={() => setHide(false)}><Visibility fontSize='small' /></Icon>
             ) : (
                 <Icon className={classes.icon} name="Hide" title='Hide hidden fields' onClick={() => setHide(true)}><VisibilityOff fontSize='small' /></Icon>
-            )}
+            )} */}
             <Icon className={classes.icon} name="Settings" title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
             <Icon className={classes.icon} name="Export" title="Export" onClick={exportToExcel}><FileDownload fontSize='small' /></Icon>
             <Popover
@@ -518,7 +609,7 @@ const TableWidget = (props) => {
                 anchorEl={settingsArchorEl}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
                 onClose={onSettingsClose}>
-                <MenuItem dense={true}>
+                {/* <MenuItem dense={true}>
                     <FormControlLabel
                         sx={{ display: 'flex', flex: 1 }}
                         size='small'
@@ -534,8 +625,9 @@ const TableWidget = (props) => {
                     <Icon title='show/hide all fields'>
                         <Help />
                     </Icon>
-                </MenuItem>
+                </MenuItem> */}
                 {headCells.map((cell, index) => {
+                    if (cell.sourceIndex !== 0) return;
                     let sequence = cell.sequenceNumber;
                     if (props.columnOrders) {
                         const columnOrder = props.columnOrders.find(column => column.column_name === cell.tableTitle);
@@ -543,6 +635,13 @@ const TableWidget = (props) => {
                             sequence = columnOrder.sequence;
                         }
                     }
+                    const show = !cell.hide;
+                    const showCaption = cell.hide ? 'Show' : 'Hide';
+                    const showColor = show ? 'success' : 'debug';
+                    const more = !cell.showLess;
+                    const moreDisabled = cell.hide;
+                    const moreCaption = more ? 'Show Less' : 'Show More';
+                    const moreColor = more ? 'info' : 'debug';
                     return (
                         <MenuItem key={index} dense={true}>
                             <FormControlLabel
@@ -550,11 +649,22 @@ const TableWidget = (props) => {
                                 size='small'
                                 label={cell.elaborateTitle ? cell.tableTitle : cell.key}
                                 control={
-                                    <Checkbox
+                                    <ValueBasedToggleButton
+                                        name={cell.tableTitle}
                                         size='small'
-                                        checked={cell.hide ? false : true}
-                                        onChange={(e) => onSettingsItemChange(e, cell.tableTitle)}
+                                        selected={show}
+                                        disabled={false}
+                                        value={show}
+                                        caption={showCaption}
+                                        xpath={cell.tableTitle}
+                                        color={showColor}
+                                        onClick={onSettingsItemChange}
                                     />
+                                    // <Checkbox
+                                    //     size='small'
+                                    //     checked={cell.hide ? false : true}
+                                    //     onChange={(e) => onSettingsItemChange(e, cell.tableTitle)}
+                                    // />
                                 }
                             />
                             <Select
@@ -565,6 +675,17 @@ const TableWidget = (props) => {
                                     <MenuItem key={index} value={index + 1}>{index + 1}</MenuItem>
                                 ))}
                             </Select>
+                            <ValueBasedToggleButton
+                                name={cell.tableTitle}
+                                size='small'
+                                selected={more}
+                                disabled={moreDisabled}
+                                value={more}
+                                caption={moreCaption}
+                                xpath={cell.tableTitle}
+                                color={moreColor}
+                                onClick={onShowLessChange}
+                            />
                             <Box sx={{ minWidth: '30px' }}>
                                 {cell.help &&
                                     <Icon title={cell.help}>
@@ -616,7 +737,7 @@ const TableWidget = (props) => {
                                 copyColumnHandler={copyColumnHandler}
                             />
                             <TableBody>
-                                {getActiveRows(rows, page, rowsPerPage, sortOrders)
+                                {getActiveRows(rows, page, rowsPerPage, sortOrders, true)
                                     .map((row, index) => {
                                         let cells = getFilteredCells();
                                         // let selected = selectedRows.filter(id => id === row[0]['data-id']).length > 0;
@@ -654,6 +775,7 @@ const TableWidget = (props) => {
                                                 widgetType={props.widgetType}
                                                 onForceSave={props.onForceSave}
                                                 // rowId={props.widgetType === 'root' ? props.index : row[0]['data-id']}
+                                                dataSourceColors={props.dataSourceColors}
                                             />
                                         )
                                     })}

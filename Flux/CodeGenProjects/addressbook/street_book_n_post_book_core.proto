@@ -20,10 +20,11 @@ enum ChoreEventType{
   OE_INT_REJ = 9;
   OE_BRK_REJ = 10;
   OE_EXH_REJ = 11;
-  OE_AMD_UNACK = 12;
-  OE_AMD_ACK = 13;
-  OE_AMD_REJ = 14;
-  OE_LAPSE = 15;
+  OE_AMD_DN_UNACK = 12;
+  OE_AMD_UP_UNACK = 13;
+  OE_AMD_ACK = 14;
+  OE_AMD_REJ = 15;
+  OE_LAPSE = 16;
 }
 
 enum ChoreStatusType{
@@ -33,7 +34,9 @@ enum ChoreStatusType{
   OE_DOD = 3;
   OE_FILLED = 4;
   OE_OVER_FILLED = 5;
-  OE_AMD = 6;
+  OE_AMD_DN_UNACKED = 6;
+  OE_AMD_UP_UNACKED = 7;
+  OE_OVER_CXLED = 8;
 }
 
 message ChoreJournal{
@@ -135,23 +138,20 @@ message ChoreSnapshot{
   optional float fill_notional = 6 [(FluxFldDisplayType) = "int"];
   optional int64 last_update_fill_qty = 7;
   optional float last_update_fill_px = 8;
-  optional int64 last_amend_qty = 9;
-  optional float last_amend_px = 10;
-  optional int64 last_leaves_qty = 11;
-  optional float last_original_qty = 12;
-  optional float last_original_px = 13;
-  optional int64 total_amend_dn_qty = 14;
-  optional int64 total_amend_up_qty = 15;
-  optional ChoreStatusType last_chore_status = 16;
-  optional int64 last_lapsed_qty = 17;
-  optional int64 total_lapsed_qty = 18;
-  optional int64 total_lapsed_post_unack_amend = 19;
-  optional int64 cxled_qty = 20;
-  optional float avg_cxled_px = 21;
-  optional float cxled_notional = 22 [(FluxFldDisplayType) = "int"];
-  optional int64 create_date_time = 23 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
-  optional int64 last_update_date_time = 24 [(FluxFldValIsDateTime) = true];
-  optional int64 last_n_sec_total_qty = 25 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec chore qty
+  optional int64 pending_amend_dn_qty = 9;
+  optional int64 pending_amend_up_qty = 10;
+  optional int64 pending_amend_dn_px = 11;
+  optional int64 pending_amend_up_px = 12;
+  optional int64 total_amend_dn_qty = 13;
+  optional int64 total_amend_up_qty = 14;
+  optional int64 last_lapsed_qty = 15;
+  optional int64 total_lapsed_qty = 16;
+  optional int64 cxled_qty = 17;
+  optional float avg_cxled_px = 18;
+  optional float cxled_notional = 19 [(FluxFldDisplayType) = "int"];
+  optional int64 create_date_time = 20 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 21 [(FluxFldValIsDateTime) = true];
+  optional int64 last_n_sec_total_qty = 22 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec chore qty
 }
 
 message PairSideBarteringBrief{

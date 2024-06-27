@@ -279,6 +279,10 @@ message StratCollection{
     h: 13,
     widget_ui_data: {
       view_layout: UI_ABBREVIATED_FILTER
+    },
+    join_sort_chores: {
+      chore_by: 'Side',
+      sort_type: 'asc'
     }
   };
   option (FluxMsgSmallSizedCollection) = true;

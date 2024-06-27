@@ -222,6 +222,21 @@ def get_default_max_notional() -> int:
     return 300_000
 
 
+TERMINAL_STATES: Final[List[ChoreStatusType]] = [ChoreStatusType.OE_DOD]
+OTHER_TERMINAL_STATES: Final[List[ChoreStatusType]] = [ChoreStatusType.OE_FILLED,
+                                                       ChoreStatusType.OE_OVER_FILLED, ChoreStatusType.OE_OVER_CXLED]
+NON_FILLED_TERMINAL_STATES: Final[List[ChoreStatusType]] = [ChoreStatusType.OE_DOD,
+                                                            ChoreStatusType.OE_OVER_FILLED,
+                                                            ChoreStatusType.OE_OVER_CXLED]
+
+def is_chore_status_terminal(chore_status: ChoreStatusType) -> bool:
+    return chore_status in TERMINAL_STATES + OTHER_TERMINAL_STATES
+
+
+def chore_has_terminal_state(chore_snapshot: ChoreSnapshot) -> bool:
+    return chore_snapshot.chore_status in TERMINAL_STATES + OTHER_TERMINAL_STATES
+
+
 class MobileBookMutexManager:
     def __init__(self, mobile_book_provider: ctypes.CDLL, *args):
         self.mobile_book_provider = mobile_book_provider

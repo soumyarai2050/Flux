@@ -27,6 +27,18 @@ template <class T> struct Monitor
         lock.unlock();
         c_.notify_all();
     }
+    void push(T&& data)
+    {
+        std::unique_lock<std::mutex> lock(m_);
+        q_.push(std::move(data));
+        lock.unlock();
+        c_.notify_all();
+    }
+
+    auto  size() {
+        return q_.size();
+    }
+
     bool pop(T& val)
     {
         std::unique_lock<std::mutex> lock(m_);

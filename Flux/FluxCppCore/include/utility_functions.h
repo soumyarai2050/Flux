@@ -3,6 +3,7 @@
 #include <boost/asio.hpp>
 #include <Python.h>
 #include <quill/Quill.h>
+#include <yaml-cpp/yaml.h>
 
 #include "market_data_service.pb.h"
 #include "market_data_constants.h"
@@ -17,6 +18,46 @@ namespace FluxCppCore {
         return static_cast<int32_t>(acceptor.local_endpoint().port());
     }
 
+    void inline get_trade_symbols_from_config(std::vector<std::string> &r_symbols_out) {
+            std::string config_file_name = "trade_symbols.yaml";
+            auto root_dir = std::filesystem::current_path().parent_path().parent_path().parent_path();
+            std::filesystem::current_path(root_dir);
+            auto config_dir_path = std::filesystem::current_path() / "ProjectGroup" / "market_data" / "data";
+            if (std::filesystem::exists(config_dir_path)) {
+                std::filesystem::current_path(config_dir_path);
+                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
+                r_symbols_out = config[market_data_handler::symbol_fld_name].as<std::vector<std::string>>();
+            } else {
+                root_dir = std::filesystem::current_path().parent_path().parent_path();
+                std::filesystem::current_path(root_dir);
+                config_dir_path = std::filesystem::current_path() / "TradeEngine" /  "ProjectGroup" / "market_data" / "data";
+                std::filesystem::current_path(config_dir_path);
+                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
+                r_symbols_out = config[market_data_handler::symbol_fld_name].as<std::vector<std::string>>();
+            }
+        }
+
+        int8_t inline get_market_depth_levels_from_config() {
+            std::string config_file_name = "config.yaml";
+            int8_t market_depth_levels{0};
+            auto root_dir = std::filesystem::current_path().parent_path().parent_path().parent_path();
+            std::filesystem::current_path(root_dir);
+            auto config_dir_path = std::filesystem::current_path() / "ProjectGroup" / "strat_executor" / "data";
+            if (std::filesystem::exists(config_dir_path)) {
+                std::filesystem::current_path(config_dir_path);
+                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
+                market_depth_levels = config["market_depth_levels"].as<int8_t>();
+            } else {
+                root_dir = std::filesystem::current_path().parent_path().parent_path();
+                std::filesystem::current_path(root_dir);
+                config_dir_path = std::filesystem::current_path()  / "TradeEngine" / "ProjectGroup" / "strat_executor" / "data";
+                std::filesystem::current_path(config_dir_path);
+                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
+                market_depth_levels =  config["market_depth_levels"].as<int8_t>();
+            }
+            return market_depth_levels;
+        }
+
     struct PythonGIL
     {
         PythonGIL() : py_gil_{PyGILState_Ensure()} {}
@@ -26,6 +67,12 @@ namespace FluxCppCore {
 
         PyGILState_STATE py_gil_;
 
+    };
+
+    enum class CacheOperationResult {
+        SUSSESS_DB_N_CACHE_UPDATE = 1,
+        LOCK_NOT_FOUND = 2,
+        DB_N_CACHE_UPDATE_FAILED = 3,
     };
 
 

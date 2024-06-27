@@ -4085,7 +4085,7 @@ def check_alert_str_in_strat_alerts_n_portfolio_alerts(activated_pair_strat_id: 
             return alert
     else:
         # Checking alert in portfolio_alert if reason failed to add in strat_alert
-        check_alert_str_in_portfolio_alert(check_str, assert_fail_msg)
+        return check_alert_str_in_portfolio_alert(check_str, assert_fail_msg)
 
 
 def handle_place_chore_and_check_str_in_alert_for_executor_limits(symbol: str, side: Side, px: float, qty: int,
@@ -4829,7 +4829,7 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
 
         # running last barter once more before sell side
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
-        print(f"LastBarters created: buy_symbol: {leg1_symbol}, sell_symbol: {sell_symbol}")
+        print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
@@ -4926,6 +4926,521 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
 
         strat_buy_notional += expected_buy_chore_snapshot.fill_notional
         strat_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
+    return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
+
+
+def handle_test_buy_sell_n_sell_buy_pair_chore(
+        total_loop_count: int,
+        refresh_sec: int, buy_chore_: ChoreJournalBaseModel,
+        sell_chore_: ChoreJournalBaseModel,
+        buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
+        expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
+        expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
+        expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
+        pair_strat_list: List[PairStratBaseModel], expected_strat_limits_list: List[StratLimits],
+        expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
+        last_barter_fixture_list: List[Dict],
+        symbol_overview_obj_list: List[SymbolOverviewBaseModel],
+        market_depth_basemodel_list: List[MarketDepthBaseModel],
+        is_non_systematic_run: bool = False):
+    residual_test_wait = 4 * refresh_sec
+
+    active_pair_strat_list = []
+    executor_web_client_list = []
+    for idx, pair_strat_ in enumerate(pair_strat_list):
+        expected_strat_limits_list[idx].residual_restriction.residual_mark_seconds = 2 * refresh_sec
+        active_pair_strat, executor_web_client = (
+            move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
+                                                           symbol_overview_obj_list, expected_strat_limits_list[idx],
+                                                           expected_start_status_))
+        active_pair_strat_list.append(active_pair_strat)
+        executor_web_client_list.append(executor_web_client)
+        print(f"Created Strat: {active_pair_strat}")
+
+    active_pair_strat1 = active_pair_strat_list[0]
+    expected_strat_limits1 = expected_strat_limits_list[0]
+    buy_symbol1 = active_pair_strat_list[0].pair_strat_params.strat_leg1.sec.sec_id
+    sell_symbol1 = active_pair_strat_list[0].pair_strat_params.strat_leg2.sec.sec_id
+
+    active_pair_strat2 = active_pair_strat_list[1]
+    expected_strat_limits2 = expected_strat_limits_list[1]
+    buy_symbol2 = active_pair_strat_list[1].pair_strat_params.strat_leg2.sec.sec_id
+    sell_symbol2 = active_pair_strat_list[1].pair_strat_params.strat_leg1.sec.sec_id
+
+    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
+    buy_tob_last_update_date_time_tracker1: DateTime | None = None
+    buy_tob_last_update_date_time_tracker2: DateTime | None = None
+    sell_tob_last_update_date_time_tracker1: DateTime | None = None
+    sell_tob_last_update_date_time_tracker2: DateTime | None = None
+    buy_chore_id1 = None
+    sell_chore_id1 = None
+    buy_chore_id2 = None
+    sell_chore_id2 = None
+    buy_cxl_chore_id1 = None
+    sell_cxl_chore_id1 = None
+    buy_cxl_chore_id2 = None
+    sell_cxl_chore_id2 = None
+    expected_buy_symbol_side_snapshot1 = copy.deepcopy(expected_symbol_side_snapshot_[0])
+    expected_buy_symbol_side_snapshot1.security.sec_id = buy_symbol1
+    expected_buy_symbol_side_snapshot2 = copy.deepcopy(expected_symbol_side_snapshot_[0])
+    expected_buy_symbol_side_snapshot2.security.sec_id = buy_symbol2
+    expected_sell_symbol_side_snapshot1 = copy.deepcopy(expected_symbol_side_snapshot_[1])
+    expected_sell_symbol_side_snapshot1.security.sec_id = sell_symbol1
+    expected_sell_symbol_side_snapshot2 = copy.deepcopy(expected_symbol_side_snapshot_[1])
+    expected_sell_symbol_side_snapshot2.security.sec_id = sell_symbol2
+    expected_strat_status1 = copy.deepcopy(expected_start_status_)
+    expected_strat_status2 = copy.deepcopy(expected_start_status_)
+    expected_strat_brief_obj1 = copy.deepcopy(expected_strat_brief_)
+    expected_strat_brief_obj1.pair_buy_side_bartering_brief.security.sec_id = buy_symbol1
+    expected_strat_brief_obj1.pair_sell_side_bartering_brief.security.sec_id = sell_symbol1
+    expected_strat_brief_obj2 = copy.deepcopy(expected_strat_brief_)
+    expected_strat_brief_obj2.pair_buy_side_bartering_brief.security.sec_id = buy_symbol2
+    expected_strat_brief_obj2.pair_sell_side_bartering_brief.security.sec_id = sell_symbol2
+
+    bid_buy_top_market_depth1 = None
+    ask_sell_top_market_depth1 = None
+    executor_web_client1 = executor_web_client_list[0]
+    stored_market_depth = executor_web_client1.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol1 and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth1 = market_depth
+        if market_depth.symbol == sell_symbol1 and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth1 = market_depth
+
+    bid_buy_top_market_depth2 = None
+    ask_sell_top_market_depth2 = None
+    executor_web_client2 = executor_web_client_list[1]
+    stored_market_depth = executor_web_client2.get_all_market_depth_client()
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol2 and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth2 = market_depth
+        if market_depth.symbol == sell_symbol2 and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth2 = market_depth
+
+    for loop_count in range(1, total_loop_count + 1):
+
+        # first handling strat with BUY-SELL pair
+        start_time = DateTime.utcnow()
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Loop started at {start_time}")
+        expected_buy_chore_snapshot1 = copy.deepcopy(expected_buy_chore_snapshot_)
+        expected_buy_chore_snapshot1.chore_brief.security.sec_id = buy_symbol1
+
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol1, sell_symbol1, last_barter_fixture_list, executor_web_client1)
+        print(f"LastBarters created: buy_symbol: {buy_symbol1}, sell_symbol: {sell_symbol1}")
+
+        if not is_non_systematic_run:
+            # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+            time.sleep(1)
+            update_tob_through_market_depth_to_place_buy_chore(executor_web_client1, bid_buy_top_market_depth1,
+                                                               ask_sell_top_market_depth1)
+
+            # Waiting for tob to trigger place chore
+            buy_tob_last_update_date_time_tracker1 = \
+                wait_for_get_new_chore_placed_from_tob(100, buy_symbol1,
+                                                       buy_tob_last_update_date_time_tracker1, Side.BUY,
+                                                       executor_web_client1)
+            time_delta = DateTime.utcnow() - start_time
+            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Received buy TOB of last_update_date_time "
+                  f"{buy_tob_last_update_date_time_tracker1}, time delta {time_delta.total_seconds()}")
+        else:
+            # placing new non-systematic new_chore
+            qty = random.randint(85, 95)
+            px = random.randint(90, 100)
+            place_new_chore(buy_symbol1, Side.BUY, px, qty, executor_web_client1)
+            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Created new_chore obj")
+            time.sleep(2)
+
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              buy_symbol1, executor_web_client1,
+                                                                              last_chore_id=buy_chore_id1)
+        buy_chore_id1 = placed_chore_journal.chore.chore_id
+        create_buy_chore_date_time1: DateTime = placed_chore_journal.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Received chore_journal with {buy_chore_id1}")
+        time.sleep(2)
+
+        # Checking placed chore computations
+        check_placed_buy_chore_computes_before_all_sells(
+            loop_count, buy_chore_id1, buy_symbol1,
+            placed_chore_journal, expected_buy_chore_snapshot1,
+            expected_buy_symbol_side_snapshot1,
+            expected_sell_symbol_side_snapshot1,
+            active_pair_strat1,
+            expected_strat_limits1, expected_strat_status1,
+            expected_strat_brief_obj1, executor_web_client1)
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Checked buy placed chore of chore_id {buy_chore_id1}")
+
+        executor_web_client1.barter_simulator_process_chore_ack_query_client(
+            buy_chore_id1, placed_chore_journal.chore.px,
+            placed_chore_journal.chore.qty,
+            placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id,
+            placed_chore_journal.chore.underlying_account
+        )
+
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol1, executor_web_client1)
+
+        # Checking Ack response on placed chore
+        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot1,
+                                     executor_web_client1)
+        print(
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Checked buy placed chore ACK of chore_id {buy_chore_id1}")
+
+        buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
+        buy_fill_journal_obj.fill_qty = random.randint(50, 55)
+        buy_fill_journal_obj.fill_px = random.randint(90, 100)
+        executor_web_client1.barter_simulator_process_fill_query_client(
+            buy_chore_id1, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
+            Side.BUY, buy_symbol1, buy_fill_journal_obj.underlying_account)
+
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(buy_chore_id1, executor_web_client1)
+
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_buy_chore_before_sells(
+            buy_symbol1, placed_fill_journal_obj,
+            expected_buy_chore_snapshot1, expected_buy_symbol_side_snapshot1,
+            expected_sell_symbol_side_snapshot1,
+            active_pair_strat1,
+            expected_strat_limits1, expected_strat_status1,
+            expected_strat_brief_obj1,
+            executor_web_client1)
+        print(
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Checked buy placed chore FILL of chore_id {buy_chore_id1}")
+
+        # Sleeping to let the chore get cxlled
+        time.sleep(residual_test_wait)
+
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+                                                                           buy_symbol1, executor_web_client1,
+                                                                           last_chore_id=buy_cxl_chore_id1)
+        buy_cxl_chore_id1 = cxl_chore_journal.chore.chore_id
+
+        # Checking CXL_ACK receive on placed chore by cxl_req from residual removal
+        check_cxl_receive_for_placed_buy_chore_before_sells(buy_symbol1, cxl_chore_journal,
+                                                            expected_buy_chore_snapshot1,
+                                                            expected_buy_symbol_side_snapshot1,
+                                                            expected_sell_symbol_side_snapshot1,
+                                                            active_pair_strat1,
+                                                            expected_strat_limits1, expected_strat_status1,
+                                                            expected_strat_brief_obj1, executor_web_client1)
+
+        strat_buy_notional += expected_buy_chore_snapshot1.fill_notional
+        strat_buy_fill_notional += expected_buy_chore_snapshot1.fill_notional
+
+        # handle sell chore
+        chore_id = None
+        cxl_chore_id = None
+
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Loop started")
+        expected_sell_chore_snapshot1 = copy.deepcopy(expected_sell_chore_snapshot_)
+        expected_sell_chore_snapshot1.chore_brief.security.sec_id = sell_symbol1
+
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol1, sell_symbol1, last_barter_fixture_list, executor_web_client1)
+        print(f"LastBarters created: buy_symbol: {buy_symbol1}, sell_symbol: {sell_symbol1}")
+
+        if not is_non_systematic_run:
+            # required to make buy side tob latest so that when top update reaches in test place chore function in
+            # executor both side are new last_update_date_time
+            run_last_barter(buy_symbol1, sell_symbol1, [last_barter_fixture_list[0]], executor_web_client1)
+            # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+            update_tob_through_market_depth_to_place_sell_chore(executor_web_client1, ask_sell_top_market_depth1,
+                                                                bid_buy_top_market_depth1)
+
+            # Waiting for tob to trigger place chore
+            sell_tob_last_update_date_time_tracker1 = \
+                wait_for_get_new_chore_placed_from_tob(120, sell_symbol1, sell_tob_last_update_date_time_tracker1,
+                                                       Side.SELL, executor_web_client1)
+            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Received buy TOB")
+        else:
+            # placing new non-systematic new_chore
+            qty = random.randint(95, 105)
+            px = random.randint(100, 110)
+            place_new_chore(sell_symbol1, Side.SELL, px, qty, executor_web_client1)
+            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Created new_chore obj")
+            time.sleep(2)
+
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              sell_symbol1, executor_web_client1,
+                                                                              last_chore_id=sell_chore_id1)
+        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        sell_chore_id1 = placed_chore_journal.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Received chore_journal with {sell_chore_id1}")
+        time.sleep(2)
+
+        # Checking placed chore computations
+        check_placed_sell_chore_computes_after_all_buys(
+            loop_count, sell_chore_id1, sell_symbol1, placed_chore_journal, expected_sell_chore_snapshot1,
+            expected_sell_symbol_side_snapshot1, expected_buy_symbol_side_snapshot1, active_pair_strat1,
+            expected_strat_limits1, expected_strat_status1,
+            expected_strat_brief_obj1, executor_web_client1)
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Checked sell placed chore of chore_id {sell_chore_id1}")
+
+        executor_web_client1.barter_simulator_process_chore_ack_query_client(
+            sell_chore_id1, placed_chore_journal.chore.px,
+            placed_chore_journal.chore.qty,
+            placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id,
+            placed_chore_journal.chore.underlying_account)
+
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol1, executor_web_client1)
+
+        # Checking Ack response on placed chore
+        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+                                      expected_sell_chore_snapshot1, executor_web_client1)
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, "
+              f"Checked sell placed chore ACK of chore_id {sell_chore_id1}")
+
+        sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
+        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
+        sell_fill_journal_obj.fill_px = random.randint(100, 110)
+        executor_web_client1.barter_simulator_process_fill_query_client(
+            sell_chore_id1, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
+            Side.SELL, sell_symbol1, sell_fill_journal_obj.underlying_account)
+
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(sell_chore_id1, executor_web_client1)
+
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_sell_chore_after_all_buys(
+            loop_count, sell_chore_id1, sell_symbol1, placed_fill_journal_obj,
+            expected_sell_chore_snapshot1, expected_sell_symbol_side_snapshot1,
+            expected_buy_symbol_side_snapshot1, active_pair_strat1, expected_strat_limits1,
+            expected_strat_status1, expected_strat_brief_obj1, executor_web_client1)
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Checked sell placed chore FILL")
+
+        # Sleeping to let the chore get cxlled
+        time.sleep(residual_test_wait)
+
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+                                                                           sell_symbol1, executor_web_client1,
+                                                                           last_chore_id=sell_cxl_chore_id1)
+        sell_cxl_chore_id1 = cxl_chore_journal.chore.chore_id
+
+        # Checking CXL_ACK receive on cxl req by residual handler
+        check_cxl_receive_for_placed_sell_chore_after_all_buys(sell_symbol1,
+                                                               cxl_chore_journal, expected_sell_chore_snapshot1,
+                                                               expected_sell_symbol_side_snapshot1,
+                                                               expected_buy_symbol_side_snapshot1,
+                                                               active_pair_strat1, expected_strat_limits1,
+                                                               expected_strat_status1, expected_strat_brief_obj1,
+                                                               executor_web_client1)
+
+        strat_sell_notional += expected_sell_chore_snapshot1.fill_notional
+        strat_sell_fill_notional += expected_sell_chore_snapshot1.fill_notional
+
+        ################################################################################################################
+        # Now handling SELL-BUY strat's chore
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Loop started")
+        expected_sell_chore_snapshot2 = copy.deepcopy(expected_sell_chore_snapshot_)
+        expected_sell_chore_snapshot2.chore_brief.security.sec_id = sell_symbol2
+
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, executor_web_client2)
+        print(f"LastBarters created: buy_symbol: {buy_symbol2}, sell_symbol: {sell_symbol2}")
+
+        if not is_non_systematic_run:
+            # required to make buy side tob latest so that when top update reaches in test place chore function in
+            # executor both side are new last_update_date_time
+            run_last_barter(buy_symbol2, sell_symbol2, [last_barter_fixture_list[0]], executor_web_client2)
+            # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+            update_tob_through_market_depth_to_place_sell_chore(executor_web_client2, ask_sell_top_market_depth2,
+                                                                bid_buy_top_market_depth2)
+
+            # Waiting for tob to trigger place chore
+            sell_tob_last_update_date_time_tracker = \
+                wait_for_get_new_chore_placed_from_tob(120, sell_symbol2,
+                                                       sell_tob_last_update_date_time_tracker2,
+                                                       Side.SELL, executor_web_client2)
+            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Received buy TOB")
+        else:
+            # placing new non-systematic new_chore
+            qty = random.randint(95, 105)
+            px = random.randint(100, 110)
+            place_new_chore(sell_symbol2, Side.SELL, px, qty, executor_web_client2)
+            print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Created new_chore obj")
+            time.sleep(2)
+
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              sell_symbol2, executor_web_client2,
+                                                                              last_chore_id=sell_chore_id2)
+        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        sell_chore_id2 = placed_chore_journal.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Received chore_journal with {sell_chore_id2}")
+        time.sleep(2)
+
+        # Checking placed chore computations
+        check_placed_sell_chore_computes_before_buys(loop_count, sell_chore_id2, sell_symbol2,
+                                                     placed_chore_journal, expected_sell_chore_snapshot2,
+                                                     expected_sell_symbol_side_snapshot2,
+                                                     expected_buy_symbol_side_snapshot2, active_pair_strat2,
+                                                     expected_strat_limits2, expected_strat_status2,
+                                                     expected_strat_brief_obj2, executor_web_client2)
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Checked sell placed chore of chore_id {sell_chore_id2}")
+
+        executor_web_client2.barter_simulator_process_chore_ack_query_client(
+            sell_chore_id2, placed_chore_journal.chore.px, placed_chore_journal.chore.qty, placed_chore_journal.chore.side,
+            placed_chore_journal.chore.security.sec_id, placed_chore_journal.chore.underlying_account)
+
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol2, executor_web_client2)
+
+        # Checking Ack response on placed chore
+        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+                                      expected_sell_chore_snapshot2, executor_web_client2)
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, "
+              f"Checked sell placed chore ACK of chore_id {sell_chore_id2}")
+
+        sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
+        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
+        sell_fill_journal_obj.fill_px = random.randint(100, 110)
+        executor_web_client2.barter_simulator_process_fill_query_client(
+            sell_chore_id2, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
+            Side.SELL, sell_symbol2, sell_fill_journal_obj.underlying_account)
+
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(sell_chore_id2, executor_web_client2)
+
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_sell_chore_before_buys(
+            sell_symbol2, placed_fill_journal_obj,
+            expected_sell_chore_snapshot2, expected_sell_symbol_side_snapshot2,
+            expected_buy_symbol_side_snapshot2, active_pair_strat2,
+            expected_strat_limits2, expected_strat_status2, expected_strat_brief_obj2,
+            executor_web_client2)
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Checked sell placed chore FILL")
+
+        # Sleeping to let the chore get cxlled
+        time.sleep(residual_test_wait)
+
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+                                                                           sell_symbol2, executor_web_client2,
+                                                                           last_chore_id=sell_cxl_chore_id2)
+        sell_cxl_chore_id2 = cxl_chore_journal.chore.chore_id
+
+        # Checking CXL_ACK receive on cxl req by residual handler
+        check_cxl_receive_for_placed_sell_chore_before_buy(sell_symbol2,
+                                                           cxl_chore_journal, expected_sell_chore_snapshot2,
+                                                           expected_sell_symbol_side_snapshot2,
+                                                           expected_buy_symbol_side_snapshot2,
+                                                           active_pair_strat2, expected_strat_limits2,
+                                                           expected_strat_status2, expected_strat_brief_obj2,
+                                                           executor_web_client2)
+
+        strat_sell_notional += expected_sell_chore_snapshot2.fill_notional
+        strat_sell_fill_notional += expected_sell_chore_snapshot2.fill_notional
+
+        start_time = DateTime.utcnow()
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Loop started at {start_time}")
+        expected_buy_chore_snapshot2 = copy.deepcopy(expected_buy_chore_snapshot_)
+        expected_buy_chore_snapshot2.chore_brief.security.sec_id = buy_symbol2
+
+        # placing chore
+        current_itr_expected_buy_chore_journal_ = copy.deepcopy(buy_chore_)
+        current_itr_expected_buy_chore_journal_.chore.security.sec_id = buy_symbol2
+
+        # running last barter once more before sell side
+        run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, executor_web_client2)
+        print(f"LastBarters created: buy_symbol: {buy_symbol2}, sell_symbol: {sell_symbol2}")
+
+        if not is_non_systematic_run:
+            # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
+            time.sleep(1)
+            update_tob_through_market_depth_to_place_buy_chore(executor_web_client2, bid_buy_top_market_depth2,
+                                                               ask_sell_top_market_depth2)
+
+            # Waiting for tob to trigger place chore
+            buy_tob_last_update_date_time_tracker = \
+                wait_for_get_new_chore_placed_from_tob(100, buy_symbol2,
+                                                       buy_tob_last_update_date_time_tracker2, Side.BUY,
+                                                       executor_web_client2)
+            time_delta = DateTime.utcnow() - start_time
+            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Received buy TOB of last_update_date_time "
+                  f"{buy_tob_last_update_date_time_tracker}, time delta {time_delta.total_seconds()}")
+        else:
+            # placing new non-systematic new_chore
+            qty = random.randint(85, 95)
+            px = random.randint(90, 100)
+            place_new_chore(buy_symbol2, Side.BUY, px, qty, executor_web_client2)
+            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Created new_chore obj")
+            time.sleep(2)
+
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              buy_symbol2, executor_web_client2,
+                                                                              last_chore_id=buy_chore_id2)
+        buy_chore_id2 = placed_chore_journal.chore.chore_id
+        create_buy_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Received chore_journal with {buy_chore_id2}")
+        time.sleep(2)
+
+        # Checking placed chore computations
+        check_placed_buy_chore_computes_after_sells(loop_count, buy_chore_id2, buy_symbol2,
+                                                    placed_chore_journal, expected_buy_chore_snapshot2,
+                                                    expected_buy_symbol_side_snapshot2,
+                                                    expected_sell_symbol_side_snapshot2, active_pair_strat2,
+                                                    expected_strat_limits2, expected_strat_status2,
+                                                    expected_strat_brief_obj2, executor_web_client2)
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Checked buy placed chore of chore_id {buy_chore_id2}")
+
+        executor_web_client2.barter_simulator_process_chore_ack_query_client(
+            buy_chore_id2, current_itr_expected_buy_chore_journal_.chore.px,
+            current_itr_expected_buy_chore_journal_.chore.qty,
+            current_itr_expected_buy_chore_journal_.chore.side,
+            current_itr_expected_buy_chore_journal_.chore.security.sec_id,
+            current_itr_expected_buy_chore_journal_.chore.underlying_account
+        )
+
+        placed_chore_journal_obj_ack_response = \
+            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol2, executor_web_client2)
+
+        # Checking Ack response on placed chore
+        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot2,
+                                     executor_web_client2)
+        print(
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Checked buy placed chore ACK of chore_id {buy_chore_id2}")
+
+        buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
+        buy_fill_journal_obj.fill_qty = random.randint(50, 55)
+        buy_fill_journal_obj.fill_px = random.randint(90, 100)
+        executor_web_client2.barter_simulator_process_fill_query_client(
+            buy_chore_id2, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
+            Side.BUY, buy_symbol2, buy_fill_journal_obj.underlying_account)
+
+        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(buy_chore_id2, executor_web_client2)
+
+        # Checking Fill receive on placed chore
+        check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count, buy_chore_id2,
+                                                                buy_symbol2, placed_fill_journal_obj,
+                                                                expected_buy_chore_snapshot2,
+                                                                expected_buy_symbol_side_snapshot2,
+                                                                expected_sell_symbol_side_snapshot2, active_pair_strat2,
+                                                                expected_strat_limits2, expected_strat_status2,
+                                                                expected_strat_brief_obj2, executor_web_client2)
+        print(
+            f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Checked buy placed chore FILL of chore_id {chore_id}")
+
+        # Sleeping to let the chore get cxlled
+        time.sleep(residual_test_wait)
+
+        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+                                                                           buy_symbol2, executor_web_client2,
+                                                                           last_chore_id=buy_cxl_chore_id2)
+        buy_cxl_chore_id2 = cxl_chore_journal.chore.chore_id
+
+        # Checking CXL_ACK receive on cxl req by residual handler
+        check_cxl_receive_for_placed_buy_chore_after_all_sells(buy_symbol2,
+                                                               cxl_chore_journal, expected_buy_chore_snapshot2,
+                                                               expected_buy_symbol_side_snapshot2,
+                                                               expected_sell_symbol_side_snapshot2,
+                                                               active_pair_strat2, expected_strat_limits2,
+                                                               expected_strat_status2, expected_strat_brief_obj2,
+                                                               executor_web_client2)
+
+        strat_buy_notional += expected_buy_chore_snapshot2.fill_notional
+        strat_buy_fill_notional += expected_buy_chore_snapshot2.fill_notional
+
+        # Any additional compute post each strat's single chore comes here ...
+
     return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
 
 

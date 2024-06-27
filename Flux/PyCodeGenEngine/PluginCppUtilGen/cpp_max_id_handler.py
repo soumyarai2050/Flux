@@ -90,7 +90,7 @@ class CppMaxIdHandler(BaseProtoPlugin):
         output_content: str = ""
         output_content += "#pragma once\n\n"
         output_content += "#include <iostream>\n"
-        output_content += f'#include <mutex>"\n\n'
+        output_content += f'#include <mutex>\n\n'
 
         return output_content
 

@@ -191,6 +191,7 @@ const DynamicMenu = (props) => {
                             caption={caption}
                             disabled={isDisabledValue}
                             xpath={xpath}
+                            allowForceUpdate={collection.button.allow_force_update}
                             action={collection.button.action}
                             source={collection.source}
                             onClick={onClick}
@@ -240,6 +241,7 @@ const DynamicMenu = (props) => {
                             caption={caption}
                             disabled={isDisabledValue}
                             xpath={xpath}
+                            allowForceUpdate={collection.button.allow_force_update}
                             action={collection.button.action}
                             onClick={onClick}
                             iconName={collection.button.button_icon_name}

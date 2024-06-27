@@ -192,8 +192,8 @@ export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation
     return rows;
 }
 
-export function getActiveRows(rows, page, pageSize, sortOrders) {
-    return stableSort(rows, SortComparator.getInstance(sortOrders))
+export function getActiveRows(rows, page, pageSize, sortOrders, nestedArray = false) {
+    return stableSort(rows, SortComparator.getInstance(sortOrders, nestedArray))
         .slice(page * pageSize, page * pageSize + pageSize);
 }
 
@@ -288,9 +288,12 @@ export function sortAlertArray(alertArray) {
         } else if (severityB > severityA) {
             return 1;
         } else {  // same severity
-            if (a.last_update_analyzer_time >= b.last_update_analyzer_time) {
+            if (a.last_update_analyzer_time > b.last_update_analyzer_time) {
                 return -1;
-            } else {
+            } else {  // same last update date time
+                if (a.alert_count >= b.alert_count) {
+                    return -1;
+                }
                 return 1;
             }
         }
@@ -324,17 +327,92 @@ export function getColorTypeFromValue(collection, value, separator = '-') {
     return color;
 }
 
+// Function to ensure each inner array is symmetric based on max counts of a specified field
+function ensureSymmetry(arr, field) {
+    // Step 1: Calculate max counts for the specified field dynamically
+    let maxCounts = {};
+
+    arr.forEach(innerArr => {
+        let innerArrMaxCounts = {};
+        innerArr.forEach(obj => {
+            let fieldValue = obj[field];
+            if (!innerArrMaxCounts.hasOwnProperty(fieldValue)) {
+                innerArrMaxCounts[fieldValue] = 0;
+            }
+            innerArrMaxCounts[fieldValue]++;
+        });
+        if (maxCounts) {
+            Object.keys(innerArrMaxCounts).forEach(key => {
+                if (!maxCounts.hasOwnProperty(key) || maxCounts[key] < innerArrMaxCounts[key]) {
+                    maxCounts[key] = innerArrMaxCounts[key];
+                }
+            })
+        } else {
+            maxCounts = { ...innerArrMaxCounts };
+        }
+    });
+
+    // Step 2: Ensure symmetry based on max counts
+    let grouped = arr.map(innerArr => {
+        // Group objects by the specified field
+        let groupedObj = {};
+        Object.keys(maxCounts).map(key => {
+            groupedObj[key] = [];
+        })
+        let grouped = innerArr.reduce((acc, obj) => {
+            let fieldValue = obj[field];
+            if (!acc[fieldValue]) {
+                acc[fieldValue] = [];
+            }
+            acc[fieldValue].push(obj);
+            return acc;
+        }, groupedObj);
+
+        // Ensure each group has exactly maxCounts[field] objects
+        Object.keys(grouped).forEach((key) => {
+            let currentLength = grouped[key].length;
+            if (currentLength < maxCounts[key]) {
+                // Add empty objects to make it symmetric
+                for (let i = currentLength; i < maxCounts[key]; i++) {
+                    grouped[key].push({});
+                }
+            }
+        });
+
+        // Flatten the grouped objects back into an array
+        let result = [];
+        Object.keys(grouped).forEach((key) => {
+            result.push(...grouped[key]);
+        });
+
+        return result;
+    });
+
+    return grouped;
+}
+
 export function getGroupedTableRows(tableRows, groupBy, joinSortOrders = null) {
     if (groupBy && groupBy.length > 0) {
-        tableRows = Object.values(_.groupBy(tableRows, item => {
+        // tableRows = Object.values(_.groupBy(tableRows, item => {
+        //     const groupKeys = [];
+        //     groupBy.forEach(groupingField => {
+        //         groupKeys.push(_.get(item, groupingField));
+        //     })
+        //     return groupKeys.join('_');
+        // }));
+        const groupedRowsDict = _.groupBy(tableRows, item => {
             const groupKeys = [];
             groupBy.forEach(groupingField => {
                 groupKeys.push(_.get(item, groupingField));
             })
             return groupKeys.join('_');
-        }));
+        });
+        tableRows = Object.values(groupedRowsDict);
+
         if (joinSortOrders && joinSortOrders.length > 0) {
             tableRows = tableRows.map(rows => stableSort(rows, SortComparator.getInstance(joinSortOrders)));
+            const joinOrder = joinSortOrders[0].order_by;
+            tableRows = ensureSymmetry(tableRows, joinOrder);
         }
     } else {
         tableRows = tableRows.map(row => [row]);

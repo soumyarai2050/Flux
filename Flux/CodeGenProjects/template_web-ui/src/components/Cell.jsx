@@ -14,7 +14,7 @@ import {
     validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase, getReducerArrrayFromCollections,
     getDataSourceColor
 } from '../utils';
-import { DataTypes, Modes } from '../constants';
+import { ColorTypes, DataTypes, Modes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
@@ -171,7 +171,7 @@ const Cell = (props) => {
         setClipboardText(text);
     }
 
-    const dataSourceColor = getDataSourceColor(theme, collection.sourceIndex, collection.joinKey, collection.commonGroupKey);
+    const dataSourceColor = getDataSourceColor(theme, collection.sourceIndex, collection.joinKey, collection.commonGroupKey, props.dataSourceColors?.[collection.sourceIndex]);
 
     let type = DataTypes.STRING;
     let enumValues = [];
@@ -578,8 +578,8 @@ const Cell = (props) => {
 
     if (type === 'alert_bubble') {
         const classesStr = classesArray.join(' ');
-        const bubbleCount = value[0];
-        const bubbleColor = value[1];
+        const bubbleCount = value ? value[0] : 0;
+        const bubbleColor = value ? value[1] : ColorTypes.DEFAULT;
         return (
             <TableCell
                 className={classesStr}
@@ -675,6 +675,7 @@ const Cell = (props) => {
                     xpath={dataxpath}
                     disabled={!!(dataRemove || disabled || buttonDisable || isDisabledValue)}
                     action={collection.button.action}
+                    allowForceUpdate={collection.button.allow_force_update}
                     dataSourceId={dataSourceId}
                     source={collection.source}
                     onClick={props.onButtonClick}
@@ -769,7 +770,7 @@ const Cell = (props) => {
         } else if (type === DataTypes.STRING && !isValidJsonString(updatedData)) {
             let tooltipText = '';
             if (updatedData !== null && updatedData !== undefined) {
-                let lines = updatedData.split('\n');
+                let lines = updatedData.replace(/\\n/g, '\n').split('\n');
                 tooltipText = (
                     <>
                         {lines.map((line, idx) => (
@@ -835,9 +836,10 @@ const Cell = (props) => {
         value = value.toLocaleString();
     }
     let text, linkText = null;
-    if (collection.type === DataTypes.DATE_TIME && collection.displayType === 'time') {
+    if (collection.type === DataTypes.DATE_TIME && collection.displayType !== 'datetime') {
         linkText = value;
-        text = linkText ? dayjs.utc(linkText).format('HH:mm:ss.SSS') : null;
+        text = linkText ? dayjs.utc(linkText).isSame(dayjs(), 'day') ? dayjs.utc(linkText).format('HH:mm:ss.SSS') : linkText : null;
+        value = text;
     }
     let dataModified = previousValue !== currentValue;
     // if (tableCellColorClass) {
@@ -847,7 +849,7 @@ const Cell = (props) => {
         classesArray.push(disabledClass);
     }
 
-    if (mode === Modes.EDIT_MODE && dataModified) {
+    if (mode === Modes.EDIT_MODE && dataModified && !collection.serverPopulate && !collection.ormNoUpdate) {
         let originalValue = previousValue !== undefined && previousValue !== null ? previousValue : '';
         if (collection.displayType === DataTypes.INTEGER && typeof (originalValue) === DataTypes.NUMBER) {
             originalValue = floatToInt(originalValue);
@@ -891,8 +893,9 @@ const Cell = (props) => {
                 data-xpath={xpath} 
                 data-dataxpath={dataxpath}>
                 <div className={tableCellColorClass}>
-                    {collection.displayType === 'time' ? <LinkText text={text} linkText={linkText} /> :
-                        value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
+                    {/* {collection.displayType === 'time' ? <LinkText text={text} linkText={linkText} /> : */}
+                    {/* value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>} */}
+                    {value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
                     {validationError.current && (
                         <Tooltip title={validationError.current} sx={{ marginLeft: '20px' }} disableInteractive><Error color='error' /></Tooltip>
                     )}

@@ -11,34 +11,42 @@ const ButtonWrapper = ({ condition, wrapper, children }) => {
 const ValueBasedToggleButton = (props) => {
     let buttonClass = classes[props.color];
     const Icon = props.iconName ? MuiIcon[props.iconName] : null;
+    let disabledClass = '';
+    if (props.disabled) {
+        disabledClass = classes.disabled;
+    }
 
     const clickTimeout = useRef(null);
 
     const handleClicks = (e) => {
-        if (clickTimeout.current !== null) {
-            // double click event
-            props.onClick(e, props.action, props.xpath, props.value, props.dataSourceId, props.source, true);
-            clearTimeout(clickTimeout.current);
-            clickTimeout.current = null;
+        if (props.allowForceUpdate) {
+            if (clickTimeout.current !== null) {
+                // double click event
+                props.onClick(e, props.action, props.xpath, props.value, props.dataSourceId, props.source, true);
+                clearTimeout(clickTimeout.current);
+                clickTimeout.current = null;
+            } else {
+                // single click event
+                const timeout = setTimeout(() => {
+                    if (clickTimeout.current !== null) {
+                        props.onClick(e, props.action, props.xpath, props.value, props.dataSourceId, props.source);
+                        clearTimeout(clickTimeout.current)
+                        clickTimeout.current = null;
+                    }
+                }, 300);
+                clickTimeout.current = timeout;
+            }
         } else {
-            // single click event
-            const timeout = setTimeout(() => {
-                if (clickTimeout.current !== null) {
-                    props.onClick(e, props.action, props.xpath, props.value, props.dataSourceId, props.source);
-                    clearTimeout(clickTimeout.current)
-                    clickTimeout.current = null;
-                }
-            }, 300);
-            clickTimeout.current = timeout;
+            props.onClick(e, props.action, props.xpath, props.value, props.dataSourceId, props.source);
         }
     }
 
     return (
         <ButtonWrapper
             condition={!!props.disabled}
-            wrapper={children => <Tooltip title={props.caption}>{children}</Tooltip>}>
+            wrapper={children => <Tooltip className={disabledClass} title={props.caption}>{children}</Tooltip>}>
             <ToggleButton
-                className={`${classes.button} ${buttonClass}`}
+                className={`${classes.button} ${buttonClass} ${disabledClass}`}
                 name={props.name}
                 size={props.size}
                 selected={true}

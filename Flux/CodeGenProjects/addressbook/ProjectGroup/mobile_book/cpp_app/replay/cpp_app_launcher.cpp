@@ -4,13 +4,11 @@
 #include "cpp_app_semaphore.h"
 #include "mongo_db_singleton.h"
 #include "top_of_book_handler.h"
-#include "mobile_book_cache.h"
 #include "mock_mobile_book_cache.h"
 
 extern "C" void cpp_app_launcher() {
 
     std::thread cpp_app_launcher_thread([&] {
-        // quill::start();
         std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db = MongoDBHandlerSingleton::get_instance();
         mobile_book_handler::TopOfBookHandler top_of_book_handler(sp_mongo_db, top_of_book_websocket_server);
         mobile_book_handler::MarketDepthHandler market_depth_handler(sp_mongo_db, market_depth_websocket_server,

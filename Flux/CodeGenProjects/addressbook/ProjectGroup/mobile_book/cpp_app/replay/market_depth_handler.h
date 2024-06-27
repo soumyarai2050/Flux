@@ -33,87 +33,134 @@ namespace mobile_book_handler {
             m_market_depth_db_codec_.insert_or_update(kr_market_depth_obj, db_id);
         }
 
-        void handle_md_update(mobile_book::MarketDepth &r_market_depth_obj) {
+        FluxCppCore::CacheOperationResult handle_md_update(mobile_book::MarketDepth &r_market_depth_obj) {
 
-            auto date_time = FluxCppCore::get_utc_time_microseconds();
-            if (!r_market_depth_obj.has_arrival_time() and !r_market_depth_obj.has_exch_time()) {
-                r_market_depth_obj.set_arrival_time(date_time);
-                r_market_depth_obj.set_exch_time(date_time);
+            if (!r_market_depth_obj.has_arrival_time() or !r_market_depth_obj.has_exch_time()) {
+                auto date_time = FluxCppCore::get_utc_time_microseconds();
+                if (!r_market_depth_obj.has_arrival_time()) {
+                    r_market_depth_obj.set_arrival_time(date_time);
+                }
+                if (!r_market_depth_obj.has_exch_time()) {
+                    r_market_depth_obj.set_exch_time(date_time);
+                }
             }
 
             if (r_market_depth_obj.position() == 0) {
-                mobile_book::TopOfBook top_of_book_obj;
-                create_top_of_book_from_md(r_market_depth_obj, top_of_book_obj);
+                m_top_of_book_obj_.Clear();
                 if (r_market_depth_obj.side() == mobile_book::TickType::BID) {
-                    if (m_market_depth_obj_.exch_time() <= r_market_depth_obj.exch_time() and
-                        m_top_of_book_obj_.last_update_date_time() <= top_of_book_obj.last_update_date_time()) {
-
-                        void* p_md_mutex = market_cache::MarketDepthCache::get_bid_md_mutex_from_depth(
-                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
-                        void*  p_tob_mutex = market_cache::TopOfBookCache::get_top_of_book_mutex(top_of_book_obj.symbol());
-                        auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
-                        auto top_of_book_mutex = static_cast<std::mutex*>(p_tob_mutex);
-                        auto lock_status = std::try_lock(*md_mutex, *top_of_book_mutex);
-                        if (lock_status == ALL_LOCKS_AVAILABE_) {
-                            std::lock_guard<std::mutex> lock_md_mutex(*md_mutex, std::adopt_lock);
-                            std::lock_guard<std::mutex> lock_top_of_book_mutex(*top_of_book_mutex, std::adopt_lock);
-                            market_cache::MarketDepthCache::update_bid_market_depth_cache(r_market_depth_obj);
-                            mobile_book_handler::market_cache::TopOfBookCache::update_top_of_book_cache(top_of_book_obj);
-                        }
+                    if (m_md_time_ > r_market_depth_obj.exch_time()) {
+                        LOG_DEBUG(GetLogger(), "Ignoring update cache and DB because stored time is greater than "
+                                               "current time;;; stored time: {};;; current time: {}",
+                                               m_md_time_, r_market_depth_obj.exch_time());
+                        return FluxCppCore::CacheOperationResult::DB_N_CACHE_UPDATE_FAILED;
                     }
+
+                    m_md_time_ = r_market_depth_obj.exch_time();
+
+                    void* p_md_mutex = market_cache::MarketDepthCache::get_bid_md_mutex_from_depth(
+                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
+                    void*  p_tob_mutex = market_cache::TopOfBookCache::get_top_of_book_mutex(
+                        r_market_depth_obj.symbol());
+
+                    auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
+                    auto top_of_book_mutex = static_cast<std::mutex*>(p_tob_mutex);
+                    auto lock_status = std::try_lock(*md_mutex, *top_of_book_mutex);
+                    if (lock_status != ALL_LOCKS_AVAILABE_) {
+                        m_monitor_.push(r_market_depth_obj);
+                        LOG_DEBUG(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
+                            r_market_depth_obj.DebugString());
+                        return FluxCppCore::CacheOperationResult::LOCK_NOT_FOUND;
+                    }
+
+                    create_top_of_book_from_md(r_market_depth_obj, m_top_of_book_obj_);
+                    {
+                        std::lock_guard<std::mutex> lock_md_mutex(*md_mutex, std::adopt_lock);
+                        std::lock_guard<std::mutex> lock_top_of_book_mutex(*top_of_book_mutex, std::adopt_lock);
+                        market_cache::MarketDepthCache::update_bid_market_depth_cache(r_market_depth_obj);
+                        mobile_book_handler::market_cache::TopOfBookCache::update_top_of_book_cache(m_top_of_book_obj_);
+                    }
+                    notify_semaphore.release();
                 } else if (r_market_depth_obj.side() == mobile_book::TickType::ASK) {
-                    if (m_market_depth_obj_.exch_time() <= r_market_depth_obj.exch_time() and
-                        m_top_of_book_obj_.last_update_date_time() <= top_of_book_obj.last_update_date_time()) {
-
-                        void* p_md_mutex = market_cache::MarketDepthCache::get_ask_md_mutex_from_depth(
-                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
-                        void*  p_tob_mutex = market_cache::TopOfBookCache::get_top_of_book_mutex(top_of_book_obj.symbol());
-                        auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
-                        auto top_of_book_mutex = static_cast<std::mutex*>(p_tob_mutex);
-                        auto lock_status = std::try_lock(*md_mutex, *top_of_book_mutex);
-                        if (lock_status == ALL_LOCKS_AVAILABE_) {
-                            std::lock_guard<std::mutex> lock_md_mutex(*md_mutex, std::adopt_lock);
-                            std::lock_guard<std::mutex> lock_top_of_book_mutex(*top_of_book_mutex, std::adopt_lock);
-                            market_cache::MarketDepthCache::update_bid_market_depth_cache(r_market_depth_obj);
-                            mobile_book_handler::market_cache::TopOfBookCache::update_top_of_book_cache(top_of_book_obj);
-                        }
-
-                        m_market_depth_obj_.Clear();
-                        m_top_of_book_obj_.Clear();
-                        m_top_of_book_obj_.CopyFrom(top_of_book_obj);
-                        m_market_depth_obj_.CopyFrom(r_market_depth_obj);
+                    if (m_md_time_ > r_market_depth_obj.exch_time()) {
+                        LOG_DEBUG(GetLogger(), "Ignoring update cache and DB because stored time is greater than current time;;; "
+                                       "stored time: {};;; current time: {}",
+                                       m_md_time_, r_market_depth_obj.exch_time());
+                        return FluxCppCore::CacheOperationResult::DB_N_CACHE_UPDATE_FAILED;
                     }
 
-                } // else not required: TopOfBook only need ASK and BID
-                notify_semaphore.release();
+                    m_md_time_ = r_market_depth_obj.exch_time();
 
+                    void* p_md_mutex = market_cache::MarketDepthCache::get_ask_md_mutex_from_depth(
+                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
+                    void*  p_tob_mutex = market_cache::TopOfBookCache::get_top_of_book_mutex(r_market_depth_obj.symbol());
+
+                    auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
+                    auto top_of_book_mutex = static_cast<std::mutex*>(p_tob_mutex);
+                    auto lock_status = std::try_lock(*md_mutex, *top_of_book_mutex);
+                    if (lock_status != ALL_LOCKS_AVAILABE_) {
+                        m_monitor_.push(r_market_depth_obj);
+                        LOG_DEBUG(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
+                            r_market_depth_obj.DebugString());
+                        return FluxCppCore::CacheOperationResult::LOCK_NOT_FOUND;
+                    }
+
+                    create_top_of_book_from_md(r_market_depth_obj, m_top_of_book_obj_);
+                    {
+                        std::lock_guard<std::mutex> lock_md_mutex(*md_mutex, std::adopt_lock);
+                        std::lock_guard<std::mutex> lock_top_of_book_mutex(*top_of_book_mutex, std::adopt_lock);
+                        market_cache::MarketDepthCache::update_bid_market_depth_cache(r_market_depth_obj);
+                        mobile_book_handler::market_cache::TopOfBookCache::update_top_of_book_cache(m_top_of_book_obj_);
+                    }
+                    notify_semaphore.release();
+                } // else not required: TopOfBook only need ASK and BID
             } else {
                 if (r_market_depth_obj.side() == mobile_book::TickType::BID) {
-
-                    if (m_market_depth_obj_.exch_time() <= r_market_depth_obj.exch_time()) {
-
-                        void* p_md_mutex = market_cache::MarketDepthCache::get_bid_md_mutex_from_depth(
-                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
-                        auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
-                        std::unique_lock<std::mutex> lock_md_mutex(*md_mutex, std::try_to_lock_t{});
-                        if (lock_md_mutex.owns_lock()) {
-                            market_cache::MarketDepthCache::update_bid_market_depth_cache(r_market_depth_obj);
-                        }
+                    if (m_md_time_ > r_market_depth_obj.exch_time()) {
+                        LOG_DEBUG(GetLogger(), "Ignoring update cache and DB because stored time is greater than current time;;; "
+                                       "stored time: {};;; current time: {}",
+                                       m_md_time_, r_market_depth_obj.exch_time());
+                        return FluxCppCore::CacheOperationResult::DB_N_CACHE_UPDATE_FAILED;
                     }
+
+                    m_md_time_ = r_market_depth_obj.exch_time();
+
+                    void* p_md_mutex = market_cache::MarketDepthCache::get_bid_md_mutex_from_depth(
+                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
+                    auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
+                    std::unique_lock<std::mutex> lock_md_mutex(*md_mutex, std::try_to_lock_t{});
+                    if (!lock_md_mutex.owns_lock()) {
+                        m_monitor_.push(r_market_depth_obj);
+                        LOG_DEBUG(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
+                            r_market_depth_obj.DebugString());
+                        return FluxCppCore::CacheOperationResult::LOCK_NOT_FOUND;
+                    }
+                    market_cache::MarketDepthCache::update_bid_market_depth_cache(r_market_depth_obj);
                 } else {
-                    if (m_market_depth_obj_.exch_time() <= r_market_depth_obj.exch_time()) {
-                        void* p_md_mutex = market_cache::MarketDepthCache::get_ask_md_mutex_from_depth(
-                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
-                        auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
-                        std::unique_lock<std::mutex> lock_md_mutex(*md_mutex, std::try_to_lock_t{});
-                        if (lock_md_mutex.owns_lock()) {
-                            market_cache::MarketDepthCache::update_ask_market_depth_cache(r_market_depth_obj);
-                        }
+                    if (m_md_time_ > r_market_depth_obj.exch_time()) {
+                        LOG_DEBUG(GetLogger(), "Ignoring update cache and DB because stored time is greater than current time;;; "
+                                       "stored time: {};;; current time: {}",
+                                       m_md_time_, r_market_depth_obj.exch_time());
+                        return FluxCppCore::CacheOperationResult::DB_N_CACHE_UPDATE_FAILED;
                     }
+
+                    m_md_time_ = r_market_depth_obj.exch_time();
+
+                    void* p_md_mutex = market_cache::MarketDepthCache::get_ask_md_mutex_from_depth(
+                        r_market_depth_obj.symbol(), r_market_depth_obj.position());
+                    auto md_mutex = static_cast<std::mutex*>(p_md_mutex);
+                    std::unique_lock<std::mutex> lock_md_mutex(*md_mutex, std::try_to_lock_t{});
+                    if (!lock_md_mutex.owns_lock()) {
+                        m_monitor_.push(r_market_depth_obj);
+                        LOG_DEBUG(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
+                            r_market_depth_obj.DebugString());
+                        return FluxCppCore::CacheOperationResult::LOCK_NOT_FOUND;
+                    }
+                    market_cache::MarketDepthCache::update_ask_market_depth_cache(r_market_depth_obj);
                 }
             }
 
             m_monitor_.push(r_market_depth_obj);
+            return FluxCppCore::CacheOperationResult::SUSSESS_DB_N_CACHE_UPDATE;
 
         }
 
@@ -144,8 +191,9 @@ namespace mobile_book_handler {
         Monitor<mobile_book::MarketDepth> m_monitor_{};
         std::jthread m_db_n_ws_handler_thread_;
         const int8_t ALL_LOCKS_AVAILABE_{-1};
-        mobile_book::MarketDepth m_market_depth_obj_{};
         mobile_book::TopOfBook m_top_of_book_obj_{};
+        int64_t m_md_time_{0};
+        int64_t m_top_of_book_time_{0};
 
         void update_market_depth_cache_() {
             mobile_book::MarketDepthList market_depth_documents;

@@ -41,30 +41,32 @@ const Row = (props) => {
             onDoubleClick={onRowDoubleClick}>
             {cells.map((cell, i) => {
                 const cellRow = row[cell.sourceIndex];
-                let selected = props.selectedRows.includes(cellRow['data-id'])
+                let selected = cellRow ? props.selectedRows.includes(cellRow['data-id']) : false;
                 let collection = collections.filter(c => c.tableTitle === cell.tableTitle)[0];
-                let xpath = cellRow['xpath_' + cell.key];
-                if (cell.tableTitle && cell.tableTitle.indexOf('.') > -1) {
+                let xpath = cellRow?.['xpath_' + cell.key];
+                if (cellRow && cell.tableTitle && cell.tableTitle.indexOf('.') > -1) {
                     xpath = cellRow[cell.tableTitle.substring(0, cell.tableTitle.lastIndexOf('.')) + '.xpath_' + cell.key]
                 }
 
                 let disabled = false;
-                if (cellRow[cell.tableTitle] === undefined) {
-                    disabled = true;
-                } else if (mode === Modes.EDIT_MODE) {
-                    if (collection && collection.ormNoUpdate && !cellRow['data-add']) {
+                if (cellRow) {
+                    if (cellRow[cell.tableTitle] === undefined) {
                         disabled = true;
-                    } else if (collection.uiUpdateOnly && cellRow['data-add']) {
-                        disabled = true;
-                    } else if (cellRow['data-remove']) {
-                        disabled = true;
+                    } else if (mode === Modes.EDIT_MODE) {
+                        if (collection && collection.ormNoUpdate && !cellRow['data-add']) {
+                            disabled = true;
+                        } else if (collection.uiUpdateOnly && cellRow['data-add']) {
+                            disabled = true;
+                        } else if (cellRow['data-remove']) {
+                            disabled = true;
+                        }
                     }
                 }
 
                 let dataxpath = getDataxpath(data, xpath);
-                let dataAdd = cellRow['data-add'] ? cellRow['data-add'] : false;
-                let dataRemove = cellRow['data-remove'] ? cellRow['data-remove'] : false;
-                let value = cellRow[cell.tableTitle];
+                let dataAdd = cellRow && cellRow['data-add'] ? cellRow['data-add'] : false;
+                let dataRemove = cellRow && cellRow['data-remove'] ? cellRow['data-remove'] : false;
+                let value = cellRow?.[cell.tableTitle];
                 let previousValue;
                 if (props.widgetType === 'repeatedRoot') {
                     if (cellRow && selected) {
@@ -79,6 +81,14 @@ const Row = (props) => {
                     previousValue = _.get(originalData, xpath);
                 }
                 // let previousValue = _.get(originalData, xpath);
+                if (cell.joinKey || cell.commonGroupKey) {
+                    if (!value) {
+                        const joinedKeyCellRow = row.find(r => r?.[cell.tableTitle] !== null && r?.[cell.tableTitle] !== undefined);
+                        if (joinedKeyCellRow) {
+                            value = joinedKeyCellRow ? joinedKeyCellRow[cell.tableTitle] : undefined;
+                        }
+                    }
+                }
 
                 if (cell.hide) return;
                 let buttonDisable = false;
@@ -117,8 +127,10 @@ const Row = (props) => {
                         widgetType={props.widgetType}
                         selected={selected}
                         onForceSave={props.onForceSave}
-                        dataSourceId={props.widgetType === 'root' ? props.index : cellRow['data-id']}
+                        dataSourceId={cellRow ? props.widgetType === 'root' ? props.index : cellRow['data-id'] : null}
                         onRowSelect={onRowSelect}
+                        nullCell={cellRow ? false : true}
+                        dataSourceColors={props.dataSourceColors}
                     />
                 )
             })}

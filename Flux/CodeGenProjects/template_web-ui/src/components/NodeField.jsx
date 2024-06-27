@@ -212,11 +212,9 @@ const NodeField = (props) => {
         }
 
         // let value = props.data.value ? props.data.value : props.data.value === 0 ? 0 : props.data.value === -0 ? -0 : '';
-        let value = cloneDeep(inputValue);
-        if (props.data.displayType == DataTypes.INTEGER && props.data.value !== -0) {
-            if (value !== '') {
-                value = floatToInt(value);
-            }
+        let value = inputValue ? cloneDeep(inputValue) : inputValue === 0 ? 0 : inputValue === -0 ? -0 : '';
+        if (props.data.displayType == DataTypes.INTEGER && props.data.value !== -0 && value !== '') {
+            value = floatToInt(value);
         }
         validationError.current = validateConstraints(props.data, value, min, max);
 

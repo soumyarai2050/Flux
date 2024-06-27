@@ -1373,7 +1373,7 @@ class StreetBook:
                 leg_2_top_of_book = (
                     self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book())
 
-                if leg_1_top_of_book is None or leg_2_top_of_book is None:
+                if not self._both_side_tob_has_data(leg_1_top_of_book, leg_2_top_of_book):
                     logging.warning(f"strats need both sides of TOB to be present, "
                                     f"found  only leg_1 or only leg_2 or neither of them"
                                     f";;;tob found: {leg_1_top_of_book = }, "

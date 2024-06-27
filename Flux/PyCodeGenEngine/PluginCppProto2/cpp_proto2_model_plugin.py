@@ -161,7 +161,8 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
         nested_enum_list = []
 
         file_msg_name_list = ["market_data_n_strat_executor_core.proto",
-                              "dashboards_n_market_data_n_strat_executor_core.proto"]
+                              "dashboards_n_market_data_n_strat_executor_core.proto",
+                              "strat_executor_n_post_trade_engine_core.proto"]
 
         for dependency in self.dependency_file_list:
             dependency_name: str = dependency.proto.name

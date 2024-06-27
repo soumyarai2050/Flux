@@ -438,6 +438,8 @@ message BarterSimulatorProcessAmendReq{
     QueryParamsDataType: "str",
     QueryParams: "underlying_account",
     QueryParamsDataType: "str",
+    QueryParams: "chore_event",
+    QueryParamsDataType: "ChoreEventType",
     QueryParams: "px",
     QueryParamsDataType: "float | None = None",
     QueryParams: "qty",

@@ -85,6 +85,10 @@ message MarketDepth {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
+    join_sort_chores: {
+      chore_by: 'side',
+      sort_type: 'desc'
+    },
     depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true

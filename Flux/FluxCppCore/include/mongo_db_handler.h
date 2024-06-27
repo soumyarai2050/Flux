@@ -9,7 +9,6 @@
 #include <mongocxx/pool.hpp>
 
 #include "../../generated/CppUtilGen/market_data_constants.h"
-#include "quill/Quill.h"
 #include "logger.h"
 
 
@@ -32,11 +31,7 @@ namespace FluxCppCore {
                                 const int max_pool_size = market_data_handler::max_pool_size_val):
         str_uri(kr_db_uri + "/?minPoolSize=" + std::to_string(min_pool_size) + "&maxPoolSize=" + std::to_string(max_pool_size)),
         client(pool.acquire()), m_db_name_(_kr_db_name), market_data_service_db((*client)[m_db_name_]),
-        m_min_pool_size_(min_pool_size), m_max_pool_size_(max_pool_size) {
-
-           // LOG_INFO(m_p_logger_, "Mongo URI: {}", str_uri);
-
-        }
+        m_min_pool_size_(min_pool_size), m_max_pool_size_(max_pool_size) {}
 
         mongocxx::instance inst{};
         std::string m_mongo_db_uri_;
@@ -50,6 +45,5 @@ namespace FluxCppCore {
     protected:
         const int m_min_pool_size_;
         const int m_max_pool_size_;
-        // quill::Logger* m_p_logger_;
     };
 }

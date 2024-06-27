@@ -396,6 +396,52 @@ function Layout(props) {
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 
+    const onShowLessChange = useCallback((name, showLess, bindVal = null) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                if (bindVal || bindVal === 0) {
+                    bindVal = String(bindVal)
+                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
+                    if (widgetUIData) {
+                        widgetUIData.show_less = showLess;
+                        widgetUIData.bind_id_val = bindVal;
+                    } else {
+                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], show_less: showLess, bind_id_val: bindVal });
+                    }
+                } else {
+                    layout.widget_ui_data[0].show_less = showLess;
+                }
+            }
+            return layout
+        });
+        setLayoutsById();
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
+    const onDataSourceColorsChange = useCallback((name, updatedColors, bindVal = null) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                if (bindVal || bindVal === 0) {
+                    bindVal = String(bindVal)
+                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
+                    if (widgetUIData) {
+                        widgetUIData.data_source_colors = updatedColors;
+                        widgetUIData.bind_id_val = bindVal;
+                    } else {
+                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], data_source_colors: updatedColors, bind_id_val: bindVal });
+                    }
+                } else {
+                    layout.widget_ui_data[0].data_source_colors = updatedColors;
+                }
+            }
+            return layout
+        });
+        setLayoutsById();
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
     const onOverrideChange = useCallback((name, enableOverride, disableOverride, bindVal = null) => {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {

@@ -9,7 +9,7 @@ from pendulum import DateTime
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import get_fills_journal_log_key
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import get_fills_journal_log_key, is_chore_status_terminal
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_base_strat_cache import \
     EmailBookServiceBaseStratCache
@@ -109,8 +109,7 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         override to enrich _chore_id_to_open_chore_snapshot_dict [invoke base first and then act here]
         """
         _chore_snapshots_update_date_time = super().set_chore_snapshot(chore_snapshot)
-        if chore_snapshot.chore_status not in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED,
-                                               ChoreStatusType.OE_OVER_FILLED]:
+        if not is_chore_status_terminal(chore_snapshot.chore_status):
             self._chore_id_to_open_chore_snapshot_dict[chore_snapshot.chore_brief.chore_id] = chore_snapshot
         else:
             if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:

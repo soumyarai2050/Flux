@@ -1669,6 +1669,61 @@ def test_same_pair_parallel_run_both_side_in_pair(
 
 
 @pytest.mark.nightly
+def test_same_pair_parallel_place_chore_in_sequence(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    try:
+        # making opposite side tradable in running phone_book
+        email_book_service_native_web_client.update_is_opposite_side_tradable_val_query_client(True)
+        total_strats = 10
+        leg1_symbol = "CB_Sec_1"
+        leg2_symbol = "EQT_Sec_1"
+
+        buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        time.sleep(2)
+
+        sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+                                           leg1_side=Side.SELL, leg2_side=Side.BUY)
+        time.sleep(2)
+        pair_strat_list = [buy_sell_pair_strat, sell_buy_pair_strat]
+
+        max_loop_count_per_side = 2
+        strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = (
+            handle_test_buy_sell_n_sell_buy_pair_chore(
+                max_loop_count_per_side,
+                refresh_sec_update_fixture, buy_chore_,
+                sell_chore_,
+                buy_fill_journal_, sell_fill_journal_,
+                expected_buy_chore_snapshot_,
+                expected_sell_chore_snapshot_,
+                expected_symbol_side_snapshot_,
+                pair_strat_list, expected_strat_limits_,
+                expected_strat_status_, expected_strat_brief_,
+                last_barter_fixture_list,
+                symbol_overview_obj_list,
+                market_depth_basemodel_list,
+                False))
+
+        expected_portfolio_status_.overall_buy_notional = strat_buy_notional
+        expected_portfolio_status_.overall_sell_notional = strat_sell_notional
+        expected_portfolio_status_.overall_buy_fill_notional = strat_buy_fill_notional
+        expected_portfolio_status_.overall_sell_fill_notional = strat_sell_fill_notional
+        verify_portfolio_status(expected_portfolio_status_)
+    except Exception as e:
+        raise e
+    finally:
+        email_book_service_native_web_client.update_is_opposite_side_tradable_val_query_client(False)
+
+
+@pytest.mark.nightly
 def test_same_n_opposite_strats_in_combination1(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
@@ -7105,61 +7160,12 @@ def test_log_book_frequent_pair_strat_updates(
                 raise Exception(future.exception())
 
 
-def check_all_computes_for_amend(
-        active_pair_strat_id, symbol, side, chore_id, executor_http_client,
-        new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-        last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
+def _check_all_computes_in_models_other_than_chore_snapshot(
+        active_pair_strat_id, symbol, side, executor_http_client, chore_snapshot,
+        new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
         filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px, other_side_residual_qty,
-        other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, rej_check: bool | None = None,
-        residual_qty: int | None = None, is_sell_buy_strat: bool = False, total_lapsed_post_unack_amend: int = 0):
-    chore_snapshot = get_chore_snapshot_from_chore_id(chore_id,
-                                                      executor_http_client)
-    assert chore_snapshot.chore_status == chore_status, \
-        f"Mismatched: Chore status must be {chore_status} but found: {chore_snapshot.chore_status = }"
-    assert chore_snapshot.chore_brief.qty == new_qty, \
-        f"Mismatched: expected chore_snapshot qty: {new_qty} found: {chore_snapshot.chore_brief.qty = }"
-    assert chore_snapshot.chore_brief.px == new_px, \
-        f"Mismatched: expected chore_snapshot px: {new_px} found: {chore_snapshot.chore_brief.px = }"
-    expected_chore_notional = new_qty * get_px_in_usd(new_px)
-    assert chore_snapshot.chore_brief.chore_notional == expected_chore_notional, \
-        (f"Mismatched: expected chore_snapshot expected_chore_notional: {expected_chore_notional} "
-         f"found: {chore_snapshot.chore_brief.chore_notional = }")
-    assert chore_snapshot.last_amend_qty == amend_qty, \
-        f"Mismatched: expected chore_snapshot last_amend_qty: {amend_qty} found: {chore_snapshot.last_amend_qty = }"
-    assert chore_snapshot.last_amend_px == amend_px, \
-        f"Mismatched: expected chore_snapshot last_amend_px: {amend_px} found: {chore_snapshot.last_amend_px = }"
-    assert chore_snapshot.last_original_qty == last_original_qty, \
-        (f"Mismatched: expected chore_snapshot last_original_qty: {last_original_qty} "
-         f"found: {chore_snapshot.last_original_qty = }")
-    assert chore_snapshot.last_original_px == last_original_px, \
-        (f"Mismatched: expected chore_snapshot last_original_px: {last_original_px} "
-         f"found: {chore_snapshot.last_original_px= }")
-    assert chore_snapshot.total_amend_dn_qty == total_amend_dn_qty, \
-        (f"Mismatched: expected chore_snapshot total_amend_dn_qty: {total_amend_dn_qty} "
-         f"found: {chore_snapshot.total_amend_dn_qty= }")
-    assert chore_snapshot.total_amend_up_qty == total_amend_up_qty, \
-        (f"Mismatched: expected chore_snapshot total_amend_up_qty: {total_amend_up_qty} "
-         f"found: {chore_snapshot.total_amend_up_qty= }")
-    assert chore_snapshot.cxled_qty == cxled_qty, \
-        f"Mismatched: ChoreSnapshot cxled_qty must be {cxled_qty}, found {chore_snapshot.cxled_qty}"
-    assert chore_snapshot.cxled_notional == cxled_notional, \
-        (f"Mismatched: ChoreSnapshot cxled_notional must be {cxled_notional}, "
-         f"found {chore_snapshot.cxled_notional}")
-    assert chore_snapshot.avg_cxled_px == cxled_px, \
-        (f"Mismatched: ChoreSnapshot avg_cxled_px must be "
-         f"{cxled_px}, found {chore_snapshot.avg_cxled_px}")
-    assert chore_snapshot.filled_qty == filled_qty, \
-        f"Mismatched: ChoreSnapshot avg_cxled_px must be {filled_qty}, found {chore_snapshot.filled_qty}"
-    assert chore_snapshot.fill_notional == filled_notional, \
-        (f"Mismatched: ChoreSnapshot fill_notional must be {filled_notional}, "
-         f"found {chore_snapshot.fill_notional}")
-    assert chore_snapshot.avg_fill_px == filled_px, \
-        f"Mismatched: ChoreSnapshot avg_fill_px must be {filled_px}, found {chore_snapshot.avg_fill_px}"
-    if total_lapsed_post_unack_amend:
-        assert chore_snapshot.total_lapsed_post_unack_amend == total_lapsed_post_unack_amend, \
-            (f"Mismatched: ChoreSnapshot total_lapsed_post_unack_amend must be {total_lapsed_post_unack_amend}, "
-             f"found {chore_snapshot.total_lapsed_post_unack_amend}")
-
+        other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+        residual_qty: int | None = None, is_sell_buy_strat: bool = False):
     symbol_side_snapshot_list = (
         executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(symbol, side))
     assert len(symbol_side_snapshot_list) == 1, \
@@ -7211,19 +7217,11 @@ def check_all_computes_for_amend(
     assert (strat_brief_bartering_brief.open_notional == open_notional), \
         (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
          f"{open_notional}, found {strat_brief_bartering_brief.open_notional = }")
-    if residual_qty is None:
-        if chore_status == ChoreStatusType.OE_DOD:
-            if not rej_check and amend_qty is not None:
-                residual_qty = amend_qty - filled_qty
-            else:
-                residual_qty = new_qty - filled_qty
-            # else not required: taking passed param value
-        else:
-            residual_qty = 0
     assert (strat_brief_bartering_brief.residual_qty == residual_qty), \
         (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
          f"{residual_qty}, found {strat_brief_bartering_brief.residual_qty = }")
-    if chore_status in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED, ChoreStatusType.OE_OVER_FILLED]:
+    if chore_status in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED,
+                        ChoreStatusType.OE_OVER_FILLED, ChoreStatusType.OE_OVER_CXLED]:
         consumable_open_chores = 5
     else:
         consumable_open_chores = 4
@@ -7369,6 +7367,77 @@ def check_all_computes_for_amend(
         (f"Mismatched: expected portfolio_status.overall_{side.lower()}_fill_notional: "
          f"{filled_notional}, found {overall_fill_notional = }")
 
+
+def check_all_computes_for_amend(
+        active_pair_strat_id, symbol, side, chore_id, executor_http_client,
+        new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+        pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty,
+        open_qty, open_notional, open_px, filled_qty,
+        filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px, other_side_residual_qty,
+        other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+        residual_qty: int | None = None, is_sell_buy_strat: bool = False, total_lapsed_post_unack_amend: int = 0,
+        total_lapsed_qty: int = 0):
+    chore_snapshot = get_chore_snapshot_from_chore_id(chore_id,
+                                                      executor_http_client)
+    assert chore_snapshot.chore_status == chore_status, \
+        f"Mismatched: Chore status must be {chore_status} but found: {chore_snapshot.chore_status = }"
+    assert chore_snapshot.chore_brief.qty == new_qty, \
+        f"Mismatched: expected chore_snapshot qty: {new_qty} found: {chore_snapshot.chore_brief.qty = }"
+    assert chore_snapshot.chore_brief.px == new_px, \
+        f"Mismatched: expected chore_snapshot px: {new_px} found: {chore_snapshot.chore_brief.px = }"
+    expected_chore_notional = new_qty * get_px_in_usd(new_px)
+    assert chore_snapshot.chore_brief.chore_notional == expected_chore_notional, \
+        (f"Mismatched: expected chore_snapshot expected_chore_notional: {expected_chore_notional} "
+         f"found: {chore_snapshot.chore_brief.chore_notional = }")
+    assert chore_snapshot.total_amend_dn_qty == total_amend_dn_qty, \
+        (f"Mismatched: expected chore_snapshot total_amend_dn_qty: {total_amend_dn_qty} "
+         f"found: {chore_snapshot.total_amend_dn_qty= }")
+    assert chore_snapshot.total_amend_up_qty == total_amend_up_qty, \
+        (f"Mismatched: expected chore_snapshot total_amend_up_qty: {total_amend_up_qty} "
+         f"found: {chore_snapshot.total_amend_up_qty= }")
+    assert chore_snapshot.cxled_qty == cxled_qty, \
+        f"Mismatched: ChoreSnapshot cxled_qty must be {cxled_qty}, found {chore_snapshot.cxled_qty}"
+    assert chore_snapshot.cxled_notional == cxled_notional, \
+        (f"Mismatched: ChoreSnapshot cxled_notional must be {cxled_notional}, "
+         f"found {chore_snapshot.cxled_notional}")
+    assert chore_snapshot.avg_cxled_px == cxled_px, \
+        (f"Mismatched: ChoreSnapshot avg_cxled_px must be "
+         f"{cxled_px}, found {chore_snapshot.avg_cxled_px}")
+    assert chore_snapshot.filled_qty == filled_qty, \
+        f"Mismatched: ChoreSnapshot filled_qty must be {filled_qty}, found {chore_snapshot.filled_qty}"
+    assert chore_snapshot.fill_notional == filled_notional, \
+        (f"Mismatched: ChoreSnapshot fill_notional must be {filled_notional}, "
+         f"found {chore_snapshot.fill_notional}")
+    assert chore_snapshot.pending_amend_dn_px == pending_amend_dn_px, \
+        (f"Mismatched: ChoreSnapshot pending_amend_dn_px must be {pending_amend_dn_px}, "
+         f"found {chore_snapshot.pending_amend_dn_px}")
+    assert chore_snapshot.pending_amend_dn_qty == pending_amend_dn_qty, \
+        (f"Mismatched: ChoreSnapshot pending_amend_dn_qty must be {pending_amend_dn_qty}, "
+         f"found {chore_snapshot.pending_amend_dn_qty}")
+    assert chore_snapshot.pending_amend_up_px == pending_amend_up_px, \
+        (f"Mismatched: ChoreSnapshot pending_amend_up_px must be {pending_amend_up_px}, "
+         f"found {chore_snapshot.pending_amend_up_px}")
+    assert chore_snapshot.pending_amend_up_qty == pending_amend_up_qty, \
+        (f"Mismatched: ChoreSnapshot pending_amend_up_qty must be {pending_amend_up_qty}, "
+         f"found {chore_snapshot.pending_amend_up_qty}")
+    assert chore_snapshot.avg_fill_px == filled_px, \
+        f"Mismatched: ChoreSnapshot avg_fill_px must be {filled_px}, found {chore_snapshot.avg_fill_px}"
+    assert chore_snapshot.total_lapsed_qty == total_lapsed_qty, \
+        (f"Mismatched: ChoreSnapshot total_lapsed_qty must be {total_lapsed_qty}, "
+         f"found {chore_snapshot.total_lapsed_qty}")
+    if total_lapsed_post_unack_amend:
+        assert chore_snapshot.total_lapsed_post_unack_amend == total_lapsed_post_unack_amend, \
+            (f"Mismatched: ChoreSnapshot total_lapsed_post_unack_amend must be {total_lapsed_post_unack_amend}, "
+             f"found {chore_snapshot.total_lapsed_post_unack_amend}")
+
+    _check_all_computes_in_models_other_than_chore_snapshot(
+        active_pair_strat_id, symbol, side, executor_http_client, chore_snapshot,
+        new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
+        filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px, other_side_residual_qty,
+        other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+        residual_qty, is_sell_buy_strat)
+
+
 @pytest.mark.nightly
 def test_simple_non_risky_amend_based_on_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
@@ -7410,30 +7479,24 @@ def test_simple_non_risky_amend_based_on_qty(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_symbol_side_snapshot = None
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_qty = qty
-                buy_px = px
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -7444,6 +7507,7 @@ def test_simple_non_risky_amend_based_on_qty(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -7451,51 +7515,52 @@ def test_simple_non_risky_amend_based_on_qty(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_px)
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_qty * get_px_in_usd(px)
+                cxled_exposure = buy_cxl_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
+                amend_qty = 10
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_qty = qty + 10
+                amend_qty = 10
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                pending_amend_up_px = 0
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
-                qty=amend_qty)
+                chore_event=chore_event, qty=amend_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
             amend_px = None
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -7513,28 +7578,22 @@ def test_simple_non_risky_amend_based_on_qty(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_px)
+                filled_exposure = buy_filled_notional - filled_qty * get_px_in_usd(px)
+                cxled_exposure = buy_cxl_notional
             last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -7546,14 +7605,14 @@ def test_simple_non_risky_amend_based_on_qty(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK, chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 0
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
@@ -7561,7 +7620,6 @@ def test_simple_non_risky_amend_based_on_qty(
                 total_amend_up_qty = 10
 
             new_px = px
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
@@ -7577,28 +7635,22 @@ def test_simple_non_risky_amend_based_on_qty(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_px) - cxled_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
@@ -7606,22 +7658,20 @@ def test_simple_non_risky_amend_based_on_qty(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             if side == Side.BUY:
-                cxled_qty = (qty - amend_qty) + (amend_qty - filled_qty)
+                cxled_qty = open_qty + amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 0
             else:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
+                cxled_qty = open_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 total_amend_dn_qty = 0
                 total_amend_up_qty = 10
 
             new_px = px
-            amend_px = None
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
@@ -7634,37 +7684,31 @@ def test_simple_non_risky_amend_based_on_qty(
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_cxl_notional = cxled_notional
+                residual_qty = cxled_qty - amend_qty
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_px) - cxled_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+                residual_qty = cxled_qty
             last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
     except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+        print(e)
+        raise e
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -7710,16 +7754,10 @@ def test_simple_risky_amend_based_on_qty(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_symbol_side_snapshot = None
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
@@ -7731,9 +7769,11 @@ def test_simple_risky_amend_based_on_qty(
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -7744,79 +7784,73 @@ def test_simple_risky_amend_based_on_qty(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                open_exposure = open_notional
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_px)
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
+                amend_qty = 10
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_qty = qty - 10
+                amend_qty = 10
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             if side == Side.BUY:
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
             else:
                 new_qty = qty
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
 
             new_px = px
-            amend_px = None
-            chore_status = ChoreStatusType.OE_AMD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
             open_notional = open_qty * get_px_in_usd(px)
             open_px = px
-            last_original_qty = qty
-            last_original_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -7824,28 +7858,21 @@ def test_simple_risky_amend_based_on_qty(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_px) - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -7857,60 +7884,17 @@ def test_simple_risky_amend_based_on_qty(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            if side == Side.BUY:
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                new_qty = amend_qty
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                new_qty = qty
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
 
-            new_px = px
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(px)
-            open_px = px
-            last_original_qty = qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_px) - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            pending_amend_dn_qty = 0
+            pending_amend_up_qty = 0
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
@@ -7919,67 +7903,48 @@ def test_simple_risky_amend_based_on_qty(
                                                                                   chore_symbol, executor_http_client)
 
             if side == Side.BUY:
-                cxled_qty = amend_qty - filled_qty
+                cxled_qty = open_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                new_qty = amend_qty
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
             else:
-                new_qty = qty
-                cxled_qty = (qty - amend_qty) + (amend_qty - filled_qty)
+                cxled_qty = open_qty + amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-
+            residual_qty = open_qty
             new_px = px
-            amend_px = None
             chore_status = ChoreStatusType.OE_DOD
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
             open_qty = 0
             open_notional = 0
             open_px = 0
-            last_original_qty = qty
-            last_original_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_residual_qty = cxled_qty
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_px) - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
     except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+        print(e)
+        raise e
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -8025,15 +7990,10 @@ def test_simple_non_risky_amend_based_on_px(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_px = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_qty = qty
-                buy_px = px
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
@@ -8045,9 +8005,11 @@ def test_simple_non_risky_amend_based_on_px(
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -8058,6 +8020,7 @@ def test_simple_non_risky_amend_based_on_px(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -8065,51 +8028,46 @@ def test_simple_non_risky_amend_based_on_px(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_qty * get_px_in_usd(px)
+                cxled_exposure = buy_cxl_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                buy_amend_px = amend_px
+                amend_px = 1
+                pending_amend_dn_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
+                amend_px = 1
+                pending_amend_up_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            amend_qty = None
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -8126,28 +8084,21 @@ def test_simple_non_risky_amend_based_on_px(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_qty * get_px_in_usd(px)
+                cxled_exposure = buy_cxl_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -8159,65 +8110,49 @@ def test_simple_non_risky_amend_based_on_px(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-
-            new_px = amend_px
-            amend_qty = None
+            if side == Side.BUY:
+                new_px = px - amend_px
+            else:
+                new_px = px + amend_px
             chore_status = ChoreStatusType.OE_ACKED
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            cxled_qty = 0
-            cxled_px = 0
-            cxled_notional = 0
-            new_qty = qty
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
                 filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
+                cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px) - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_DOD
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
             cxled_qty = qty - filled_qty
-            cxled_px = amend_px
+            cxled_px = new_px
             cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
             if side == Side.BUY:
                 other_side_residual_qty = 0
@@ -8225,37 +8160,29 @@ def test_simple_non_risky_amend_based_on_px(
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_residual_qty = cxled_qty
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px) - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
     except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+        print(e)
+        raise e
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -8301,30 +8228,24 @@ def test_simple_risky_amend_based_on_px(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_symbol_side_snapshot = None
-        buy_filled_qty = None
-        buy_qty = None
-        buy_px = None
-        buy_amend_px = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_qty = qty
-                buy_px = px
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -8335,70 +8256,64 @@ def test_simple_risky_amend_based_on_px(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px + 1
-                buy_amend_px = amend_px
+                amend_px = 1
+                new_px = px + amend_px
+                pending_amend_up_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
+                amend_px = 1
+                new_px = px - amend_px
+                pending_amend_dn_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
-            new_qty = qty
-            new_px = amend_px
-            amend_qty = None
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = qty - filled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            last_original_px = px
-            last_original_qty = qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -8406,28 +8321,22 @@ def test_simple_risky_amend_based_on_px(
                 filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional
             last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -8439,64 +8348,29 @@ def test_simple_risky_amend_based_on_px(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            new_px = amend_px
-            amend_qty = None
             chore_status = ChoreStatusType.OE_ACKED
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            cxled_qty = 0
-            cxled_px = 0
-            cxled_notional = 0
-            new_qty = qty
-            last_original_qty = qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px) - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            pending_amend_dn_px = 0
+            pending_amend_up_px = 0
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_DOD
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
             cxled_qty = qty - filled_qty
-            cxled_px = amend_px
+            cxled_px = new_px
             cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
             if side == Side.BUY:
                 other_side_residual_qty = 0
@@ -8504,37 +8378,30 @@ def test_simple_risky_amend_based_on_px(
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_residual_qty = residual_qty
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px) - cxled_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
     except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+        print(e)
+        raise e
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -8579,31 +8446,24 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -8614,61 +8474,58 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                open_exposure = open_notional
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px)))
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -8682,33 +8539,25 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                open_exposure = open_notional
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px)))
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -8721,29 +8570,26 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
+                new_px = px - amend_px
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 0
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
                 total_amend_up_qty = 10
 
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_ACKED
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -8751,52 +8597,34 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px)))
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                cxled_qty = (qty - amend_qty) + (amend_qty - filled_qty)
-                cxled_notional = (qty - amend_qty) * get_px_in_usd(px) + (amend_qty - filled_qty) * get_px_in_usd(
-                    amend_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-            else:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
-                cxled_notional = (amend_qty - filled_qty) * get_px_in_usd(amend_px)
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
@@ -8806,38 +8634,30 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))) - cxled_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
     except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+        print(e)
+        raise e
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -8873,8 +8693,6 @@ def test_simple_risky_amend_based_on_px_and_qty(
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -8883,32 +8701,24 @@ def test_simple_risky_amend_based_on_px_and_qty(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_amend_qty = None
-        buy_amend_px = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
-
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
-            expected_chore_notional = qty * get_px_in_usd(px)
-            chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
-                                                              executor_http_client)
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -8919,60 +8729,60 @@ def test_simple_risky_amend_based_on_px_and_qty(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                open_exposure = open_notional
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_qty = amend_qty
+                pending_amend_up_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_qty = amend_qty
+                pending_amend_dn_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
@@ -8980,21 +8790,16 @@ def test_simple_risky_amend_based_on_px_and_qty(
                 total_amend_up_qty = 10
             else:
                 new_qty = qty
-                cxled_qty = qty - amend_qty
+                new_px = px - amend_px
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 0
 
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -9002,28 +8807,22 @@ def test_simple_risky_amend_based_on_px_and_qty(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -9035,82 +8834,30 @@ def test_simple_risky_amend_based_on_px_and_qty(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                new_qty = qty
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
 
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_ACKED
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
-                cxled_notional = (amend_qty - filled_qty) * get_px_in_usd(amend_px)
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                new_qty = qty
-                cxled_qty = (qty - amend_qty) + (amend_qty - filled_qty)
-                cxled_notional = (qty - amend_qty) * get_px_in_usd(px) + (amend_qty - filled_qty) * get_px_in_usd(
-                    amend_px)
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
@@ -9120,331 +8867,30 @@ def test_simple_risky_amend_based_on_px_and_qty(
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_cxl_notional = cxled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
     except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
-    finally:
-        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
-
-
-@pytest.mark.nightly
-def test_simple_risky_amend_based_on_px_or_qty(
-        static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
-        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
-        last_barter_fixture_list, symbol_overview_obj_list,
-        market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
-        leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    residual_wait_sec = 4 * refresh_sec_update_fixture
-
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list))
-
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
-
-    try:
-        # updating yaml_configs according to this test
-        for symbol in config_dict["symbol_configs"]:
-            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
-        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
-
-        # updating simulator's configs
-        executor_http_client.barter_simulator_reload_config_query_client()
-
-        # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
-
-        buy_filled_qty = None
-        buy_px = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
-
-            # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
-                                                                            executor_http_client)
-
-            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
-            expected_chore_notional = qty * get_px_in_usd(px)
-            chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
-                                                              executor_http_client)
-
-            new_qty = qty
-            new_px = px
-            amend_qty = None
-            amend_px = None
-            chore_status = ChoreStatusType.OE_ACKED
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = qty - filled_qty
-            open_notional = open_qty * get_px_in_usd(px)
-            open_px = px
-            cxled_qty = 0
-            cxled_notional = 0
-            cxled_px = 0
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
-            else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            if side == Side.BUY:
-                # buy side: px is amending dn which is non-risky and qty is amended up which is risky so overall
-                # it should be risky
-                amend_px = px - 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
-            else:
-                # sell side: px is amending dn which is risky and qty is amended up which is non-risky so overall
-                # it should be risky
-                amend_px = px - 1
-                amend_qty = qty + 10
-
-            executor_http_client.barter_simulator_process_amend_req_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account,
-                qty=amend_qty, px=amend_px)
-
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
-
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 10
-            new_qty = amend_qty
-            cxled_qty = 0
-            cxled_px = 0
-            cxled_notional = 0
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px))
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Placing Amend ACK chore and checking amend should be applied on ack
-            executor_http_client.barter_simulator_process_amend_ack_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account)
-
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
-                                                                                  chore_symbol,
-                                                                                  executor_http_client)
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 10
-            new_qty = amend_qty
-            cxled_qty = 0
-            cxled_px = 0
-            cxled_notional = 0
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_ACKED
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px))
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # waiting for chore to get cxled
-            time.sleep(residual_wait_sec)
-
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
-                                                                                  chore_symbol, executor_http_client)
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 10
-            new_qty = amend_qty
-            cxled_qty = amend_qty - filled_qty
-            cxled_px = amend_px
-            cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_DOD
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = 0
-            open_notional = 0
-            open_px = 0
-            last_original_qty = qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-    except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+        print(e)
+        raise e
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -9488,30 +8934,24 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            last_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -9522,6 +8962,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -9529,53 +8970,50 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px)))
-            last_original_px = None
-            last_original_qty = None
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -9593,42 +9031,32 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px)))
-
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # placing fills before receiving AMD_ACK
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
 
+            last_filled_qty = filled_qty
             filled_qty = filled_qty * 2
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -9646,28 +9074,21 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px)))
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -9680,29 +9101,28 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
+                new_px = px - amend_px
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 0
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
                 total_amend_up_qty = 10
 
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_ACKED
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -9710,52 +9130,34 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px)))
-
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                cxled_qty = (qty - amend_qty) + (amend_qty - filled_qty)
-                cxled_notional = (qty - amend_qty) * get_px_in_usd(px) + (amend_qty - filled_qty) * get_px_in_usd(
-                    amend_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-            else:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
-                cxled_notional = (amend_qty - filled_qty) * get_px_in_usd(amend_px)
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
@@ -9765,38 +9167,30 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_cxl_notional = cxled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))) - cxled_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
     except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+        print(e)
+        raise e
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -9840,30 +9234,24 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            last_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -9874,6 +9262,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -9881,52 +9270,50 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))
-            last_original_px = None
-            last_original_qty = None
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -9944,37 +9331,30 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # placing fills before receiving AMD_ACK - makes chore filled
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
 
+            last_filled_qty = filled_qty
             filled_qty = filled_qty * 2
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
@@ -9996,27 +9376,21 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -10029,62 +9403,58 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
-                total_amend_dn_qty = 10
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
-                chore_status = ChoreStatusType.OE_OVER_FILLED
+                chore_status = ChoreStatusType.OE_OVER_CXLED
                 open_qty = 0
                 open_notional = 0
                 open_px = 0
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
                 chore_status = ChoreStatusType.OE_ACKED
-                open_qty = amend_qty - filled_qty
-                open_notional = open_qty * get_px_in_usd(amend_px)
-                open_px = amend_px
+                open_qty = amend_qty
+                open_notional = open_qty * get_px_in_usd(new_px)
+                open_px = new_px
 
-            new_px = amend_px
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
-            last_original_qty = qty
-            last_original_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = 0
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             if side == Side.BUY:
                 paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
@@ -10093,68 +9463,57 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
 
                 # Checking alert in strat_alert
                 time.sleep(5)
-                check_str = "Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_FILLED,"
-                assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
+                check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_CXLED to chore "
+                             "which was ChoreStatusType.OE_FILLED before")
+                assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
                 check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
                 # forcefully turning strat to active again for checking sell chore
                 pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
                 pair_strat.strat_state = StratState.StratState_ACTIVE
                 email_book_service_native_web_client.put_pair_strat_client(pair_strat)
+                time.sleep(5)
             else:
                 time.sleep(5)
-                check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore ACKED to chore "
+                check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore back to ACKED "
                              "which was FILLED before amend")
                 assert_fail_msg = f"Can't find alert: {check_str!r}"
                 check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
                 time.sleep(residual_wait_sec)
 
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
-                cxled_px = amend_px
+                cxled_qty = open_qty
+                cxled_px = open_px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
                 chore_status = ChoreStatusType.OE_DOD
+                residual_qty = open_qty
                 open_qty = 0
                 open_notional = 0
                 open_px = 0
-                new_px = amend_px
                 filled_notional = filled_qty * get_px_in_usd(px)
                 filled_px = px
-                last_original_qty = qty
-                last_original_px = px
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(buy_symbol, Side.BUY))
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px)) - cxled_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
-                try:
-                    check_all_computes_for_amend(
-                        active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                        new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                        last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                        filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                        other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                        cxled_exposure)
-                except AssertionError as ass_e:
-                    print("ASSERT", ass_e)
-                    raise AssertionError(ass_e)
-                except Exception as e:
-                    print("Exception", e)
-                    raise Exception(e)
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
 
     except AssertionError as e:
+        print(e)
         raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -10198,30 +9557,24 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            last_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -10232,6 +9585,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -10239,52 +9593,50 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))
-            last_original_px = None
-            last_original_qty = None
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -10302,37 +9654,30 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # placing fills before receiving AMD_ACK - makes chore filled
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
 
+            last_filled_qty = filled_qty
             filled_qty = filled_qty * 2
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
@@ -10354,27 +9699,21 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
             assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
@@ -10396,64 +9735,64 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
-                total_amend_dn_qty = 10
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
+                chore_status = ChoreStatusType.OE_OVER_CXLED
+                open_qty = 0
+                open_notional = 0
+                open_px = 0
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
+                chore_status = ChoreStatusType.OE_OVER_FILLED
+                open_qty = 0
+                open_notional = 0
+                open_px = 0
 
-            open_qty = 0
-            open_notional = 0
-            open_px = 0
-            chore_status = ChoreStatusType.OE_OVER_FILLED
-            new_px = amend_px
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
-            last_original_qty = qty
-            last_original_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = 0
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Checking alert in strat_alert
             time.sleep(5)
-            check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_FILLED to "
-                         "chore which is already OVER_FILLED")
-            assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
+            check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_CXLED to "
+                         "chore which was ChoreStatusType.OE_OVER_FILLED before")
+            assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
             if side == Side.BUY:
@@ -10463,12 +9802,485 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 email_book_service_native_web_client.put_pair_strat_client(pair_strat)
 
     except AssertionError as e:
+        print(e)
         raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_post_amd_ack(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    """
+    Amend Up is non-risky on sell side so using sell side only in this test
+    """
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 60
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # buy test
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+
+        for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
+            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
+
+            # checking ACK chore before amend
+            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+                                                                            executor_http_client)
+            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+
+            new_qty = qty
+            new_px = px
+            chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            residual_qty = cxled_qty
+            other_side_residual_qty = 0
+            other_side_fill_notional = 0
+            open_exposure = - open_notional
+            filled_exposure = - filled_notional
+            cxled_exposure = - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty, is_sell_buy_strat=True)
+
+            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            amend_px = 1
+            amend_qty = 22
+            pending_amend_up_px = amend_px
+            pending_amend_up_qty = amend_qty
+            chore_event = ChoreEventType.OE_AMD_UP_UNACK
+            chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
+            new_qty = qty
+            new_px = px
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            other_side_residual_qty = 0
+            other_side_fill_notional = 0
+            open_exposure = - open_notional
+            filled_exposure = - filled_notional
+            cxled_exposure = - cxled_notional
+
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty, is_sell_buy_strat=True)
+
+            # placing fills before receiving AMD_ACK - makes chore filled
+            executor_http_client.barter_simulator_process_fill_query_client(
+                latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
+                latest_ack_obj.chore.underlying_account)
+
+            last_filled_qty = filled_qty
+            filled_qty = filled_qty * 2
+
+            new_qty = qty
+            new_px = px
+            chore_status = ChoreStatusType.OE_OVER_FILLED
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            other_side_residual_qty = 0
+            other_side_fill_notional = 0
+            open_exposure = - open_notional
+            filled_exposure = - filled_notional
+            cxled_exposure = - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty, is_sell_buy_strat=True)
+
+            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
+            assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
+                f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+
+            time.sleep(5)
+            check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
+            assert_fail_msg = f"Can't find alert: {check_str!r}"
+            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+
+            # Placing Amend ACK chore and checking amend should be applied on ack
+            executor_http_client.barter_simulator_process_amend_ack_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+                                                                                  chore_symbol,
+                                                                                  executor_http_client)
+            new_qty = qty + amend_qty
+            new_px = px + amend_px
+            cxled_qty = 0
+            cxled_px = 0
+            cxled_notional = 0
+            total_amend_dn_qty = 0
+            total_amend_up_qty = amend_qty
+            chore_status = ChoreStatusType.OE_FILLED
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            other_side_residual_qty = 0
+            other_side_fill_notional = 0
+            open_exposure = - open_notional
+            filled_exposure = - filled_notional
+            cxled_exposure = - cxled_notional
+
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty, is_sell_buy_strat=True)
+
+            # Checking alert in strat_alert
+            time.sleep(5)
+            check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore FILLED "
+                         "which was OVER_FILLED before amend")
+            assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
+            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+
+            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
+            assert paused_pair_strat.strat_state == StratState.StratState_ACTIVE, \
+                f"Mismatched: strat state must be ACTIVE, found: {paused_pair_strat.strat_state}"
+
+    except AssertionError as e:
+        print(e)
+        raise AssertionError(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_post_amd_ack(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    """
+    Amend Up is non-risky on sell side so using sell side only in this test
+    """
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 60
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # buy test
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+
+        for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
+            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
+
+            # checking ACK chore before amend
+            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+                                                                            executor_http_client)
+            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+
+            new_qty = qty
+            new_px = px
+            chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            residual_qty = cxled_qty
+            other_side_residual_qty = 0
+            other_side_fill_notional = 0
+            open_exposure = - open_notional
+            filled_exposure = - filled_notional
+            cxled_exposure = - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty, is_sell_buy_strat=True)
+
+            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            amend_px = 1
+            amend_qty = 30
+            pending_amend_up_px = amend_px
+            pending_amend_up_qty = amend_qty
+            chore_event = ChoreEventType.OE_AMD_UP_UNACK
+            chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
+            new_qty = qty
+            new_px = px
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            other_side_residual_qty = 0
+            other_side_fill_notional = 0
+            open_exposure = - open_notional
+            filled_exposure = - filled_notional
+            cxled_exposure = - cxled_notional
+
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty, is_sell_buy_strat=True)
+
+            # placing fills before receiving AMD_ACK - makes chore filled
+            executor_http_client.barter_simulator_process_fill_query_client(
+                latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
+                latest_ack_obj.chore.underlying_account)
+
+            last_filled_qty = filled_qty
+            filled_qty = filled_qty * 2
+
+            new_qty = qty
+            new_px = px
+            chore_status = ChoreStatusType.OE_OVER_FILLED
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            other_side_residual_qty = 0
+            other_side_fill_notional = 0
+            open_exposure = - open_notional
+            filled_exposure = - filled_notional
+            cxled_exposure = - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty, is_sell_buy_strat=True)
+
+            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
+            assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
+                f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+
+            time.sleep(5)
+            check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
+            assert_fail_msg = f"Can't find alert: {check_str!r}"
+            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+
+            # Placing Amend ACK chore and checking amend should be applied on ack
+            executor_http_client.barter_simulator_process_amend_ack_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+                                                                                  chore_symbol,
+                                                                                  executor_http_client)
+            new_qty = qty + amend_qty
+            new_px = px + amend_px
+            cxled_qty = 0
+            cxled_px = 0
+            cxled_notional = 0
+            total_amend_dn_qty = 0
+            total_amend_up_qty = amend_qty
+            chore_status = ChoreStatusType.OE_ACKED
+            open_qty = new_qty - filled_qty
+            open_px = new_px
+            open_notional = open_qty * get_px_in_usd(open_px)
+
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            other_side_residual_qty = 0
+            other_side_fill_notional = 0
+            open_exposure = - open_notional
+            filled_exposure = - filled_notional
+            cxled_exposure = - cxled_notional
+
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty, is_sell_buy_strat=True)
+
+            # Checking alert in strat_alert
+            time.sleep(5)
+            check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore back to ACKED "
+                         "which was OVER_FILLED before amend")
+            assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
+            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+
+            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
+            assert paused_pair_strat.strat_state == StratState.StratState_ACTIVE, \
+                f"Mismatched: strat state must be ACTIVE, found: {paused_pair_strat.strat_state}"
+
+            # waiting for chore to get cxled
+            time.sleep(residual_wait_sec)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+                                                                                  chore_symbol, executor_http_client)
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
+            cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
+            chore_status = ChoreStatusType.OE_DOD
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            residual_qty = open_qty
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            other_side_residual_qty = 0
+            other_side_fill_notional = 0
+            open_exposure = - open_notional
+            filled_exposure = - filled_notional
+            cxled_exposure = - cxled_notional
+
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty, is_sell_buy_strat=True)
+
+    except AssertionError as e:
+        print(e)
+        raise AssertionError(e)
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -10514,30 +10326,24 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            last_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -10548,80 +10354,76 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                open_exposure = open_notional
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px))
-            last_original_px = None
-            last_original_qty = None
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
                 total_amend_up_qty = 10
             else:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
+                new_px = px - amend_px
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 0
 
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -10629,62 +10431,35 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
-
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # placing fills before receiving AMD_ACK
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
 
+            last_filled_qty = filled_qty
             filled_qty = filled_qty * 2
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -10692,27 +10467,21 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -10724,30 +10493,12 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
 
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_ACKED
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -10755,47 +10506,30 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
-
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
-                cxled_notional = (amend_qty - filled_qty) * get_px_in_usd(amend_px)
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                cxled_qty = (qty - amend_qty) + (amend_qty - filled_qty)
-                cxled_notional = (qty - amend_qty) * get_px_in_usd(px) + (amend_qty - filled_qty) * get_px_in_usd(
-                    amend_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
+            residual_qty = open_qty
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -10809,37 +10543,29 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_residual_qty = residual_qty
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
-
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
     except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+        print(e)
+        raise e
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -10885,30 +10611,24 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            last_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -10919,6 +10639,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -10926,75 +10647,70 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 filled_exposure = filled_qty * get_px_in_usd(px)
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
-            last_original_px = None
-            last_original_qty = None
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            # Placing Amend req chore and checking computes
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-                open_qty = amend_qty - filled_qty
+                total_amend_up_qty = amend_qty
             else:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
-                total_amend_dn_qty = 10
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
-                open_qty = qty - filled_qty - cxled_qty
-                open_notional = 0
 
-            open_px = amend_px
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            chore_status = ChoreStatusType.OE_AMD
-            new_px = amend_px
+            open_qty = new_qty - filled_qty - cxled_qty
+            open_px = new_px
+            open_notional = open_qty * get_px_in_usd(new_px)
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
-            last_original_qty = qty
-            last_original_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -11002,28 +10718,21 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = - cxled_notional
-
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # placing fills before receiving AMD_ACK - makes chore filled
             last_filled_qty = open_qty
@@ -11031,34 +10740,14 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, last_filled_qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account, use_exact_passed_qty=True)
 
-            filled_qty = amend_qty
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
+            filled_qty = new_qty - cxled_qty
 
             open_qty = 0
             open_notional = 0
             open_px = 0
             chore_status = ChoreStatusType.OE_FILLED
-            new_px = amend_px
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
-            last_original_qty = qty
-            last_original_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -11066,27 +10755,21 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = - cxled_notional
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -11098,67 +10781,40 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-
-            open_qty = 0
-            open_notional = 0
-            open_px = 0
             chore_status = ChoreStatusType.OE_FILLED
-            new_px = amend_px
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            last_original_qty = qty
-            last_original_px = px
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = - cxled_notional
-
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
     except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+        print(e)
+        raise e
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -11204,30 +10860,24 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            last_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -11238,82 +10888,7 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
-            else:
-                other_side_residual_qty = 0
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
-            last_original_px = None
-            last_original_qty = None
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
-            else:
-                amend_px = px - 1
-                amend_qty = qty - 10
-
-            executor_http_client.barter_simulator_process_amend_req_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account,
-                qty=amend_qty, px=amend_px)
-
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-                open_qty = amend_qty - filled_qty
-            else:
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-                open_qty = qty - filled_qty - cxled_qty
-                open_notional = 0
-
-            open_px = amend_px
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            chore_status = ChoreStatusType.OE_AMD
-            new_px = amend_px
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            last_original_qty = qty
-            last_original_px = px
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -11321,28 +10896,90 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = - cxled_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            # Placing Amend req chore and checking computes
+            if side == Side.BUY:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+            else:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
+            if side == Side.BUY:
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
+                cxled_qty = 0
+                cxled_px = 0
+                cxled_notional = 0
+                total_amend_dn_qty = 0
+                total_amend_up_qty = amend_qty
+            else:
+                cxled_qty = amend_qty
+                cxled_px = px
+                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
+                new_qty = qty
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
+                total_amend_up_qty = 0
+
+            open_qty = new_qty - filled_qty - cxled_qty
+            open_px = new_px
+            open_notional = open_qty * get_px_in_usd(open_px)
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # placing fills before receiving AMD_ACK - makes chore filled
             last_filled_qty = open_qty + 20
@@ -11351,33 +10988,13 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 latest_ack_obj.chore.underlying_account, use_exact_passed_qty=True)
 
             filled_qty += last_filled_qty
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
 
             open_qty = 0
             open_notional = 0
             open_px = 0
             chore_status = ChoreStatusType.OE_OVER_FILLED
-            new_px = amend_px
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
-            last_original_qty = qty
-            last_original_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -11385,27 +11002,21 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = - cxled_notional
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
             assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
@@ -11426,59 +11037,36 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-
-            open_qty = 0
-            open_notional = 0
-            open_px = 0
             chore_status = ChoreStatusType.OE_OVER_FILLED
-            new_px = amend_px
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            last_original_qty = qty
-            last_original_px = px
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = 0
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = - cxled_notional
-
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             if side == Side.BUY:
                 # forcefully turning strat to active again for checking sell chore
@@ -11487,12 +11075,8 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 email_book_service_native_web_client.put_pair_strat_client(pair_strat)
 
     except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
+        print(e)
+        raise e
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
@@ -11509,7 +11093,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
         market_depth_basemodel_list, expected_chore_limits_,
         expected_portfolio_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    # IMPO: amending dn to qty less than already filled qty in non-risky case can only be possible in buy side since,
+    # IMPO: amending dn to qty less than open qty in non-risky case can only be possible in buy side since,
     # amend dn is non-risky in buy, sell side if amend_dn is done then it will be risky and amending up is not for
     # this test
 
@@ -11553,8 +11137,6 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -11566,51 +11148,49 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            residual_qty = 0
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = (qty - filled_qty) * get_px_in_usd(px)
             filled_exposure = filled_qty * get_px_in_usd(px)
             cxled_exposure = 0
-            last_original_px = None
-            last_original_qty = None
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
+            check_all_computes_for_amend(
+                active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                residual_qty=residual_qty)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            amend_px = px - 1
-            amend_qty = qty - 10
+            amend_px = 1
+            amend_qty = 10
+            chore_event = ChoreEventType.OE_AMD_DN_UNACK
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             # not updating any value since this amend req should get rejected and values should stay unchanged
-            amend_qty = None
-            amend_px = None
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -11619,7 +11199,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
                 raise Exception(e)
 
             time.sleep(5)
-            check_str = "Unsupported: Amend qty is less than already filled qty - ignoring is amend request"
+            check_str = "Unexpected: Amend qty is higher than open qty - ignoring is amend request"
             assert_fail_msg = f"Couldn't find any alert saying: {check_str}"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -11646,19 +11226,19 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
         market_depth_basemodel_list, expected_chore_limits_,
         expected_portfolio_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    # IMPO: amending dn to qty less than already filled qty in risky case can only be possible in sell side since,
+    # IMPO: amending dn to qty less than open qty in risky case can only be possible in sell side since,
     # amend dn is risky in sell, buy side if amend_dn is done then it will be non-risky and amending up is not for
     # this test
 
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -11669,17 +11249,15 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["fill_percent"] = 95
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
 
-        for px, qty, chore_symbol, side in [(110, 95, sell_symbol, Side.SELL)]:
+        for px, qty, chore_symbol, side in [(110, 95, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
@@ -11690,8 +11268,6 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -11703,20 +11279,24 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            residual_qty = 0
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
             filled_exposure = - filled_qty * get_px_in_usd(px)
             cxled_exposure = 0
-            last_original_px = None
-            last_original_qty = None
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -11724,30 +11304,31 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
                 print("Exception", e)
                 raise Exception(e)
 
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            amend_px = px - 1
-            amend_qty = qty - 10
+            # Placing Amend req chore and checking computes
+            amend_px = 1
+            amend_qty = 10
+            chore_event = ChoreEventType.OE_AMD_DN_UNACK
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             # not updating any value since this amend req should get rejected and values should stay unchanged
-            amend_qty = None
-            amend_px = None
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -11756,7 +11337,7 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
                 raise Exception(e)
 
             time.sleep(5)
-            check_str = "Unsupported: Amend qty is less than already filled qty - ignoring is amend request"
+            check_str = "Unexpected: Amend qty is higher than open qty - ignoring is amend request"
             assert_fail_msg = f"Couldn't find any alert saying: {check_str}"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -11772,7 +11353,7 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
 
 
 @pytest.mark.nightly
-def test_non_risky_amend_based_on_px_and_qty_with_amend_making_filled(
+def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
@@ -11825,8 +11406,6 @@ def test_non_risky_amend_based_on_px_and_qty_with_amend_making_filled(
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -11838,44 +11417,51 @@ def test_non_risky_amend_based_on_px_and_qty_with_amend_making_filled(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            residual_qty = 0
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = (qty - filled_qty) * get_px_in_usd(px)
             filled_exposure = filled_qty * get_px_in_usd(px)
             cxled_exposure = 0
-
-            last_original_px = None
-            last_original_qty = None
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            amend_px = px - 1
-            amend_qty = filled_qty
+            amend_px = 1
+            amend_qty = open_qty
+            chore_event = ChoreEventType.OE_AMD_DN_UNACK
+            chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+            pending_amend_dn_px = amend_px
+            pending_amend_dn_qty = amend_qty
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -11895,16 +11481,17 @@ def test_non_risky_amend_based_on_px_and_qty_with_amend_making_filled(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -11916,21 +11503,19 @@ def test_non_risky_amend_based_on_px_and_qty_with_amend_making_filled(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            cxled_qty = qty - amend_qty
+            cxled_qty = open_qty
             cxled_px = px
             cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
             new_qty = qty
-            total_amend_dn_qty = open_qty   # removing whatever is open
+            total_amend_dn_qty = amend_qty
             total_amend_up_qty = 0
             chore_status = ChoreStatusType.OE_DOD
             open_qty = 0
             open_notional = 0
             open_px = 0
-            new_px = amend_px
+            new_px = px - amend_px
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
-            last_original_qty = qty
-            last_original_px = px
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = open_notional
@@ -11940,21 +11525,22 @@ def test_non_risky_amend_based_on_px_and_qty_with_amend_making_filled(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # Checking alert in strat_alert
             time.sleep(5)
-            check_str = "Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore DOD,"
-            assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
+            check_str = "Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore DOD"
+            assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
@@ -11969,7 +11555,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_amend_making_filled(
 
 
 @pytest.mark.nightly
-def test_risky_amend_based_on_px_and_qty_with_amend_making_filled(
+def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
@@ -11984,15 +11570,15 @@ def test_risky_amend_based_on_px_and_qty_with_amend_making_filled(
     # amend dn is risky in sell, buy side if amend_dn is done then it will be non-risky and amending up is not for
     # this test
 
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -12009,9 +11595,9 @@ def test_risky_amend_based_on_px_and_qty_with_amend_making_filled(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
 
-        for px, qty, chore_symbol, side in [(110, 95, sell_symbol, Side.SELL)]:
+        for px, qty, chore_symbol, side in [(110, 95, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
@@ -12022,8 +11608,6 @@ def test_risky_amend_based_on_px_and_qty_with_amend_making_filled(
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -12035,42 +11619,49 @@ def test_risky_amend_based_on_px_and_qty_with_amend_making_filled(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            residual_qty = 0
             other_side_residual_qty = 0
             other_side_fill_notional = 0
-            open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-            filled_exposure = - filled_qty * get_px_in_usd(px)
+            open_exposure = - open_notional
+            filled_exposure = - filled_notional
             cxled_exposure = 0
-
-            last_original_px = None
-            last_original_qty = None
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            amend_px = px - 1
-            amend_qty = filled_qty
+            amend_px = 1
+            amend_qty = open_qty
+            chore_event = ChoreEventType.OE_AMD_DN_UNACK
+            pending_amend_dn_px = amend_px
+            pending_amend_dn_qty = amend_qty
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
-            cxled_qty = qty - amend_qty
+            cxled_qty = open_qty
             cxled_px = px
             cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
             new_qty = qty
@@ -12080,11 +11671,9 @@ def test_risky_amend_based_on_px_and_qty_with_amend_making_filled(
             open_qty = 0
             open_notional = 0
             open_px = 0
-            new_px = amend_px
+            new_px = px - amend_px
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
-            last_original_qty = qty
-            last_original_px = px
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = - open_notional
@@ -12094,20 +11683,21 @@ def test_risky_amend_based_on_px_and_qty_with_amend_making_filled(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # Checking alert in strat_alert
             time.sleep(5)
-            check_str = "Received ChoreEventType.OE_AMD_UNACK for amend qty which makes chore DOD,"
+            check_str = "Received ChoreEventType.OE_AMD_DN_UNACK for amend qty which makes chore DOD"
 
             assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
@@ -12122,39 +11712,25 @@ def test_risky_amend_based_on_px_and_qty_with_amend_making_filled(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            cxled_qty = qty - amend_qty
-            cxled_px = px
-            cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-            new_qty = qty
-            total_amend_up_qty = 0
-            chore_status = ChoreStatusType.OE_DOD
-            open_qty = 0
-            open_notional = 0
-            open_px = 0
-            new_px = amend_px
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            last_original_qty = qty
-            last_original_px = px
-            other_side_residual_qty = 0
-            other_side_fill_notional = 0
-            open_exposure = - open_notional
-            filled_exposure = - filled_notional
-            cxled_exposure = - cxled_notional
 
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -12206,17 +11782,10 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
@@ -12227,32 +11796,39 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             last_filled_qty = filled_qty
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol,
-                                                                                    executor_http_client)
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -12263,33 +11839,31 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            last_original_qty = None
-            last_original_px = None
+            residual_qty = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_amend_px)))
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -12313,53 +11887,57 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
-                cxled_qty = (qty - amend_qty) + (amend_qty - filled_qty)
-                cxled_notional = ((qty - amend_qty) * get_px_in_usd(amend_px) +
-                                  (amend_qty - filled_qty) * get_px_in_usd(px))
                 new_qty = qty
+                new_px = px - amend_px
+                cxled_qty = amend_qty + (qty - filled_qty)
+                cxled_notional = (amend_qty * get_px_in_usd(px) +
+                                  (new_qty - filled_qty) * get_px_in_usd(px))
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 0
+                chore_status = ChoreStatusType.OE_OVER_CXLED
             else:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
+                cxled_qty = new_qty - filled_qty
                 cxled_notional = (((qty - filled_qty) * get_px_in_usd(px)) +
-                                  ((amend_qty - qty) * get_px_in_usd(amend_px)))
+                                  (amend_qty * get_px_in_usd(px)))
                 total_amend_dn_qty = 0
                 total_amend_up_qty = 10
-            new_px = amend_px
+                chore_status = ChoreStatusType.OE_DOD
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
-            chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = 0
             open_notional = 0
             open_px = 0
-            last_original_qty = qty
-            last_original_px = px
             if side == Side.BUY:
+                residual_qty = new_qty - filled_qty
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
+                open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                residual_qty = new_qty - filled_qty - amend_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_amend_px))) - cxled_notional
-
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -12367,10 +11945,29 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
                 print("Exception", e)
                 raise Exception(e)
 
-            time.sleep(5)
-            check_str = "Amending dn qty on chore which is already DOD"
-            assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            if side == Side.BUY:
+                paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
+                assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
+                    f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+
+                time.sleep(5)
+                check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_CXLED to chore "
+                             "which was ChoreStatusType.OE_DOD before")
+                assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
+                check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id,
+                                                                   check_str, assert_fail_msg)
+            else:
+                check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore DOD, before status "
+                             "was ChoreStatusType.OE_DOD - applying amend and putting chore as DOD")
+                assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
+                check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id,
+                                                                   check_str, assert_fail_msg)
+
+            if side == Side.BUY:
+                # forcefully turning strat to active again for checking sell chore
+                pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
+                pair_strat.strat_state = StratState.StratState_ACTIVE
+                email_book_service_native_web_client.put_pair_strat_client(pair_strat)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -12422,17 +12019,10 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
@@ -12443,61 +12033,59 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             last_filled_qty = filled_qty
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
-            # Placing Amend req chore and checking computes
+            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
-
-            if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
-            else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
             else:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
-                total_amend_dn_qty = 10
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
-
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
+            residual_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -12505,22 +12093,23 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -12543,49 +12132,51 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
-                cxled_notional = (amend_qty - filled_qty) * get_px_in_usd(amend_px)
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                cxled_qty = (qty - amend_qty) + (amend_qty - filled_qty)
-                cxled_notional = (qty - amend_qty) * get_px_in_usd(px) + (amend_qty - filled_qty) * get_px_in_usd(
-                    amend_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-            cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = 0
             open_notional = 0
             open_px = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
+                cxled_qty += new_qty - filled_qty
+                cxled_notional += (new_qty - filled_qty) * get_px_in_usd(new_px)
+                cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
+                residual_qty = (qty + amend_qty) - filled_qty
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
+                open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                cxled_qty += (qty - amend_qty) - filled_qty
+                cxled_notional += ((qty - amend_qty) - filled_qty) * get_px_in_usd(new_px)
+                cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
+                residual_qty = (qty - amend_qty) - filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -12644,17 +12235,10 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
@@ -12665,32 +12249,39 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             last_filled_qty = filled_qty
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol,
-                                                                                    executor_http_client)
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -12701,33 +12292,31 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            last_original_qty = None
-            last_original_px = None
+            residual_qty = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px)))
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -12751,29 +12340,26 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
-                cxled_qty = (qty - amend_qty)
-                cxled_notional = (qty - amend_qty) * get_px_in_usd(px)
+                cxled_qty = amend_qty
+                cxled_notional = amend_qty * get_px_in_usd(px)
                 new_qty = qty
+                new_px = px - amend_px
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 0
                 cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
                 total_amend_up_qty = 10
                 cxled_px = 0
 
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_CXL_UNACK
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -12781,23 +12367,23 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px)))
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -12812,21 +12398,10 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
             cxl_ack_chore_journal.id = None
             executor_http_client.create_chore_journal_client(cxl_ack_chore_journal)
 
-            if side == Side.BUY:
-                cxled_qty = (qty - amend_qty) + (amend_qty - filled_qty)
-                cxled_notional = ((qty - amend_qty) * get_px_in_usd(px) +
-                                  (amend_qty - filled_qty) * get_px_in_usd(amend_px))
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-            else:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
-                cxled_notional = ((amend_qty - filled_qty) * get_px_in_usd(amend_px))
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            new_px = amend_px
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
+            residual_qty = open_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
@@ -12838,27 +12413,30 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
+                open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = (((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) +
-                                  ((buy_qty - buy_amend_qty) * get_px_in_usd(buy_px))) - cxled_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -12917,17 +12495,10 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
@@ -12938,53 +12509,59 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             last_filled_qty = filled_qty
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol,
-                                                                                    executor_http_client)
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
+                cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-                cxled_px = 0
+                total_amend_up_qty = amend_qty
             else:
-                cxled_qty = (qty - amend_qty)
-                cxled_notional = (qty - amend_qty) * get_px_in_usd(px)
+                cxled_qty = amend_qty
+                cxled_px = px
+                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
-                total_amend_dn_qty = 10
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
-                cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
-
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
+            residual_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -12992,23 +12569,23 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13031,53 +12608,19 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-                cxled_px = 0
-            else:
-                cxled_qty = (qty - amend_qty)
-                cxled_notional = (qty - amend_qty) * get_px_in_usd(px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-                cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
-
-            new_px = amend_px
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             chore_status = ChoreStatusType.OE_CXL_UNACK
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
-
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13092,21 +12635,10 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
             cxl_ack_chore_journal.id = None
             executor_http_client.create_chore_journal_client(cxl_ack_chore_journal)
 
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
-                cxled_notional = ((amend_qty - filled_qty) * get_px_in_usd(amend_px))
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                cxled_qty = (qty - amend_qty) + (amend_qty - filled_qty)
-                cxled_notional = ((qty - amend_qty) * get_px_in_usd(px) +
-                                  (amend_qty - filled_qty) * get_px_in_usd(amend_px))
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-            new_px = amend_px
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
+            residual_qty = open_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
@@ -13118,26 +12650,30 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
+                open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_amend_qty - buy_filled_qty) * get_px_in_usd(buy_amend_px)) - cxled_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13194,47 +12730,49 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
 
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol,
+                                                                                    executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -13245,31 +12783,31 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            last_original_qty = None
-            last_original_px = None
+            residual_qty = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - filled_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = ((buy_qty - buy_filled_qty) * get_px_in_usd(buy_px)) - cxled_notional
-            last_filled_qty = filled_qty
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13287,42 +12825,35 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            new_qty = qty
-            new_px = px
             chore_status = ChoreStatusType.OE_ACKED
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = qty - filled_qty
-            open_notional = open_qty * get_px_in_usd(px)
-            open_px = px
-            cxled_qty = 0
-            cxled_notional = 0
-            cxled_px = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = ((buy_qty - buy_filled_qty) * get_px_in_usd(buy_px)) - cxled_notional
-            last_filled_qty = filled_qty
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13335,43 +12866,41 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            new_qty = qty
-            new_px = px
             chore_status = ChoreStatusType.OE_DOD
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = 0
-            open_notional = 0
-            open_px = 0
             cxled_qty = qty - filled_qty
             cxled_notional = cxled_qty * get_px_in_usd(px)
             cxled_px = px
+            residual_qty = open_qty
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                open_exposure = open_notional
+                filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = ((buy_qty - buy_filled_qty) * get_px_in_usd(buy_px)) - cxled_notional
-            last_filled_qty = filled_qty
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13421,8 +12950,6 @@ def test_risky_amend_rej_based_on_px_and_qty(
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -13430,72 +12957,70 @@ def test_risky_amend_rej_based_on_px_and_qty(
 
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_px = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
-
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+            # Placing Amend req chore and checking computes
             if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
-            expected_chore_notional = qty * get_px_in_usd(px)
-            chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
-                                                              executor_http_client)
-
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
-
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol,
+                                                                                    executor_http_client)
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
             else:
                 new_qty = qty
-                cxled_qty = qty - amend_qty
+                new_px = px - amend_px
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
 
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
+            residual_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -13503,22 +13028,23 @@ def test_risky_amend_rej_based_on_px_and_qty(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_qty - buy_filled_qty) * get_px_in_usd(buy_px)) - cxled_notional
-            last_filled_qty = filled_qty
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13538,8 +13064,6 @@ def test_risky_amend_rej_based_on_px_and_qty(
                                                                                   executor_http_client)
             new_qty = qty
             new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -13555,26 +13079,26 @@ def test_risky_amend_rej_based_on_px_and_qty(
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_px)
-            last_filled_qty = filled_qty
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13587,45 +13111,41 @@ def test_risky_amend_rej_based_on_px_and_qty(
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            new_qty = qty
-            new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_DOD
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
+            cxled_qty = open_qty
+            cxled_notional = cxled_qty * get_px_in_usd(px)
+            cxled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
-            cxled_qty = qty - filled_qty
-            cxled_notional = cxled_qty * get_px_in_usd(px)
-            cxled_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                open_exposure = open_notional
+                filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_px) - cxled_notional
-            last_filled_qty = filled_qty
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13661,7 +13181,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
     risky in buy side amend will be applied, then fulfill comes and then rej comes, removing
     amended up qty and making chore over filled
     """
-        
+
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
@@ -13701,54 +13221,60 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
                                                               executor_http_client)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            amend_px = px + 1
-            amend_qty = qty + 10
+            amend_px = 1
+            amend_qty = 10
+            pending_amend_up_px = amend_px
+            pending_amend_up_qty = amend_qty
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            chore_event = ChoreEventType.OE_AMD_UP_UNACK
+            chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+            new_qty = qty + amend_qty
+            new_px = px + amend_px
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol,
+                                                                                    executor_http_client)
 
             # placing fills before receiving AMD_ACK - makes chore filled
             executor_http_client.barter_simulator_process_fill_query_client(
-                latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, amend_qty, side, chore_symbol,
+                latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, new_qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account, use_exact_passed_qty=True)
 
-            new_qty = amend_qty
-            filled_qty = amend_qty
+            filled_qty = new_qty
             cxled_qty = 0
             cxled_px = 0
             cxled_notional = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 10
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_FILLED
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = 0
             open_qty = 0
             open_notional = 0
             open_px = 0
-            last_original_qty = qty
-            last_original_px = px
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = open_notional
             filled_exposure = filled_notional
             cxled_exposure = cxled_notional
-
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13783,15 +13309,14 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
             open_exposure = open_notional
             filled_exposure = filled_notional
             cxled_exposure = 0
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13821,7 +13346,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
 
 
 @pytest.mark.nightly
-def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_rej(
+def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
@@ -13877,18 +13402,28 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_rej(
                                                               executor_http_client)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            amend_px = px + 1
-            amend_qty = qty + 10
+            amend_px = 1
+            amend_qty = 10
+            pending_amend_up_px = amend_px
+            pending_amend_up_qty = amend_qty
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            chore_event = ChoreEventType.OE_AMD_UP_UNACK
+            chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+            new_qty = qty + amend_qty
+            new_px = px + amend_px
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol,
+                                                                                    executor_http_client)
 
             # placing fills before receiving AMD_ACK
             filled_qty = qty
@@ -13896,35 +13431,30 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_rej(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, filled_qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account, use_exact_passed_qty=True)
 
-            new_qty = amend_qty
             cxled_qty = 0
             cxled_px = 0
             cxled_notional = 0
             total_amend_dn_qty = 0
-            total_amend_up_qty = 10
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
+            total_amend_up_qty = amend_qty
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
-            open_qty = amend_qty - filled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_qty = new_qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = open_notional
             filled_exposure = filled_notional
             cxled_exposure = cxled_notional
-
-            last_filled_qty = filled_qty
+            residual_qty = 0
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13959,15 +13489,14 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_rej(
             open_exposure = open_notional
             filled_exposure = filled_notional
             cxled_exposure = 0
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -13977,7 +13506,8 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_rej(
 
             time.sleep(5)
             check_str = ("Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
-                         "ChoreStatusType.OE_AMD before amend applied - reverted status: ChoreStatusType.OE_FILLED")
+                         "ChoreStatusType.OE_AMD_UP_UNACKED before amend applied - "
+                         "status post amd_rej applied: ChoreStatusType.OE_FILLED")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -14009,15 +13539,15 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
     risky in sell side, amend will be applied, then overfill comes with 105 qty and
     then rej comes, removing amended up qty and making chore acked again
     """
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -14028,17 +13558,15 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["fill_percent"] = 0
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
 
-        for px, qty, chore_symbol, side in [(95, 110, sell_symbol, Side.SELL)]:
+        for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
@@ -14050,41 +13578,46 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
             chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
                                                               executor_http_client)
 
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            amend_px = px - 1
-            amend_qty = qty - 10
-
+            # Placing Amend req chore and checking computes
+            amend_px = 1
+            amend_qty = 10
+            chore_event = ChoreEventType.OE_AMD_DN_UNACK
+            pending_amend_dn_px = amend_px
+            pending_amend_dn_qty = amend_qty
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            new_qty = qty
+            new_px = px - amend_px
+            
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             # placing fills before receiving AMD_ACK - makes chore filled
-            filled_qty = amend_qty + 5
+            filled_qty = (qty - amend_qty) + 5
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, filled_qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account, use_exact_passed_qty=True)
 
-            new_qty = qty
-            cxled_qty = qty - amend_qty
+            cxled_qty = amend_qty
             cxled_px = px
             cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-            total_amend_dn_qty = 10
+            total_amend_dn_qty = amend_qty
             total_amend_up_qty = 0
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_OVER_FILLED
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = 0
             open_qty = 0
             open_notional = 0
             open_px = 0
-            last_original_qty = qty
-            last_original_px = px
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = - open_notional
@@ -14094,10 +13627,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14126,8 +13660,6 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
                                                                                   executor_http_client)
             new_qty = qty
             new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -14148,11 +13680,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14175,15 +13707,8 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            new_qty = qty
-            new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_DOD
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
@@ -14195,15 +13720,14 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
             open_exposure = - open_notional
             filled_exposure = - filled_notional
             cxled_exposure = - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14239,15 +13763,15 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
     risky in sell side, amend will be applied, then overfill comes with 110 qty and
     then rej comes, removing amended up qty and checking chore state must be FILLED
     """
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -14266,9 +13790,9 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
 
-        for px, qty, chore_symbol, side in [(95, 110, sell_symbol, Side.SELL)]:
+        for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
@@ -14280,18 +13804,26 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
             chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
                                                               executor_http_client)
 
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            amend_px = px - 1
-            amend_qty = qty - 10
+            # Placing Amend req chore and checking computes
+            amend_px = 1
+            amend_qty = 10
+            chore_event = ChoreEventType.OE_AMD_DN_UNACK
+            pending_amend_dn_px = amend_px
+            pending_amend_dn_qty = amend_qty
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            new_qty = qty
+            new_px = px - amend_px
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             # placing fills before receiving AMD_ACK - makes chore filled
@@ -14300,21 +13832,18 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, filled_qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account, use_exact_passed_qty=True)
 
-            new_qty = qty
-            cxled_qty = qty - amend_qty
+            cxled_qty = amend_qty
             cxled_px = px
             cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-            total_amend_dn_qty = 10
+            total_amend_dn_qty = amend_qty
             total_amend_up_qty = 0
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_OVER_FILLED
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = 0
             open_qty = 0
             open_notional = 0
             open_px = 0
-            last_original_qty = qty
-            last_original_px = px
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = - open_notional
@@ -14324,10 +13853,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14356,8 +13886,6 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
                                                                                   executor_http_client)
             new_qty = qty
             new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_FILLED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -14378,11 +13906,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14428,15 +13956,15 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
     risky in sell side, amend will be applied, then fill comes with 100 qty and
     then rej comes, removing amended up qty and checking chore state must be ACK
     """
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -14455,9 +13983,9 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
 
-        for px, qty, chore_symbol, side in [(95, 110, sell_symbol, Side.SELL)]:
+        for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
@@ -14469,41 +13997,46 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
             chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
                                                               executor_http_client)
 
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            amend_px = px - 1
-            amend_qty = qty - 10
+            # Placing Amend req chore and checking computes
+            amend_px = 1
+            amend_qty = 10
+            chore_event = ChoreEventType.OE_AMD_DN_UNACK
+            pending_amend_dn_px = amend_px
+            pending_amend_dn_qty = amend_qty
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            new_qty = qty
+            new_px = px - amend_px
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             # placing fills before receiving AMD_ACK - makes chore filled
-            filled_qty = amend_qty
+            filled_qty = qty - amend_qty
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, filled_qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account, use_exact_passed_qty=True)
 
-            new_qty = qty
-            cxled_qty = qty - amend_qty
+            cxled_qty = amend_qty
             cxled_px = px
             cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-            total_amend_dn_qty = 10
+            total_amend_dn_qty = amend_qty
             total_amend_up_qty = 0
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_FILLED
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = 0
             open_qty = 0
             open_notional = 0
             open_px = 0
-            last_original_qty = qty
-            last_original_px = px
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = - open_notional
@@ -14513,10 +14046,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14556,11 +14090,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14570,7 +14104,8 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
 
             time.sleep(5)
             check_str = ("Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
-                         "ChoreStatusType.OE_FILLED before amend applied - reverted status: ChoreStatusType.OE_ACKED")
+                         "ChoreStatusType.OE_FILLED before amend applied - status post amd_rej applied: "
+                         "ChoreStatusType.OE_ACKED")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -14586,6 +14121,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
@@ -14601,11 +14137,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14664,8 +14200,8 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
         buy_residual_qty = None
-        buy_fill_notional = None
-        buy_cxled_notional = None
+        buy_filled_notional = None
+        buy_cxl_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
 
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
@@ -14679,25 +14215,37 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol,
+                                                                                    executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -14708,32 +14256,31 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            last_original_qty = None
-            last_original_px = None
+            residual_qty = 0
             if side == Side.BUY:
-                buy_fill_notional = filled_notional
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
             else:
                 other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - filled_notional
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14750,10 +14297,11 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14772,13 +14320,18 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_CXL_UNACK
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14799,35 +14352,37 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
             if side == Side.BUY:
-                buy_residual_qty = cxled_qty
-                buy_cxled_notional = cxled_notional
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
+                open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_residual_qty = residual_qty
+                buy_filled_notional = filled_notional
+                buy_cxl_notional = cxled_notional
             else:
                 other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=cxled_qty)
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14885,72 +14440,70 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
 
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_px = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
-
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+            # Placing Amend req chore and checking computes
             if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
-            expected_chore_notional = qty * get_px_in_usd(px)
-            chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
-                                                              executor_http_client)
-
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
-
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol,
+                                                                                    executor_http_client)
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
             else:
                 new_qty = qty
-                cxled_qty = qty - amend_qty
+                new_px = px - amend_px
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
 
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
+            residual_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -14958,22 +14511,23 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = ((buy_qty - buy_filled_qty) * get_px_in_usd(buy_px)) - cxled_notional
-            last_filled_qty = filled_qty
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14990,11 +14544,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -15014,8 +14568,6 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
                                                                                   executor_http_client)
             new_qty = qty
             new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_CXL_UNACK
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -15031,26 +14583,26 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_px)
-            last_filled_qty = filled_qty
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -15067,13 +14619,12 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             
             new_qty = qty
             new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_DOD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
@@ -15083,27 +14634,30 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                open_exposure = open_notional
+                filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = (buy_qty - buy_filled_qty) * get_px_in_usd(buy_px) - cxled_notional
-            last_filled_qty = filled_qty
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    rej_check=True)
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -15161,8 +14715,8 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
         buy_residual_qty = None
-        buy_fill_notional = None
-        buy_cxled_notional = None
+        buy_filled_notional = None
+        buy_cxl_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
 
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
@@ -15171,30 +14725,40 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol,
+                                                                                    executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -15205,32 +14769,31 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            last_original_qty = None
-            last_original_px = None
+            residual_qty = 0
             if side == Side.BUY:
-                buy_fill_notional = filled_notional
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
             else:
                 other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - filled_notional
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -15238,7 +14801,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
                 print("Exception", e)
                 raise Exception(e)
 
-            # applying cxl req
+            # applying cxl req and cxl ack
             executor_http_client.barter_simulator_place_cxl_chore_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.side, latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.security.sec_id, latest_ack_obj.chore.underlying_account)
@@ -15249,17 +14812,19 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
             if side == Side.BUY:
-                buy_residual_qty = cxled_qty
-                buy_cxled_notional = cxled_notional
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
                 other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
@@ -15267,17 +14832,17 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = 0
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=cxled_qty)
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -15298,11 +14863,11 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=cxled_qty)
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -15312,7 +14877,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
 
             time.sleep(5)
             check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
-                         f".* - ignoring this chore_journal and chore will stay unchanged")
+                         f".* - ignoring this amend chore_journal and chore will stay unchanged")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -15366,69 +14931,70 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
         buy_residual_qty = None
-        buy_fill_notional = None
-        buy_cxled_notional = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
-
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+            # Placing Amend req chore and checking computes
             if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
-            expected_chore_notional = qty * get_px_in_usd(px)
-            chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
-                                                              executor_http_client)
-
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
-
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol,
+                                                                                    executor_http_client)
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
             else:
                 new_qty = qty
-                cxled_qty = qty - amend_qty
+                new_px = px - amend_px
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
 
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
+            residual_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
-                buy_fill_notional = filled_notional
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
@@ -15441,16 +15007,17 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -15458,7 +15025,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
                 print("Exception", e)
                 raise Exception(e)
 
-            # applying cxl req
+            # applying cxl req and cxl ack
             executor_http_client.barter_simulator_place_cxl_chore_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.side, latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.security.sec_id, latest_ack_obj.chore.underlying_account)
@@ -15478,29 +15045,30 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
             open_notional = 0
             open_px = 0
             if side == Side.BUY:
-                buy_residual_qty = cxled_qty
-                buy_cxled_notional = cxled_notional
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
+                open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
                 other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
 
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
@@ -15523,9 +15091,9 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
@@ -15537,7 +15105,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
 
             time.sleep(5)
             check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
-                         f".* - ignoring this chore_journal and chore will stay unchanged")
+                         f".* - ignoring this amend chore_journal and chore will stay unchanged")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
             check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
@@ -15550,151 +15118,6 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         raise Exception(err_str_)
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
-
-
-def _test_avoid_same_amend(
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        last_barter_fixture_list, symbol_overview_obj_list, market_depth_basemodel_list,
-        leg1_leg2_symbol_list, refresh_sec_update_fixture, do_amend_px: bool = False, do_amend_qty: bool = False):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    residual_wait_sec = 4 * refresh_sec_update_fixture
-
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list))
-
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
-
-    try:
-        # updating yaml_configs according to this test
-        for symbol in config_dict["symbol_configs"]:
-            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
-        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
-
-        # updating simulator's configs
-        executor_http_client.barter_simulator_reload_config_query_client()
-
-        # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
-
-        for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
-
-            # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
-                                                                            executor_http_client)
-            chore_id = latest_ack_obj.chore.chore_id
-            chore_snapshot_before_amend = get_chore_snapshot_from_chore_id(chore_id,
-                                                              executor_http_client)
-
-            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-            else:
-                amend_px = px + 1
-                amend_qty = qty + 10
-            if do_amend_qty and not do_amend_px:
-                amend_qty = qty
-            elif do_amend_px and not do_amend_qty:
-                amend_px = px
-            elif do_amend_px and do_amend_qty:
-                amend_px = px
-                amend_qty = qty
-
-            executor_http_client.barter_simulator_process_amend_req_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account,
-                qty=amend_qty, px=amend_px)
-
-            chore_snapshot_after_amend = get_chore_snapshot_from_chore_id(chore_id,
-                                                              executor_http_client)
-
-            assert chore_snapshot_before_amend == chore_snapshot_after_amend, \
-                ("Mismatched: chore_snapshot must be unchanged before and after amend req with same qty or px, "
-                 f"found {chore_snapshot_before_amend = }, {chore_snapshot_after_amend = }")
-
-            time.sleep(5)
-            check_str = (f"Found amend request for chore_id: .*, with "
-                         f"amend request for qty or px, same as existing qty or px - avoiding amend request")
-            assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
-
-            if side == Side.BUY:
-                time.sleep(residual_wait_sec)
-
-    except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
-    finally:
-        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
-
-
-@pytest.mark.nightly
-def test_avoid_same_amend_based_on_qty(
-        static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
-        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
-        last_barter_fixture_list, symbol_overview_obj_list,
-        market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
-        leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    _test_avoid_same_amend(pair_strat_, expected_strat_limits_, expected_strat_status_, last_barter_fixture_list,
-                           symbol_overview_obj_list, market_depth_basemodel_list, leg1_leg2_symbol_list,
-                           refresh_sec_update_fixture, do_amend_qty=True)
-
-
-@pytest.mark.nightly
-def test_avoid_same_amend_based_on_px(
-        static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
-        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
-        last_barter_fixture_list, symbol_overview_obj_list,
-        market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
-        leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    _test_avoid_same_amend(pair_strat_, expected_strat_limits_, expected_strat_status_, last_barter_fixture_list,
-                           symbol_overview_obj_list, market_depth_basemodel_list, leg1_leg2_symbol_list,
-                           refresh_sec_update_fixture, do_amend_px=True)
-
-
-@pytest.mark.nightly
-def test_avoid_same_amend_based_on_px_n_qty(
-        static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
-        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
-        last_barter_fixture_list, symbol_overview_obj_list,
-        market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
-        leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    _test_avoid_same_amend(pair_strat_, expected_strat_limits_, expected_strat_status_, last_barter_fixture_list,
-                           symbol_overview_obj_list, market_depth_basemodel_list, leg1_leg2_symbol_list,
-                           refresh_sec_update_fixture, do_amend_px=True, do_amend_qty=True)
 
 
 @pytest.mark.nightly
@@ -15729,8 +15152,6 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -15739,31 +15160,24 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_qty = None
-        buy_amend_qty = None
-        buy_amend_px = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -15774,31 +15188,30 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -15808,50 +15221,34 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
 
             for i in range(3):
                 print(f"{i+1}th amend for side {side}")
-                if i == 0:
-                    new_qty = qty
-                    new_px = px
-                    total_amend_dn_qty = 0
-                    total_amend_up_qty = 0
-                else:
-                    if side == Side.BUY:
-                        new_qty = qty
-                        new_px = amend_px
-                        total_amend_dn_qty = 10 * i
-                        total_amend_up_qty = 0
-                        # cxled_qty = 10 * i
-                        # cxled_px = px - (1 * (i-1))
-                        # cxled_notional += 10 * get_px_in_usd(cxled_px)
-                    else:
-                        new_qty = amend_qty
-                        new_px = amend_px
-                        total_amend_dn_qty = 0
-                        total_amend_up_qty = 10 * i
-                        # cxled_qty = 0
-                        # cxled_notional = 0
-                        # cxled_px = 0
-                        
+
                 # Placing Amend req chore and checking computes should stay same since it is non-risky amend
                 if side == Side.BUY:
-                    amend_px = px - (1 * (i+1))
-                    amend_qty = qty - (10 * (i+1))
-                    buy_amend_qty = amend_qty
-                    buy_amend_px = amend_px
+                    amend_px = 1
+                    amend_qty = 10
+                    chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                    chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+                    pending_amend_dn_px = amend_px
+                    pending_amend_dn_qty = amend_qty
                 else:
-                    amend_px = px + (1 * (i+1))
-                    amend_qty = qty + (10 * (i+1))
+                    amend_px = 1
+                    amend_qty = 10
+                    chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                    chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+                    pending_amend_up_px = amend_px
+                    pending_amend_up_qty = amend_qty
 
                 executor_http_client.barter_simulator_process_amend_req_query_client(
                     latest_ack_obj.chore.chore_id,
                     latest_ack_obj.chore.side,
                     latest_ack_obj.chore.security.sec_id,
                     latest_ack_obj.chore.underlying_account,
+                    chore_event=chore_event,
                     qty=amend_qty, px=amend_px)
 
-                latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                        chore_symbol, executor_http_client)
-
-                chore_status = ChoreStatusType.OE_AMD
+                latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                        chore_symbol,
+                                                                                        executor_http_client)
                 filled_notional = filled_qty * get_px_in_usd(px)
                 filled_px = px
                 open_qty = new_qty - filled_qty - cxled_qty
@@ -15864,22 +15261,23 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
                     filled_exposure = filled_notional
                     cxled_exposure = cxled_notional
                 else:
-                    other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                    other_side_residual_qty = buy_residual_qty
                     buy_symbol_side_snapshot_list = (
                         executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                             buy_symbol, Side.BUY))
                     other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                     open_exposure = - open_notional
-                    filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                    cxled_exposure = buy_cxled_notional - cxled_notional
-                last_filled_qty = filled_qty
+                    filled_exposure = buy_filled_notional - filled_notional
+                    cxled_exposure = buy_cxl_notional - cxled_notional
                 try:
                     check_all_computes_for_amend(
                         active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                        new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                        last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                        filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                        other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                        new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                        pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                        filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                        other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                        cxled_exposure,
+                        residual_qty=residual_qty)
                 except AssertionError as ass_e:
                     print("ASSERT", ass_e)
                     raise AssertionError(ass_e)
@@ -15898,30 +15296,27 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
                                                                                       chore_symbol,
                                                                                       executor_http_client)
                 if side == Side.BUY:
-                    cxled_qty = 10 * (i + 1)
-                    cxled_notional += 10 * get_px_in_usd(new_px)
+                    cxled_qty += amend_qty
+                    cxled_notional += amend_qty * get_px_in_usd(new_px)
                     cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
-                    total_amend_dn_qty = 10 * (i + 1)
+                    total_amend_dn_qty += amend_qty
                     total_amend_up_qty = 0
                     new_qty = qty
-                    last_original_qty = qty
-                    last_original_px = new_px
+                    new_px -= amend_px
                 else:
-                    last_original_qty = new_qty
-                    last_original_px = new_px
-                    new_qty = amend_qty
+                    new_qty += amend_qty
+                    new_px += amend_px
                     cxled_qty = 0
                     cxled_px = 0
                     cxled_notional = 0
                     total_amend_dn_qty = 0
-                    total_amend_up_qty = 10 * (i + 1)
+                    total_amend_up_qty += amend_qty
 
-                new_px = amend_px
                 chore_status = ChoreStatusType.OE_ACKED
                 filled_notional = filled_qty * get_px_in_usd(px)
                 filled_px = px
                 open_qty = new_qty - filled_qty - cxled_qty
-                open_px = amend_px
+                open_px = new_px
                 open_notional = open_qty * get_px_in_usd(open_px)
                 if side == Side.BUY:
                     other_side_residual_qty = 0
@@ -15930,22 +15325,23 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
                     filled_exposure = filled_notional
                     cxled_exposure = cxled_notional
                 else:
-                    other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                    other_side_residual_qty = buy_residual_qty
                     buy_symbol_side_snapshot_list = (
                         executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                             buy_symbol, Side.BUY))
                     other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                     open_exposure = - open_notional
-                    filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                    cxled_exposure = buy_cxled_notional - cxled_notional
-                last_filled_qty = filled_qty
+                    filled_exposure = buy_filled_notional - filled_notional
+                    cxled_exposure = buy_cxl_notional - cxled_notional
                 try:
                     check_all_computes_for_amend(
                         active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                        new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                        last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                        filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                        other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                        new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                        pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                        filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                        other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                        cxled_exposure,
+                        residual_qty=residual_qty)
                 except AssertionError as ass_e:
                     print("ASSERT", ass_e)
                     raise AssertionError(ass_e)
@@ -15958,45 +15354,43 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                cxled_qty += open_qty
-                cxled_notional += open_notional
-                buy_cxled_notional = cxled_notional
-                new_qty = qty
-            else:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
-                cxled_notional = (amend_qty - filled_qty) * get_px_in_usd(amend_px)
+
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
+                open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16056,32 +15450,24 @@ def test_risky_multi_amend_based_on_px_and_qty(
         # buy test
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_qty = None
-        buy_px = None
-        buy_amend_qty = None
-        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
-
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
-            expected_chore_notional = qty * get_px_in_usd(px)
-            chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
-                                                              executor_http_client)
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -16092,31 +15478,30 @@ def test_risky_multi_amend_based_on_px_and_qty(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                 open_exposure = - open_notional
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)
-                cxled_exposure = buy_cxled_notional
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16126,52 +15511,57 @@ def test_risky_multi_amend_based_on_px_and_qty(
 
             for i in range(3):
                 print(f"{i+1}th amend for side {side}")
+
                 # Placing Amend req chore and checking computes should stay same since it is non-risky amend
                 if side == Side.BUY:
-                    amend_px = px + (i+1)
-                    amend_qty = qty + (10 * (i+1))
-                    buy_amend_qty = amend_qty
-                    buy_amend_px = amend_px
+                    amend_px = 1
+                    amend_qty = 10
+                    chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                    chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
                 else:
-                    amend_px = px - (i+1)
-                    amend_qty = qty - (10 * (i+1))
+                    amend_px = 1
+                    amend_qty = 10
+                    chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                    chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
                 executor_http_client.barter_simulator_process_amend_req_query_client(
                     latest_ack_obj.chore.chore_id,
                     latest_ack_obj.chore.side,
                     latest_ack_obj.chore.security.sec_id,
                     latest_ack_obj.chore.underlying_account,
+                    chore_event=chore_event,
                     qty=amend_qty, px=amend_px)
 
-                latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                        chore_symbol, executor_http_client)
+                latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                        chore_symbol,
+                                                                                        executor_http_client)
 
                 if side == Side.BUY:
-                    new_qty = amend_qty
+                    new_qty += amend_qty
+                    new_px += amend_px
                     cxled_qty = 0
                     cxled_px = 0
                     cxled_notional = 0
                     total_amend_dn_qty = 0
-                    total_amend_up_qty += 10
-                    last_original_qty = qty + (10 * i)
-                    last_original_px = px + i
+                    total_amend_up_qty += amend_qty
+                    pending_amend_up_px = amend_px
+                    pending_amend_up_qty = amend_qty
                 else:
-                    new_qty = qty
-                    cxled_qty += 10
-                    cxled_notional += 10 * get_px_in_usd(px - i)
+                    cxled_qty += amend_qty
+                    cxled_notional += amend_qty * get_px_in_usd(new_px)
                     cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
-                    total_amend_dn_qty += 10
+                    new_qty = qty
+                    new_px -= amend_px
+                    total_amend_dn_qty += amend_qty
                     total_amend_up_qty = 0
-                    last_original_qty = qty
-                    last_original_px = px - i
+                    pending_amend_dn_px = amend_px
+                    pending_amend_dn_qty = amend_qty
 
-                new_px = amend_px
-                chore_status = ChoreStatusType.OE_AMD
                 filled_notional = filled_qty * get_px_in_usd(px)
                 filled_px = px
                 open_qty = new_qty - filled_qty - cxled_qty
-                open_notional = open_qty * get_px_in_usd(amend_px)
-                open_px = amend_px
+                open_notional = open_qty * get_px_in_usd(new_px)
+                open_px = new_px
                 if side == Side.BUY:
                     other_side_residual_qty = 0
                     other_side_fill_notional = 0
@@ -16179,22 +15569,23 @@ def test_risky_multi_amend_based_on_px_and_qty(
                     filled_exposure = filled_notional
                     cxled_exposure = cxled_notional
                 else:
-                    other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                    other_side_residual_qty = buy_residual_qty
                     buy_symbol_side_snapshot_list = (
                         executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                             buy_symbol, Side.BUY))
                     other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
                     open_exposure = - open_notional
-                    filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                    cxled_exposure = buy_cxled_notional - cxled_notional
-                last_filled_qty = filled_qty
+                    filled_exposure = buy_filled_notional - filled_notional
+                    cxled_exposure = buy_cxl_notional - cxled_notional
                 try:
                     check_all_computes_for_amend(
                         active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                        new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                        last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                        filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                        other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                        new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                        pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                        filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                        other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                        cxled_exposure,
+                        residual_qty=residual_qty)
                 except AssertionError as ass_e:
                     print("ASSERT", ass_e)
                     raise AssertionError(ass_e)
@@ -16213,13 +15604,19 @@ def test_risky_multi_amend_based_on_px_and_qty(
                                                                                       chore_symbol,
                                                                                       executor_http_client)
                 chore_status = ChoreStatusType.OE_ACKED
+                pending_amend_dn_px = 0
+                pending_amend_dn_qty = 0
+                pending_amend_up_px = 0
+                pending_amend_up_qty = 0
                 try:
                     check_all_computes_for_amend(
                         active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                        new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                        last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                        filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                        other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                        new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                        pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                        filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                        other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                        cxled_exposure,
+                        residual_qty=residual_qty)
                 except AssertionError as ass_e:
                     print("ASSERT", ass_e)
                     raise AssertionError(ass_e)
@@ -16232,45 +15629,42 @@ def test_risky_multi_amend_based_on_px_and_qty(
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = amend_qty - filled_qty
-                cxled_notional = (amend_qty - filled_qty) * get_px_in_usd(amend_px)
-                buy_cxled_notional = cxled_notional
-            else:
-                new_qty = qty
-                cxled_qty += open_qty
-                cxled_notional += open_notional
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            residual_qty = open_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = 0
+                open_exposure = open_notional
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_residual_qty = residual_qty
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
             else:
-                other_side_residual_qty = buy_amend_qty - buy_filled_qty
+                other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
                     executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
                         buy_symbol, Side.BUY))
                 other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_filled_qty * get_px_in_usd(buy_px) - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16290,7 +15684,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
 
 
 @pytest.mark.nightly
-def test_multi_amends_based_on_qty_n_then_px_1(
+def test_multi_amends_based_on_qty_n_then_px(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
@@ -16325,8 +15719,6 @@ def test_multi_amends_based_on_qty_n_then_px_1(
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -16345,31 +15737,39 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             # First Handling Non-Risky amend Case for qty
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
-                amend_qty = qty - 10
+                amend_qty = 10
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+                pending_amend_dn_qty = amend_qty
             else:
-                amend_qty = qty + 10
+                amend_qty = 10
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+                pending_amend_up_qty = amend_qty
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            amend_px = None
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
+            residual_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = qty - filled_qty
@@ -16378,8 +15778,6 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            last_original_qty = None
-            last_original_px = None
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -16396,14 +15794,14 @@ def test_multi_amends_based_on_qty_n_then_px_1(
                 open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
                 filled_exposure = buy_fill_notional - filled_qty * get_px_in_usd(px)
                 cxled_exposure = buy_cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16421,28 +15819,25 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol, executor_http_client)
             if side == Side.BUY:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
-                total_amend_dn_qty = 10
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
 
             new_px = px
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             open_qty = new_qty - filled_qty - cxled_qty
             open_notional = open_qty * get_px_in_usd(px)
             open_px = px
-            last_original_qty = qty
-            last_original_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -16458,14 +15853,14 @@ def test_multi_amends_based_on_qty_n_then_px_1(
                 open_exposure = - open_notional
                 filled_exposure = buy_fill_notional - filled_notional
                 cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16476,43 +15871,47 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             # Next, Handling Risky amend Case for qty
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             # qty = new_qty
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
-                amend_qty = new_qty + 10
-                buy_amend_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+                pending_amend_up_qty = amend_qty
             else:
-                amend_qty = new_qty - 10
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+                pending_amend_dn_qty = amend_qty
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             last_qty = new_qty
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = new_qty + amend_qty
                 total_amend_dn_qty = 10
-                total_amend_up_qty = 20
+                total_amend_up_qty = 10
             else:
                 new_qty = new_qty
-                cxled_qty = new_qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 10
 
             new_px = px
-            amend_px = None
-            chore_status = ChoreStatusType.OE_AMD
             open_qty = new_qty - filled_qty - cxled_qty
             open_notional = open_qty * get_px_in_usd(px)
             open_px = px
-            last_original_qty = last_qty
-            last_original_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -16532,11 +15931,11 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16554,17 +15953,12 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-
-            new_px = px
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(px)
-            open_px = px
-            last_original_qty = last_qty
-            last_original_px = px
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -16584,11 +15978,11 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16598,24 +15992,33 @@ def test_multi_amends_based_on_qty_n_then_px_1(
 
             # Next, Handling Non-Risky amend Case for px
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
-                amend_px = new_px - 1
-                buy_amend_px = amend_px
+                amend_px = 1
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+                pending_amend_dn_px = amend_px
             else:
-                amend_px = new_px + 1
+                amend_px = 1
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+                pending_amend_up_px = amend_px
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             open_qty = new_qty - filled_qty - cxled_qty
             open_notional = open_qty * get_px_in_usd(open_px)
             if side == Side.BUY:
@@ -16637,11 +16040,11 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, None, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16659,11 +16062,13 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            new_px = amend_px
-            last_original_qty = new_qty
+            if side == Side.BUY:
+                new_px = px - amend_px
+            else:
+                new_px = px + amend_px
             chore_status = ChoreStatusType.OE_ACKED
             open_qty = new_qty - filled_qty - cxled_qty
-            open_px = amend_px
+            open_px = new_px
             open_notional = open_qty * get_px_in_usd(open_px)
             if side == Side.BUY:
                 other_side_residual_qty = 0
@@ -16684,11 +16089,11 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, None, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16697,29 +16102,37 @@ def test_multi_amends_based_on_qty_n_then_px_1(
                 raise Exception(e)
 
             # Next, Handling Risky amend Case for px
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
-                amend_px = new_px + 1
-                buy_amend_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+                pending_amend_up_px = amend_px
             else:
-                amend_px = new_px - 1
-
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+                pending_amend_dn_px = amend_px
+                
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
-            last_original_px = new_px
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
+            if side == Side.BUY:
+                new_px += amend_px
+            else:
+                new_px -= amend_px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_px = amend_px
+            open_px = new_px
             open_notional = open_qty * get_px_in_usd(open_px)
-            last_original_qty = new_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -16739,11 +16152,11 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, None, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16761,10 +16174,11 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_ACKED
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -16780,15 +16194,14 @@ def test_multi_amends_based_on_qty_n_then_px_1(
                 open_exposure = - open_notional
                 filled_exposure = buy_fill_notional - filled_notional
                 cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, None, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16831,11 +16244,11 @@ def test_multi_amends_based_on_qty_n_then_px_1(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, None, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure, residual_qty=residual_qty)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -16855,573 +16268,7 @@ def test_multi_amends_based_on_qty_n_then_px_1(
 
 
 @pytest.mark.nightly
-def test_multi_amends_based_on_qty_n_then_px_2(
-        static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
-        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
-        last_barter_fixture_list, symbol_overview_obj_list,
-        market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
-        leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    """
-    Does multi-amend test - first amends non-risky qty to +-10 based on side, then risky qty to +-10,
-    then non-risky +-1 based on px and at last risky +-1 based on px
-    """
-
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    residual_wait_sec = 4 * refresh_sec_update_fixture
-
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list))
-
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
-
-    try:
-        # updating yaml_configs according to this test
-        for symbol in config_dict["symbol_configs"]:
-            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
-        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
-
-        # updating simulator's configs
-        executor_http_client.barter_simulator_reload_config_query_client()
-
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
-
-        buy_cxled_notional = None
-        buy_residual_qty = None
-        buy_fill_notional = None
-        for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-
-            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
-
-            # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
-                                                                            executor_http_client)
-            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
-            # First Handling Non-Risky amend Case for qty
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            if side == Side.BUY:
-                amend_qty = qty - 20
-                buy_amend_qty = amend_qty
-            else:
-                amend_qty = qty + 20
-
-            executor_http_client.barter_simulator_process_amend_req_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account,
-                qty=amend_qty)
-
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
-            new_qty = qty
-            new_px = px
-            amend_px = None
-            chore_status = ChoreStatusType.OE_AMD
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = qty - filled_qty
-            open_notional = open_qty * get_px_in_usd(px)
-            open_px = px
-            cxled_qty = 0
-            cxled_notional = 0
-            cxled_px = 0
-            last_original_qty = None
-            last_original_px = None
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_notional
-                cxled_exposure = 0
-                buy_fill_notional = filled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = buy_fill_notional - filled_qty * get_px_in_usd(px)
-                cxled_exposure = buy_cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Placing Amend ACK chore and checking amend should be applied on ack
-            executor_http_client.barter_simulator_process_amend_ack_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account)
-
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
-                                                                                  chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                new_qty = qty
-                total_amend_dn_qty = 20
-                total_amend_up_qty = 0
-            else:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 20
-
-            new_px = px
-            amend_px = None
-            chore_status = ChoreStatusType.OE_ACKED
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(px)
-            open_px = px
-            last_original_qty = qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Next, Handling Risky amend Case for qty
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            # qty = new_qty
-            if side == Side.BUY:
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
-            else:
-                amend_qty = qty + 10
-
-            executor_http_client.barter_simulator_process_amend_req_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account,
-                qty=amend_qty)
-
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol,
-                                                                                    executor_http_client)
-            last_qty = new_qty
-            if side == Side.BUY:
-                new_qty = amend_qty
-                total_amend_dn_qty = 20
-                total_amend_up_qty = 10
-            else:
-                new_qty = new_qty
-                cxled_qty = new_qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 20
-
-            new_px = px
-            amend_px = None
-            chore_status = ChoreStatusType.OE_AMD
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(px)
-            open_px = px
-            last_original_qty = last_qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Placing Amend ACK chore and checking amend should be applied on ack
-            executor_http_client.barter_simulator_process_amend_ack_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account)
-
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
-                                                                                  chore_symbol,
-                                                                                  executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-
-            new_px = px
-            amend_px = None
-            chore_status = ChoreStatusType.OE_ACKED
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(px)
-            open_px = px
-            last_original_qty = last_qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Next, Handling Non-Risky amend Case for px
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            if side == Side.BUY:
-                amend_px = new_px - 1
-                buy_amend_px = amend_px
-            else:
-                amend_px = new_px + 1
-
-            executor_http_client.barter_simulator_process_amend_req_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account,
-                px=amend_px)
-
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol,
-                                                                                    executor_http_client)
-            new_px = px
-            chore_status = ChoreStatusType.OE_AMD
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(open_px)
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = buy_fill_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, None, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Placing Amend ACK chore and checking amend should be applied on ack
-            executor_http_client.barter_simulator_process_amend_ack_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account)
-
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
-                                                                                  chore_symbol,
-                                                                                  executor_http_client)
-            new_px = amend_px
-            last_original_qty = new_qty
-            chore_status = ChoreStatusType.OE_ACKED
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_px = amend_px
-            open_notional = open_qty * get_px_in_usd(open_px)
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = buy_fill_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, None, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Next, Handling Risky amend Case for px
-            if side == Side.BUY:
-                amend_px = new_px + 1
-                buy_amend_px = amend_px
-            else:
-                amend_px = new_px - 1
-
-            executor_http_client.barter_simulator_process_amend_req_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account,
-                px=amend_px)
-
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol,
-                                                                                    executor_http_client)
-            last_original_px = new_px
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_px = amend_px
-            open_notional = open_qty * get_px_in_usd(open_px)
-            last_original_qty = new_qty
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = buy_fill_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, None, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Placing Amend ACK chore and checking amend should be applied on ack
-            executor_http_client.barter_simulator_process_amend_ack_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account)
-
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
-                                                                                  chore_symbol,
-                                                                                  executor_http_client)
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_ACKED
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = buy_fill_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, None, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # waiting for chore to get cxled
-            time.sleep(residual_wait_sec)
-
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
-                                                                                  chore_symbol,
-                                                                                  executor_http_client)
-            cxled_notional += open_qty * get_px_in_usd(new_px)
-            cxled_qty += open_qty
-            cxled_px = get_usd_to_local_px_or_notional(cxled_notional / cxled_qty)
-            residual_qty = open_qty
-            chore_status = ChoreStatusType.OE_DOD
-            open_qty = 0
-            open_notional = 0
-            open_px = 0
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = buy_fill_notional
-                cxled_exposure = cxled_notional
-                buy_cxled_notional = cxled_notional
-                buy_residual_qty = residual_qty
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = 0
-                filled_exposure = buy_fill_notional - filled_notional
-                cxled_exposure = buy_cxled_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, None, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure, residual_qty=residual_qty)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-    except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
-    finally:
-        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
-
-
-@pytest.mark.nightly
-def test_multi_amends_based_on_qty_n_px(
+def test_multi_amends_based_on_qty_n_px1(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
@@ -17475,31 +16322,41 @@ def test_multi_amends_based_on_qty_n_px(
             latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             # First Handling Non-Risky amend Case for qty
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -17510,8 +16367,7 @@ def test_multi_amends_based_on_qty_n_px(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            last_original_qty = None
-            last_original_px = None
+            residual_qty = 0
             if side == Side.BUY:
                 buy_fill_notional = filled_notional
                 other_side_residual_qty = 0
@@ -17532,11 +16388,12 @@ def test_multi_amends_based_on_qty_n_px(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -17555,29 +16412,28 @@ def test_multi_amends_based_on_qty_n_px(
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
+                new_px = px - amend_px
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 0
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
                 total_amend_up_qty = 10
 
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_ACKED
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -17597,11 +16453,11 @@ def test_multi_amends_based_on_qty_n_px(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure)
+                    cxled_exposure, residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -17612,45 +16468,54 @@ def test_multi_amends_based_on_qty_n_px(
             # Next, Handling Risky amend Case for qty
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             # qty = new_qty
-
-            last_original_qty = new_qty
-            last_original_px = new_px
-
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty += amend_qty
+                new_px += amend_px
                 total_amend_dn_qty = 10
-                total_amend_up_qty = 20
+                total_amend_up_qty = 10
             else:
-                cxled_qty = new_qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = new_px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 20
+                new_px -= amend_px
+                total_amend_dn_qty = 10
                 total_amend_up_qty = 10
 
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -17670,10 +16535,12 @@ def test_multi_amends_based_on_qty_n_px(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                    cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -17693,7 +16560,10 @@ def test_multi_amends_based_on_qty_n_px(
                                                                                   executor_http_client)
 
             chore_status = ChoreStatusType.OE_ACKED
-
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -17713,10 +16583,12 @@ def test_multi_amends_based_on_qty_n_px(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                    cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -17759,11 +16631,385 @@ def test_multi_amends_based_on_qty_n_px(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                    cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_multi_amends_based_on_qty_n_px2(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    """
+    Does multi-amend test - first does risky amends on qty and px and then does non-risky amend
+    """
+
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+
+        buy_cxled_notional = None
+        buy_residual_qty = None
+        buy_fill_notional = None
+        for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
+
+            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
+
+            # checking ACK chore before amend
+            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+                                                                            executor_http_client)
+            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+
+            # First Handling Risky amend Case for qty
+            # Placing Amend req chore and checking computes
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            if side == Side.BUY:
+                amend_px = 1
+                amend_qty = 10
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+            else:
+                amend_px = 1
+                amend_qty = 10
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
+
+            if side == Side.BUY:
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
+                total_amend_dn_qty = 0
+                total_amend_up_qty = 10
+                cxled_qty = 0
+                cxled_px = 0
+            else:
+                cxled_qty = amend_qty
+                cxled_px = px
+                new_qty = qty
+                new_px = px - amend_px
+                total_amend_dn_qty = 10
+                total_amend_up_qty = 0
+
+            residual_qty = 0
+            cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = new_qty - filled_qty - cxled_qty
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_fill_notional - filled_notional
+                cxled_exposure = buy_cxled_notional - cxled_notional
+            last_filled_qty = filled_qty
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                    cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            # Placing Amend ACK chore and checking amend should be applied on ack
+            executor_http_client.barter_simulator_process_amend_ack_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+                                                                                  chore_symbol,
+                                                                                  executor_http_client)
+
+            chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_fill_notional - filled_notional
+                cxled_exposure = buy_cxled_notional - cxled_notional
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                    cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            # Next, Handling Non-Risky amend Case for qty
+            # Placing Amend req chore and checking computes
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            if side == Side.BUY:
+                amend_px = 1
+                amend_qty = 10
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+            else:
+                amend_px = 1
+                amend_qty = 10
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol,
+                                                                                    executor_http_client)
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            residual_qty = 0
+            if side == Side.BUY:
+                buy_fill_notional = filled_notional
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = 0
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_fill_notional - filled_notional
+                cxled_exposure = buy_cxled_notional - cxled_notional
+            last_filled_qty = filled_qty
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                    cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            # Placing Amend ACK chore and checking amend should be applied on ack
+            executor_http_client.barter_simulator_process_amend_ack_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+                                                                                  chore_symbol,
+                                                                                  executor_http_client)
+            if side == Side.BUY:
+                cxled_qty = amend_qty
+                cxled_px = new_px
+                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
+                new_px -= amend_px
+                total_amend_dn_qty = 10
+                total_amend_up_qty = 10
+            else:
+                new_qty += amend_qty
+                new_px += amend_px
+                total_amend_dn_qty = 10
+                total_amend_up_qty = 10
+
+            chore_status = ChoreStatusType.OE_ACKED
+            open_qty = new_qty - filled_qty - cxled_qty
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_fill_notional - filled_notional
+                cxled_exposure = buy_cxled_notional - cxled_notional
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
                     cxled_exposure, residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            # waiting for chore to get cxled
+            time.sleep(residual_wait_sec)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+                                                                                  chore_symbol,
+                                                                                  executor_http_client)
+            cxled_notional += open_qty * get_px_in_usd(new_px)
+            cxled_qty += open_qty
+            cxled_px = get_usd_to_local_px_or_notional(cxled_notional / cxled_qty)
+            residual_qty = open_qty
+            chore_status = ChoreStatusType.OE_DOD
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = buy_fill_notional
+                cxled_exposure = cxled_notional
+                buy_cxled_notional = cxled_notional
+                buy_residual_qty = residual_qty
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = 0
+                filled_exposure = buy_fill_notional - filled_notional
+                cxled_exposure = buy_cxled_notional - cxled_notional
+            last_filled_qty = filled_qty
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                    cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -17821,205 +17067,12 @@ def check_all_computes_for_lapse(
         (f"Mismatched: ChoreSnapshot total_lapsed_qty must be {cxled_qty}, "
          f"found {chore_snapshot.total_lapsed_qty}")
 
-    symbol_side_snapshot_list = (
-        executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(symbol, side))
-    assert len(symbol_side_snapshot_list) == 1, \
-        (f"found {len(symbol_side_snapshot_list) = }, must be exact 1 for symbol and side: "
-         f"{symbol, side}")
-
-    symbol_side_snapshot = symbol_side_snapshot_list[0]
-    assert symbol_side_snapshot.total_qty == chore_qty, \
-        (f"Mismatched: expected symbol_side_snapshot.total_qty: {chore_qty}, "
-         f"found {symbol_side_snapshot.total_qty=}")
-    assert symbol_side_snapshot.avg_px == chore_px, \
-        (f"Mismatched: expected symbol_side_snapshot.avg_px: {chore_px}, "
-         f"found {symbol_side_snapshot.avg_px=}")
-    assert symbol_side_snapshot.total_filled_qty == filled_qty, \
-        (f"Mismatched: symbol_side_snapshot.total_filled_qty must be {filled_qty}, found "
-         f"{symbol_side_snapshot.total_filled_qty=}")
-    assert symbol_side_snapshot.total_fill_notional == filled_notional, \
-        (f"Mismatched: symbol_side_snapshot.total_fill_notional must be {filled_notional}, "
-         f"found {symbol_side_snapshot.total_fill_notional=}")
-    assert symbol_side_snapshot.avg_fill_px == filled_px, \
-        (f"Mismatched: symbol_side_snapshot.avg_fill_px must be {filled_px}, found "
-         f"{symbol_side_snapshot.avg_fill_px=}")
-    assert symbol_side_snapshot.total_cxled_qty == cxled_qty, \
-        (f"Mismatched: symbol_side_snapshot.total_cxled_qty must be {cxled_qty}, found "
-         f"{symbol_side_snapshot.total_cxled_qty = }")
-    assert (symbol_side_snapshot.total_cxled_notional == cxled_notional), \
-        (f"Mismatched: symbol_side_snapshot.total_cxled_notional must be "
-         f"{cxled_notional}, found {symbol_side_snapshot.total_cxled_notional = }")
-    assert symbol_side_snapshot.avg_cxled_px == cxled_px, \
-        (f"Mismatched: symbol_side_snapshot.avg_cxled_px must be {cxled_px}, found "
-         f"{symbol_side_snapshot.avg_cxled_px = }")
-    assert symbol_side_snapshot.last_update_fill_px == filled_px, \
-        (f"Mismatched: symbol_side_snapshot.last_update_fill_px must be {filled_px}, found "
-         f"{symbol_side_snapshot.last_update_fill_px = }")
-    assert symbol_side_snapshot.last_update_fill_qty == last_filled_qty, \
-        (f"Mismatched: symbol_side_snapshot.last_update_fill_qty must be {last_filled_qty}, found "
-         f"{symbol_side_snapshot.last_update_fill_qty = }")
-
-    leg1_last_barter_px, leg2_last_barter_px = get_both_side_last_barter_px()
-    strat_limits = executor_http_client.get_strat_limits_client(active_pair_strat_id)
-    strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat_id)
-    if side == Side.BUY:
-        strat_brief_bartering_brief = strat_brief.pair_buy_side_bartering_brief
-    else:
-        strat_brief_bartering_brief = strat_brief.pair_sell_side_bartering_brief
-    assert (strat_brief_bartering_brief.open_qty == open_qty), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
-         f"{open_qty}, found {strat_brief_bartering_brief.open_qty = }")
-    assert (strat_brief_bartering_brief.open_notional == open_notional), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
-         f"{open_notional}, found {strat_brief_bartering_brief.open_notional = }")
-    assert (strat_brief_bartering_brief.residual_qty == residual_qty), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
-         f"{residual_qty}, found {strat_brief_bartering_brief.residual_qty = }")
-    if chore_status in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED, ChoreStatusType.OE_OVER_FILLED]:
-        consumable_open_chores = 5
-    else:
-        consumable_open_chores = 4
-    assert (strat_brief_bartering_brief.consumable_open_chores == consumable_open_chores), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
-         f"{consumable_open_chores}, found {strat_brief_bartering_brief.consumable_open_chores = }")
-    assert (strat_brief_bartering_brief.all_bkr_cxlled_qty == cxled_qty), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
-         f"{cxled_qty}, found {strat_brief_bartering_brief.all_bkr_cxlled_qty = }")
-    assert (strat_brief_bartering_brief.consumable_notional == (
-            strat_limits.max_single_leg_notional - symbol_side_snapshot.total_fill_notional - open_notional)), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
-         f"{strat_limits.max_single_leg_notional - symbol_side_snapshot.total_fill_notional - open_notional}, "
-         f"found {strat_brief_bartering_brief.consumable_notional = }")
-    assert (strat_brief_bartering_brief.consumable_open_notional ==
-            strat_limits.max_open_single_leg_notional - open_notional), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
-         f"{strat_limits.max_open_single_leg_notional - open_notional}, "
-         f"found {strat_brief_bartering_brief.consumable_open_notional = }")
-    total_security_size: int = \
-        static_data.get_security_float_from_ticker(chore_snapshot.chore_brief.security.sec_id)
-    assert (strat_brief_bartering_brief.consumable_concentration == (
-            (total_security_size / 100 * strat_limits.max_concentration) -
-            (open_qty + symbol_side_snapshot.total_filled_qty))), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
-         f"{(total_security_size / 100 * strat_limits.max_concentration) - (open_qty + symbol_side_snapshot.total_filled_qty)}, "
-         f"found {strat_brief_bartering_brief.consumable_concentration = }")
-    assert (strat_brief_bartering_brief.consumable_cxl_qty == (
-            (((open_qty + symbol_side_snapshot.total_filled_qty +
-               symbol_side_snapshot.total_cxled_qty) / 100) * strat_limits.cancel_rate.max_cancel_rate) -
-            symbol_side_snapshot.total_cxled_qty)), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
-         f"{(((open_qty + symbol_side_snapshot.total_filled_qty + symbol_side_snapshot.total_cxled_qty) / 100) * strat_limits.cancel_rate.max_cancel_rate) - symbol_side_snapshot.total_cxled_qty}, "
-         f"found {strat_brief_bartering_brief.consumable_cxl_qty = }")
-    if not is_sell_buy_strat:
-        if side == Side.BUY:
-            current_last_barter_px = leg1_last_barter_px
-            other_last_barter_px = leg2_last_barter_px
-        else:
-            current_last_barter_px = leg2_last_barter_px
-            other_last_barter_px = leg1_last_barter_px
-    else:
-        if side == Side.SELL:
-            current_last_barter_px = leg1_last_barter_px
-            other_last_barter_px = leg2_last_barter_px
-        else:
-            current_last_barter_px = leg2_last_barter_px
-            other_last_barter_px = leg1_last_barter_px
-
-    assert (strat_brief_bartering_brief.indicative_consumable_residual == (
-            strat_limits.residual_restriction.max_residual -
-            ((strat_brief_bartering_brief.residual_qty *
-              get_px_in_usd(current_last_barter_px)) - (
-                     other_side_residual_qty * get_px_in_usd(other_last_barter_px))))), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
-         f"{strat_limits.residual_restriction.max_residual - ((strat_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
-         f"found {strat_brief_bartering_brief.indicative_consumable_residual = }")
-    assert (strat_brief.consumable_nett_filled_notional == (
-            strat_limits.max_net_filled_notional -
-            abs(symbol_side_snapshot.total_fill_notional - other_side_fill_notional))), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_nett_filled_notional: "
-         f"{strat_limits.max_open_single_leg_notional}, "
-         f"found {strat_brief_bartering_brief.consumable_nett_filled_notional = }")
-
-    strat_status = executor_http_client.get_strat_status_client(active_pair_strat_id)
-    if side == Side.BUY:
-        total_qty = strat_status.total_buy_qty
-        total_open_qty = strat_status.total_open_buy_qty
-        total_open_notional = strat_status.total_open_buy_notional
-        avg_open_px = strat_status.avg_open_buy_px
-        total_fill_qty = strat_status.total_fill_buy_qty
-        total_fill_notional = strat_status.total_fill_buy_notional
-        avg_fill_px = strat_status.avg_fill_buy_px
-        total_cxl_qty = strat_status.total_cxl_buy_qty
-        total_cxl_notional = strat_status.total_cxl_buy_notional
-        avg_cxl_px = strat_status.avg_cxl_buy_px
-    else:
-        total_qty = strat_status.total_sell_qty
-        total_open_qty = strat_status.total_open_sell_qty
-        total_open_notional = strat_status.total_open_sell_notional
-        avg_open_px = strat_status.avg_open_sell_px
-        total_fill_qty = strat_status.total_fill_sell_qty
-        total_fill_notional = strat_status.total_fill_sell_notional
-        avg_fill_px = strat_status.avg_fill_sell_px
-        total_cxl_qty = strat_status.total_cxl_sell_qty
-        total_cxl_notional = strat_status.total_cxl_sell_notional
-        avg_cxl_px = strat_status.avg_cxl_sell_px
-
-    total_open_exposure = strat_status.total_open_exposure
-    total_fill_exposure = strat_status.total_fill_exposure
-    total_cxl_exposure = strat_status.total_cxl_exposure
-    assert total_qty == chore_qty, \
-        (f"Mismatched: expected strat_status.total_{side.lower()}_qty: "
-         f"{chore_qty}, found {total_qty=}")
-    assert total_open_qty == open_qty, \
-        (f"Mismatched: expected strat_status total_open_{side.lower()}_qty: "
-         f"{open_qty}, found {total_open_qty=}")
-    assert (total_open_notional == open_notional), \
-        (f"Mismatched: expected strat_status.total_open_{side.lower()}_notional: "
-         f"{open_notional}, found {total_open_notional=}")
-    assert (avg_open_px == open_px), \
-        (f"Mismatched: expected strat_status.avg_open_{side.lower()}_px: "
-         f"{chore_px}, found {avg_open_px=}")
-    assert (total_fill_qty == filled_qty), \
-        (f"Mismatched: expected strat_status.total_fill_{side.lower()}_qty: "
-         f"{filled_qty}, found {total_fill_qty=}")
-    assert (total_fill_notional == filled_notional), \
-        (f"Mismatched: expected strat_status.total_fill_{side.lower()}_notional: "
-         f"{filled_notional}, found {total_fill_notional=}")
-    assert (avg_fill_px == filled_px), \
-        (f"Mismatched: expected strat_status.avg_fill_{side.lower()}_px: "
-         f"{filled_px}, found {avg_fill_px=}")
-    assert (total_cxl_qty == cxled_qty), \
-        (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_qty: "
-         f"{cxled_qty}, found {total_cxl_qty=}")
-    assert (total_cxl_notional == cxled_notional), \
-        (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_notional: "
-         f"{cxled_notional}, found {total_cxl_notional=}")
-    assert (avg_cxl_px == cxled_px), \
-        (f"Mismatched: expected strat_status.avg_cxl_{side.lower()}_px: "
-         f"{cxled_px}, found {avg_cxl_px=}")
-    assert (total_open_exposure == open_exposure), \
-        (f"Mismatched: expected strat_status.total_open_exposure: "
-         f"{open_exposure}, found {total_open_exposure=}")
-    assert (total_fill_exposure == filled_exposure), \
-        (f"Mismatched: expected strat_status.total_fill_exposure: "
-         f"{filled_exposure}, found {total_fill_exposure=}")
-    assert (total_cxl_exposure == cxled_exposure), \
-        (f"Mismatched: expected strat_status.total_cxl_exposure: "
-         f"{cxled_exposure}, found {total_cxl_exposure=}")
-
-    portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
-    if side == Side.BUY:
-        overall_notional = portfolio_status.overall_buy_notional
-        overall_fill_notional = portfolio_status.overall_buy_fill_notional
-    else:
-        overall_notional = portfolio_status.overall_sell_notional
-        overall_fill_notional = portfolio_status.overall_sell_fill_notional
-    assert (overall_notional == open_notional + filled_notional), \
-        (f"Mismatched: expected portfolio_status.overall_{side.lower()}_notional: "
-         f"{open_notional + filled_notional}, found {overall_notional=}")
-    assert (overall_fill_notional == filled_notional), \
-        (f"Mismatched: expected portfolio_status.overall_{side.lower()}_fill_notional: "
-         f"{filled_notional}, found {overall_fill_notional=}")
+    _check_all_computes_in_models_other_than_chore_snapshot(
+        active_pair_strat_id, symbol, side, executor_http_client, chore_snapshot,
+        chore_qty, chore_px, chore_status, open_qty, open_notional, open_px, filled_qty,
+        filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px, other_side_residual_qty,
+        other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+        residual_qty, is_sell_buy_strat)
 
 
 @pytest.mark.nightly
@@ -19838,9 +18891,11 @@ def test_lapse_pre_non_risky_amend_ack(
 
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -19851,6 +18906,7 @@ def test_lapse_pre_non_risky_amend_ack(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -19866,16 +18922,14 @@ def test_lapse_pre_non_risky_amend_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -19885,24 +18939,32 @@ def test_lapse_pre_non_risky_amend_ack(
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -19928,14 +18990,14 @@ def test_lapse_pre_non_risky_amend_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -19953,7 +19015,6 @@ def test_lapse_pre_non_risky_amend_ack(
                 qty=lapse_qty)
 
             # putting lapse before cxl_ack
-            chore_status = ChoreStatusType.OE_ACKED
             open_qty -= lapse_qty
             open_notional = open_qty * get_px_in_usd(px)
             cxled_qty = lapse_qty
@@ -20004,23 +19065,22 @@ def test_lapse_pre_non_risky_amend_ack(
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
             if side == Side.BUY:
-                cxled_qty += (qty - lapse_qty) - amend_qty
+                cxled_qty += amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
-                total_amend_dn_qty = 10
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 20
-            new_px = amend_px
+                total_amend_up_qty = amend_qty
             chore_status = ChoreStatusType.OE_ACKED
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -20036,16 +19096,14 @@ def test_lapse_pre_non_risky_amend_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure,
-                    residual_qty=residual_qty)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -20059,19 +19117,15 @@ def test_lapse_pre_non_risky_amend_ack(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
-            cxled_notional += open_qty * get_px_in_usd(px)
-            if side == Side.BUY:
-                buy_residual_qty = cxled_qty
-                buy_cxl_notional = cxled_notional
-            new_qty = qty
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            residual_qty = cxled_qty
+            cxled_notional += open_qty * get_px_in_usd(new_px)
+            residual_qty = open_qty + lapsed_qty
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             if side == Side.BUY:
                 buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
+                buy_cxl_notional = cxled_notional
             filled_px = px
             open_qty = 0
             open_notional = 0
@@ -20091,13 +19145,121 @@ def test_lapse_pre_non_risky_amend_ack(
                 open_exposure = 0
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+        
+        
+@pytest.mark.nightly
+def test_full_lapse_pre_non_risky_amend_ack(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # buy test
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+
+        buy_filled_notional = None
+        buy_cxl_notional = None
+        buy_residual_qty = None
+        for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
+            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
+
+            # checking ACK chore before amend
+            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+                                                                            executor_http_client)
+            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+
+            new_qty = qty
+            new_px = px
+            chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            residual_qty = cxled_qty
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_qty * get_px_in_usd(px)
+                cxled_exposure = 0
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
@@ -20107,8 +19269,215 @@ def test_lapse_pre_non_risky_amend_ack(
                 print("Exception", e)
                 raise e
 
+            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            if side == Side.BUY:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+            else:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
+            new_qty = qty
+            new_px = px
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_qty * get_px_in_usd(px)
+                cxled_exposure = 0
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            # putting lapse qty before amend ack comes
+            executor_http_client.barter_simulator_process_lapse_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                qty=None)
+            lapse_qty = open_qty
+
+            # putting lapse before cxl_ack
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            cxled_qty = lapse_qty
+            residual_qty = lapse_qty
+            cxled_notional = cxled_qty * get_px_in_usd(px)
+            cxled_px = px
+            lapsed_qty = cxled_qty
+            total_lapsed_qty = cxled_qty
+            chore_status = ChoreStatusType.OE_DOD
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_qty * get_px_in_usd(px)
+                cxled_exposure = cxled_notional
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            last_filled_qty = filled_qty
+            try:
+                check_all_computes_for_lapse(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
+                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    lapsed_qty, total_lapsed_qty, residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+            # Placing Amend ACK chore and checking amend should be applied on ack
+            executor_http_client.barter_simulator_process_amend_ack_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+                                                                                  chore_symbol,
+                                                                                  executor_http_client)
+            if side == Side.BUY:
+                new_qty = qty
+                new_px = px - amend_px
+                total_amend_dn_qty = 10
+                total_amend_up_qty = 0
+                chore_status = ChoreStatusType.OE_OVER_CXLED
+            else:
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
+                total_amend_dn_qty = 0
+                total_amend_up_qty = 10
+                chore_status = ChoreStatusType.OE_DOD
+            cxled_qty += amend_qty
+            cxled_notional += amend_qty * get_px_in_usd(px)
+            cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            if side == Side.BUY:
+                residual_qty = new_qty - filled_qty
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
+            else:
+                residual_qty = new_qty - filled_qty - amend_qty
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            if side == Side.BUY:
+                paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
+                assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
+                    f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+
+                time.sleep(5)
+                check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_CXLED to chore "
+                             "which was ChoreStatusType.OE_DOD before")
+                assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
+                check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id,
+                                                                   check_str, assert_fail_msg)
+            else:
+                check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore DOD, before status "
+                             "was ChoreStatusType.OE_DOD - applying amend and putting chore as DOD")
+                assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
+                check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id,
+                                                                   check_str, assert_fail_msg)
+
+            if side == Side.BUY:
+                # forcefully turning strat to active again for checking sell chore
+                pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
+                pair_strat.strat_state = StratState.StratState_ACTIVE
+                email_book_service_native_web_client.put_pair_strat_client(pair_strat)
+
     except AssertionError as e:
-        raise e
+        raise AssertionError(e)
     except Exception as e:
         err_str_ = (f"Some Error Occurred: exception: {e}, "
                     f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
@@ -20171,9 +19540,11 @@ def test_lapse_pre_non_risky_amend_req(
             print("Checking chore post OE_ACK")
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -20184,7 +19555,7 @@ def test_lapse_pre_non_risky_amend_req(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            residual_qty = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -20200,16 +19571,13 @@ def test_lapse_pre_non_risky_amend_req(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, 
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
@@ -20258,8 +19626,7 @@ def test_lapse_pre_non_risky_amend_req(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     lapsed_qty, total_lapsed_qty, residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
@@ -20270,25 +19637,33 @@ def test_lapse_pre_non_risky_amend_req(
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10 - lapse_qty
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             if side == Side.BUY:
@@ -20310,17 +19685,17 @@ def test_lapse_pre_non_risky_amend_req(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, 
-                    residual_qty=residual_qty)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -20334,23 +19709,22 @@ def test_lapse_pre_non_risky_amend_req(
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
             if side == Side.BUY:
-                cxled_qty += (qty - lapse_qty) - amend_qty
+                cxled_qty += amend_qty
+                new_px = px - amend_px
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
-                total_amend_dn_qty = 10
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 20
-            new_px = amend_px
+                total_amend_up_qty = amend_qty
             chore_status = ChoreStatusType.OE_ACKED
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -20370,11 +19744,11 @@ def test_lapse_pre_non_risky_amend_req(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, 
-                    residual_qty=residual_qty)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -20388,25 +19762,12 @@ def test_lapse_pre_non_risky_amend_req(
             print("Checking chore cxled post residual time wait")
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                cxled_qty += open_qty
-                buy_residual_qty = cxled_qty - lapsed_qty
-                cxled_notional += open_qty * get_px_in_usd(amend_px)
-                buy_cxl_notional = cxled_notional
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-            else:
-                new_qty = amend_qty
-                cxled_qty += open_qty
-                cxled_notional += open_qty * get_px_in_usd(amend_px)
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 20
+
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
-            if side == Side.BUY:
-                buy_filled_notional = filled_notional
             filled_px = px
             residual_qty += open_qty
             open_qty = 0
@@ -20418,6 +19779,9 @@ def test_lapse_pre_non_risky_amend_req(
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_cxl_notional = cxled_notional
+                buy_residual_qty = residual_qty
             else:
                 other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
@@ -20427,15 +19791,14 @@ def test_lapse_pre_non_risky_amend_req(
                 open_exposure = 0
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, 
-                    residual_qty=residual_qty)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -20444,7 +19807,7 @@ def test_lapse_pre_non_risky_amend_req(
                 raise e
 
     except AssertionError as e:
-        raise e
+        raise AssertionError(e)
     except Exception as e:
         err_str_ = (f"Some Error Occurred: exception: {e}, "
                     f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
@@ -20496,9 +19859,6 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
         # buy test
         run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
 
-        buy_filled_notional = None
-        buy_cxl_notional = None
-        buy_residual_qty = None
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
@@ -20510,8 +19870,6 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             print("Checking chore post OE_ACK")
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -20523,21 +19881,22 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             residual_qty = 0
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = - open_notional
             filled_exposure = - filled_notional
             cxled_exposure = - cxled_notional
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
@@ -20571,14 +19930,13 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             open_exposure = - open_notional
             filled_exposure = - filled_notional
             cxled_exposure = - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure, lapsed_qty, total_lapsed_qty, residual_qty=residual_qty, is_sell_buy_strat=True)
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    lapsed_qty, total_lapsed_qty, residual_qty=residual_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -20586,23 +19944,27 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
                 print("Exception", e)
                 raise e
 
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            amend_px = px + 1
-            amend_qty = qty + 10 - lapse_qty
+            # Placing Amend req chore and checking computes
+            amend_px = 1
+            amend_qty = 10
+            pending_amend_up_px = amend_px
+            pending_amend_up_qty = amend_qty
+            chore_event = ChoreEventType.OE_AMD_UP_UNACK
+            chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             other_side_residual_qty = 0
@@ -20614,11 +19976,11 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -20637,16 +19999,14 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
-            new_qty = amend_qty
+            new_qty = qty + amend_qty
             total_amend_dn_qty = 0
             total_amend_up_qty = 10
-            new_px = amend_px
+            new_px = px + amend_px
             chore_status = ChoreStatusType.OE_ACKED
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = - open_notional
@@ -20656,11 +20016,11 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -20674,9 +20034,8 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             print("Checking chore cxled post residual time wait")
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            new_qty = amend_qty
             cxled_qty += open_qty
-            cxled_notional += open_qty * get_px_in_usd(amend_px)
+            cxled_notional += open_qty * get_px_in_usd(new_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -20690,15 +20049,14 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             open_exposure = 0
             filled_exposure = - filled_notional
             cxled_exposure = - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty, is_sell_buy_strat=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -20707,7 +20065,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
                 raise e
 
     except AssertionError as e:
-        raise e
+        raise Exception(e)
     except Exception as e:
         err_str_ = (f"Some Error Occurred: exception: {e}, "
                     f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
@@ -20770,8 +20128,6 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             print("Checking chore post OE_ACK")
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -20783,21 +20139,22 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             residual_qty = 0
             other_side_residual_qty = 0
             other_side_fill_notional = 0
             open_exposure = open_notional
-            filled_exposure = filled_qty * get_px_in_usd(px)
-            cxled_exposure = 0
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
+            filled_exposure = filled_notional
+            cxled_exposure = cxled_notional
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
@@ -20831,7 +20188,6 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             open_exposure = open_notional
             filled_exposure = filled_qty * get_px_in_usd(px)
             cxled_exposure = cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
@@ -20848,43 +20204,44 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
                 raise e
 
             # Placing Amend req chore and checking computes
-            amend_px = px + 1
-            amend_qty = qty + 10 - lapse_qty
+            amend_px = 1
+            amend_qty = 10
+            pending_amend_up_px = amend_px
+            pending_amend_up_qty = amend_qty
+            chore_event = ChoreEventType.OE_AMD_UP_UNACK
+            chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
-            new_qty = amend_qty
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
+            new_qty = qty + amend_qty
+            new_px = px + amend_px
             total_amend_dn_qty = 0
-            total_amend_up_qty = 10
+            total_amend_up_qty = amend_qty
             other_side_residual_qty = 0
             other_side_fill_notional = 0
-            open_qty = amend_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
+            open_qty = new_qty - filled_qty - cxled_qty
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             open_exposure = open_notional
             filled_exposure = filled_qty * get_px_in_usd(px)
             cxled_exposure = cxled_notional
-            last_filled_qty = filled_qty
-            last_original_px = px
-            last_original_qty = qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -20904,14 +20261,18 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -20926,9 +20287,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
-            cxled_notional += open_qty * get_px_in_usd(amend_px)
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 10
+            cxled_notional += open_qty * get_px_in_usd(new_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             residual_qty += open_qty
@@ -20944,11 +20303,11 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -20957,7 +20316,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
                 raise e
 
     except AssertionError as e:
-        raise e
+        raise AssertionError(e)
     except Exception as e:
         err_str_ = (f"Some Error Occurred: exception: {e}, "
                     f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
@@ -21020,9 +20379,11 @@ def test_lapse_pre_risky_amend_req(
             print("Checking chore post OE_ACK")
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -21033,12 +20394,12 @@ def test_lapse_pre_risky_amend_req(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            residual_qty = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
                 other_side_residual_qty = buy_residual_qty
@@ -21049,16 +20410,13 @@ def test_lapse_pre_risky_amend_req(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, 
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
@@ -21119,38 +20477,47 @@ def test_lapse_pre_risky_amend_req(
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10 - lapse_qty
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 20
+                total_amend_up_qty = amend_qty
             else:
-                cxled_qty += (qty - lapse_qty) - amend_qty
+                cxled_qty += amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
-                total_amend_dn_qty = 10
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             last_original_qty = qty
             last_original_px = px
             if side == Side.BUY:
@@ -21172,11 +20539,11 @@ def test_lapse_pre_risky_amend_req(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, 
-                    residual_qty=residual_qty)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -21196,15 +20563,18 @@ def test_lapse_pre_risky_amend_req(
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
             chore_status = ChoreStatusType.OE_ACKED
-            last_filled_qty = filled_qty
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, 
-                    residual_qty=residual_qty)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -21218,25 +20588,11 @@ def test_lapse_pre_risky_amend_req(
             print("Checking chore cxled post residual time wait")
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty += open_qty
-                cxled_notional += open_qty * get_px_in_usd(amend_px)
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 20
-                buy_cxl_notional = cxled_notional
-                buy_residual_qty = cxled_qty
-            else:
-                cxled_qty += open_qty
-                cxled_notional += open_qty * get_px_in_usd(amend_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
-            if side == Side.BUY:
-                buy_filled_notional = filled_notional
             filled_px = px
             residual_qty += open_qty
             open_qty = 0
@@ -21248,6 +20604,9 @@ def test_lapse_pre_risky_amend_req(
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
                 other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
@@ -21257,15 +20616,14 @@ def test_lapse_pre_risky_amend_req(
                 open_exposure = 0
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, 
-                    residual_qty=residual_qty)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -21337,9 +20695,11 @@ def test_lapse_pre_risky_amend_ack(
             print("Checking chore post OE_ACK")
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -21350,12 +20710,12 @@ def test_lapse_pre_risky_amend_ack(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            residual_qty = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
                 other_side_residual_qty = buy_residual_qty
@@ -21366,15 +20726,12 @@ def test_lapse_pre_risky_amend_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
@@ -21386,40 +20743,47 @@ def test_lapse_pre_risky_amend_ack(
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
             else:
-                cxled_qty += qty - amend_qty
+                cxled_qty += amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
-                total_amend_dn_qty = 10
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -21439,9 +20803,9 @@ def test_lapse_pre_risky_amend_ack(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
@@ -21461,7 +20825,6 @@ def test_lapse_pre_risky_amend_ack(
                 qty=lapse_qty)
 
             print("Checking chore post LAPSE")
-            chore_status = ChoreStatusType.OE_AMD
             open_qty -= lapse_qty
             open_notional = open_qty * get_px_in_usd(new_px)
             cxled_qty += lapse_qty
@@ -21485,7 +20848,6 @@ def test_lapse_pre_risky_amend_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
@@ -21513,15 +20875,18 @@ def test_lapse_pre_risky_amend_ack(
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
             chore_status = ChoreStatusType.OE_ACKED
-            last_filled_qty = filled_qty
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty,total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -21535,25 +20900,11 @@ def test_lapse_pre_risky_amend_ack(
             print("Checking chore cxled post residual time wait")
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty += open_qty
-                cxled_notional += open_qty * get_px_in_usd(amend_px)
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-                buy_cxl_notional = cxled_notional
-                buy_residual_qty = cxled_qty
-            else:
-                cxled_qty += open_qty
-                cxled_notional += open_qty * get_px_in_usd(amend_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
-            if side == Side.BUY:
-                buy_filled_notional = filled_notional
             filled_px = px
             residual_qty += open_qty
             open_qty = 0
@@ -21565,6 +20916,9 @@ def test_lapse_pre_risky_amend_ack(
                 open_exposure = 0
                 filled_exposure = filled_notional
                 cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
             else:
                 other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
@@ -21574,15 +20928,14 @@ def test_lapse_pre_risky_amend_ack(
                 open_exposure = 0
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -21592,6 +20945,603 @@ def test_lapse_pre_risky_amend_ack(
 
     except AssertionError as e:
         raise e
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_lapse_pre_risky_amend_ack(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # buy test
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+
+        buy_filled_notional = None
+        buy_cxl_notional = None
+        buy_residual_qty = None
+        for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
+            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
+
+            # checking ACK chore before amend
+            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+                                                                            executor_http_client)
+            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+
+            print("Checking chore post OE_ACK")
+            new_qty = qty
+            new_px = px
+            chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            residual_qty = cxled_qty
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = 0
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            if side == Side.BUY:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+            else:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
+            print("Checking chore post OE_AMD_UNACK")
+            if side == Side.BUY:
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
+                total_amend_dn_qty = 0
+                total_amend_up_qty = amend_qty
+            else:
+                cxled_qty += amend_qty
+                cxled_px = px
+                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
+                new_qty = qty
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
+                total_amend_up_qty = 0
+            open_qty = new_qty - filled_qty - cxled_qty
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            last_filled_qty = filled_qty
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            # putting lapse qty before amend ack comes
+            lapse_qty = 10
+            executor_http_client.barter_simulator_process_lapse_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                qty=lapse_qty)
+
+            print("Checking chore post LAPSE")
+            open_qty -= lapse_qty
+            open_notional = open_qty * get_px_in_usd(new_px)
+            cxled_qty += lapse_qty
+            residual_qty = lapse_qty
+            cxled_notional += lapse_qty * get_px_in_usd(new_px)
+            cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
+            lapsed_qty = lapse_qty
+            total_lapsed_qty = lapse_qty
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_qty * get_px_in_usd(px)
+                cxled_exposure = cxled_notional
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_lapse(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
+                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                    cxled_exposure,
+                    lapsed_qty, total_lapsed_qty, residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+            # Placing Amend ACK chore and checking amend should be applied on ack
+            executor_http_client.barter_simulator_process_amend_ack_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+                                                                                  chore_symbol,
+                                                                                  executor_http_client)
+            print("Checking chore post OE_AMD_ACK")
+            chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty,total_lapsed_qty=total_lapsed_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+            # waiting for chore to get cxled
+            time.sleep(residual_wait_sec)
+
+            print("Checking chore cxled post residual time wait")
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+                                                                                  chore_symbol, executor_http_client)
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
+            cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
+            chore_status = ChoreStatusType.OE_DOD
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            residual_qty += open_qty
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = 0
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = 0
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+    except AssertionError as e:
+        raise e
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+        
+
+@pytest.mark.nightly
+def test_full_lapse_pre_risky_amend_ack(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # buy test
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+
+        buy_filled_notional = None
+        buy_cxl_notional = None
+        buy_residual_qty = None
+        for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
+            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
+
+            # checking ACK chore before amend
+            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+                                                                            executor_http_client)
+            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+
+            print("Checking chore post OE_ACK")
+            new_qty = qty
+            new_px = px
+            chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            residual_qty = cxled_qty
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = 0
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            if side == Side.BUY:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+            else:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
+            print("Checking chore post OE_AMD_UNACK")
+            if side == Side.BUY:
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
+                total_amend_dn_qty = 0
+                total_amend_up_qty = amend_qty
+            else:
+                cxled_qty += amend_qty
+                cxled_px = px
+                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
+                new_qty = qty
+                new_px = px - amend_px
+                total_amend_dn_qty = amend_qty
+                total_amend_up_qty = 0
+            open_qty = new_qty - filled_qty - cxled_qty
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            last_filled_qty = filled_qty
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            # putting lapse qty before amend ack comes
+            executor_http_client.barter_simulator_process_lapse_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                qty=None)
+            lapse_qty = open_qty
+
+            print("Checking chore post LAPSE")
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            chore_status = ChoreStatusType.OE_DOD
+            cxled_qty += lapse_qty
+            residual_qty = lapse_qty
+            cxled_notional += lapse_qty * get_px_in_usd(new_px)
+            cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
+            lapsed_qty = lapse_qty
+            total_lapsed_qty = lapse_qty
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_qty * get_px_in_usd(px)
+                cxled_exposure = cxled_notional
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_lapse(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
+                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                    cxled_exposure,
+                    lapsed_qty, total_lapsed_qty, residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+            # Placing Amend ACK chore and checking amend should be applied on ack
+            executor_http_client.barter_simulator_process_amend_ack_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+                                                                                  chore_symbol,
+                                                                                  executor_http_client)
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+    except AssertionError as e:
+        raise Exception(e)
     except Exception as e:
         err_str_ = (f"Some Error Occurred: exception: {e}, "
                     f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
@@ -21652,9 +21602,11 @@ def test_lapse_post_non_risky_amend(
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -21665,11 +21617,12 @@ def test_lapse_post_non_risky_amend(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                open_exposure = open_notional
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
                 other_side_residual_qty = buy_residual_qty
@@ -21680,45 +21633,49 @@ def test_lapse_post_non_risky_amend(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -21732,8 +21689,8 @@ def test_lapse_post_non_risky_amend(
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                open_exposure = open_notional
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
                 other_side_residual_qty = buy_residual_qty
@@ -21744,20 +21701,20 @@ def test_lapse_post_non_risky_amend(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -21770,29 +21727,26 @@ def test_lapse_post_non_risky_amend(
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
-                cxled_qty = qty - amend_qty
+                cxled_qty = amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
                 new_qty = qty
+                new_px = px - amend_px
                 total_amend_dn_qty = 10
                 total_amend_up_qty = 0
             else:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 cxled_qty = 0
                 cxled_px = 0
                 cxled_notional = 0
                 total_amend_dn_qty = 0
                 total_amend_up_qty = 10
 
-            new_px = amend_px
             chore_status = ChoreStatusType.OE_ACKED
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -21808,20 +21762,20 @@ def test_lapse_post_non_risky_amend(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # putting lapse qty before amend ack comes
             lapse_qty = 10
@@ -21877,18 +21831,8 @@ def test_lapse_post_non_risky_amend(
 
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            if side == Side.BUY:
-                cxled_qty += open_qty
-                cxled_notional += open_qty * get_px_in_usd(amend_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-            else:
-                new_qty = amend_qty
-                cxled_qty += open_qty
-                cxled_notional += open_qty * get_px_in_usd(amend_px)
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+            cxled_qty += open_qty
+            cxled_notional += open_qty * get_px_in_usd(open_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -21920,380 +21864,11 @@ def test_lapse_post_non_risky_amend(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-    except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        err_str_ = (f"Some Error Occurred: exception: {e}, "
-                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        print(err_str_)
-        raise Exception(err_str_)
-    finally:
-        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
-
-
-@pytest.mark.nightly
-def test_lapse_post_risky_amend(
-        static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
-        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
-        last_barter_fixture_list, symbol_overview_obj_list,
-        market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
-        leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    residual_wait_sec = 4 * refresh_sec_update_fixture
-
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list))
-
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
-
-    try:
-        # updating yaml_configs according to this test
-        for symbol in config_dict["symbol_configs"]:
-            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
-        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
-
-        # updating simulator's configs
-        executor_http_client.barter_simulator_reload_config_query_client()
-
-        # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
-
-        buy_residual_qty = None
-        buy_cxl_notional = None
-        buy_filled_notional = None
-        for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
-
-            # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
-                                                                            executor_http_client)
-
-            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
-
-            expected_chore_notional = qty * get_px_in_usd(px)
-            chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
-                                                              executor_http_client)
-
-            new_qty = qty
-            new_px = px
-            amend_qty = None
-            amend_px = None
-            chore_status = ChoreStatusType.OE_ACKED
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = qty - filled_qty
-            open_notional = open_qty * get_px_in_usd(px)
-            open_px = px
-            cxled_qty = 0
-            cxled_notional = 0
-            cxled_px = 0
-            residual_qty = 0
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = (qty - filled_qty) * get_px_in_usd(px)
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = 0
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_notional - filled_notional
-                cxled_exposure = buy_cxl_notional - cxled_notional
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
-                buy_amend_qty = amend_qty
-                buy_amend_px = amend_px
-            else:
-                amend_px = px - 1
-                amend_qty = qty - 10
-
-            executor_http_client.barter_simulator_process_amend_req_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account,
-                qty=amend_qty, px=amend_px)
-
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
-
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                new_qty = qty
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_notional - filled_notional
-                cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # Placing Amend ACK chore and checking amend should be applied on ack
-            executor_http_client.barter_simulator_process_amend_ack_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account)
-
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
-                                                                                  chore_symbol,
-                                                                                  executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty = 0
-                cxled_px = 0
-                cxled_notional = 0
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                new_qty = qty
-                cxled_qty = qty - amend_qty
-                cxled_px = px
-                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_ACKED
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
-            open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_notional - filled_notional
-                cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
-            except Exception as e:
-                print("Exception", e)
-                raise Exception(e)
-
-            # putting lapse qty before amend ack comes
-            lapse_qty = 10
-            executor_http_client.barter_simulator_process_lapse_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account,
-                qty=lapse_qty)
-
-            print("Checking chore post LAPSE")
-            chore_status = ChoreStatusType.OE_ACKED
-            open_qty -= lapse_qty
-            open_notional = open_qty * get_px_in_usd(new_px)
-            cxled_qty += lapse_qty
-            residual_qty = lapse_qty
-            cxled_notional += lapse_qty * get_px_in_usd(new_px)
-            cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
-            lapsed_qty = lapse_qty
-            total_lapsed_qty = lapse_qty
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = open_notional
-                filled_exposure = filled_qty * get_px_in_usd(px)
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_notional - filled_notional
-                cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_lapse(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure, lapsed_qty, total_lapsed_qty, residual_qty=residual_qty)
-            except AssertionError as ass_e:
-                print("ASSERT", ass_e)
-                raise ass_e
-            except Exception as e:
-                print("Exception", e)
-                raise e
-
-            # waiting for chore to get cxled
-            time.sleep(residual_wait_sec)
-
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
-                                                                                  chore_symbol,
-                                                                                  executor_http_client)
-            if side == Side.BUY:
-                new_qty = amend_qty
-                cxled_qty += open_qty
-                cxled_notional += open_qty * get_px_in_usd(amend_px)
-                total_amend_dn_qty = 0
-                total_amend_up_qty = 10
-            else:
-                cxled_qty += open_qty
-                cxled_notional += open_qty * get_px_in_usd(amend_px)
-                new_qty = qty
-                total_amend_dn_qty = 10
-                total_amend_up_qty = 0
-            cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
-            chore_status = ChoreStatusType.OE_DOD
-            filled_notional = filled_qty * get_px_in_usd(px)
-            if side == Side.BUY:
-                buy_residual_qty = lapse_qty + open_qty
-                buy_cxl_notional = cxled_notional
-                buy_filled_notional = filled_notional
-            residual_qty += open_qty
-            filled_px = px
-            open_qty = 0
-            open_notional = 0
-            open_px = 0
-            if side == Side.BUY:
-                other_side_residual_qty = 0
-                other_side_fill_notional = 0
-                open_exposure = 0
-                filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
-            else:
-                other_side_residual_qty = buy_residual_qty
-                buy_symbol_side_snapshot_list = (
-                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
-                        buy_symbol, Side.BUY))
-                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
-                open_exposure = - open_notional
-                filled_exposure = buy_filled_notional - filled_notional
-                cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
-            try:
-                check_all_computes_for_amend(
-                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
-                    cxled_exposure, residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -22354,10 +21929,6 @@ def test_lapse_pre_non_risky_amend_rej_req(
         buy_cxl_notional = None
         buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
@@ -22368,11 +21939,13 @@ def test_lapse_pre_non_risky_amend_rej_req(
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = qty - filled_qty
-            open_notional = open_qty * get_px_in_usd(px)
             open_px = px
             cxled_qty = 0
             cxled_notional = 0
-            cxled_px = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
 
             # putting lapse qty before amend ack comes
             lapse_qty = 10
@@ -22408,7 +21981,6 @@ def test_lapse_pre_non_risky_amend_rej_req(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
@@ -22426,29 +21998,34 @@ def test_lapse_pre_non_risky_amend_rej_req(
             print("Checking chore post OE_AMD_UNACK")
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10 - lapse_qty
-                buy_amend_qty = amend_qty
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
-            last_original_qty = None
-            last_original_px = None
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -22464,15 +22041,14 @@ def test_lapse_pre_non_risky_amend_rej_req(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -22496,6 +22072,10 @@ def test_lapse_pre_non_risky_amend_rej_req(
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             open_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
@@ -22512,15 +22092,14 @@ def test_lapse_pre_non_risky_amend_rej_req(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -22534,11 +22113,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
             print("Checking chore post OE_CXL_ACK")
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            new_qty = qty
-            new_px = px
             chore_status = ChoreStatusType.OE_DOD
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(px)
@@ -22572,11 +22147,11 @@ def test_lapse_pre_non_risky_amend_rej_req(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -22645,11 +22220,14 @@ def test_lapse_pre_non_risky_amend_rej_ack(
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
+            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             new_qty = qty
             new_px = px
-            amend_qty = None
-            amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -22660,11 +22238,12 @@ def test_lapse_pre_non_risky_amend_rej_ack(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
-                filled_exposure = filled_qty * get_px_in_usd(px)
+                filled_exposure = filled_notional
                 cxled_exposure = 0
             else:
                 other_side_residual_qty = buy_residual_qty
@@ -22675,16 +22254,14 @@ def test_lapse_pre_non_risky_amend_rej_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_original_px = None
-            last_original_qty = None
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -22694,24 +22271,32 @@ def test_lapse_pre_non_risky_amend_rej_ack(
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
             else:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            chore_status = ChoreStatusType.OE_AMD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -22741,16 +22326,17 @@ def test_lapse_pre_non_risky_amend_rej_ack(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
-                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure)
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # putting lapse qty before amend ack comes
             lapse_qty = 10
@@ -22762,7 +22348,6 @@ def test_lapse_pre_non_risky_amend_rej_ack(
                 qty=lapse_qty)
 
             # putting lapse before cxl_ack
-            chore_status = ChoreStatusType.OE_AMD
             open_qty -= lapse_qty
             open_notional = open_qty * get_px_in_usd(px)
             cxled_qty = lapse_qty
@@ -22812,11 +22397,13 @@ def test_lapse_pre_non_risky_amend_rej_ack(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            new_qty = qty
-            new_px = px
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             open_px = px
             if side == Side.BUY:
                 other_side_residual_qty = 0
@@ -22833,21 +22420,20 @@ def test_lapse_pre_non_risky_amend_rej_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
@@ -22856,18 +22442,15 @@ def test_lapse_pre_non_risky_amend_rej_ack(
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(px)
-            if side == Side.BUY:
-                buy_residual_qty = cxled_qty
-                buy_cxl_notional = cxled_notional
             new_qty = qty
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
             residual_qty = cxled_qty
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
             if side == Side.BUY:
                 buy_filled_notional = filled_notional
+                buy_residual_qty = cxled_qty
+                buy_cxl_notional = cxled_notional
             filled_px = px
             open_qty = 0
             open_notional = 0
@@ -22891,9 +22474,119 @@ def test_lapse_pre_non_risky_amend_rej_ack(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+    except AssertionError as e:
+        raise e
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_full_lapse_pre_non_risky_amend_rej_ack(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # buy test
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+
+        buy_filled_notional = None
+        buy_cxl_notional = None
+        buy_residual_qty = None
+        for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
+            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
+
+            # checking ACK chore before amend
+            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+                                                                            executor_http_client)
+            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+
+            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+            new_qty = qty
+            new_px = px
+            chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            residual_qty = cxled_qty
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = 0
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
@@ -22902,6 +22595,160 @@ def test_lapse_pre_non_risky_amend_rej_ack(
             except Exception as e:
                 print("Exception", e)
                 raise e
+
+            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            if side == Side.BUY:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+            else:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
+            new_qty = qty
+            new_px = px
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_qty * get_px_in_usd(px)
+                cxled_exposure = 0
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            last_filled_qty = filled_qty
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+            # putting lapse qty before amend ack comes
+            executor_http_client.barter_simulator_process_lapse_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                qty=None)
+            lapse_qty = open_qty
+
+            # putting lapse before cxl_ack
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            cxled_qty = lapse_qty
+            residual_qty = lapse_qty
+            cxled_notional = cxled_qty * get_px_in_usd(px)
+            cxled_px = px
+            lapsed_qty = cxled_qty
+            total_lapsed_qty = cxled_qty
+            chore_status = ChoreStatusType.OE_DOD
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_qty * get_px_in_usd(px)
+                cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            last_filled_qty = filled_qty
+            try:
+                check_all_computes_for_lapse(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
+                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    lapsed_qty, total_lapsed_qty, residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+            print("Checking chore post OE_AMD_REJ")
+            # Placing Amend REJ chore
+            executor_http_client.barter_simulator_process_amend_rej_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+                                                                                  chore_symbol,
+                                                                                  executor_http_client)
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            time.sleep(5)
+            check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
+                         f".* - ignoring this amend chore_journal and chore will stay unchanged")
+            assert_fail_msg = f"Can't find alert: {check_str!r}"
+            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise e
@@ -22956,10 +22803,6 @@ def test_lapse_post_non_risky_amend_rej_ack(
         buy_cxl_notional = None
         buy_filled_notional = None
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
-            if side == Side.BUY:
-                buy_px = px
-                buy_qty = qty
-
             place_new_chore(chore_symbol, side, px, qty, executor_http_client)
 
             # checking ACK chore before amend
@@ -22967,6 +22810,15 @@ def test_lapse_post_non_risky_amend_rej_ack(
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
+            new_qty = qty
+            new_px = px
+            chore_status = ChoreStatusType.OE_ACKED
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = qty - filled_qty
@@ -22975,39 +22827,13 @@ def test_lapse_post_non_risky_amend_rej_ack(
             cxled_qty = 0
             cxled_notional = 0
             cxled_px = 0
-            residual_qty = 0
-            print("Checking chore post OE_AMD_UNACK")
-            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
-            if side == Side.BUY:
-                amend_px = px - 1
-                amend_qty = qty - 10
-                buy_amend_qty = amend_qty
-            else:
-                amend_px = px + 1
-                amend_qty = qty + 10
-
-            executor_http_client.barter_simulator_process_amend_req_query_client(
-                latest_ack_obj.chore.chore_id,
-                latest_ack_obj.chore.side,
-                latest_ack_obj.chore.security.sec_id,
-                latest_ack_obj.chore.underlying_account,
-                qty=amend_qty, px=amend_px)
-
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
-                                                                                    chore_symbol, executor_http_client)
-            new_qty = qty
-            new_px = px
-            chore_status = ChoreStatusType.OE_AMD
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            last_original_qty = None
-            last_original_px = None
+            residual_qty = cxled_qty
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
                 open_exposure = open_notional
                 filled_exposure = filled_notional
-                cxled_exposure = cxled_notional
+                cxled_exposure = 0
             else:
                 other_side_residual_qty = buy_residual_qty
                 buy_symbol_side_snapshot_list = (
@@ -23017,24 +22843,90 @@ def test_lapse_post_non_risky_amend_rej_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
-            print("Checking chore post OE_AMD_REJ")
-            # Placing Amend REJ chore
+            # Placing Amend req chore and checking computes should stay same since it is non-risky amend
+            if side == Side.BUY:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_px = amend_px
+                pending_amend_dn_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+            else:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_px = amend_px
+                pending_amend_up_qty = amend_qty
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
+            new_qty = qty
+            new_px = px
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = 0
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
+
+            # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_rej_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
@@ -23044,12 +22936,11 @@ def test_lapse_post_non_risky_amend_rej_ack(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            new_qty = qty
-            new_px = px
             chore_status = ChoreStatusType.OE_ACKED
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            open_px = px
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -23065,13 +22956,13 @@ def test_lapse_post_non_risky_amend_rej_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
@@ -23115,7 +23006,6 @@ def test_lapse_post_non_risky_amend_rej_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
@@ -23174,17 +23064,17 @@ def test_lapse_post_non_risky_amend_rej_ack(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -23228,8 +23118,6 @@ def test_lapse_pre_risky_amend_rej_req(
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
-            config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -23248,8 +23136,6 @@ def test_lapse_pre_risky_amend_rej_req(
                                                                             executor_http_client)
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
-            if side == Side.BUY:
-                buy_filled_qty = filled_qty
 
             expected_chore_notional = qty * get_px_in_usd(px)
             chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
@@ -23264,6 +23150,10 @@ def test_lapse_pre_risky_amend_rej_req(
             cxled_notional = 0
             cxled_px = 0
             residual_qty = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
 
             # putting lapse qty before amend ack comes
             lapse_qty = 10
@@ -23317,42 +23207,51 @@ def test_lapse_pre_risky_amend_rej_req(
             print("Checking chore post OE_AMD_UNACK")
             # Placing Amend req chore and checking computes
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_qty = amend_qty
+                pending_amend_up_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10 - residual_qty
-
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_qty = amend_qty
+                pending_amend_dn_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+        
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
-
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+        
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 20
+                total_amend_up_qty = amend_qty
             else:
                 available_qty = qty - lapse_qty
                 new_qty = qty
-                cxled_qty += available_qty - amend_qty
+                new_px = px - amend_px
+                cxled_qty += amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
 
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             last_original_qty = qty
             last_original_px = px
             if side == Side.BUY:
@@ -23374,17 +23273,17 @@ def test_lapse_pre_risky_amend_rej_req(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             print("Checking chore post OE_AMD_REJ")
             # Placing Amend REJ
@@ -23399,17 +23298,14 @@ def test_lapse_pre_risky_amend_rej_req(
                                                                                   executor_http_client)
             new_qty = qty
             new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             if side == Side.SELL:
-                available_qty = qty - lapse_qty
-                cxled_qty -= available_qty - amend_qty
-                cxled_notional -= (available_qty - amend_qty) * get_px_in_usd(px)
+                cxled_qty -= amend_qty
+                cxled_notional -= amend_qty * get_px_in_usd(px)
             open_qty = qty - filled_qty - cxled_qty
             open_notional = open_qty * get_px_in_usd(px)
             open_px = px
@@ -23432,17 +23328,17 @@ def test_lapse_pre_risky_amend_rej_req(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
@@ -23450,15 +23346,7 @@ def test_lapse_pre_risky_amend_rej_req(
             print("Checking chore post OE_CXL_ACK")
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
-            new_qty = qty
-            new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_DOD
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
-            filled_notional = filled_qty * get_px_in_usd(px)
-            filled_px = px
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(px)
             residual_qty += open_qty
@@ -23489,17 +23377,17 @@ def test_lapse_pre_risky_amend_rej_req(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -23579,47 +23467,58 @@ def test_lapse_pre_risky_amend_rej_ack(
             cxled_notional = 0
             cxled_px = 0
             residual_qty = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
 
             print("Checking chore post OE_AMD_UNACK")
             # Placing Amend req chore and checking computes
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_qty = amend_qty
+                pending_amend_up_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_qty = amend_qty
+                pending_amend_dn_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
             else:
                 new_qty = qty
-                cxled_qty += qty - amend_qty
+                new_px = px - amend_px
+                cxled_qty += amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
 
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -23635,21 +23534,20 @@ def test_lapse_pre_risky_amend_rej_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # putting lapse qty before amend ack comes
             lapse_qty = 10
@@ -23661,7 +23559,6 @@ def test_lapse_pre_risky_amend_rej_ack(
                 qty=lapse_qty)
 
             print("Checking chore post LAPSE")
-            chore_status = ChoreStatusType.OE_AMD
             open_qty -= lapse_qty
             open_notional = open_qty * get_px_in_usd(new_px)
             cxled_qty += lapse_qty
@@ -23685,7 +23582,6 @@ def test_lapse_pre_risky_amend_rej_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
@@ -23713,19 +23609,16 @@ def test_lapse_pre_risky_amend_rej_ack(
                                                                                   executor_http_client)
             new_qty = qty
             new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_ACKED
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
+            cxled_qty = lapse_qty
             if side == Side.BUY:
-                # reverting lapse cxled notional
-                cxled_notional += -lapsed_qty * get_px_in_usd(amend_px) + lapsed_qty * get_px_in_usd(px)
+                cxled_notional = cxled_qty * get_px_in_usd(px + amend_px)
             else:
-                cxled_qty = lapse_qty
-                cxled_notional = cxled_qty * get_px_in_usd(px)
+                cxled_notional = cxled_qty * get_px_in_usd(px - amend_px)
             cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             open_qty = qty - filled_qty - cxled_qty
             open_notional = open_qty * get_px_in_usd(px)
@@ -23749,17 +23642,17 @@ def test_lapse_pre_risky_amend_rej_ack(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
@@ -23769,8 +23662,6 @@ def test_lapse_pre_risky_amend_rej_ack(
                                                                                   chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
-            # amend_qty = None
-            # amend_px = None
             chore_status = ChoreStatusType.OE_DOD
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -23783,7 +23674,7 @@ def test_lapse_pre_risky_amend_rej_ack(
                 buy_residual_qty = residual_qty
                 buy_cxl_notional = cxled_notional
                 buy_filled_notional = filled_notional
-            cxled_px = px
+            cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
             open_qty = 0
             open_notional = 0
             open_px = 0
@@ -23806,17 +23697,17 @@ def test_lapse_pre_risky_amend_rej_ack(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -23830,7 +23721,7 @@ def test_lapse_pre_risky_amend_rej_ack(
 
 
 @pytest.mark.nightly
-def test_lapse_post_risky_amend_rej_ack(
+def test_full_lapse_pre_risky_amend_rej_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
@@ -23896,47 +23787,58 @@ def test_lapse_post_risky_amend_rej_ack(
             cxled_notional = 0
             cxled_px = 0
             residual_qty = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
 
             print("Checking chore post OE_AMD_UNACK")
             # Placing Amend req chore and checking computes
             if side == Side.BUY:
-                amend_px = px + 1
-                amend_qty = qty + 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_qty = amend_qty
+                pending_amend_up_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
             else:
-                amend_px = px - 1
-                amend_qty = qty - 10
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_qty = amend_qty
+                pending_amend_dn_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
 
             executor_http_client.barter_simulator_process_amend_req_query_client(
                 latest_ack_obj.chore.chore_id,
                 latest_ack_obj.chore.side,
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_UNACK,
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
-                new_qty = amend_qty
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
                 total_amend_dn_qty = 0
-                total_amend_up_qty = 10
+                total_amend_up_qty = amend_qty
             else:
                 new_qty = qty
-                cxled_qty += qty - amend_qty
+                new_px = px - amend_px
+                cxled_qty += amend_qty
                 cxled_px = px
                 cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
-                total_amend_dn_qty = 10
+                total_amend_dn_qty = amend_qty
                 total_amend_up_qty = 0
 
-            new_px = amend_px
-            chore_status = ChoreStatusType.OE_AMD
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
             open_qty = new_qty - filled_qty - cxled_qty
-            open_notional = open_qty * get_px_in_usd(amend_px)
-            open_px = amend_px
-            last_original_qty = qty
-            last_original_px = px
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -23952,21 +23854,72 @@ def test_lapse_post_risky_amend_rej_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
-                raise AssertionError(ass_e)
+                raise ass_e
             except Exception as e:
                 print("Exception", e)
-                raise Exception(e)
+                raise e
+
+            # putting lapse qty before amend ack comes
+            executor_http_client.barter_simulator_process_lapse_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                qty=None)
+            lapse_qty = open_qty
+
+            print("Checking chore post LAPSE")
+            open_qty = 0
+            open_notional = 0
+            open_px = 0
+            chore_status = ChoreStatusType.OE_DOD
+            cxled_qty += lapse_qty
+            residual_qty = lapse_qty
+            cxled_notional += lapse_qty * get_px_in_usd(new_px)
+            cxled_px = get_usd_to_local_px_or_notional(cxled_notional) / cxled_qty
+            lapsed_qty = lapse_qty
+            total_lapsed_qty = lapse_qty
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+                buy_cxl_notional = cxled_notional
+                buy_filled_notional = filled_notional
+                buy_residual_qty = residual_qty
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+            try:
+                check_all_computes_for_lapse(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
+                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
+                    cxled_exposure, lapsed_qty, total_lapsed_qty, residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise ass_e
+            except Exception as e:
+                print("Exception", e)
+                raise e
 
             print("Checking chore post OE_AMD_REJ")
             # Placing Amend REJ
@@ -23979,22 +23932,159 @@ def test_lapse_post_risky_amend_rej_ack(
             latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
-            new_qty = qty
-            new_px = px
-            # amend_qty = None
-            # amend_px = None
-            chore_status = ChoreStatusType.OE_ACKED
-            total_amend_dn_qty = 0
-            total_amend_up_qty = 0
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            time.sleep(5)
+            check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
+                         f".* - ignoring this amend chore_journal and chore will stay unchanged")
+            assert_fail_msg = f"Can't find alert: {check_str!r}"
+            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_lapse_post_risky_amend_rej_ack(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_pair_strat, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+
+        buy_residual_qty = None
+        buy_cxl_notional = None
+        buy_filled_notional = None
+        for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY), (95, 110, sell_symbol, Side.SELL)]:
+            place_new_chore(chore_symbol, side, px, qty, executor_http_client)
+
+            # checking ACK chore before amend
+            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+                                                                            executor_http_client)
+
+            filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
+            if side == Side.BUY:
+                buy_filled_qty = filled_qty
+
+            expected_chore_notional = qty * get_px_in_usd(px)
+            chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
+                                                              executor_http_client)
+
             filled_notional = filled_qty * get_px_in_usd(px)
             filled_px = px
-            if side == Side.SELL:
-                cxled_qty -= qty - amend_qty
-                cxled_notional -= (qty - amend_qty) * get_px_in_usd(px)
-                cxled_px = 0
-            open_qty = qty - filled_qty - cxled_qty
+            open_qty = qty - filled_qty
             open_notional = open_qty * get_px_in_usd(px)
             open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            residual_qty = 0
+            pending_amend_dn_px = 0
+            pending_amend_dn_qty = 0
+            pending_amend_up_px = 0
+            pending_amend_up_qty = 0
+
+            print("Checking chore post OE_AMD_UNACK")
+            # Placing Amend req chore and checking computes
+            if side == Side.BUY:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_up_qty = amend_qty
+                pending_amend_up_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_UP_UNACK
+                chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
+            else:
+                amend_px = 1
+                amend_qty = 10
+                pending_amend_dn_qty = amend_qty
+                pending_amend_dn_px = amend_px
+                chore_event = ChoreEventType.OE_AMD_DN_UNACK
+                chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
+
+            executor_http_client.barter_simulator_process_amend_req_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account,
+                chore_event=chore_event,
+                qty=amend_qty, px=amend_px)
+
+            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                                                                                    chore_symbol, executor_http_client)
+
+            if side == Side.BUY:
+                new_qty = qty + amend_qty
+                new_px = px + amend_px
+                cxled_qty = 0
+                cxled_px = 0
+                cxled_notional = 0
+                total_amend_dn_qty = 0
+                total_amend_up_qty = amend_qty
+            else:
+                new_qty = qty
+                new_px = px - amend_px
+                cxled_qty = amend_qty
+                cxled_px = px
+                cxled_notional = cxled_qty * get_px_in_usd(cxled_px)
+                total_amend_dn_qty = amend_qty
+                total_amend_up_qty = 0
+
+            residual_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = new_qty - filled_qty - cxled_qty
+            open_notional = open_qty * get_px_in_usd(new_px)
+            open_px = new_px
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 other_side_fill_notional = 0
@@ -24010,13 +24100,67 @@ def test_lapse_post_risky_amend_rej_ack(
                 open_exposure = - open_notional
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
-            last_filled_qty = filled_qty
+
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
+                    residual_qty=residual_qty)
+            except AssertionError as ass_e:
+                print("ASSERT", ass_e)
+                raise AssertionError(ass_e)
+            except Exception as e:
+                print("Exception", e)
+                raise Exception(e)
+
+            # Placing Amend REJ
+            executor_http_client.barter_simulator_process_amend_rej_query_client(
+                latest_ack_obj.chore.chore_id,
+                latest_ack_obj.chore.side,
+                latest_ack_obj.chore.security.sec_id,
+                latest_ack_obj.chore.underlying_account)
+
+            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+                                                                                  chore_symbol,
+                                                                                  executor_http_client)
+            new_qty = qty
+            new_px = px
+            chore_status = ChoreStatusType.OE_ACKED
+            total_amend_dn_qty = 0
+            total_amend_up_qty = 0
+            filled_notional = filled_qty * get_px_in_usd(px)
+            filled_px = px
+            open_qty = qty - filled_qty
+            open_notional = open_qty * get_px_in_usd(px)
+            open_px = px
+            cxled_qty = 0
+            cxled_notional = 0
+            cxled_px = 0
+            if side == Side.BUY:
+                other_side_residual_qty = 0
+                other_side_fill_notional = 0
+                open_exposure = open_notional
+                filled_exposure = filled_notional
+                cxled_exposure = cxled_notional
+            else:
+                other_side_residual_qty = buy_residual_qty
+                buy_symbol_side_snapshot_list = (
+                    executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(
+                        buy_symbol, Side.BUY))
+                other_side_fill_notional = buy_symbol_side_snapshot_list[0].total_fill_notional
+                open_exposure = - open_notional
+                filled_exposure = buy_filled_notional - filled_notional
+                cxled_exposure = buy_cxl_notional - cxled_notional
+
+            try:
+                check_all_computes_for_amend(
+                    active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                     residual_qty=residual_qty)
             except AssertionError as ass_e:
@@ -24119,11 +24263,11 @@ def test_lapse_post_risky_amend_rej_ack(
             try:
                 check_all_computes_for_amend(
                     active_pair_strat.id, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
-                    new_qty, new_px, amend_qty, amend_px, chore_status, total_amend_dn_qty, total_amend_up_qty,
-                    last_original_qty, last_original_px, open_qty, open_notional, open_px, filled_qty,
-                    filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
+                    new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
+                    pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
+                    filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)

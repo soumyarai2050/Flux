@@ -19,47 +19,64 @@ namespace mobile_book_handler {
                                   TopOfBookHandler &r_top_of_book_handler) :
         m_sp_mongo_db_(std::move(sp_mongo_db_)), mr_last_barter_websocket_server_(r_last_barter_websocket_server_),
         mr_top_of_book_handler_(r_top_of_book_handler),
-        m_last_barter_db_codec_(m_sp_mongo_db_), handler_thread_{[this](){handle();}} {}
+        m_last_barter_db_codec_(m_sp_mongo_db_), m_db_n_ws_update_handler_thread_{[this](){handle_db_n_ws_update();}} {}
 
-        void handle_last_barter_update(mobile_book::LastBarter &r_last_barter_obj) {
+        FluxCppCore::CacheOperationResult handle_last_barter_update(mobile_book::LastBarter &r_last_barter_obj) {
 
-            if (!r_last_barter_obj.has_arrival_time() and !r_last_barter_obj.has_exch_time()) {
+
+            if (!r_last_barter_obj.has_arrival_time() or !r_last_barter_obj.has_exch_time()) {
                 auto date_time = FluxCppCore::get_utc_time_microseconds();
-                r_last_barter_obj.set_arrival_time(date_time);
-                r_last_barter_obj.set_exch_time(date_time);
-            }
-            mobile_book::TopOfBook top_of_book_obj;
-            create_top_of_book_obj_from_last_barter(r_last_barter_obj, top_of_book_obj);
-
-            if (m_last_barter_obj_.exch_time() <= r_last_barter_obj.exch_time() and
-                m_top_of_book_obj_.last_update_date_time() <= top_of_book_obj.last_update_date_time()) {
-
-                [[maybe_unused]] void* p_lt_mutex = market_cache::LastBarterCache::get_last_barter_mutex(
-                    r_last_barter_obj.symbol_n_exch_id().symbol());
-                [[maybe_unused]] void* p_tob_mutex = market_cache::TopOfBookCache::get_top_of_book_mutex(
-                    top_of_book_obj.symbol());
-
-                auto last_barter_mutex = static_cast<std::mutex*>(p_lt_mutex);
-                auto top_of_book_mutex = static_cast<std::mutex*>(p_tob_mutex);
-
-                auto lock_status = std::try_lock(*last_barter_mutex, *top_of_book_mutex);
-                if (lock_status == ALL_LOCKS_AVAILABLE_) {
-                    std::lock_guard<std::mutex> last_barter_lock(*last_barter_mutex, std::adopt_lock);
-                    std::lock_guard<std::mutex> top_of_book_lock(*top_of_book_mutex, std::adopt_lock);
-                    mobile_book_handler::market_cache::LastBarterCache::update_last_barter_cache(r_last_barter_obj);
-                    mobile_book_handler::market_cache::TopOfBookCache::update_top_of_book_cache(top_of_book_obj);
+                if (!r_last_barter_obj.has_arrival_time()) {
+                    r_last_barter_obj.set_arrival_time(date_time);
                 }
-                notify_semaphore.release();
-                m_last_barter_obj_.Clear();
-                m_top_of_book_obj_.Clear();
-                m_last_barter_obj_.CopyFrom(r_last_barter_obj);
-                m_top_of_book_obj_.CopyFrom(top_of_book_obj);
+                if (!r_last_barter_obj.has_exch_time()) {
+                    r_last_barter_obj.set_exch_time(date_time);
+                }
             }
 
+            m_top_of_book_obj_.Clear();
+
+            if (r_last_barter_obj.exch_time() < m_last_barter_time_) {
+                LOG_DEBUG(GetLogger(), "Ignoring update cache and DB because stored time is greater than current time;;; "
+                                       "stored time: {};;; current time: {}",
+                                       m_last_barter_time_, r_last_barter_obj.exch_time());
+                return FluxCppCore::CacheOperationResult::DB_N_CACHE_UPDATE_FAILED;
+            }
+
+
+            void* p_lt_mutex = market_cache::LastBarterCache::get_last_barter_mutex(
+                    r_last_barter_obj.symbol_n_exch_id().symbol());
+            void* p_tob_mutex = market_cache::TopOfBookCache::get_top_of_book_mutex(
+                r_last_barter_obj.symbol_n_exch_id().symbol());
+
+            auto last_barter_mutex = static_cast<std::mutex*>(p_lt_mutex);
+            auto top_of_book_mutex = static_cast<std::mutex*>(p_tob_mutex);
+
+            auto lock_status = std::try_lock(*last_barter_mutex, *top_of_book_mutex);
+
+            if (lock_status != ALL_LOCKS_AVAILABLE_) {
+                m_monito_.push(r_last_barter_obj);
+                LOG_DEBUG(GetLogger(), "Ignoring cache update lock not found;;; last_barter_obj: {}",
+                    r_last_barter_obj.DebugString());
+                return FluxCppCore::CacheOperationResult::LOCK_NOT_FOUND;
+            }
+
+            create_top_of_book_obj_from_last_barter(r_last_barter_obj, m_top_of_book_obj_);
+            {
+                std::lock_guard<std::mutex> last_barter_lock(*last_barter_mutex, std::adopt_lock);
+                std::lock_guard<std::mutex> top_of_book_lock(*top_of_book_mutex, std::adopt_lock);
+                mobile_book_handler::market_cache::LastBarterCache::update_last_barter_cache(r_last_barter_obj);
+                mobile_book_handler::market_cache::TopOfBookCache::update_top_of_book_cache(m_top_of_book_obj_);
+            }
+
+            notify_semaphore.release();
+
+            m_last_barter_time_ = r_last_barter_obj.exch_time();
             m_monito_.push(r_last_barter_obj);
+            return FluxCppCore::CacheOperationResult::SUSSESS_DB_N_CACHE_UPDATE;
         }
 
-        void handle() {
+        void handle_db_n_ws_update() {
             std::string last_barter_key;
             int32_t last_barter_id;
             bsoncxx::builder::basic::document bson_doc{};
@@ -67,7 +84,6 @@ namespace mobile_book_handler {
             while(1)
             {
                 if(m_monito_.pop(last_barter)) {
-                    LOG_DEBUG(GetLogger(), "LastBarter: {}", last_barter.DebugString());
                     MobileBookKeyHandler::get_key_out(last_barter, last_barter_key);
                     prepare_doc(last_barter, bson_doc);
                     bool status = m_last_barter_db_codec_.insert(bson_doc, last_barter_key, last_barter_id);
@@ -91,10 +107,10 @@ namespace mobile_book_handler {
         TopOfBookHandler &mr_top_of_book_handler_;
         FluxCppCore::MongoDBCodec<mobile_book::LastBarter, mobile_book::LastBarterList> m_last_barter_db_codec_;
         Monitor<mobile_book::LastBarter> m_monito_{};
-        std::jthread handler_thread_;
+        std::jthread m_db_n_ws_update_handler_thread_;
         const int8_t ALL_LOCKS_AVAILABLE_{-1};
-        mobile_book::LastBarter m_last_barter_obj_{};
         mobile_book::TopOfBook m_top_of_book_obj_{};
+        int64_t m_last_barter_time_{0};
 
 
         void update_last_barter_cache() {

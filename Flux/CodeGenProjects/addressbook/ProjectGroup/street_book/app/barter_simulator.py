@@ -354,7 +354,8 @@ class BarterSimulator(BarteringLinkBase):
 
     @classmethod
     async def place_amend_req_chore(cls, chore_id: str, side: Side, bartering_sec_id: str,
-                                    system_sec_id: str, underlying_account: str | None = "bartering-account",
+                                    system_sec_id: str, amend_event: ChoreEventType,
+                                    underlying_account: str | None = "bartering-account",
                                     px: float | None = None, qty: int | None = None):
         if px is None and qty is None:
             logging.error("Both Px and Qty can't be None while placing amend chore - ignoring this "
@@ -370,7 +371,7 @@ class BarterSimulator(BarteringLinkBase):
         msg = f"SIM:Amend Request for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}"
         add_to_texts(chore_brief, msg)
         chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
-                                     chore_event=ChoreEventType.OE_AMD_UNACK)
+                                     chore_event=amend_event)
         await underlying_create_chore_journal_http(chore_journal)
 
     @classmethod

@@ -32,10 +32,7 @@ void unlock_mutex(PyObject *p_mutex_ptr) {
 }
 
 void initialize_database(const char *db_uri, const char *db_name, PyObject *port_dict) {
-    // quill::start();
-    LOG_INFO(GetLogger(), "Inside: {}", __func__);
-    // add_symbols_to_the_cache_container();
-    // code to initialize the database
+
     MongoDBHandlerSingleton::get_instance(db_uri, db_name);
 
     // Acquire the GIL
@@ -61,7 +58,6 @@ void create_or_update_md_n_tob(const int32_t id, const char *symbol, [[maybe_unu
         k_side = mobile_book::TickType::ASK;
     }
 
-    LOG_INFO(GetLogger(), "inside {}, symbol: {}, side: {}", __func__, symbol, TickType_Name(k_side));
 
     auto sp_mongo_db = MongoDBHandlerSingleton::get_instance();
     static TopOfBookHandler topOfBookHandler(sp_mongo_db, top_of_book_websocket_server);
@@ -85,7 +81,6 @@ void create_or_update_md_n_tob(const int32_t id, const char *symbol, [[maybe_unu
     market_depth.set_cumulative_avg_px(cumulative_avg_px);
 
     market_depth_handler.handle_md_update(market_depth);
-    LOG_INFO(GetLogger(), "exit {}, symbol: {}, side: {}", __func__, symbol, TickType_Name(market_depth_obj.side()));
 }
 
 void create_or_update_last_barter_n_tob(const int32_t id, const char *symbol, const char *exch_id,
@@ -93,7 +88,6 @@ void create_or_update_last_barter_n_tob(const int32_t id, const char *symbol, co
     const char *market_barter_volume_id, const int64_t participation_period_last_barter_qty_sum,
     const int32_t applicable_period_seconds) {
 
-    LOG_INFO(GetLogger(), "Inside: {}, symbol: {}", __func__, symbol);
     auto sp_mongo_db = MongoDBHandlerSingleton::get_instance();
     static TopOfBookHandler topOfBookHandler(sp_mongo_db, top_of_book_websocket_server);
     static mobile_book_handler::LastBarterHandler lastBarterHandler(sp_mongo_db, last_barter_websocket_server,
@@ -104,8 +98,8 @@ void create_or_update_last_barter_n_tob(const int32_t id, const char *symbol, co
     last_barter.set_px(px);
     last_barter.set_qty(qty);
     last_barter.set_premium(premium);
-    last_barter.set_exch_time(FluxCppCore::get_utc_time_microseconds());
-    last_barter.set_arrival_time(FluxCppCore::get_utc_time_microseconds());
+    // last_barter.set_exch_time(FluxCppCore::get_utc_time_microseconds());
+    // last_barter.set_arrival_time(FluxCppCore::get_utc_time_microseconds());
     last_barter.mutable_symbol_n_exch_id()->set_symbol(symbol);
     last_barter.mutable_symbol_n_exch_id()->set_exch_id(exch_id);
     last_barter.mutable_market_barter_volume()->set_id(market_barter_volume_id);
@@ -113,15 +107,13 @@ void create_or_update_last_barter_n_tob(const int32_t id, const char *symbol, co
     last_barter.mutable_market_barter_volume()->set_applicable_period_seconds(applicable_period_seconds);
 
     lastBarterHandler.handle_last_barter_update(last_barter);
-    LOG_INFO(GetLogger(), "Exit: {}, symbol: {}", __func__, symbol);
 }
 
 void add_symbols_to_the_cache_container() {
     std::vector<std::string> symbols;
-    mobile_book_handler::market_cache::get_barter_symbols_from_config(symbols);
-    int8_t market_depth_levels = mobile_book_handler::market_cache::get_market_depth_levels_from_config();
+    FluxCppCore::get_barter_symbols_from_config(symbols);
+    int8_t market_depth_levels = FluxCppCore::get_market_depth_levels_from_config();
     for (const auto& symbol : symbols) {
-        std::cout << "symbol: " << symbol <<  std::endl;
         FluxCppCore::AddOrGetContainerObj::add_container_obj_for_symbol(symbol);
         for (int8_t i = 0; i < market_depth_levels; ++i) {
             mobile_book_handler::market_cache::MarketDepthCache::create_bid_market_depth_cache(symbol, i);

@@ -878,7 +878,7 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
                           sell_fill_journal_, expected_buy_chore_snapshot_,
                           expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
                           pair_strat_, expected_strat_limits_, expected_strat_status_,
-                          expected_strat_brief_, expected_portfolio_status_, 
+                          expected_strat_brief_, expected_portfolio_status_,
                           last_barter_fixture_list, symbol_overview_obj_list,
                           market_depth_basemodel_list, expected_chore_limits_,
                           expected_portfolio_limits_, max_loop_count_per_side,
@@ -1787,7 +1787,7 @@ def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_an
     activate_pair_strat, executor_http_client = (
         create_n_activate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                 copy.deepcopy(expected_strat_limits_),
-                                copy.deepcopy(expected_strat_status_), symbol_overview_obj_list, 
+                                copy.deepcopy(expected_strat_status_), symbol_overview_obj_list,
                                 market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activate_pair_strat.id}_simulate_config.yaml"
@@ -1858,7 +1858,7 @@ def test_strat_limits_with_positive_low_consumable_participation_qty(
     activate_pair_strat, executor_http_client = (
         create_n_activate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                 copy.deepcopy(expected_strat_limits_),
-                                copy.deepcopy(expected_strat_status_), symbol_overview_obj_list, 
+                                copy.deepcopy(expected_strat_status_), symbol_overview_obj_list,
                                 market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activate_pair_strat.id}_simulate_config.yaml"
@@ -2536,7 +2536,7 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
     created_pair_strat = create_strat(buy_symbol, sell_symbol, pair_strat_)
     handle_place_both_side_chores_for_portfolio_limits_test(
         buy_symbol, sell_symbol, created_pair_strat, expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list, 
+        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, expect_no_chore=True)
 
     # checking portfolio_status open_chores
@@ -2802,7 +2802,7 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
     limit_breaching_pair_strat = create_strat(buy_symbol, sell_symbol, pair_strat_)
     handle_place_both_side_chores_for_portfolio_limits_test(
         buy_symbol, sell_symbol, limit_breaching_pair_strat, expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list, 
+        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, expect_no_chore=True)
 
     # Checking alert in portfolio_alert
@@ -2999,7 +2999,7 @@ def test_portfolio_limits_rolling_new_chore_breach(static_data_, clean_and_set_l
     stored_pair_strat_basemodel = create_strat(buy_symbol, sell_symbol, pair_strat_)
     handle_place_both_side_chores_for_portfolio_limits_test(
         buy_symbol, sell_symbol, stored_pair_strat_basemodel, expected_strat_limits_, expected_strat_status_,
-        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list, 
+        symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, expect_no_chore=True)
 
     # Checking alert in portfolio_alert

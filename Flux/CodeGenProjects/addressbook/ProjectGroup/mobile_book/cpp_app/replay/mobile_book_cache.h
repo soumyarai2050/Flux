@@ -7,58 +7,12 @@
 #include "mobile_book_service.pb.h"
 #include "utility_functions.h"
 #include "string_util.h"
-#include "yaml-cpp/yaml.h"
 #include "add_or_get_container_from_py_cache.h"
 #include "logger.h"
 
 
 namespace mobile_book_handler {
     namespace market_cache {
-
-        void inline get_barter_symbols_from_config(std::vector<std::string> &r_symbols_out) {
-            std::string config_file_name = "barter_symbols.yaml";
-            auto root_dir = std::filesystem::current_path().parent_path().parent_path().parent_path();
-            std::filesystem::current_path(root_dir);
-            auto config_dir_path = std::filesystem::current_path() / "ProjectGroup" / "mobile_book" / "data";
-            if (std::filesystem::exists(config_dir_path)) {
-                std::filesystem::current_path(config_dir_path);
-                std::cout << std::filesystem::current_path() << "\n";
-                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
-                r_symbols_out = config[mobile_book_handler::symbol_fld_name].as<std::vector<std::string>>();
-            } else {
-                root_dir = std::filesystem::current_path().parent_path().parent_path();
-                std::filesystem::current_path(root_dir);
-                config_dir_path = std::filesystem::current_path() / "ProjectGroup" / "mobile_book" / "data";
-                std::filesystem::current_path(config_dir_path);
-                std::cout << std::filesystem::current_path() << "\n";
-                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
-                r_symbols_out = config[mobile_book_handler::symbol_fld_name].as<std::vector<std::string>>();
-            }
-
-        }
-
-        int8_t inline get_market_depth_levels_from_config() {
-            std::string config_file_name = "config.yaml";
-            int8_t market_depth_levels{0};
-            auto root_dir = std::filesystem::current_path().parent_path().parent_path().parent_path();
-            std::filesystem::current_path(root_dir);
-            auto config_dir_path = std::filesystem::current_path() / "ProjectGroup" / "street_book" / "data";
-            if (std::filesystem::exists(config_dir_path)) {
-                std::filesystem::current_path(config_dir_path);
-                std::cout << std::filesystem::current_path() << "\n";
-                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
-                market_depth_levels = config["market_depth_levels"].as<int8_t>();
-            } else {
-                root_dir = std::filesystem::current_path().parent_path().parent_path();
-                std::filesystem::current_path(root_dir);
-                config_dir_path = std::filesystem::current_path() / "ProjectGroup" / "street_book" / "data";
-                std::filesystem::current_path(config_dir_path);
-                std::cout << std::filesystem::current_path() << "\n";
-                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
-                market_depth_levels =  config["market_depth_levels"].as<int8_t>();
-            }
-            return market_depth_levels;
-        }
 
         class LastBarterCache {
         public:
@@ -74,7 +28,6 @@ namespace mobile_book_handler {
                     assert(p_get_mobile_book_container_object != nullptr);
 
                     if (p_get_mobile_book_container_object == Py_None) {
-                        std::cout << "-------------------------------------" << std::endl;
                         LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_symbol);
                         return;
@@ -280,7 +233,6 @@ namespace mobile_book_handler {
 
                 {
                     FluxCppCore::PythonGIL gil;
-                    std::cout << "inside: {}" << __func__ << std::endl;
                     PyObject* p_get_mobile_book_container_object =
                         FluxCppCore::AddOrGetContainerObj::get_mobile_book_container_instance(
                             kr_top_of_book_obj.symbol());
@@ -318,13 +270,14 @@ namespace mobile_book_handler {
                             p_get_mobile_book_container_object, get_top_of_book_last_barter_key.c_str());
                         PyObject* p_get_last_barter_obj = PyObject_CallObject(p_get_last_barter_function, nullptr);
                         if (p_get_last_barter_obj != Py_None) {
+                            LOG_DEBUG(GetLogger(), "Calling update_top_of_book_last_barter");
                             update_top_of_book_last_barter(kr_top_of_book_obj, p_get_mobile_book_container_object);
                         } else {
+                            LOG_DEBUG(GetLogger(), "Calling create_top_of_last_barter_cache");
                             create_top_of_last_barter_cache(kr_top_of_book_obj, p_get_mobile_book_container_object);
                         }
                     }
                 }
-                std::cout << "exit: {}" << __func__ << std::endl;
             }
 
             static void create_top_of_bid_quote_cache(const mobile_book::TopOfBook &kr_top_of_book_obj,
@@ -701,7 +654,6 @@ namespace mobile_book_handler {
                 {
                     FluxCppCore::PythonGIL gil;
 
-                    std::cout << "inside: {}" << __func__ << std::endl;
                     PyObject* p_args;
                     PyObject* p_mobile_book_container_instance =
                         FluxCppCore::AddOrGetContainerObj::get_mobile_book_container_instance(
@@ -796,7 +748,6 @@ namespace mobile_book_handler {
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyFloat_FromDouble(kr_market_depth_obj.cumulative_avg_px()));
                     assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_cumulative_avg_px, p_args)));
-                    std::cout << "exit: {}" << __func__ << std::endl;
                 }
 
             }
@@ -806,7 +757,6 @@ namespace mobile_book_handler {
 
                 {
                     FluxCppCore::PythonGIL gil;
-                    std::cout << "inside: {}" << __func__ << std::endl;
                     PyObject* p_mobile_book_container_instance =
                         FluxCppCore::AddOrGetContainerObj::get_mobile_book_container_instance(
                             kr_market_depth_obj.symbol());
@@ -900,7 +850,6 @@ namespace mobile_book_handler {
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyFloat_FromDouble(kr_market_depth_obj.cumulative_avg_px()));
                     assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_cumulative_avg_px, p_args)));
-                    std::cout << "exit: {}" << __func__ << std::endl;
 
                 }
 

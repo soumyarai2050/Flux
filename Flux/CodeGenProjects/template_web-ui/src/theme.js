@@ -77,7 +77,7 @@ const lightThemeComponents = {
             root: {
                 '&:nth-of-type(even)': {
                     // backgroundColor: cssVar('--grey-100'),
-                    opacity: 0.85
+                    // opacity: 0.85
                 },
                 '&.Mui-selected': {
                     backgroundColor: cssVar('--blue-100'),
@@ -164,7 +164,7 @@ const darkThemeComponents = {
             root: {
                 '&:nth-of-type(even)': {
                     // backgroundColor: cssVar('--grey-800'),
-                    opacity: 0.85
+                    // opacity: 0.85
                 },
                 '&.Mui-selected': {
                     backgroundColor: cssVar('--indigo-300'),
@@ -228,6 +228,7 @@ export const lightTheme = createTheme({
         },
         background: {
             default: cssVar('--light-primary-dark'),
+            primary: cssVar('--light-primary-dark'),
             secondary: cssVar('--teal-400'),
             commonKey: cssVar('--teal-400'),
             nodeHeader: cssVar('--teal-400'),

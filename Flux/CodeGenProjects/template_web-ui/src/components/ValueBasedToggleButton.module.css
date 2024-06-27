@@ -4,6 +4,11 @@
     color: white !important;
 }
 
+.disabled {
+    cursor: not-allowed !important;
+    pointer-events: all;
+}
+
 .critical {
     /* background-color: #9C0006 !important; */
     background-color: var(--red-800) !important;
