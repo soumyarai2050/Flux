@@ -90,7 +90,7 @@ const Row = (props) => {
                     }
                 }
 
-                if (cell.hide) return;
+                // if (cell.hide) return;
                 let buttonDisable = false;
                 if (props.widgetType === 'repeatedRoot' && !selected) {
                     buttonDisable = true;

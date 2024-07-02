@@ -1680,7 +1680,7 @@ export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], 
     return tableColumns;
 }
 
-export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false, repeatedView = false) {
+export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false, repeatedView = false, showLess = false) {
     if (rows.length > 1) {
         tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => !column.noCommonKey);
     }
@@ -1712,6 +1712,7 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
     if (rows.length > 0) {
         tableColumns.map((column) => {
             if (hide && column.hide) return;
+            if (showLess && column.showLess) return;
             let fieldName = column.tableTitle;
             if (collectionView) {
                 if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {

@@ -15,7 +15,8 @@ export const Icon = (props) => {
                 disabled={props.disabled}
                 name={props.name}
                 size='small'
-                onClick={props.onClick}>
+                onClick={props.onClick}
+                onDoubleClick={props.onDoubleClick ? props.onDoubleClick : () => {}}>
                 {props.children}
             </IconButton>
         </Tooltip>

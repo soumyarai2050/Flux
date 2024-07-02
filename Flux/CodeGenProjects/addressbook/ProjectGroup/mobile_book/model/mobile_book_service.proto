@@ -27,6 +27,11 @@ option (FluxFileImportDependencyModel) = {
   ImportModelName: "LastBarterList"
 };
 
+option (FluxFileImportDependencyModel) = {
+    ImportFileName: "street_book_n_post_book_core.proto",
+    ImportModelName: "ChoreJournal"
+};
+
 option (FluxFileCRUDPortOffset) = 40;
 
 message SideSpecificMobileBookBrief{

@@ -178,40 +178,49 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
 
         dependency_file_msg_name_list = []
 
+        flux_import_models: list = self.get_complex_option_value_from_proto(file, self.flux_file_import_dependency_model, True)
+        import_file_msg: List[str] = []
+        import_msg_name_list: List[str] = []
+        for _ in flux_import_models:
+            import_file_msg.append(_.get("ImportFileName"))
+            msg_list = _.get("ImportModelName")
+            for __ in msg_list:
+                import_msg_name_list.append(__)
         for file in self.dependency_file_list:
-            if file.proto.name in file_msg_name_list:
+            if file.proto.name in import_file_msg:
                 for msg in file.messages:
-                    num: int = 1
-                    dependency_file_msg_name_list.append(msg.proto.name)
-                    output_content += f"message {msg.proto.name} {{\n"
-                    for fld in msg.fields:
-                        if fld.enum is None:
-                            if fld.message is None:
-                                fld_name = fld.proto.name
-                                fld_cardinality = fld.cardinality.name.lower()
-                                fld_kind = fld.kind.name.lower()
-                                output_content += f"\t{fld_cardinality} {fld_kind} {fld_name} = {num};\n"
-                                num += 1
+                    if msg.proto.name in import_msg_name_list:
+                        num: int = 1
+                        dependency_file_msg_name_list.append(msg.proto.name)
+                        output_content += f"message {msg.proto.name} {{\n"
+                        for fld in msg.fields:
+                            if fld.enum is None:
+                                if fld.message is None:
+                                    fld_name = fld.proto.name
+                                    fld_cardinality = fld.cardinality.name.lower()
+                                    fld_kind = fld.kind.name.lower()
+                                    output_content += f"\t{fld_cardinality} {fld_kind} {fld_name} = {num};\n"
+                                    num += 1
+                                else:
+                                    if (fld.message.proto.name not in message_name_list and
+                                            fld.message.proto.name not in dependency_file_msg_name_list):
+                                        dependency_file_msg_name_list.append(fld.message.proto.name)
+                                        message_name_list.append(fld.message.proto.name)
+                                        message_list.append(fld.message)
+                                    fld_name = fld.proto.name
+                                    fld_cardinality = fld.cardinality.name.lower()
+                                    fld_msg = fld.message.proto.name
+                                    output_content += f"\t{fld_cardinality} {fld_msg} {fld_name} = {num};\n"
+                                    num += 1
                             else:
-                                if (fld.message.proto.name not in message_name_list and
-                                        fld.message.proto.name not in dependency_file_msg_name_list):
-                                    dependency_file_msg_name_list.append(fld.message.proto.name)
-                                    message_name_list.append(fld.message.proto.name)
-                                    message_list.append(fld.message)
+                                if fld.enum not in self.file_enum_list and fld.enum not in enum_list:
+                                    self.file_enum_list.append(fld.enum)
                                 fld_name = fld.proto.name
                                 fld_cardinality = fld.cardinality.name.lower()
-                                fld_msg = fld.message.proto.name
-                                output_content += f"\t{fld_cardinality} {fld_msg} {fld_name} = {num};\n"
+                                fld_enum_name = fld.enum.proto.name
+                                output_content += f"\t{fld_cardinality} {fld_enum_name} {fld_name} = {num};\n"
                                 num += 1
-                        else:
-                            if fld.enum not in self.file_enum_list and fld.enum not in enum_list:
-                                self.file_enum_list.append(fld.enum)
-                            fld_name = fld.proto.name
-                            fld_cardinality = fld.cardinality.name.lower()
-                            fld_enum_name = fld.enum.proto.name
-                            output_content += f"\t{fld_cardinality} {fld_enum_name} {fld_name} = {num};\n"
-                            num += 1
-                    output_content += "}\n\n"
+                        output_content += "}\n\n"
 
         for enums in dependency_enum_list:
             for enum in enums:

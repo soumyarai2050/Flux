@@ -1,4 +1,4 @@
-import React, { Fragment, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { Fragment, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     Autocomplete, Box, Button, Chip, Divider, TextField, Table, TableContainer, TableBody, TableRow, TableCell,
     TablePagination, Select, MenuItem, FormControlLabel, Checkbox, Snackbar, Alert, Popover
@@ -42,7 +42,7 @@ function AbbreviatedFilterWidget(props) {
     const [groupedRows, setGroupedRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
     const [openSettings, setOpenSettings] = useState(false);
-    const [selectAll, setSelectAll] = useState(false);
+    // const [selectAll, setSelectAll] = useState(false);
     const [headCells, setHeadCells] = useState([]);
     const [commonKeys, setCommonKeys] = useState([]);
     const [toastMessage, setToastMessage] = useState(null);
@@ -53,7 +53,10 @@ function AbbreviatedFilterWidget(props) {
     const [showHidden, setShowHidden] = useState(false);
     const [showMore, setShowMore] = useState(false);
     const [visibilityMenuArchorEl, setVisibilityMenuAnchorEl] = useState();
-    const [openDataSourceDialog, setOpenDataSourceDialog] = useState(false)
+    const [openDataSourceDialog, setOpenDataSourceDialog] = useState(false);
+    const [showAll, setShowAll] = useState(false);
+    const [moreAll, setMoreAll] = useState(false);
+    const visibilityMenuClickTimeout = useRef(null);
 
     const maxRowSize = useMemo(() => getMaxRowSize(activeRows), [activeRows]);
 
@@ -113,10 +116,10 @@ function AbbreviatedFilterWidget(props) {
         if (props.mode === Modes.EDIT_MODE) {
             setCommonKeys([]);
         } else {
-            const commonKeyCollections = getCommonKeyCollections(activeRows, headCells, false, true);
+            const commonKeyCollections = getCommonKeyCollections(activeRows, headCells, !showHidden && !showAll, true, false, !showMore && !moreAll);
             setCommonKeys(commonKeyCollections);
         }
-    }, [activeRows, headCells, props.mode])
+    }, [activeRows, headCells, props.mode, showHidden, showMore, showAll, moreAll])
 
     useEffect(() => {
         const activeItems = [];
@@ -236,7 +239,8 @@ function AbbreviatedFilterWidget(props) {
         // let hide = !e.target.checked;
         let hide = value;
         if (hide) {
-            setSelectAll(false);
+            // setSelectAll(false);
+            setShowAll(false);
         }
         let updatedHeadCells = headCells.map(cell => cell.key === key ? { ...cell, hide: hide } : cell)
         setHeadCells(updatedHeadCells);
@@ -288,26 +292,40 @@ function AbbreviatedFilterWidget(props) {
         props.onShowLessChange(showLessArray);
     }
 
-    const onSelectAll = (e) => {
-        let updatedHeadCells = cloneDeep(headCells);
-        if (e.target.checked) {
-            updatedHeadCells = updatedHeadCells.map(cell => {
-                cell.hide = false;
-                return cell;
-            })
-        } else {
-            updatedHeadCells = updatedHeadCells.map(cell => {
-                cell.hide = true;
-                return cell;
-            })
-        }
-        setSelectAll(e.target.checked);
-        setHeadCells(updatedHeadCells);
+    // const onSelectAll = (e) => {
+    //     let updatedHeadCells = cloneDeep(headCells);
+    //     if (e.target.checked) {
+    //         updatedHeadCells = updatedHeadCells.map(cell => {
+    //             cell.hide = false;
+    //             return cell;
+    //         })
+    //     } else {
+    //         updatedHeadCells = updatedHeadCells.map(cell => {
+    //             cell.hide = true;
+    //             return cell;
+    //         })
+    //     }
+    //     setSelectAll(e.target.checked);
+    //     setHeadCells(updatedHeadCells);
+    // }
+
+    const showAllHandler = (e, action, key, value, dataSourceId, source) => {
+        setShowAll(!value);
     }
 
-    const copyColumnHandler = (columnName) => {
+    const moreAllHandler = (e, action, key, value, dataSourceId, source) => {
+        setMoreAll(!value);
+    }
+
+    const copyColumnHandler = (cell) => {
+        const columnName = cell.key;
+        let sourceIndex = cell.sourceIndex;
+        if (sourceIndex === null || sourceIndex === undefined) {
+            sourceIndex = 0;
+        }
         const values = [columnName];
-        rows.map(row => {
+        groupedRows.map(r => {
+            const row = r[sourceIndex];
             values.push(row[columnName]);
         })
         const text = values.join('\n');
@@ -374,12 +392,44 @@ function AbbreviatedFilterWidget(props) {
         setVisibilityMenuAnchorEl(null);
     }
 
+    const visibilityMenuClickHandler = (checked) => {
+        if (visibilityMenuClickTimeout.current !== null) {
+            // double click event
+            clearTimeout(visibilityMenuClickTimeout.current);
+            visibilityMenuClickTimeout.current = null;
+        } else {
+            // single click event
+            const timeout = setTimeout(() => {
+                if (visibilityMenuClickTimeout.current !== null) {
+                    if (checked) {
+                        setShowHidden(false);
+                        setShowMore(false);
+                    } else {
+                        setShowMore(true);
+                    }
+                    clearTimeout(visibilityMenuClickTimeout.current)
+                    visibilityMenuClickTimeout.current = null;
+                }
+            }, 300);
+            visibilityMenuClickTimeout.current = timeout;
+        }
+    }
+
+    const visibilityMenuDoubleClickHandler = (checked) => {
+        if (checked) {
+            setShowHidden(false);
+            setShowMore(false);
+        } else {
+            setShowHidden(true);
+        }
+    }
+
     function getFilteredCells() {
         let updatedCells = cloneDeep(headCells);
-        if (showHidden) {
+        if (!showHidden && !showAll) {
             updatedCells = updatedCells.filter(cell => !cell.hide);
         }
-        if (!showMore) {
+        if (!showMore && !moreAll) {
             updatedCells = updatedCells.filter(cell => !cell.showLess);
         }
         updatedCells = updatedCells.filter(cell => commonKeys.filter(c => c.key === cell.key && c.sourceIndex === cell.sourceIndex).length === 0)
@@ -408,15 +458,16 @@ function AbbreviatedFilterWidget(props) {
             })}
         </>
     )
-
+    const visibiltyColor = showMore ? 'info' : showHidden ? 'success' : 'inherit';
     const visibilityMenu = (
         <>
             <Icon
                 className={classes.icon}
                 name='Visibility'
                 title='Visibility'
-                onClick={onVisibilityMenuOpen}>
-                <Visibility fontSize='small' />
+                onClick={() => visibilityMenuClickHandler(showMore || showHidden)}
+                onDoubleClick={() => visibilityMenuDoubleClickHandler(showMore || showHidden)}>
+                <Visibility fontSize='small' color={visibiltyColor} />
             </Icon>
             <Popover
                 id={`${props.name}_visibility_menu`}
@@ -472,20 +523,34 @@ function AbbreviatedFilterWidget(props) {
                 anchorEl={settingsArchorEl}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
                 onClose={onSettingsClose}>
-                {/* <MenuItem dense={true}>
+                <MenuItem dense={true}>
                     <FormControlLabel
                         sx={{ display: 'flex', flex: 1 }}
                         size='small'
-                        label='Select All / Unselect All'
                         control={
-                            <Checkbox
+                            <ValueBasedToggleButton
+                                name='HideShowAll'
                                 size='small'
-                                checked={selectAll}
-                                onChange={onSelectAll}
+                                selected={showAll}
+                                value={showAll}
+                                caption={showAll ? 'Show Default' : 'Show All'}
+                                xpath='HideShowAll'
+                                color={showAll ? 'debug' : 'success'}
+                                onClick={showAllHandler}
                             />
                         }
                     />
-                </MenuItem> */}
+                    <ValueBasedToggleButton
+                        name='MoreLessAll'
+                        size='small'
+                        selected={moreAll}
+                        value={moreAll}
+                        caption={moreAll ? 'More Default' : 'More All'}
+                        xpath='MoreLessAll'
+                        color={moreAll ? 'debug' : 'info'}
+                        onClick={moreAllHandler}
+                    />
+                </MenuItem>
                 {headCells.map((cell, index) => {
                     if (cell.sourceIndex !== 0) return;
                     let sequence = cell.sequenceNumber;
@@ -500,7 +565,7 @@ function AbbreviatedFilterWidget(props) {
                     const showColor = show ? 'success' : 'debug';
                     const more = !cell.showLess;
                     const moreDisabled = cell.hide;
-                    const moreCaption = more ? 'Show Less' : 'Show More';
+                    const moreCaption = more ? 'Less' : 'More';
                     const moreColor = more ? 'info' : 'debug';
                     return (
                         <MenuItem key={cell.key} dense={true}>
@@ -653,7 +718,7 @@ function AbbreviatedFilterWidget(props) {
                                                                     {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
                                                                 </TableCell> */}
                                                                 {filteredHeadCells.map((cell, i) => {
-                                                                    if (cell.hide) return;
+                                                                    // if (cell.hide) return;
                                                                     let cellRow = row[cell.sourceIndex];
                                                                     if (cellRow) {
                                                                         Object.keys(props.itemsMetadataDict).map((source) => {

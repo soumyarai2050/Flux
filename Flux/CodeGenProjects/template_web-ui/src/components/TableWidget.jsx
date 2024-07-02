@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, Fragment, memo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Fragment, memo } from 'react';
 import _, { cloneDeep } from 'lodash';
 import {
     TableContainer, Table, TableBody, DialogTitle, DialogContent, DialogContentText,
@@ -40,19 +40,23 @@ const TableWidget = (props) => {
     const [page, setPage] = useState(PageCache.getPage(props.name));
     const [sortOrders, setSortOrders] = useState(props.sortOrders ? props.sortOrders : []);
     const [openModalPopup, setOpenModalPopup] = useState(false);
-    const [selectAll, setSelectAll] = useState(false);
+    // const [selectAll, setSelectAll] = useState(false);
     const [toastMessage, setToastMessage] = useState(null);
     const [clipboardText, setClipboardText] = useState(null);
     const [userChanges, setUserChanges] = useState({});
     const [openVisibilityMenu, setOpenVisibilityMenu] = useState(false);
     const [showMore, setShowMore] = useState(false);
     const [visibilityMenuArchorEl, setVisibilityMenuAnchorEl] = useState();
+    const [showAll, setShowAll] = useState(false);
+    const [moreAll, setMoreAll] = useState(false);
+    const visibilityMenuClickTimeout = useRef(null);
 
     useEffect(() => {
         setData(props.data);
         setRows(props.rows);
         setHeadCells(props.tableColumns);
-        setCommonkeys(props.commonKeyCollections);
+        // creates column flickering if enabled
+        // setCommonkeys(props.commonKeyCollections);
     }, [props.data, props.rows]);
 
     useEffect(() => {
@@ -69,9 +73,9 @@ const TableWidget = (props) => {
     }, [props.sortOrders])
 
     useEffect(() => {
-        let commonKeyCollections = getCommonKeyCollections(rows, headCells, hide, false, props.widgetType === 'repeatedRoot' ? true : false);
+        let commonKeyCollections = getCommonKeyCollections(rows, headCells, hide && !showAll, false, props.widgetType === 'repeatedRoot' ? true : false, !showMore && !moreAll);
         setCommonkeys(commonKeyCollections);
-    }, [rows, headCells, props.mode, hide])
+    }, [rows, headCells, props.mode, hide, showMore, showAll, moreAll])
 
     useEffect(() => {
         if (rows.length === 0) {
@@ -92,10 +96,10 @@ const TableWidget = (props) => {
 
     function getFilteredCells() {
         let updatedCells = cloneDeep(headCells);
-        if (hide) {
+        if (hide && !showAll) {
             updatedCells = updatedCells.filter(cell => !cell.hide);
         }
-        if (!showMore) {
+        if (!showMore && !moreAll) {
             updatedCells = updatedCells.filter(cell => !cell.showLess);
         }
         updatedCells = updatedCells.filter(cell => {
@@ -121,21 +125,29 @@ const TableWidget = (props) => {
         PageCache.setPage(props.name, 0);
     };
 
-    const onSelectAll = (e) => {
-        let updatedHeadCells = cloneDeep(headCells);
-        if (e.target.checked) {
-            updatedHeadCells = updatedHeadCells.map(cell => {
-                cell.hide = false;
-                return cell;
-            })
-        } else {
-            updatedHeadCells = updatedHeadCells.map(cell => {
-                cell.hide = true;
-                return cell;
-            })
-        }
-        setSelectAll(e.target.checked);
-        setHeadCells(updatedHeadCells);
+    // const onSelectAll = (e) => {
+    //     let updatedHeadCells = cloneDeep(headCells);
+    //     if (e.target.checked) {
+    //         updatedHeadCells = updatedHeadCells.map(cell => {
+    //             cell.hide = false;
+    //             return cell;
+    //         })
+    //     } else {
+    //         updatedHeadCells = updatedHeadCells.map(cell => {
+    //             cell.hide = true;
+    //             return cell;
+    //         })
+    //     }
+    //     setSelectAll(e.target.checked);
+    //     setHeadCells(updatedHeadCells);
+    // }
+
+    const showAllHandler = (e, action, key, value, dataSourceId, source) => {
+        setShowAll(!value);
+    }
+
+    const moreAllHandler = (e, action, key, value, dataSourceId, source) => {
+        setMoreAll(!value);
     }
 
     const handleRequestSort = (event, property, retainSortLevel = false) => {
@@ -309,7 +321,8 @@ const TableWidget = (props) => {
         // let hide = !e.target.checked;
         let hide = value;
         if (hide) {
-            setSelectAll(false);
+            // setSelectAll(false);
+            setShowAll(false);
         }
         let updatedHeadCells = headCells.map((cell) => cell.tableTitle === key ? { ...cell, hide: hide } : cell)
         setHeadCells(updatedHeadCells);
@@ -342,9 +355,9 @@ const TableWidget = (props) => {
 
     const onShowLessChange = (e, action, key, value, dataSourceId, source) => {
         let less = value;
-        let updatedHeadCells = headCells.map(cell => cell.key === key ? { ...cell, showLess: less } : cell)
+        let updatedHeadCells = headCells.map(cell => cell.tableTitle === key ? { ...cell, showLess: less } : cell)
         setHeadCells(updatedHeadCells);
-        let collection = props.collections.filter(c => c.key === key)[0];
+        let collection = props.collections.filter(c => c.tableTitle === key)[0];
         const showLessArray = cloneDeep(props.showLess);
         if (less) {
             if (collection.showLess !== less) {
@@ -502,10 +515,16 @@ const TableWidget = (props) => {
         writeFileXLSX(wb, `${props.name}.xlsx`);
     }, [props.collections, props.name, props.xpath])
 
-    const copyColumnHandler = useCallback((xpath) => {
+    const copyColumnHandler = useCallback((cell) => {
+        let sourceIndex = cell.sourceIndex;
+        const xpath = cell.tableTitle;
+        if (sourceIndex === null || sourceIndex === undefined) {
+            sourceIndex = 0;
+        }
         let columnName = xpath.split('.').pop();
         let values = [columnName];
-        rows.map(row => {
+        rows.map(r => {
+            const row = r[sourceIndex];
             values.push(row[xpath]);
         })
         const text = values.join('\n');
@@ -547,16 +566,50 @@ const TableWidget = (props) => {
         setVisibilityMenuAnchorEl(null);
     }
 
+    const visibilityMenuClickHandler = (checked) => {
+        if (visibilityMenuClickTimeout.current !== null) {
+            // double click event
+            clearTimeout(visibilityMenuClickTimeout.current);
+            visibilityMenuClickTimeout.current = null;
+        } else {
+            // single click event
+            const timeout = setTimeout(() => {
+                if (visibilityMenuClickTimeout.current !== null) {
+                    if (checked) {
+                        setHide(true);
+                        setShowMore(false);
+                    } else {
+                        setShowMore(true);
+                    }
+                    clearTimeout(visibilityMenuClickTimeout.current)
+                    visibilityMenuClickTimeout.current = null;
+                }
+            }, 300);
+            visibilityMenuClickTimeout.current = timeout;
+        }
+    }
+
+    const visibilityMenuDoubleClickHandler = (checked) => {
+        if (checked) {
+            setHide(true);
+            setShowMore(false);
+        } else {
+            setHide(false);
+        }
+    }
+
     const maxSequence = Math.max(...headCells.map(cell => cell.sequenceNumber));
 
+    const visibiltyColor = showMore ? 'info' : !hide ? 'success' : 'inherit';
     const visibilityMenu = (
         <>
             <Icon
                 className={classes.icon}
                 name='Visibility'
                 title='Visibility'
-                onClick={onVisibilityMenuOpen}>
-                <Visibility fontSize='small' />
+                onClick={() => visibilityMenuClickHandler(showMore || !hide)}
+                onDoubleClick={() => visibilityMenuDoubleClickHandler(showMore || !hide)}>
+                <Visibility fontSize='small' color={visibiltyColor} />
             </Icon>
             <Popover
                 id={`${props.name}_visibility_menu`}
@@ -609,23 +662,34 @@ const TableWidget = (props) => {
                 anchorEl={settingsArchorEl}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
                 onClose={onSettingsClose}>
-                {/* <MenuItem dense={true}>
+                <MenuItem dense={true}>
                     <FormControlLabel
                         sx={{ display: 'flex', flex: 1 }}
                         size='small'
-                        label='Select All / Unselect All'
                         control={
-                            <Checkbox
+                            <ValueBasedToggleButton
+                                name='HideShowAll'
                                 size='small'
-                                checked={selectAll}
-                                onChange={onSelectAll}
+                                selected={showAll}
+                                value={showAll}
+                                caption={showAll ? 'Show Default' : 'Show All'}
+                                xpath='HideShowAll'
+                                color={showAll ? 'debug' : 'success'}
+                                onClick={showAllHandler}
                             />
                         }
                     />
-                    <Icon title='show/hide all fields'>
-                        <Help />
-                    </Icon>
-                </MenuItem> */}
+                    <ValueBasedToggleButton
+                        name='MoreLessAll'
+                        size='small'
+                        selected={moreAll}
+                        value={moreAll}
+                        caption={moreAll ? 'More Default' : 'More All'}
+                        xpath='MoreLessAll'
+                        color={moreAll ? 'debug' : 'info'}
+                        onClick={moreAllHandler}
+                    />
+                </MenuItem>
                 {headCells.map((cell, index) => {
                     if (cell.sourceIndex !== 0) return;
                     let sequence = cell.sequenceNumber;
@@ -640,7 +704,7 @@ const TableWidget = (props) => {
                     const showColor = show ? 'success' : 'debug';
                     const more = !cell.showLess;
                     const moreDisabled = cell.hide;
-                    const moreCaption = more ? 'Show Less' : 'Show More';
+                    const moreCaption = more ? 'Less' : 'More';
                     const moreColor = more ? 'info' : 'debug';
                     return (
                         <MenuItem key={index} dense={true}>

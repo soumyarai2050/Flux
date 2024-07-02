@@ -46,7 +46,7 @@ const CustomHeadCell = (props) => {
                 {emptyPrefixCells}
                 {props.headCells.map((cell, index) => {
                     // don't add cells which starts with xpath or cells that are hidden
-                    if (cell.key.startsWith('xpath_') || cell.hide) {
+                    if (cell.key.startsWith('xpath_')) {
                         return;
                     }
                     // if (cell.showLess) return;
@@ -67,7 +67,7 @@ const CustomHeadCell = (props) => {
                             sortDirection={sortOrder ? sortOrder.sort_type : false}>
                             {props.copyColumnHandler && (
                                 <Tooltip title="Click to copy column" disableInteractive>
-                                    <IconButton className={classes.icon} size='small' onClick={() => props.copyColumnHandler(cellKey)}>
+                                    <IconButton className={classes.icon} size='small' onClick={() => props.copyColumnHandler(cell)}>
                                         <ContentCopy fontSize='small' />
                                     </IconButton>
                                 </Tooltip>
