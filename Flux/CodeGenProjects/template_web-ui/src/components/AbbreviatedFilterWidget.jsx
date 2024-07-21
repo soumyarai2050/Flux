@@ -86,7 +86,7 @@ function AbbreviatedFilterWidget(props) {
                 sortOrders,
                 filters: props.filters,
                 joinBy: props.joinBy,
-                joinSortOrders: props.joinSortOrders
+                joinSort: props.joinSort
             });
         }
     }, [items, props.modifiedItemsMetadataDict, page, rowsPerPage, sortOrders, props.filters, props.joinBy])
@@ -244,7 +244,7 @@ function AbbreviatedFilterWidget(props) {
         }
         let updatedHeadCells = headCells.map(cell => cell.key === key ? { ...cell, hide: hide } : cell)
         setHeadCells(updatedHeadCells);
-        let collection = props.collections.filter(c => c.key === key)[0];
+        let collection = props.collections.find(c => c.key === key);
         let enableOverride = cloneDeep(props.enableOverride);
         let disableOverride = cloneDeep(props.disableOverride);
         if (hide) {
@@ -275,7 +275,7 @@ function AbbreviatedFilterWidget(props) {
         let less = value;
         let updatedHeadCells = headCells.map(cell => cell.key === key ? { ...cell, showLess: less } : cell)
         setHeadCells(updatedHeadCells);
-        let collection = props.collections.filter(c => c.key === key)[0];
+        let collection = props.collections.find(c => c.key === key);
         const showLessArray = cloneDeep(props.showLess);
         if (less) {
             if (collection.showLess !== less) {

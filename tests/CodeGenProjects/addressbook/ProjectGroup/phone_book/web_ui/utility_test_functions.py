@@ -1059,7 +1059,7 @@ def flux_fld_default_widget(schema_dict: Dict, widget: WebElement, widget_type: 
                             layout: Layout, field_query):
     field_name: str = field_query.field_name
     default_value: str = field_query.properties['default']
-    if (field_name != "bkr_disable" and field_name != "pos_disable" and field_name != "sec_type" and
+    if (field_name != "bkr_disable" and field_name != "pos_disable" and field_name != "sec_id_source" and
             field_name != "dismiss" and field_name != "kill_switch" and field_name != "strat_state" and
             field_name != "exch_response_max_seconds" and field_name != "priority"):
         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=widget_type,
@@ -1215,7 +1215,7 @@ def flux_fld_title_in_widgets(result: List[WidgetQuery], widget_type: WidgetType
                 else:
                     field_title = field_query.properties["title"].replace(" ", "_")
                 print(field_title)
-                if (field_name != "exch_id" and field_name != "sec_id" and field_name != "sec_type" and
+                if (field_name != "exch_id" and field_name != "sec_id" and field_name != "sec_id_source" and
                         field_name != "company"):
                     assert field_title in common_key_list
 

@@ -25,8 +25,8 @@ def static_data_(cb_eqt_security_records_):
 @pytest.fixture()
 def pair_securities_with_sides_():
     yield {
-        "security1": {"sec_id": "CB_Sec_1", "sec_type": "TICKER"}, "side1": "BUY",
-        "security2": {"sec_id": "EQT_Sec_1", "sec_type": "TICKER"}, "side2": "SELL"
+        "security1": {"sec_id": "CB_Sec_1", "sec_id_source": "TICKER"}, "side1": "BUY",
+        "security2": {"sec_id": "EQT_Sec_1", "sec_id_source": "TICKER"}, "side2": "SELL"
     }
 
 
@@ -253,7 +253,7 @@ def expected_brokers_(leg1_leg2_symbol_list) -> List[BrokerOptional]:
     sec_positions: List[SecPositionOptional] = []
     for buy_symbol, sell_symbol in leg1_leg2_symbol_list:
         cb_sec_position: SecPositionOptional = (
-            SecPositionOptional(security=SecurityOptional(sec_id=buy_symbol, sec_type=SecurityType.SEDOL)))
+            SecPositionOptional(security=SecurityOptional(sec_id=buy_symbol, sec_id_source=SecurityIdSource.SEDOL)))
         cb_positions: List[PositionOptional] = [PositionOptional(type=PositionType.SOD, priority=0,
                                                                  available_size=10_000, allocated_size=10_000,
                                                                  consumed_size=0,
@@ -261,7 +261,7 @@ def expected_brokers_(leg1_leg2_symbol_list) -> List[BrokerOptional]:
         cb_sec_position.positions = cb_positions
         sec_positions.append(cb_sec_position)
         eqt_sec_position: SecPositionOptional = (
-            SecPositionOptional(security=SecurityOptional(sec_id=f"{sell_symbol}.SS", sec_type=SecurityType.RIC)))
+            SecPositionOptional(security=SecurityOptional(sec_id=f"{sell_symbol}.SS", sec_id_source=SecurityIdSource.RIC)))
         eqt_positions: List[PositionOptional] = [
             PositionOptional(type=PositionType.SOD, priority=0, available_size=10_000, allocated_size=10_000,
                              consumed_size=0, pos_disable=False, premium_percentage=2),

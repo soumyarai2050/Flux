@@ -19,42 +19,30 @@ namespace FluxCppCore {
     }
 
     void inline get_trade_symbols_from_config(std::vector<std::string> &r_symbols_out) {
-            std::string config_file_name = "trade_symbols.yaml";
-            auto root_dir = std::filesystem::current_path().parent_path().parent_path().parent_path();
-            std::filesystem::current_path(root_dir);
-            auto config_dir_path = std::filesystem::current_path() / "ProjectGroup" / "market_data" / "data";
-            if (std::filesystem::exists(config_dir_path)) {
-                std::filesystem::current_path(config_dir_path);
-                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
-                r_symbols_out = config[market_data_handler::symbol_fld_name].as<std::vector<std::string>>();
-            } else {
-                root_dir = std::filesystem::current_path().parent_path().parent_path();
-                std::filesystem::current_path(root_dir);
-                config_dir_path = std::filesystem::current_path() / "TradeEngine" /  "ProjectGroup" / "market_data" / "data";
-                std::filesystem::current_path(config_dir_path);
-                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
-                r_symbols_out = config[market_data_handler::symbol_fld_name].as<std::vector<std::string>>();
+            const char* config_file = getenv("CONFIG_FILE");
+            if (!config_file) {
+                throw std::runtime_error("export env variable {CONFIG_FILE}");
             }
+            if (access(config_file, F_OK) != 0) {
+                throw std::runtime_error(std::format("{} not accessable", config_file));
+            }
+
+            YAML::Node config = YAML::LoadFile(config_file);
+            r_symbols_out = config[market_data_handler::symbol_fld_name].as<std::vector<std::string>>();
+
         }
 
         int8_t inline get_market_depth_levels_from_config() {
-            std::string config_file_name = "config.yaml";
+            const char* config_file = getenv("CONFIG_FILE");
             int8_t market_depth_levels{0};
-            auto root_dir = std::filesystem::current_path().parent_path().parent_path().parent_path();
-            std::filesystem::current_path(root_dir);
-            auto config_dir_path = std::filesystem::current_path() / "ProjectGroup" / "strat_executor" / "data";
-            if (std::filesystem::exists(config_dir_path)) {
-                std::filesystem::current_path(config_dir_path);
-                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
-                market_depth_levels = config["market_depth_levels"].as<int8_t>();
-            } else {
-                root_dir = std::filesystem::current_path().parent_path().parent_path();
-                std::filesystem::current_path(root_dir);
-                config_dir_path = std::filesystem::current_path()  / "TradeEngine" / "ProjectGroup" / "strat_executor" / "data";
-                std::filesystem::current_path(config_dir_path);
-                YAML::Node config = YAML::LoadFile(std::filesystem::current_path() / config_file_name);
-                market_depth_levels =  config["market_depth_levels"].as<int8_t>();
+            if (!config_file) {
+                throw std::runtime_error("export env variable {CONFIG_FILE}");
             }
+            if (access(config_file, F_OK) != 0) {
+                throw std::runtime_error(std::format("{} not accessable", config_file));
+            }
+            YAML::Node config = YAML::LoadFile(config_file);
+            market_depth_levels = config["market_depth_levels"].as<int8_t>();
             return market_depth_levels;
         }
 
@@ -70,10 +58,15 @@ namespace FluxCppCore {
     };
 
     enum class CacheOperationResult {
-        SUSSESS_DB_N_CACHE_UPDATE = 1,
-        LOCK_NOT_FOUND = 2,
-        DB_N_CACHE_UPDATE_FAILED = 3,
+        SUCCESS_DB_AND_CACHE_UPDATE = 0,
+        LOCK_NOT_FOUND,
+        DB_AND_CACHE_UPDATE_FAILED,
+        ERROR_SYMBOL_NOT_FOUND,
+        RECEIVED_OLD_TIMESTAMP,
+        MUTEX_NOT_AVAILABLE_FOR_LOCK,
+        MUTEX_NOT_AVAILABLE
     };
+
 
 
     struct MessageTypeToPythonArgs {
@@ -157,7 +150,7 @@ namespace FluxCppCore {
             std::string last_update_date_time = format_time(kr_top_of_book_obj.last_update_date_time());
             if (kr_top_of_book_obj.has_bid_quote()) {
                 std::string bid_quote_last_update_date_time = format_time(kr_top_of_book_obj.bid_quote().last_update_date_time());
-                LOG_INFO(GetLogger(), "Bid Quote: {}, total_trading_security_size: {}",
+                LOG_INFO_IMPL(GetLogger(), "Bid Quote: {}, total_trading_security_size: {}",
                     kr_top_of_book_obj.bid_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
                 p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
                             PyUnicode_DecodeUTF8(kr_top_of_book_obj.symbol().c_str(),
@@ -179,7 +172,7 @@ namespace FluxCppCore {
 
             if (kr_top_of_book_obj.has_ask_quote()) {
                 std::string ask_quote_last_update_date_time = format_time(kr_top_of_book_obj.ask_quote().last_update_date_time());
-                LOG_INFO(GetLogger(), "Ask Quote: {}, total_trading_security_size: {}",
+                LOG_INFO_IMPL(GetLogger(), "Ask Quote: {}, total_trading_security_size: {}",
                     kr_top_of_book_obj.ask_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
                 p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
                             PyUnicode_DecodeUTF8(kr_top_of_book_obj.symbol().c_str(),
@@ -202,7 +195,7 @@ namespace FluxCppCore {
 
             if (kr_top_of_book_obj.has_last_trade()) {
                 std::string last_trade_last_update_date_time = format_time(kr_top_of_book_obj.last_trade().last_update_date_time());
-                LOG_INFO(GetLogger(), "Last Trade: {}, total_trading_security_size: {}",
+                LOG_INFO_IMPL(GetLogger(), "Last Trade: {}, total_trading_security_size: {}",
                     kr_top_of_book_obj.ask_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
                 p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
                             PyUnicode_DecodeUTF8(kr_top_of_book_obj.symbol().c_str(),

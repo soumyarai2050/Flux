@@ -135,6 +135,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     underlying_read_strat_limits_http: Callable[..., Any] | None = None
     underlying_delete_strat_status_http: Callable[..., Any] | None = None
     underlying_barter_simulator_place_cxl_chore_query_http: Callable[..., Any] | None = None
+    underlying_create_chore_journal_http: Callable[..., Any] | None = None
+    underlying_create_fills_journal_http: Callable[..., Any] | None = None
 
     @classmethod
     def initialize_underlying_http_routes(cls):
@@ -154,11 +156,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             underlying_partial_update_strat_status_http, underlying_get_open_chore_count_query_http,
             underlying_partial_update_strat_brief_http, underlying_delete_symbol_side_snapshot_http,
             get_symbol_side_underlying_account_cumulative_fill_qty_query_http, underlying_read_fills_journal_http,
-            underlying_read_last_barter_http,
+            underlying_read_last_barter_http, underlying_create_chore_journal_http,
             underlying_delete_strat_brief_http, underlying_read_market_depth_http, underlying_read_strat_status_http,
             underlying_read_strat_status_by_id_http, underlying_read_cancel_chore_http,
             underlying_read_strat_limits_http, underlying_delete_strat_status_http,
-            underlying_barter_simulator_place_cxl_chore_query_http)
+            underlying_barter_simulator_place_cxl_chore_query_http, underlying_create_fills_journal_http)
 
         cls.residual_compute_shared_lock = residual_compute_shared_lock
         cls.journal_shared_lock = journal_shared_lock
@@ -204,6 +206,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         cls.underlying_delete_strat_status_http = underlying_delete_strat_status_http
         cls.underlying_barter_simulator_place_cxl_chore_query_http = (
             underlying_barter_simulator_place_cxl_chore_query_http)
+        cls.underlying_create_chore_journal_http = underlying_create_chore_journal_http
+        cls.underlying_create_fills_journal_http = underlying_create_fills_journal_http
 
     def __init__(self):
         super().__init__()
@@ -384,6 +388,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             BarteringLinkBase.simulate_config_yaml_path = self.simulate_config_yaml_file_path
                             BarteringLinkBase.executor_port = self.port
                             BarteringLinkBase.reload_executor_configs()
+                            BarteringLinkBase.chore_create_async_callable = StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_journal_http
+                            BarteringLinkBase.fill_create_async_callable = StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_fills_journal_http
 
                             # setting partial_run to True and assigning port to pair_strat
                             if not pair_strat.is_partially_running:
@@ -600,9 +606,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         subscription_data = \
             [
                 (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
-                 str(pair_strat.pair_strat_params.strat_leg1.sec.sec_type)),
+                 str(pair_strat.pair_strat_params.strat_leg1.sec.sec_id_source)),
                 (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
-                 str(pair_strat.pair_strat_params.strat_leg2.sec.sec_type))
+                 str(pair_strat.pair_strat_params.strat_leg2.sec.sec_id_source))
             ]
         db_name = os.environ["DB_NAME"]
         exch_code = "SS" if pair_strat.pair_strat_params.strat_leg1.exch_id == "SSE" else "SZ"
@@ -1341,14 +1347,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             # therefore avoiding portfolio_limit checks too
 
     async def create_chore_snapshot_pre(self, chore_snapshot_obj: ChoreSnapshot):
-        # updating security's sec_type to default value if sec_type is None
-        if chore_snapshot_obj.chore_brief.security.sec_type is None:
-            chore_snapshot_obj.chore_brief.security.sec_type = SecurityType.TICKER
+        # updating security's sec_id_source to default value if sec_id_source is None
+        if chore_snapshot_obj.chore_brief.security.sec_id_source is None:
+            chore_snapshot_obj.chore_brief.security.sec_id_source = SecurityIdSource.TICKER
 
     async def create_symbol_side_snapshot_pre(self, symbol_side_snapshot_obj: SymbolSideSnapshot):
-        # updating security's sec_type to default value if sec_type is None
-        if symbol_side_snapshot_obj.security.sec_type is None:
-            symbol_side_snapshot_obj.security.sec_type = SecurityType.TICKER
+        # updating security's sec_id_source to default value if sec_id_source is None
+        if symbol_side_snapshot_obj.security.sec_id_source is None:
+            symbol_side_snapshot_obj.security.sec_id_source = SecurityIdSource.TICKER
 
     @staticmethod
     def is_cxled_event(event: ChoreEventType) -> bool:

@@ -11,10 +11,14 @@ import _, { cloneDeep } from 'lodash';
 import classes from './CommonKeyWidget.module.css';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import { useTheme } from '@emotion/react';
 import CopyToClipboard from './CopyToClipboard';
 import { ContentCopy } from '@mui/icons-material';
 dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const CommonKeyWidget = React.forwardRef((props, ref) => {
     // filter unset or null values from common keys
@@ -151,8 +155,13 @@ const CommonKey = (props) => {
         if (collection.displayType === DataTypes.INTEGER) {
             value = floatToInt(value);
         }
-    } else if (collection.type === DataTypes.DATE_TIME && props.truncateDateTime && value) {
-        value = dayjs.utc(value).format('YYYY-MM-DD HH:mm');
+    } else if (collection.type === DataTypes.DATE_TIME && value) {
+        const localDateTime = dayjs.utc(value).tz(localTimezone);
+        if (collection.displayType === 'datetime') {
+            value = localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
+        } else {
+            value = localDateTime.isSame(dayjs(), 'day') ? localDateTime.format('HH:mm:ss.SSS') : localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
+        }
     } else {
         value = String(value);
     }

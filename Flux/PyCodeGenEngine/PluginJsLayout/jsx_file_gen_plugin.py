@@ -986,7 +986,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    joinBy={joinBy}\n"
         output_str += "                    centerJoin={centerJoin}\n"
         output_str += "                    flip={flip}\n"
-        output_str += "                    joinSortOrders={joinSortOrders}\n"
+        output_str += "                    joinSort={joinSort}\n"
         output_str += "                    showLess={showLess}\n"
         output_str += "                    onShowLessChange={onShowLessChange}\n"
         output_str += "                    dataSourceColors={dataSourceColors}\n"
@@ -1207,16 +1207,17 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const flip = widgetOption.flip;\n"
         output_str += "    const columnOrders = widgetOption.column_orders;\n"
         output_str += "    const sortOrders = widgetOption.sort_orders;\n"
-        output_str += "    const joinSortOrders = currentSchema.widget_ui_data_element.join_sort_orders;\n"
+        output_str += "    const joinSort = currentSchema.widget_ui_data_element.join_sort;\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "    let groupedRows = getGroupedTableRows(rows, joinBy, joinSortOrders);\n"
+            output_str += "    let groupedRows = getGroupedTableRows(rows, joinBy, joinSort);\n"
         elif layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type:
             output_str += "    let groupedRows = getGroupedTableRows(rows, []);\n"
         # else not required
         output_str += "    const showLess = widgetOption.show_less ? widgetOption.show_less : [];\n"
         output_str += "    const dataSourceColors = widgetOption.data_source_colors ? widgetOption.data_source_colors : [];\n"
         output_str += "    const truncateDateTime = widgetOption.hasOwnProperty('truncate_date_time') ? " \
-                      "widgetOption.truncate_date_time : false;\n\n"
+                      "widgetOption.truncate_date_time : false;\n"
+        output_str += "    const isReadOnly = currentSchema.widget_ui_data_element.is_read_only;\n\n"
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             dependent_message = self.abbreviated_dependent_message_name
             dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
@@ -2187,15 +2188,19 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == JsxFileGenPlugin.root_type or \
                 layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "    const onChangeMode = () => {\n"
+            output_str += "        if (!isReadOnly) {\n"
             if layout_type == JsxFileGenPlugin.root_type:
-                output_str += "        setMode(Modes.EDIT_MODE);\n"
+                output_str += "            setMode(Modes.EDIT_MODE);\n"
             else:
-                output_str += "        dispatch(setMode(Modes.EDIT_MODE));\n"
+                output_str += "            dispatch(setMode(Modes.EDIT_MODE));\n"
+            output_str += "        }\n"
             output_str += "    }\n\n"
 
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "    const onChangeMode = () => {\n"
-            output_str += "        setMode(Modes.EDIT_MODE);\n"
+            output_str += "        if (!isReadOnly) {\n"
+            output_str += "            setMode(Modes.EDIT_MODE);\n"
+            output_str += "        }\n"
             output_str += "    }\n\n"
         output_str += "    const onSave = (e, modifiedObj = null, source = null, forceSave = false) => {\n"
         output_str += "        /* if save event is triggered from button (openPopup is true), " \

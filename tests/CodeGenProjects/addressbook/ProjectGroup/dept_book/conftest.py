@@ -23,7 +23,7 @@ def dash_():
             "leg1": {
                 "sec": {
                     "sec_id": "CB_Sec_1",
-                    "sec_type": "TICKER"
+                    "sec_id_source": "TICKER"
                 },
                 "exch_id": "EXCH1",
                 "vwap": 150,
@@ -32,7 +32,7 @@ def dash_():
             "leg2": {
                 "sec": {
                     "sec_id": "EQT_Sec_1",
-                    "sec_type": "TICKER"
+                    "sec_id_source": "TICKER"
                 },
                 "exch_id": "EXCH2",
                 "vwap": 10,

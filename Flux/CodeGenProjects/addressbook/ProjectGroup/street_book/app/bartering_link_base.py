@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import abstractmethod, ABC
-from typing import List, ClassVar, final, Dict, Final
+from typing import List, ClassVar, final, Dict, Final, Callable, Any
 from pendulum import DateTime
 import os
 
@@ -28,6 +28,8 @@ class BarteringLinkBase(ABC):
     simulate_config_yaml_path: str | None = None    # must be set before StreetBook is provided to BarteringDataManager
     simulate_config_dict: Dict | None = None    # must be set before StreetBook is provided to BarteringDataManager
     executor_port: int | None = None    # must be set before StreetBook is provided to BarteringDataManager
+    chore_create_async_callable: Callable[..., Any] | None = None
+    fill_create_async_callable: Callable[..., Any] | None = None
     executor_host = host
     pair_strat_config_dict = pair_strat_config_yaml_dict
     pair_strat_web_client: ClassVar[EmailBookServiceHttpClient] = email_book_service_http_client

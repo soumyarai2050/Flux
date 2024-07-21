@@ -117,7 +117,7 @@ def chore_snapshot_fixture_list():
                         "chore_id": f"Chore_{id_counter}",
                         "security": {
                             "sec_id": symbol,
-                            "sec_type": SecurityType.RIC
+                            "sec_id_source": SecurityIdSource.RIC
                         },
                         "side": Side.BUY,
                         "px": 120.5,
@@ -157,7 +157,7 @@ def chore_journal_fixture_list():
                     id=id_counter,
                     chore=ChoreBrief(
                         chore_id=f"Chore_{id_counter}",
-                        security=Security(sec_id=symbol, sec_type=SecurityType.RIC),
+                        security=Security(sec_id=symbol, sec_id_source=SecurityIdSource.RIC),
                         side=Side.BUY,
                         px=120.5 + id_counter,
                         qty=100 + id_counter,
@@ -263,13 +263,13 @@ def db_names_list(buy_sell_symbol_list):
 def expected_brokers_(buy_sell_symbol_list) -> List[Broker]:
     sec_positions: List[SecPosition] = []
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
-        cb_sec_position: SecPosition = SecPosition(security=Security(sec_id=buy_symbol, sec_type=SecurityType.SEDOL))
+        cb_sec_position: SecPosition = SecPosition(security=Security(sec_id=buy_symbol, sec_id_source=SecurityIdSource.SEDOL))
         cb_positions: List[Position] = [Position(type=PositionType.SOD, priority=0, available_size=10_000,
                                                  allocated_size=10_000, consumed_size=0)]
         cb_sec_position.positions = cb_positions
         sec_positions.append(cb_sec_position)
         eqt_sec_position: SecPosition = SecPosition(security=Security(sec_id=f"{sell_symbol}.SS",
-                                                                      sec_type=SecurityType.RIC))
+                                                                      sec_id_source=SecurityIdSource.RIC))
         eqt_positions: List[Position] = [
             Position(type=PositionType.SOD, priority=0, available_size=10_000, allocated_size=10_000, consumed_size=0),
             Position(type=PositionType.LOCATE, priority=1, available_size=10_000, allocated_size=10_000,

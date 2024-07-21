@@ -58,7 +58,7 @@ namespace mobile_book_handler {
                     time_el_.push_back(elapsed_time_ms);
                     if (time_el_.size() == 20) {
                         auto sum = std::accumulate(time_el_.begin(), time_el_.end(), 0);
-                        LOG_INFO(m_p_logger_, "Sum of total time: {}", sum);
+                        LOG_INFO_IMPL(m_p_logger_, "Sum of total time: {}", sum);
                     }
                     ++market_depth_index;
                     market_depth.Clear();

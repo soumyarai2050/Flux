@@ -1,0 +1,38 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+import "barter_core.proto";
+
+enum ChoreSubmitType{
+  ORDER_SUBMIT_UNSPECIFIED = 0;
+  ORDER_SUBMIT_DONE = 1;
+  ORDER_SUBMIT_FAILED = 2;
+}
+
+message NewChore{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: true,
+    IsTopLvlModel: false,
+    ExecutorKeySequence: "security.sec_id-side"
+    IsRepeated: true
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_new_chore_from_cache"
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required Security security = 2;
+  required Side side = 3;
+  optional float px = 4;
+  optional int64 qty = 5;
+  optional ChoreSubmitType chore_submit_state = 6 [(FluxFldServerPopulate) = true];
+  optional string algo = 7;
+  optional float pov = 8; // percentage of volume
+  optional string activate_dt = 9 [(FluxFldValIsDateTime) = true];
+  optional string deactivate_dt = 10 [(FluxFldValIsDateTime) = true];
+}

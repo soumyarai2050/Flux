@@ -1,13 +1,12 @@
 import { getAbbreviatedRows, applyFilter, getActiveRows, getGroupedTableRows } from "../workerUtils";
 
 onmessage = (e) => {
-    const { items, itemsDataDict, itemProps, abbreviation, loadedProps, page, pageSize, sortOrders, filters, joinBy, joinSortOrders } = e.data;
+    const { items, itemsDataDict, itemProps, abbreviation, loadedProps, page, pageSize, sortOrders, filters, joinBy, joinSort } = e.data;
     const rows = getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation, loadedProps);
-    const groupedRows = getGroupedTableRows(rows, joinBy, joinSortOrders);
     const filteredRows = applyFilter(rows, filters);
-    const filteredGroupedRows = applyFilter(groupedRows, filters, true);
-    const activeRows = getActiveRows(filteredGroupedRows, page, pageSize, sortOrders, true);
-    postMessage([filteredRows, filteredGroupedRows, activeRows]);
+    const groupedRows = getGroupedTableRows(filteredRows, joinBy, joinSort);
+    const activeRows = getActiveRows(groupedRows, page, pageSize, sortOrders, true);
+    postMessage([filteredRows, groupedRows, activeRows]);
 }
 
 export { };

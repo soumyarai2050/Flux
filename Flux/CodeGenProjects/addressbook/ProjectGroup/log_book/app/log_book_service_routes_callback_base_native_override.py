@@ -38,6 +38,7 @@ mobile_book_log_dir: PurePath = project_group_path / "mobile_book" / "log"
 street_book_log_dir: PurePath = project_group_path / "street_book" / "log"
 post_barter_log_dir: PurePath = project_group_path / "post_book" / "log"
 photo_book_log_dir: PurePath = project_group_path / "photo_book" / "log"
+basket_book_log_dir: PurePath = project_group_path / "basket_book" / "log"
 
 debug_mode: bool = False if ((debug_env := os.getenv("PS_LOG_ANALYZER_DEBUG")) is None or
                              len(debug_env) == 0 or debug_env == "0") else True
@@ -655,6 +656,17 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 service="photo_book",
                 log_file_path=str(
                     photo_book_log_dir / f"photo_book_logs_{datetime_str}.log"),
+                critical=True,
+                log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern=
+                log_prefix_regex_pattern_to_log_date_time_regex_pattern,
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
+                log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
+                log_file_path_is_regex=False),
+            StratLogDetail(
+                service="basket_book",
+                log_file_path=str(
+                    basket_book_log_dir / f"basket_book_logs_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=

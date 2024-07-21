@@ -7,6 +7,7 @@ import "barter_core.proto";
 import "mobile_book_n_street_book_core.proto";
 import "dept_book_n_mobile_book_n_street_book_core.proto";
 import "street_book_n_post_book_core.proto";
+// import "street_book_service.proto";
 
 package mobile_book;
 
@@ -24,13 +25,23 @@ option (FluxFileImportDependencyModel) = {
   ImportModelName: "LastBarter",
   ImportModelName: "TopOfBookList",
   ImportModelName: "MarketDepthList",
-  ImportModelName: "LastBarterList"
+  ImportModelName: "LastBarterList",
+  ImportModelName: "RawLastBarterHistory",
+  ImportModelName: "RawLastBarterHistoryList"
 };
 
 option (FluxFileImportDependencyModel) = {
     ImportFileName: "street_book_n_post_book_core.proto",
-    ImportModelName: "ChoreJournal"
+    ImportModelName: "ChoreJournal",
+    ImportModelName: "ChoreJournalList",
+
 };
+
+// option (FluxFileImportDependencyModel) = {
+//     ImportFileName: "street_book_service.proto",
+//     ImportModelName: "FillsJournal",
+//    ImportModelName: "FillsJournalList"
+// };
 
 option (FluxFileCRUDPortOffset) = 40;
 
@@ -78,7 +89,7 @@ message TickByTickBBO {
   optional int64 qty = 7;
 }
 
-message MarketBarterVolume{
+message MarketBarterVolume {
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int64 participation_period_last_barter_qty_sum = 2;
   optional int32 applicable_period_seconds = 3 [(FluxFldHelp) = "sliding window interval of above volume, unset value implies seconds from SOD till time current time"];
@@ -124,3 +135,9 @@ message MobileBookBriefList {
 message RawMarketDepthHistoryList {
   repeated RawMarketDepthHistory raw_market_depth_history = 1;
 }
+
+// TODO: Add message
+// FillsJournal
+// ChoreBrief
+// inside Security add InstrumentType
+// ChoreJournal

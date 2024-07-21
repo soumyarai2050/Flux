@@ -548,7 +548,10 @@ class BaseProtoPlugin(ABC):
     def proto_to_py_datatype(self, field: protogen.Field) -> str:
         match field.kind.name.lower():
             case "message":
-                return field.message.proto.name
+                if self.is_bool_option_enabled(field.message, BaseProtoPlugin.flux_msg_json_root):
+                    return f"{field.message.proto.name}BaseModel"
+                else:
+                    return field.message.proto.name
             case "enum":
                 return field.enum.proto.name
             case other:

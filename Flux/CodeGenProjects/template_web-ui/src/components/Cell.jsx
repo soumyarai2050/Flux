@@ -21,10 +21,13 @@ import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import classes from './Cell.module.css';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import CopyToClipboard from './CopyToClipboard';
-import LinkText from './LinkText';
 import AlertBubble from './AlertBubble';
 dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const Cell = (props) => {
     const {
@@ -501,7 +504,7 @@ const Cell = (props) => {
                             error={validationError.current !== null}
                             value={value}
                             required={required}
-                            inputFormat="DD-MM-YYYY HH:mm:ss"
+                            inputFormat="YYYY-MM-DD HH:mm:ss"
                             InputProps={inputProps}
                             onChange={(newValue) => props.onDateTimeChange(dataxpath, xpath, new Date(newValue).toISOString(), dataSourceId, collection.source)}
                             inputProps={{
@@ -836,9 +839,18 @@ const Cell = (props) => {
         value = value.toLocaleString();
     }
     let text, linkText = null;
-    if (collection.type === DataTypes.DATE_TIME && collection.displayType !== 'datetime') {
+    if (collection.type === DataTypes.DATE_TIME) {
         linkText = value;
-        text = linkText ? dayjs.utc(linkText).isSame(dayjs(), 'day') ? dayjs.utc(linkText).format('HH:mm:ss.SSS') : linkText : null;
+        if (!linkText) {
+            text = null;
+        } else {
+            const localDateTime = dayjs.utc(linkText).tz(localTimezone);
+            if (collection.displayType === 'datetime') {
+                text = localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
+            } else {
+                text = localDateTime.isSame(dayjs(), 'day') ? localDateTime.format('HH:mm:ss.SSS') : localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
+            }
+        }
         value = text;
     }
     let dataModified = previousValue !== currentValue;

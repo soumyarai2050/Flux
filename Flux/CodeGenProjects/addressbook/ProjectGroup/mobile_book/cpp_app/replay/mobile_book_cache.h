@@ -25,21 +25,28 @@ namespace mobile_book_handler {
                     PyObject* p_get_mobile_book_container_object =
                         FluxCppCore::AddOrGetContainerObj::get_mobile_book_container_instance(
                             kr_symbol);
-                    assert(p_get_mobile_book_container_object != nullptr);
 
                     if (p_get_mobile_book_container_object == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_symbol);
                         return;
                     }
                     PyObject* p_set_last_barter_last_barter_function =
                         PyObject_GetAttrString(
                             p_get_mobile_book_container_object, mobile_book_handler::set_last_barter_key.c_str());
-                    assert(p_set_last_barter_last_barter_function != nullptr);
+
                     PyObject* p_args = PyTuple_Pack(9, PyLong_FromLong(1),
                         PyUnicode_DecodeUTF8(kr_symbol.c_str(), static_cast<Py_ssize_t>(kr_symbol.size()), nullptr),
                         Py_None, Py_None, Py_None, Py_None, Py_None, Py_None, Py_None);
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_last_barter_last_barter_function, p_args)));
+                    PyObject_CallObject(p_set_last_barter_last_barter_function, p_args);
+                    auto get_last_barter = PyObject_GetAttrString(p_get_mobile_book_container_object,
+                        mobile_book_handler::get_last_barter_key.c_str());
+                    auto last_barter_obj = PyObject_CallObject(get_last_barter, nullptr);
+                    if (last_barter_obj == Py_None) {
+                        std::cout << "Last Barter Cache is none for symbol: " << kr_symbol << "\n";
+                    } else {
+                        std::cout << "Last Barter Cache created for symbol: " << kr_symbol << "\n";
+                    }
                 }
             }
 
@@ -54,7 +61,7 @@ namespace mobile_book_handler {
                             kr_symbol);
 
                     if (p_get_mobile_book_container_object == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_symbol);
                         return nullptr;
                     }
@@ -63,32 +70,42 @@ namespace mobile_book_handler {
                         PyObject_GetAttrString(
                             p_get_mobile_book_container_object, mobile_book_handler::get_last_barter_key.c_str());
                     PyObject* p_last_trde_object = PyObject_CallObject(p_get_last_barter_function, nullptr);
-                    assert(p_last_trde_object != Py_None);
+
+                    if (p_last_trde_object == Py_None) {
+                        auto err = std::format("Failed to reterive last_barter obj from container for symbol: {}", kr_symbol);
+                        LOG_ERROR_IMPL(GetLogger(), "{}", err);
+                        return nullptr;
+                    }
 
                     PyObject* p_last_barter_mutex_func = PyObject_GetAttrString(
                         p_last_trde_object, mobile_book_handler::get_mutex_key.c_str());
-                    PyObject* p_last_barter_mutex = PyObject_CallObject(p_last_barter_mutex_func, nullptr);
-                    void* mutex = PyLong_AsVoidPtr(p_last_barter_mutex);
-                    return mutex;
+                    PyObject* p_last_barter_mutex;
+                    try {
+                        p_last_barter_mutex = PyObject_CallObject(p_last_barter_mutex_func, nullptr);
+                    } catch (std::exception& ex) {
+                        LOG_ERROR_IMPL(GetLogger(), "Filed to reterive mutex obj from container for symbol: {}, "
+                                                    "exception: {}", kr_symbol, ex.what());
+                        return nullptr;
+                    }
+                    return PyLong_AsVoidPtr(p_last_barter_mutex);
                 }
             }
 
-            static void update_last_barter_cache(const mobile_book::LastBarter &kr_last_barter_obj) {
+            static bool update_last_barter_cache(const mobile_book::LastBarter &kr_last_barter_obj) {
                 Py_Initialize();
 
                 {
                     FluxCppCore::PythonGIL gil;
 
                     PyObject* p_args;
-                    LOG_INFO(GetLogger(), "Inside: {}", __func__);
                     PyObject* p_mobile_book_container_instance =
                         FluxCppCore::AddOrGetContainerObj::get_mobile_book_container_instance(
                             kr_last_barter_obj.symbol_n_exch_id().symbol());
 
                     if (p_mobile_book_container_instance == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_last_barter_obj.symbol_n_exch_id().symbol());
-                        return;
+                        return false;
                     }
 
                     PyObject* p_set_last_barter_exch_id = PyObject_GetAttrString(p_mobile_book_container_instance,
@@ -110,11 +127,6 @@ namespace mobile_book_handler {
                     PyObject* p_set_last_barter_market_barter_volume_applicable_period_seconds =
                         PyObject_GetAttrString(p_mobile_book_container_instance,
                             set_last_barter_market_barter_volume_applicable_period_seconds_key.c_str());
-                    assert(p_set_last_barter_exch_id != nullptr && p_set_last_barter_exch_time != nullptr &&
-                        p_set_last_barter_arrival_time != nullptr && p_set_last_barter_px != nullptr &&
-                        p_set_last_barter_qty != nullptr && p_set_last_barter_premium != nullptr &&
-                        p_set_last_barter_market_barter_volume_participation_period_last_barter_qty_sum != nullptr &&
-                        p_set_last_barter_market_barter_volume_applicable_period_seconds != nullptr);
 
                     try {
 
@@ -122,7 +134,7 @@ namespace mobile_book_handler {
                                                                       static_cast<Py_ssize_t>(
                                                                           kr_last_barter_obj.symbol_n_exch_id().exch_id().size()),
                                                                       nullptr));
-                        assert(Py_IsTrue(PyObject_CallObject(p_set_last_barter_exch_id, p_args)));
+                        PyObject_CallObject(p_set_last_barter_exch_id, p_args);
 
 
                         std::string exch_time = FluxCppCore::format_time(kr_last_barter_obj.exch_time());
@@ -130,40 +142,42 @@ namespace mobile_book_handler {
                                                                       static_cast<Py_ssize_t>(
                                                                           exch_time.size()),
                                                                       nullptr));
-                        assert(Py_IsTrue(PyObject_CallObject(p_set_last_barter_exch_time, p_args)));
+                        PyObject_CallObject(p_set_last_barter_exch_time, p_args);
 
                         std::string arrival_time = FluxCppCore::format_time(kr_last_barter_obj.arrival_time());
                         p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(arrival_time.c_str(),
                                                                       static_cast<Py_ssize_t>(
                                                                           arrival_time.size()),
                                                                       nullptr));
-                        assert(Py_IsTrue(PyObject_CallObject(p_set_last_barter_arrival_time, p_args)));
+                        PyObject_CallObject(p_set_last_barter_arrival_time, p_args);
 
                         p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_last_barter_obj.px()));
-                        assert(Py_IsTrue(PyObject_CallObject(p_set_last_barter_px, p_args)));
+                        PyObject_CallObject(p_set_last_barter_px, p_args);
 
                         p_args = PyTuple_Pack(1, PyLong_FromLong(kr_last_barter_obj.qty()));
-                        assert(Py_IsTrue(PyObject_CallObject(p_set_last_barter_qty, p_args)));
+                        PyObject_CallObject(p_set_last_barter_qty, p_args);
 
                         p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_last_barter_obj.premium()));
-                        assert(Py_IsTrue(PyObject_CallObject(p_set_last_barter_premium, p_args)));
+                        PyObject_CallObject(p_set_last_barter_premium, p_args);
 
                         p_args = PyTuple_Pack(1, PyLong_FromLong(
                             kr_last_barter_obj.market_barter_volume().participation_period_last_barter_qty_sum()));
-                        assert(Py_IsTrue(PyObject_CallObject(
-                            p_set_last_barter_market_barter_volume_participation_period_last_barter_qty_sum, p_args)));
+                        PyObject_CallObject(
+                            p_set_last_barter_market_barter_volume_participation_period_last_barter_qty_sum, p_args);
 
                         p_args = PyTuple_Pack(1, PyLong_FromLong(
                             kr_last_barter_obj.market_barter_volume().applicable_period_seconds()));
-                        assert(Py_IsTrue(PyObject_CallObject(
-                            p_set_last_barter_market_barter_volume_applicable_period_seconds, p_args)));
+                        PyObject_CallObject(
+                            p_set_last_barter_market_barter_volume_applicable_period_seconds, p_args);
 
                     } catch (std::exception& exception) {
-                        std::cerr << "Exception caught: " << exception.what() << std::endl;
+                        LOG_ERROR_IMPL(GetLogger(), "Exception caught while updating last_barter cache: "
+                                                    "last_barter obj: {};;; exception: {}",
+                                                    kr_last_barter_obj.DebugString(), exception.what());
+                        return false;
                     }
                 }
-                LOG_INFO(GetLogger(), "Exit: {}", __func__);
-
+                return true;
             }
         };
 
@@ -180,7 +194,7 @@ namespace mobile_book_handler {
                             kr_symbol);
 
                     if (p_get_mobile_book_container_object == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_symbol);
                         return;
                     }
@@ -193,7 +207,7 @@ namespace mobile_book_handler {
                             nullptr),
                             Py_None, Py_None, Py_None,Py_None, Py_None, Py_None, Py_None, Py_None, Py_None, Py_None,
                             Py_None,Py_None, Py_None, Py_None, Py_None);
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_function, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_function, p_args);
 
                 }
             }
@@ -209,7 +223,7 @@ namespace mobile_book_handler {
                             kr_symbol);
 
                     if (p_get_mobile_book_container_object == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_symbol);
                         return nullptr;
                     }
@@ -218,19 +232,29 @@ namespace mobile_book_handler {
                         PyObject_GetAttrString(
                             p_get_mobile_book_container_object, mobile_book_handler::get_top_of_book_key.c_str());
                     PyObject* p_top_of_book_object = PyObject_CallObject(p_get_top_of_book_function, nullptr);
-                    assert(p_top_of_book_object != Py_None);
+
+                    if (p_top_of_book_object == Py_None) {
+                        LOG_ERROR_IMPL(GetLogger(), "failed to reterive top_of_book obj for symbol: {}", kr_symbol);
+                        return nullptr;
+                    }
 
                     PyObject* p_last_barter_mutex_func = PyObject_GetAttrString(
                         p_top_of_book_object, mobile_book_handler::get_mutex_key.c_str());
-                    PyObject* p_top_of_book_mutex = PyObject_CallObject(p_last_barter_mutex_func, nullptr);
-                    void* mutex = PyLong_AsVoidPtr(p_top_of_book_mutex);
-                    return mutex;
+                    PyObject* p_top_of_book_mutex;
+                    try {
+                        p_top_of_book_mutex = PyObject_CallObject(p_last_barter_mutex_func, nullptr);
+                    } catch (std::exception& ex) {
+                        LOG_ERROR_IMPL(GetLogger(), "failed to reterive mutex from top_of_book obj for "
+                                                    "symbol: {}", kr_symbol);
+                        return nullptr;
+                    }
+                    return PyLong_AsVoidPtr(p_top_of_book_mutex);
                 }
             }
 
-            static void update_top_of_book_cache(const mobile_book::TopOfBook &kr_top_of_book_obj) {
+            static bool update_top_of_book_cache(const mobile_book::TopOfBook &kr_top_of_book_obj) {
                 Py_Initialize();
-
+                bool status{false};
                 {
                     FluxCppCore::PythonGIL gil;
                     PyObject* p_get_mobile_book_container_object =
@@ -238,9 +262,9 @@ namespace mobile_book_handler {
                             kr_top_of_book_obj.symbol());
 
                     if (p_get_mobile_book_container_object == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_top_of_book_obj.symbol());
-                        return;
+                        return false;
                     }
 
                     if (kr_top_of_book_obj.has_bid_quote()) {
@@ -248,9 +272,9 @@ namespace mobile_book_handler {
                             p_get_mobile_book_container_object, get_top_of_book_bid_quote_key.c_str());
                         PyObject* p_get_bid_quote_obj = PyObject_CallObject(p_get_bid_quote_function, nullptr);
                         if (p_get_bid_quote_obj != Py_None) {
-                            update_top_of_book_bid_quote(kr_top_of_book_obj, p_get_mobile_book_container_object);
+                            status = update_top_of_book_bid_quote(kr_top_of_book_obj, p_get_mobile_book_container_object);
                         } else {
-                            create_top_of_bid_quote_cache(kr_top_of_book_obj, p_get_mobile_book_container_object);
+                            status = create_top_of_bid_quote_cache(kr_top_of_book_obj, p_get_mobile_book_container_object);
                         }
                     }
 
@@ -259,9 +283,9 @@ namespace mobile_book_handler {
                             p_get_mobile_book_container_object, get_top_of_book_ask_quote_key.c_str());
                         PyObject* p_get_ask_quote_obj = PyObject_CallObject(p_get_ask_quote_function, nullptr);
                         if (p_get_ask_quote_obj != Py_None) {
-                            update_top_of_book_ask_quote(kr_top_of_book_obj, p_get_mobile_book_container_object);
+                            status = update_top_of_book_ask_quote(kr_top_of_book_obj, p_get_mobile_book_container_object);
                         } else {
-                            create_top_of_ask_quote_cache(kr_top_of_book_obj, p_get_mobile_book_container_object);
+                            status = create_top_of_ask_quote_cache(kr_top_of_book_obj, p_get_mobile_book_container_object);
                         }
                     }
 
@@ -270,47 +294,49 @@ namespace mobile_book_handler {
                             p_get_mobile_book_container_object, get_top_of_book_last_barter_key.c_str());
                         PyObject* p_get_last_barter_obj = PyObject_CallObject(p_get_last_barter_function, nullptr);
                         if (p_get_last_barter_obj != Py_None) {
-                            LOG_DEBUG(GetLogger(), "Calling update_top_of_book_last_barter");
-                            update_top_of_book_last_barter(kr_top_of_book_obj, p_get_mobile_book_container_object);
+                            status = update_top_of_book_last_barter(kr_top_of_book_obj, p_get_mobile_book_container_object);
                         } else {
-                            LOG_DEBUG(GetLogger(), "Calling create_top_of_last_barter_cache");
-                            create_top_of_last_barter_cache(kr_top_of_book_obj, p_get_mobile_book_container_object);
+                            status = create_top_of_last_barter_cache(kr_top_of_book_obj, p_get_mobile_book_container_object);
                         }
                     }
                 }
+                return status;
             }
 
-            static void create_top_of_bid_quote_cache(const mobile_book::TopOfBook &kr_top_of_book_obj,
+            [[nodiscard]] static bool create_top_of_bid_quote_cache(const mobile_book::TopOfBook &kr_top_of_book_obj,
                 PyObject* p_mobile_book_container_instance) {
 
                 PyObject* set_top_of_book_bid_quote_func = PyObject_GetAttrString(
                     p_mobile_book_container_instance, set_top_of_book_bid_quote_key.c_str());
                 PyObject* p_args = FluxCppCore::MessageTypeToPythonArgs::message_type_to_python_args(
                     kr_top_of_book_obj.bid_quote());
-                assert(PyObject_IsTrue(PyObject_CallObject(set_top_of_book_bid_quote_func, p_args)));
+                auto top_of_book_update_status = PyObject_CallObject(set_top_of_book_bid_quote_func, p_args);
+                return PyObject_IsTrue(top_of_book_update_status) ? true : false;
             }
 
-            static void create_top_of_ask_quote_cache(const mobile_book::TopOfBook &kr_top_of_book_obj,
+            [[nodiscard]] static bool create_top_of_ask_quote_cache(const mobile_book::TopOfBook &kr_top_of_book_obj,
                 PyObject* p_mobile_book_container_instance) {
 
                 PyObject* set_top_of_book_ask_quote_func = PyObject_GetAttrString(
                     p_mobile_book_container_instance, set_top_of_book_ask_quote_key.c_str());
                 PyObject* p_args = FluxCppCore::MessageTypeToPythonArgs::message_type_to_python_args(
                     kr_top_of_book_obj.ask_quote());
-                assert(PyObject_IsTrue(PyObject_CallObject(set_top_of_book_ask_quote_func, p_args)));
+                auto top_of_book_update_status = PyObject_CallObject(set_top_of_book_ask_quote_func, p_args);
+                return PyObject_IsTrue(top_of_book_update_status) ? true : false;
             }
 
-            static void create_top_of_last_barter_cache(const mobile_book::TopOfBook &kr_top_of_book_obj,
+            [[nodiscard]] static bool create_top_of_last_barter_cache(const mobile_book::TopOfBook &kr_top_of_book_obj,
                 PyObject* p_mobile_book_container_instance) {
 
                 PyObject* set_top_of_book_last_barter_func = PyObject_GetAttrString(
                     p_mobile_book_container_instance, set_top_of_book_last_barter_key.c_str());
                 PyObject* p_args = FluxCppCore::MessageTypeToPythonArgs::message_type_to_python_args(
                     kr_top_of_book_obj.last_barter());
-                assert(PyObject_IsTrue(PyObject_CallObject(set_top_of_book_last_barter_func, p_args)));
+                auto top_of_book_update_status = PyObject_CallObject(set_top_of_book_last_barter_func, p_args);
+                return PyObject_IsTrue(top_of_book_update_status) ? true : false;
             }
 
-            static void update_top_of_book_bid_quote(const mobile_book::TopOfBook &kr_top_book_obj,
+            [[nodiscard]] static bool update_top_of_book_bid_quote(const mobile_book::TopOfBook &kr_top_book_obj,
                 PyObject* p_mobile_book_container_instance) {
 
                 PyObject* p_args;
@@ -325,35 +351,33 @@ namespace mobile_book_handler {
                         PyObject_GetAttrString(p_mobile_book_container_instance,
                             set_top_of_book_bid_quote_last_update_date_time_key.c_str());
 
-                assert(p_set_top_of_book_price != nullptr and p_set_top_of_book_qty != nullptr and
-                    p_set_top_of_book_premium != nullptr and p_set_top_of_book_bid_quote_last_update_date_time != nullptr);
-
                 try {
 
                     p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_book_obj.bid_quote().px()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_price, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_price, p_args);
 
                     p_args = PyTuple_Pack(1, PyLong_FromLong(kr_top_book_obj.bid_quote().qty()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_qty, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_qty, p_args);
 
                     p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_book_obj.bid_quote().premium()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_premium, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_premium, p_args);
 
                     std::string bid_quote_last_update_date_time = FluxCppCore::format_time(kr_top_book_obj.bid_quote().last_update_date_time());
                     p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(
                             bid_quote_last_update_date_time.c_str(),
                             static_cast<Py_ssize_t>(bid_quote_last_update_date_time.size()),
                             nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(
-                        p_set_top_of_book_bid_quote_last_update_date_time, p_args)));
+                    PyObject_CallObject(
+                        p_set_top_of_book_bid_quote_last_update_date_time, p_args);
                     update_top_of_book_top_lev_fld(kr_top_book_obj, p_mobile_book_container_instance);
-
                 } catch (std::exception& exception) {
-                    std::cerr << "Exception caught: " << exception.what() << std::endl;
+                    LOG_ERROR_IMPL(GetLogger(), "Failed to update top_of_book, reason: {}", exception.what());
+                    return false;
                 }
+                return true;
             }
 
-            static void update_top_of_book_ask_quote(const mobile_book::TopOfBook &kr_top_of_book_obj,
+            [[nodiscard]] static bool update_top_of_book_ask_quote(const mobile_book::TopOfBook &kr_top_of_book_obj,
                  PyObject* p_mobile_book_container_instance) {
 
                 PyObject* p_set_top_of_book_price = PyObject_GetAttrString(p_mobile_book_container_instance,
@@ -364,39 +388,37 @@ namespace mobile_book_handler {
                     set_top_of_book_ask_quote_premium_key.c_str());
                 PyObject* p_set_top_of_book_ask_quote_last_update_date_time =
                         PyObject_GetAttrString(p_mobile_book_container_instance,
-                            set_top_of_book_ask_quote_last_update_date_time_key.c_str());
-
-                assert(p_set_top_of_book_price != nullptr and
-                       p_set_top_of_book_qty != nullptr and p_set_top_of_book_premium != nullptr and
-                       p_set_top_of_book_ask_quote_last_update_date_time != nullptr);
+                            set_top_of_book_ask_quote_last_update_date_time_key.c_str());;
 
                 PyObject* p_args;
 
                 try {
 
                     p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_of_book_obj.ask_quote().px()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_price, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_price, p_args);
 
                     p_args = PyTuple_Pack(1, PyLong_FromLong(kr_top_of_book_obj.ask_quote().qty()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_qty, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_qty, p_args);
 
                     p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_of_book_obj.ask_quote().premium()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_premium, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_premium, p_args);
 
                     std::string ask_quote_last_update_date_time = FluxCppCore::format_time(kr_top_of_book_obj.ask_quote().last_update_date_time());
                     p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(
                             ask_quote_last_update_date_time.c_str(),
                             static_cast<Py_ssize_t>(ask_quote_last_update_date_time.size()),
                             nullptr));
-                    assert(PyObject_IsTrue(
-                            PyObject_CallObject(p_set_top_of_book_ask_quote_last_update_date_time, p_args)));
+
+                    PyObject_CallObject(p_set_top_of_book_ask_quote_last_update_date_time, p_args);
                     update_top_of_book_top_lev_fld(kr_top_of_book_obj, p_mobile_book_container_instance);
                 } catch (std::exception &exception) {
-                    std::cerr << "Exception caught: " << exception.what() << std::endl;
+                    LOG_ERROR_IMPL(GetLogger(), "Failed to update top_of_book, reason: {}", exception.what());
+                    return false;
                 }
+                return true;
             }
 
-            static void update_top_of_book_last_barter(const mobile_book::TopOfBook &kr_top_of_book_obj,
+            [[nodiscard]] static bool update_top_of_book_last_barter(const mobile_book::TopOfBook &kr_top_of_book_obj,
                  PyObject* p_mobile_book_container_instance) {
 
                 PyObject* p_set_top_of_book_price = PyObject_GetAttrString(p_mobile_book_container_instance,
@@ -409,32 +431,30 @@ namespace mobile_book_handler {
                         PyObject_GetAttrString(p_mobile_book_container_instance,
                             set_top_of_book_last_barter_last_update_date_time_key.c_str());
 
-                assert(p_set_top_of_book_price != nullptr and p_set_top_of_book_qty != nullptr and
-                    p_set_top_of_book_premium != nullptr and p_set_top_of_book_last_barter_last_update_date_time != nullptr);
-
                 PyObject* p_args;
                 try {
 
                     p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_of_book_obj.last_barter().px()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_price, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_price, p_args);
 
                     p_args = PyTuple_Pack(1, PyLong_FromLong(kr_top_of_book_obj.last_barter().qty()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_qty, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_qty, p_args);
 
                     p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_of_book_obj.last_barter().premium()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_premium, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_premium, p_args);
 
                     std::string last_barter_last_update_date_time = FluxCppCore::format_time(kr_top_of_book_obj.last_barter().last_update_date_time());
                     p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(
                             last_barter_last_update_date_time.c_str(),
                             static_cast<Py_ssize_t>(last_barter_last_update_date_time.size()),
                             nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(
-                        p_set_top_of_book_last_barter_last_update_date_time, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_last_barter_last_update_date_time, p_args);
                     update_top_of_book_top_lev_fld(kr_top_of_book_obj, p_mobile_book_container_instance);
                 } catch (std::exception& exception) {
-                    std::cerr << "Exception caught: " << exception.what() << std::endl;
+                    LOG_ERROR_IMPL(GetLogger(), "Failed to update top_of_book, reason: {}", exception.what());
+                    return false;
                 }
+                return true;
             }
 
             static void update_top_of_book_top_lev_fld(const mobile_book::TopOfBook &kr_top_of_book_obj,
@@ -452,17 +472,12 @@ namespace mobile_book_handler {
                 PyObject* p_set_top_of_book_last_update_date_time = PyObject_GetAttrString(
                     p_mobile_book_container_instance, set_top_of_book_last_update_date_time_key.c_str());
 
-                assert(p_top_of_book_total_bartering_security_size != nullptr &&
-                       p_set_top_of_book_mkt_barter_vol_participation_period_last_barter_qty_sum != nullptr &&
-                       p_set_top_of_book_mkt_barter_vol_applicable_per_seconds != nullptr &&
-                       p_set_top_of_book_last_update_date_time != nullptr);
-
                 PyObject* p_args = nullptr;
                 PyObject* p_result = nullptr;
 
                 try {
                     p_args = PyTuple_Pack(1, PyLong_FromLong(kr_top_of_book_obj.total_bartering_security_size()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_top_of_book_total_bartering_security_size, p_args)));
+                    PyObject_CallObject(p_top_of_book_total_bartering_security_size, p_args);
 
                     for (int i = 0; i < kr_top_of_book_obj.market_barter_volume_size(); ++i) {
                         p_result = set_market_barter_volume(p_mobile_book_container_instance,
@@ -476,8 +491,8 @@ namespace mobile_book_handler {
                                                                                i).id().size()), nullptr),
                                                   PyLong_FromLong(kr_top_of_book_obj.market_barter_volume(
                                                           i).participation_period_last_barter_qty_sum()));
-                            assert(PyObject_IsTrue(PyObject_CallObject(
-                                p_set_top_of_book_mkt_barter_vol_participation_period_last_barter_qty_sum, p_args)));
+                            PyObject_CallObject(
+                                p_set_top_of_book_mkt_barter_vol_participation_period_last_barter_qty_sum, p_args);
 
                             p_args = PyTuple_Pack(2,
                                                   PyUnicode_DecodeUTF8(kr_top_of_book_obj.market_barter_volume(i).id().c_str(),
@@ -486,8 +501,7 @@ namespace mobile_book_handler {
                                                                                i).id().size()), nullptr),
                                                   PyLong_FromLong(kr_top_of_book_obj.market_barter_volume(
                                                           i).applicable_period_seconds()));
-                            assert(PyObject_IsTrue(PyObject_CallObject(
-                                p_set_top_of_book_mkt_barter_vol_applicable_per_seconds, p_args)));
+                            PyObject_CallObject(p_set_top_of_book_mkt_barter_vol_applicable_per_seconds, p_args);
                         }
                     }
 
@@ -497,9 +511,10 @@ namespace mobile_book_handler {
                                                                       last_update_date_time.size()),
                                                                   nullptr));
 
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_top_of_book_last_update_date_time, p_args)));
+                    PyObject_CallObject(p_set_top_of_book_last_update_date_time, p_args);
                 } catch (std::exception& exception) {
-                    std::cerr << "Exception caught: " << exception.what() << std::endl;
+                    auto err = std::format("Failed: top_of_book cache update, reason: {}, top_ob_book obj: {}", exception.what(), kr_top_of_book_obj.DebugString());
+                    LOG_ERROR_IMPL(GetLogger(), "{}", err);
                 }
             }
 
@@ -511,7 +526,6 @@ namespace mobile_book_handler {
 
                 p_set_func = PyObject_GetAttrString(p_mobile_book_container_instance,
                     set_top_of_book_market_barter_volume_key.c_str());
-                assert(p_set_func != nullptr);
 
                 p_args = PyTuple_Pack(3, PyUnicode_DecodeUTF8(kr_market_barter_volume_obj.id().c_str(),
                                                               static_cast<Py_ssize_t>(kr_market_barter_volume_obj.id().size()),
@@ -535,7 +549,7 @@ namespace mobile_book_handler {
                             kr_symbol);
 
                     if (p_get_mobile_book_container_object == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_symbol);
                         return;
                     }
@@ -549,7 +563,7 @@ namespace mobile_book_handler {
                                 Py_None, Py_None, Py_None,
                                 PyLong_FromLong(id_n_position),
                                 Py_None, Py_None, Py_None, Py_None, Py_None, Py_None, Py_None);
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_bid_market_depth_function, p_args)));
+                    PyObject_CallObject(p_set_bid_market_depth_function, p_args);
 
                 }
             }
@@ -565,7 +579,7 @@ namespace mobile_book_handler {
                             kr_symbol);
 
                     if (p_get_mobile_book_container_object == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_symbol);
                         return;
                     }
@@ -579,7 +593,7 @@ namespace mobile_book_handler {
                                 Py_None, Py_None, Py_None,
                                 PyLong_FromLong(id_n_position),
                                 Py_None, Py_None, Py_None, Py_None, Py_None, Py_None, Py_None);
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_bid_market_depth_function, p_args)));
+                    PyObject_CallObject(p_set_bid_market_depth_function, p_args);
 
                 }
             }
@@ -595,7 +609,7 @@ namespace mobile_book_handler {
                             kr_symbol);
 
                     if (p_get_mobile_book_container_object == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_symbol);
                         return nullptr;
                     }
@@ -606,13 +620,26 @@ namespace mobile_book_handler {
                             mobile_book_handler::get_bid_market_depth_from_depth_key.c_str());
                     PyObject* p_args = PyTuple_Pack(1, PyLong_FromLong(position));
                     PyObject* p_md_object = PyObject_CallObject(p_get_md_function, p_args);
-                    assert(p_md_object != Py_None);
+
+                    if (p_md_object == Py_None) {
+                        auto err = std::format("Failed to reterive market depth obj from container for symbol: {} at position: {}", kr_symbol, position);
+                        LOG_ERROR_IMPL(GetLogger(), "{}", err);
+                        return nullptr;
+                    }
 
                     PyObject* p_md_mutex_func = PyObject_GetAttrString(
                         p_md_object, mobile_book_handler::get_mutex_key.c_str());
-                    PyObject* p_md_mutex = PyObject_CallObject(p_md_mutex_func, nullptr);
-                    void* mutex = PyLong_AsVoidPtr(p_md_mutex);
-                    return mutex;
+                    PyObject* p_md_mutex;
+                    try {
+                        p_md_mutex = PyObject_CallObject(p_md_mutex_func, nullptr);
+                    } catch (std::exception& ex) {
+                        auto err = std::format("Failed to reterive mutex obj from container for symbol: "
+                                               "{} at position: {}", kr_symbol, position);
+                        LOG_ERROR_IMPL(GetLogger(), "{}", err);
+                        return nullptr;
+                    }
+                    return PyLong_AsVoidPtr(p_md_mutex);
+
                 }
             }
 
@@ -627,7 +654,7 @@ namespace mobile_book_handler {
                             kr_symbol);
 
                     if (p_get_mobile_book_container_object == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_symbol);
                         return nullptr;
                     }
@@ -638,13 +665,23 @@ namespace mobile_book_handler {
                             mobile_book_handler::get_ask_market_depth_from_depth_key.c_str());
                     PyObject* p_args = PyTuple_Pack(1, PyLong_FromLong(position));
                     PyObject* p_md_object = PyObject_CallObject(p_get_md_function, p_args);
-                    assert(p_md_object != Py_None);
 
+                    if (p_md_object == Py_None) {
+                        auto err = std::format("Failed to reterive market depth obj from container for symbol: {} at position: {}", kr_symbol, position);
+                        LOG_ERROR_IMPL(GetLogger(), "{}", err);
+                        return nullptr;
+                    }
                     PyObject* p_md_mutex_func = PyObject_GetAttrString(
                         p_md_object, mobile_book_handler::get_mutex_key.c_str());
-                    PyObject* p_md_mutex = PyObject_CallObject(p_md_mutex_func, nullptr);
-                    void* mutex = PyLong_AsVoidPtr(p_md_mutex);
-                    return mutex;
+                    PyObject* p_md_mutex;
+                    try {
+                        p_md_mutex = PyObject_CallObject(p_md_mutex_func, nullptr);
+                    } catch (std::exception& ex) {
+                        auto err = std::format("Failed to reterive mutex obj from container for symbol: {} at position: {}", kr_symbol, position);
+                        LOG_ERROR_IMPL(GetLogger(), "{}", err);
+                        return nullptr;
+                    }
+                    return PyLong_AsVoidPtr(p_md_mutex);
                 }
             }
 
@@ -660,7 +697,7 @@ namespace mobile_book_handler {
                             kr_market_depth_obj.symbol());
 
                     if (p_mobile_book_container_instance == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_market_depth_obj.symbol());
                         return;
                     }
@@ -688,66 +725,56 @@ namespace mobile_book_handler {
                     PyObject* p_set_market_depth_cumulative_avg_px = PyObject_GetAttrString(p_mobile_book_container_instance,
                          set_bid_market_depth_cumulative_avg_px_key.c_str());
 
-                    assert(p_set_market_depth_symbol != nullptr && p_set_market_depth_exch_time != nullptr &&
-                        p_set_market_depth_arrival_time != nullptr && p_set_market_depth_side != nullptr &&
-                        p_set_market_depth_px != nullptr && p_set_market_depth_qty != nullptr &&
-                        p_set_market_depth_market_maker != nullptr && p_set_market_depth_is_smart_depth != nullptr &&
-                        p_set_market_depth_cumulative_notional != nullptr && p_set_market_depth_cumulative_qty
-                        != nullptr && p_set_market_depth_cumulative_avg_px != nullptr);
-
-
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                      PyUnicode_DecodeUTF8(kr_market_depth_obj.symbol().c_str(),
                          static_cast<Py_ssize_t>(kr_market_depth_obj.symbol().size()), nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_symbol, p_args)));
+                    PyObject_CallObject(p_set_market_depth_symbol, p_args);
 
                     std::string exch_time = FluxCppCore::format_time(kr_market_depth_obj.exch_time());
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8(exch_time.c_str(), static_cast<Py_ssize_t>(exch_time.size()),
                             nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_exch_time, p_args)));
+                    PyObject_CallObject(p_set_market_depth_exch_time, p_args);
 
                     std::string arrival_time = FluxCppCore::format_time(kr_market_depth_obj.arrival_time());
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8(arrival_time.c_str(), static_cast<Py_ssize_t>(arrival_time.size()),
                             nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_arrival_time, p_args)));
+                    PyObject_CallObject(p_set_market_depth_arrival_time, p_args);
 
-                    LOG_INFO(GetLogger(), "Calling update side: BID");
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8("BID", static_cast<Py_ssize_t>(std::string("BID").size()),
                             nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_side, p_args)));
-                    LOG_INFO(GetLogger(), "updated side: BID");
+                    PyObject_CallObject(p_set_market_depth_side, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyFloat_FromDouble(kr_market_depth_obj.px()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_px, p_args)));
+                    PyObject_CallObject(p_set_market_depth_px, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyLong_FromLong(kr_market_depth_obj.qty()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_qty, p_args)));
+                    PyObject_CallObject(p_set_market_depth_qty, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8(kr_market_depth_obj.market_maker().c_str(),
                             static_cast<Py_ssize_t>(kr_market_depth_obj.market_maker().size()), nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_market_maker, p_args)));
+                    PyObject_CallObject(p_set_market_depth_market_maker, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyLong_FromLong(kr_market_depth_obj.is_smart_depth()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_is_smart_depth, p_args)));
+                    PyObject_CallObject(p_set_market_depth_is_smart_depth, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyFloat_FromDouble(kr_market_depth_obj.cumulative_notional()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_cumulative_notional, p_args)));
+                    PyObject_CallObject(p_set_market_depth_cumulative_notional, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyLong_FromLong(kr_market_depth_obj.cumulative_qty()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_cumulative_qty, p_args)));
+                    PyObject_CallObject(p_set_market_depth_cumulative_qty, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyFloat_FromDouble(kr_market_depth_obj.cumulative_avg_px()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_cumulative_avg_px, p_args)));
+                    PyObject_CallObject(p_set_market_depth_cumulative_avg_px, p_args);
                 }
 
             }
@@ -763,7 +790,7 @@ namespace mobile_book_handler {
 
                     PyObject* p_args;
                     if (p_mobile_book_container_instance == Py_None) {
-                        LOG_ERROR(GetLogger(), "Symbol: {} not found in the container obj",
+                        LOG_ERROR_IMPL(GetLogger(), "Symbol: {} not found in the container obj",
                             kr_market_depth_obj.symbol());
                         return;
                     }
@@ -791,65 +818,55 @@ namespace mobile_book_handler {
                     PyObject* p_set_market_depth_cumulative_avg_px = PyObject_GetAttrString(p_mobile_book_container_instance,
                          set_ask_market_depth_cumulative_avg_px_key.c_str());
 
-                    assert(p_set_market_depth_symbol != nullptr && p_set_market_depth_exch_time != nullptr &&
-                        p_set_market_depth_arrival_time != nullptr && p_set_market_depth_side != nullptr &&
-                        p_set_market_depth_px != nullptr && p_set_market_depth_qty != nullptr &&
-                        p_set_market_depth_market_maker != nullptr && p_set_market_depth_is_smart_depth != nullptr &&
-                        p_set_market_depth_cumulative_notional != nullptr && p_set_market_depth_cumulative_qty
-                        != nullptr && p_set_market_depth_cumulative_avg_px != nullptr);
-
-
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                      PyUnicode_DecodeUTF8(kr_market_depth_obj.symbol().c_str(),
                          static_cast<Py_ssize_t>(kr_market_depth_obj.symbol().size()), nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_symbol, p_args)));
+                    PyObject_CallObject(p_set_market_depth_symbol, p_args);
 
                     std::string exch_time = FluxCppCore::format_time(kr_market_depth_obj.exch_time());
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8(exch_time.c_str(), static_cast<Py_ssize_t>(exch_time.size()),
                             nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_exch_time, p_args)));
+                    PyObject_CallObject(p_set_market_depth_exch_time, p_args);
 
                     std::string arrival_time = FluxCppCore::format_time(kr_market_depth_obj.arrival_time());
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8(arrival_time.c_str(), static_cast<Py_ssize_t>(arrival_time.size()),
                             nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_arrival_time, p_args)));
-                    LOG_INFO(GetLogger(), "Calling update side: ASK");
+                    PyObject_CallObject(p_set_market_depth_arrival_time, p_args);
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8("ASK", static_cast<Py_ssize_t>(std::string("ASK").size()),
                             nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_side, p_args)));
-                    LOG_INFO(GetLogger(), "updated side: ASK");
+                    PyObject_CallObject(p_set_market_depth_side, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyFloat_FromDouble(kr_market_depth_obj.px()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_px, p_args)));
+                    PyObject_CallObject(p_set_market_depth_px, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyLong_FromLong(kr_market_depth_obj.qty()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_qty, p_args)));
+                    PyObject_CallObject(p_set_market_depth_qty, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8(kr_market_depth_obj.market_maker().c_str(),
                             static_cast<Py_ssize_t>(kr_market_depth_obj.market_maker().size()), nullptr));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_market_maker, p_args)));
+                    PyObject_CallObject(p_set_market_depth_market_maker, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyLong_FromLong(kr_market_depth_obj.is_smart_depth()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_is_smart_depth, p_args)));
+                    PyObject_CallObject(p_set_market_depth_is_smart_depth, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyFloat_FromDouble(kr_market_depth_obj.cumulative_notional()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_cumulative_notional, p_args)));
+                    PyObject_CallObject(p_set_market_depth_cumulative_notional, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyLong_FromLong(kr_market_depth_obj.cumulative_qty()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_cumulative_qty, p_args)));
+                    PyObject_CallObject(p_set_market_depth_cumulative_qty, p_args);
 
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyFloat_FromDouble(kr_market_depth_obj.cumulative_avg_px()));
-                    assert(PyObject_IsTrue(PyObject_CallObject(p_set_market_depth_cumulative_avg_px, p_args)));
+                    PyObject_CallObject(p_set_market_depth_cumulative_avg_px, p_args);
 
                 }
 

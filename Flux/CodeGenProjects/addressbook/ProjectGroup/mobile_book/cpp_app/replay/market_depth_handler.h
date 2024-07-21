@@ -49,7 +49,7 @@ namespace mobile_book_handler {
                 m_top_of_book_obj_.Clear();
                 if (r_market_depth_obj.side() == mobile_book::TickType::BID) {
                     if (m_md_time_ > r_market_depth_obj.exch_time()) {
-                        LOG_DEBUG(GetLogger(), "Ignoring update cache and DB because stored time is greater than "
+                        LOG_DEBUG_IMPL(GetLogger(), "Ignoring update cache and DB because stored time is greater than "
                                                "current time;;; stored time: {};;; current time: {}",
                                                m_md_time_, r_market_depth_obj.exch_time());
                         return FluxCppCore::CacheOperationResult::DB_N_CACHE_UPDATE_FAILED;
@@ -67,7 +67,7 @@ namespace mobile_book_handler {
                     auto lock_status = std::try_lock(*md_mutex, *top_of_book_mutex);
                     if (lock_status != ALL_LOCKS_AVAILABE_) {
                         m_monitor_.push(r_market_depth_obj);
-                        LOG_DEBUG(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
+                        LOG_DEBUG_IMPL(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
                             r_market_depth_obj.DebugString());
                         return FluxCppCore::CacheOperationResult::LOCK_NOT_FOUND;
                     }
@@ -82,7 +82,7 @@ namespace mobile_book_handler {
                     notify_semaphore.release();
                 } else if (r_market_depth_obj.side() == mobile_book::TickType::ASK) {
                     if (m_md_time_ > r_market_depth_obj.exch_time()) {
-                        LOG_DEBUG(GetLogger(), "Ignoring update cache and DB because stored time is greater than current time;;; "
+                        LOG_DEBUG_IMPL(GetLogger(), "Ignoring update cache and DB because stored time is greater than current time;;; "
                                        "stored time: {};;; current time: {}",
                                        m_md_time_, r_market_depth_obj.exch_time());
                         return FluxCppCore::CacheOperationResult::DB_N_CACHE_UPDATE_FAILED;
@@ -99,7 +99,7 @@ namespace mobile_book_handler {
                     auto lock_status = std::try_lock(*md_mutex, *top_of_book_mutex);
                     if (lock_status != ALL_LOCKS_AVAILABE_) {
                         m_monitor_.push(r_market_depth_obj);
-                        LOG_DEBUG(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
+                        LOG_DEBUG_IMPL(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
                             r_market_depth_obj.DebugString());
                         return FluxCppCore::CacheOperationResult::LOCK_NOT_FOUND;
                     }
@@ -116,7 +116,7 @@ namespace mobile_book_handler {
             } else {
                 if (r_market_depth_obj.side() == mobile_book::TickType::BID) {
                     if (m_md_time_ > r_market_depth_obj.exch_time()) {
-                        LOG_DEBUG(GetLogger(), "Ignoring update cache and DB because stored time is greater than current time;;; "
+                        LOG_DEBUG_IMPL(GetLogger(), "Ignoring update cache and DB because stored time is greater than current time;;; "
                                        "stored time: {};;; current time: {}",
                                        m_md_time_, r_market_depth_obj.exch_time());
                         return FluxCppCore::CacheOperationResult::DB_N_CACHE_UPDATE_FAILED;
@@ -130,14 +130,14 @@ namespace mobile_book_handler {
                     std::unique_lock<std::mutex> lock_md_mutex(*md_mutex, std::try_to_lock_t{});
                     if (!lock_md_mutex.owns_lock()) {
                         m_monitor_.push(r_market_depth_obj);
-                        LOG_DEBUG(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
+                        LOG_DEBUG_IMPL(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
                             r_market_depth_obj.DebugString());
                         return FluxCppCore::CacheOperationResult::LOCK_NOT_FOUND;
                     }
                     market_cache::MarketDepthCache::update_bid_market_depth_cache(r_market_depth_obj);
                 } else {
                     if (m_md_time_ > r_market_depth_obj.exch_time()) {
-                        LOG_DEBUG(GetLogger(), "Ignoring update cache and DB because stored time is greater than current time;;; "
+                        LOG_DEBUG_IMPL(GetLogger(), "Ignoring update cache and DB because stored time is greater than current time;;; "
                                        "stored time: {};;; current time: {}",
                                        m_md_time_, r_market_depth_obj.exch_time());
                         return FluxCppCore::CacheOperationResult::DB_N_CACHE_UPDATE_FAILED;
@@ -151,7 +151,7 @@ namespace mobile_book_handler {
                     std::unique_lock<std::mutex> lock_md_mutex(*md_mutex, std::try_to_lock_t{});
                     if (!lock_md_mutex.owns_lock()) {
                         m_monitor_.push(r_market_depth_obj);
-                        LOG_DEBUG(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
+                        LOG_DEBUG_IMPL(GetLogger(), "Ignoring cache update lock not found;;; market_depth_obj: {}",
                             r_market_depth_obj.DebugString());
                         return FluxCppCore::CacheOperationResult::LOCK_NOT_FOUND;
                     }

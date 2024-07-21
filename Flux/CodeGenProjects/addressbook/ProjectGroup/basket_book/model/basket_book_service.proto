@@ -1,0 +1,46 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+import "projects_core.proto";
+import "street_book_n_basket_book_core.proto";
+
+package basket_book;
+
+
+message BasketChore{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 4,
+    y: 15,
+    w: 3,
+    h: 10,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "email_book_service.proto",
+  };
+  option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: true,
+    IsTopLvlModel: false,
+    ExecutorKeySequence: "security.sec_id-side"
+    IsRepeated: true
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  repeated NewChore new_chores = 2 [(FluxFldAutoComplete) = "algo:ALGO_List"];
+}
+
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage{
+   optional DummyEnumP temp1 = 1;
+}

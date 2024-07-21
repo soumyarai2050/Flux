@@ -23,13 +23,13 @@ namespace mobile_book_handler {
         void insert_or_update_top_of_book(const mobile_book::TopOfBook &kr_top_of_book_obj) {
             int32_t db_id{-1};
             std::string top_of_book_key;
-            LOG_INFO(GetLogger(), "Top_of_book obj: {}", kr_top_of_book_obj.DebugString());
+            LOG_INFO_IMPL(GetLogger(), "Top_of_book obj: {}", kr_top_of_book_obj.DebugString());
             bool stat = m_top_of_book_db_codec_.insert_or_update(kr_top_of_book_obj, db_id);
-            LOG_DEBUG(GetLogger(), "TopOfBookHandler inserty_or_update done db_id [{}]", db_id);
+            LOG_DEBUG_IMPL(GetLogger(), "TopOfBookHandler inserty_or_update done db_id [{}]", db_id);
             assert(stat);
             MobileBookKeyHandler::get_key_out(kr_top_of_book_obj, top_of_book_key);
             db_id = m_top_of_book_db_codec_.m_root_model_key_to_db_id[top_of_book_key];
-            LOG_DEBUG(GetLogger(), "TopOfBookHandler inserty_or_update done db_id [{}]", db_id);
+            LOG_DEBUG_IMPL(GetLogger(), "TopOfBookHandler inserty_or_update done db_id [{}]", db_id);
             mobile_book::TopOfBook ws_top_of_book_obj;
             m_top_of_book_db_codec_.get_data_by_id_from_collection(ws_top_of_book_obj, db_id);
             mr_websocket_server_.NewClientCallBack(ws_top_of_book_obj, -1);
@@ -52,7 +52,7 @@ namespace mobile_book_handler {
                         top_of_book_documents.top_of_book(i).id();
             }
             for (auto const&[k, v] :  m_top_of_book_db_codec_.m_root_model_key_to_db_id) {
-                LOG_INFO(GetLogger(), "symbol[{}]->id[{}]", k, v);
+                LOG_INFO_IMPL(GetLogger(), "symbol[{}]->id[{}]", k, v);
             }
         }
     };

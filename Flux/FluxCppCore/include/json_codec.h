@@ -41,13 +41,13 @@ namespace FluxCppCore {
                         obj["side"] = 3;
                     }
                 } else {
-                    LOG_ERROR(GetLogger(), "Error: 'side' field is not a string in JSON. JSON: {}", r_json_str);
+                    LOG_ERROR_IMPL(GetLogger(), "Error: 'side' field is not a string in JSON. JSON: {}", r_json_str);
                 }
                 r_json_str = boost::json::serialize(jv);
             } catch (const std::invalid_argument& e) {
-                LOG_ERROR(GetLogger(), "Invalid argument encountered: {}, JSON: {}", e.what(), r_json_str);
+                LOG_ERROR_IMPL(GetLogger(), "Invalid argument encountered: {}, JSON: {}", e.what(), r_json_str);
             } catch (const boost::json::system_error& e) {
-                LOG_ERROR(GetLogger(), "Parse error encountered: {}, JSON: {}", e.what(), r_json_str);
+                LOG_ERROR_IMPL(GetLogger(), "Parse error encountered: {}, JSON: {}", e.what(), r_json_str);
             }
         }
 
@@ -66,7 +66,7 @@ namespace FluxCppCore {
             if (status.code() == absl::StatusCode::kOk) {
                 return true;
             } else {
-                LOG_ERROR(GetLogger(), "Failed Decoding {};;; error: {};;; json: {}",
+                LOG_ERROR_IMPL(GetLogger(), "Failed Decoding {};;; error: {};;; json: {}",
                           RootModelType::GetDescriptor()->name(), status.message(), kr_json);
                 return false;
             }
@@ -82,7 +82,7 @@ namespace FluxCppCore {
             if (status.code() == absl::StatusCode::kOk)
                 return true;
             else {
-                LOG_ERROR(GetLogger(), "Failed Encoding {};;; error: {};;; {}: {}",
+                LOG_ERROR_IMPL(GetLogger(), "Failed Encoding {};;; error: {};;; {}: {}",
                           RootModelType::GetDescriptor()->name(), status.message(),
                           RootModelType::GetDescriptor()->name(), kr_model_obj.DebugString());
                 return false;
@@ -114,14 +114,14 @@ namespace FluxCppCore {
                     } else if (item_obj["side"].as_string() == "ASK") {
                         item_obj["side"] = 3;
                     } else {
-                        LOG_ERROR(GetLogger(), "Error: 'side' field is not a string in JSON. JSON: {}", r_json_str);
+                        LOG_ERROR_IMPL(GetLogger(), "Error: 'side' field is not a string in JSON. JSON: {}", r_json_str);
                     }
                     // Serialize the JSON object back into a string
                     r_json_str = boost::json::serialize(jv);
                 } catch (const std::invalid_argument& e) {
-                    LOG_ERROR(GetLogger(), "Invalid argument encountered: {}, JSON: {}", e.what(), r_json_str);
+                    LOG_ERROR_IMPL(GetLogger(), "Invalid argument encountered: {}, JSON: {}", e.what(), r_json_str);
                 } catch (const boost::json::system_error& e) {
-                    LOG_ERROR(GetLogger(), "Parse error encountered: {}, JSON: {}", e.what(), r_json_str);
+                    LOG_ERROR_IMPL(GetLogger(), "Parse error encountered: {}, JSON: {}", e.what(), r_json_str);
                 }
             }
         }
@@ -145,7 +145,7 @@ namespace FluxCppCore {
                 } // else not required: when we try to encode empty string we'll not find `:[{` as substr
                 return true;
             } else {
-                LOG_ERROR(GetLogger(), "Failed Encoding {};;; error: {};;; {}: {}",
+                LOG_ERROR_IMPL(GetLogger(), "Failed Encoding {};;; error: {};;; {}: {}",
                           RootModelListType::GetDescriptor()->name(), status.message(),
                           RootModelListType::GetDescriptor()->name(), kr_model_list_obj.DebugString());
                 return false;
@@ -177,7 +177,7 @@ namespace FluxCppCore {
             if (status.code() == absl::StatusCode::kOk) {
                 return true;
             } else {
-                LOG_ERROR(GetLogger(), "Failed Decoding {};;; error: {};;; list_json: {}",
+                LOG_ERROR_IMPL(GetLogger(), "Failed Decoding {};;; error: {};;; list_json: {}",
                           RootModelListType::GetDescriptor()->name(), status.message(), r_list_json);
                 return false;
             }

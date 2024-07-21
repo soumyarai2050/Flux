@@ -1106,8 +1106,34 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             json_msg_str += '    },\n'
         return json_msg_str
 
-    def __handle_auto_complete_output(self, json_content: Dict) -> str:
-        json_msg_str = f'  "autocomplete": ' + f"{json.dumps(json_content['autocomplete'], indent=4)}\n"
+    def __handle_auto_complete_output(self) -> str:
+        auto_complete_path_list = []
+
+        # adding this project's autocomplete list json
+        project_path = os.getenv("PROJECT_DIR")
+        if project_path is not None and len(project_path):
+            autocomplete_file_path = PurePath(project_path) / "misc" / "autocomplete.json"
+            auto_complete_path_list.append(autocomplete_file_path)
+        else:
+            err_str = f"Env variable PROJECT_DIR received as {project_path}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
+        # adding imported project's autocomplete list json
+        for project_name in self._proto_project_name_to_msg_list_dict:
+            autocomplete_file_path = (
+                os.path.abspath(PurePath(project_path) / ".." / project_name / "misc" / "autocomplete.json"))
+            auto_complete_path_list.append(autocomplete_file_path)
+
+        auto_complete_json_dict = {}
+        for autocomplete_file_path in auto_complete_path_list:
+            if os.path.exists(autocomplete_file_path):
+                with open(autocomplete_file_path) as json_fl:
+                    json_content = json.load(json_fl)
+                    auto_complete_json_dict.update(json_content['autocomplete'])
+
+        json_msg_str = '  },\n'
+        json_msg_str += f'  "autocomplete": ' + f"{json.dumps(auto_complete_json_dict, indent=4)}\n"
         return json_msg_str
 
     def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
@@ -1156,18 +1182,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
         # Handling autocomplete json list
         if self.__add_autocomplete_dict:
-            if (autocomplete_file_path := os.getenv("AUTOCOMPLETE_FILE_PATH")) is not None and \
-                    len(autocomplete_file_path):
-                json_msg_str += '  },\n'
-
-                with open(autocomplete_file_path) as json_fl:
-                    json_content = json.load(json_fl)
-
-                json_msg_str += self.__handle_auto_complete_output(json_content)
-            else:
-                err_str = f"Env var AUTOCOMPLETE_FILE_PATH received as {autocomplete_file_path}"
-                logging.exception(err_str)
-                raise Exception(err_str)
+            json_msg_str += self.__handle_auto_complete_output()
         else:
             json_msg_str += '  }\n'
 

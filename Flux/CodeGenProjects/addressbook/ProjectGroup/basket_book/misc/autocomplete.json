@@ -1,0 +1,10 @@
+{
+  "autocomplete": {
+    "ALGO_List": [
+      "NONE",
+      "VWAP",
+      "TWAP",
+      "WVOL"
+    ]
+  }
+}

@@ -26,14 +26,14 @@ namespace FluxCppCore {
                     int32_t &r_new_generated_id_out) {
             r_new_generated_id_out = get_next_insert_id();
             update_id_in_document(r_bson_doc, r_new_generated_id_out);
-            LOG_DEBUG(GetLogger(), "bson_doc: {}", bsoncxx::to_json(r_bson_doc));
+            LOG_DEBUG_IMPL(GetLogger(), "bson_doc: {}", bsoncxx::to_json(r_bson_doc));
             try {
                 auto insert_result = m_mongo_db_collection.insert_one(r_bson_doc.view());
                 auto inserted_id = insert_result->inserted_id().get_int32().value;
                 m_root_model_key_to_db_id[kr_root_model_key] = r_new_generated_id_out;
                 return (inserted_id == r_new_generated_id_out);
             } catch (const std::exception &e) {
-                LOG_ERROR(m_p_logger_, "Error while inserting document: {}", e.what());
+                LOG_ERROR_IMPL(m_p_logger_, "Error while inserting document: {}", e.what());
                 return false;
             }
         }
@@ -160,7 +160,7 @@ namespace FluxCppCore {
                 auto result = m_mongo_db_collection.update_one(update_filter.view(), update_document.view());
 
             } catch (const std::exception &e) {
-                LOG_ERROR(m_p_logger_, "error while update: {}", e.what());
+                LOG_ERROR_IMPL(m_p_logger_, "error while update: {}", e.what());
                 return false;
             }
             return true;
@@ -207,7 +207,7 @@ namespace FluxCppCore {
 
         bool get_all_data_from_collection(RootModelListType &r_root_model_list_obj_out, int32_t retry_count = 0) {
             if (retry_count >= 10) {
-                LOG_DEBUG(m_p_logger_, "Maximum retry attempts reached while {}", __func__);
+                LOG_DEBUG_IMPL(m_p_logger_, "Maximum retry attempts reached while {}", __func__);
                 return false;
             }
             std::string all_data_from_db_json_string;
@@ -241,7 +241,7 @@ namespace FluxCppCore {
                 if (!all_data_from_db_json_string.empty())
                     return FluxCppCore::RootModelListJsonCodec<RootModelListType>::decode_model_list(r_root_model_list_obj_out, all_data_from_db_json_string);
             } catch (const mongocxx::v_noabi::query_exception& e) {
-                LOG_ERROR(m_p_logger_, "Error {}, function{}", e.what(), __func__);
+                LOG_ERROR_IMPL(m_p_logger_, "Error {}, function{}", e.what(), __func__);
                 get_all_data_from_collection(r_root_model_list_obj_out, retry_count + 1);
             }
             return false;
@@ -266,14 +266,14 @@ namespace FluxCppCore {
                 auto matched_count = result->matched_count();
                 return (modified_count == matched_count); // Return true only if all updates were successful
             } else {
-                LOG_ERROR(m_p_logger_, "Bulk update failed {}", __func__);
+                LOG_ERROR_IMPL(m_p_logger_, "Bulk update failed {}", __func__);
                 return false;
             }
         }
 
         bool get_data_by_id_from_collection(RootModelType &r_root_model_obj_out, const int32_t &kr_root_model_doc_id, int32_t retry_count = 0) {
             if (retry_count >= 10) {
-                LOG_DEBUG(m_p_logger_, "Maximum retry attempts reached while {}", __func__);
+                LOG_DEBUG_IMPL(m_p_logger_, "Maximum retry attempts reached while {}", __func__);
                 return false;
             }
             bool status = false;
@@ -300,7 +300,7 @@ namespace FluxCppCore {
                     status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, new_bson_doc);
                 }
             } catch (const mongocxx::v_noabi::query_exception& e) {
-                LOG_ERROR(m_p_logger_, "Error {}, function{}", e.what(), __func__);
+                LOG_ERROR_IMPL(m_p_logger_, "Error {}, function{}", e.what(), __func__);
                 get_data_by_id_from_collection(r_root_model_obj_out, kr_root_model_doc_id, retry_count + 1);
             }
             return status;
@@ -394,7 +394,7 @@ namespace FluxCppCore {
         bool IsInitialized(const RootModelType &kr_root_model_obj) const {
             // return true, if the object is initialized and has all the required fields (false otherwise)
             if (!kr_root_model_obj.IsInitialized()) {
-                LOG_ERROR(m_p_logger_, "Required fields is not initialized in {};;; obj: {}",
+                LOG_ERROR_IMPL(m_p_logger_, "Required fields is not initialized in {};;; obj: {}",
                           get_root_model_name(), kr_root_model_obj.DebugString());
                 return false;
             } else {
@@ -408,7 +408,7 @@ namespace FluxCppCore {
                 MarketDataKeyHandler::get_key_out(kr_root_model_obj, root_model_key_out);
                 return true;
             } else {
-				LOG_ERROR(GetLogger(), "kr_root_model_obj is not initialized: {}", kr_root_model_obj.DebugString());
+				LOG_ERROR_IMPL(GetLogger(), "kr_root_model_obj is not initialized: {}", kr_root_model_obj.DebugString());
                 return false; // false otherwise
             }
         }

@@ -42,7 +42,7 @@ const Row = (props) => {
             {cells.map((cell, i) => {
                 const cellRow = row[cell.sourceIndex];
                 let selected = cellRow ? props.selectedRows.includes(cellRow['data-id']) : false;
-                let collection = collections.filter(c => c.tableTitle === cell.tableTitle)[0];
+                let collection = collections.find(c => c.tableTitle === cell.tableTitle);
                 let xpath = cellRow?.['xpath_' + cell.key];
                 if (cellRow && cell.tableTitle && cell.tableTitle.indexOf('.') > -1) {
                     xpath = cellRow[cell.tableTitle.substring(0, cell.tableTitle.lastIndexOf('.')) + '.xpath_' + cell.key]

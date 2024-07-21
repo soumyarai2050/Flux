@@ -700,9 +700,9 @@ class StreetBook:
         subscription_data = \
             [
                 (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
-                 str(pair_strat.pair_strat_params.strat_leg1.sec.sec_type)),
+                 str(pair_strat.pair_strat_params.strat_leg1.sec.sec_id_source)),
                 (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
-                 str(pair_strat.pair_strat_params.strat_leg2.sec.sec_type))
+                 str(pair_strat.pair_strat_params.strat_leg2.sec.sec_id_source))
             ]
         db_name = os.environ["DB_NAME"]
         exch_code = "SS" if pair_strat.pair_strat_params.strat_leg1.exch_id == "SSE" else "SZ"

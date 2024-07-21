@@ -179,12 +179,15 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         else:
             return ",\n"
 
-    def __handle_autocomplete_value_task(self, option_value: str, indent_space_count: int):
+    def __handle_autocomplete_value_task(self, option_value: str, field_type: protogen.Message | None,
+                                         indent_space_count: int):
         # handling accessing and replacing list name to the value in option_value
         new_option_value = self.__handle_replacement_of_autocomplete_list_wth_value(option_value)
         output_str = ""
+        field_name_list = []
         for field_value_pair in new_option_value.split(","):
             field_name, value = field_value_pair.split("=")
+            field_name_list.append(field_name)
             if self.__response_field_case_style == "camel":
                 field_name_case_styled = convert_to_camel_case(field_name)
             else:
@@ -193,7 +196,20 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
             if field_value_pair != new_option_value.split(",")[-1]:
                 output_str += ",\n"
             else:
-                output_str += "\n"
+                # handling pending fields if field_type is message type
+                if field_type:
+                    output_str += ",\n"
+                    for f in field_type.fields:
+                        if f.proto.name not in field_name_list:
+                            match f.cardinality.name.lower():
+                                case "optional" | "required":
+                                    output_str += self.__json_non_repeated_field_sample_gen(f, indent_space_count + 2)
+                                    output_str += self.__handle_json_last_values(f, field_type.fields)
+                                case "repeated":
+                                    output_str += self.__json_repeated_field_sample_gen(f, indent_space_count + 2)
+                                    output_str += self.__handle_json_last_values(f, field_type.fields)
+                else:
+                    output_str += "\n"
 
         return output_str
 
@@ -202,6 +218,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
 
         for field in message.fields:
 
+            indent_count = 2
             if self.is_option_enabled(field, JsonSampleGenPlugin.flux_fld_auto_complete):
                 option_value = \
                     self.get_simple_option_value_from_proto(field, JsonSampleGenPlugin.flux_fld_auto_complete)
@@ -209,22 +226,37 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
                     field_name_case_styled = convert_to_camel_case(field.proto.name)
                 else:
                     field_name_case_styled = field.proto.name
-                json_sample_output += " "*(indent_space_count+2) + f'"{field_name_case_styled}":'
+                json_sample_output += " "*(indent_space_count+indent_count) + f'"{field_name_case_styled}":'
+
                 if field.kind.name.lower() == "message":
-                    json_sample_output += " {\n"
+                    if field.cardinality.name.lower() == "repeated":
+                        json_sample_output += " [\n"
+                        indent_count += 2
+                        json_sample_output += " "*(indent_space_count+indent_count) + "{\n"
+                    else:
+                        json_sample_output += " {\n"
                 else:
                     json_sample_output += " "
-                json_sample_output += self.__handle_autocomplete_value_task(option_value, indent_space_count+2)
+                json_sample_output += self.__handle_autocomplete_value_task(option_value, field.message,
+                                                                            indent_space_count+2)
                 if field.kind.name.lower() == "message":
                     if field != message.fields[-1]:
-                        json_sample_output += " "*(indent_space_count+2) + "},\n"
+                        json_sample_output += " "*(indent_space_count+indent_count) + "},\n"
                     else:
-                        json_sample_output += " "*(indent_space_count+2) + "}\n"
+                        if field.cardinality.name.lower() == "repeated":
+                            json_sample_output += " "*(indent_space_count+indent_count) + "}\n"
+                            indent_count -= 2
+                            json_sample_output += " "*(indent_space_count+indent_count) + "]\n"
+                        else:
+                            json_sample_output += " "*(indent_space_count+indent_count) + "}\n"
                 else:
                     if field != message.fields[-1]:
                         json_sample_output += ",\n"
                     else:
-                        json_sample_output += "\n"
+                        if field.cardinality.name.lower() == "repeated":
+                            json_sample_output += "]\n"
+                        else:
+                            json_sample_output += "\n"
                 continue
 
             match field.cardinality.name.lower():
@@ -248,13 +280,16 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
 
     def __load_auto_complete_json(self) -> Dict:
         if self.__is_req_autocomplete:
-            if (autocomplete_file_path := os.getenv("AUTOCOMPLETE_FILE_PATH")) is not None and \
-                    len(autocomplete_file_path):
+            project_path = os.getenv("PROJECT_DIR")
+
+            if project_path is not None and len(project_path):
+
+                autocomplete_file_path = PurePath(project_path) / "misc" / "autocomplete.json"
                 with open(autocomplete_file_path) as fl:
                     auto_complete_data = json.load(fl)
                     return auto_complete_data
             else:
-                err_str = f"Env variable AUTOCOMPLETE_FILE_PATH received as {autocomplete_file_path}"
+                err_str = f"Env variable PROJECT_DIR received as {project_path}"
                 logging.exception(err_str)
                 raise Exception(err_str)
         # else not required: If no field of any message has autocomplete option then avoiding file's content load

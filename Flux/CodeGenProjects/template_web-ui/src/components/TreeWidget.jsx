@@ -149,7 +149,7 @@ const TreeWidget = (props) => {
                         }
                         let parentindex = 0;
                         if (parentObject.length > 0) {
-                            let propname = _.keys(parentObject[parentObject.length - 1]).filter(key => key.startsWith('xpath_'))[0];
+                            let propname = _.keys(parentObject[parentObject.length - 1]).find(key => key.startsWith('xpath_'));
                             let propxpath = parentObject[parentObject.length - 1][propname];
                             parentindex = parseInt(propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'))) + 1;
                         }

@@ -9,6 +9,7 @@ import "street_book_core.proto";
 import "phone_book_n_street_book_core.proto";
 import "mobile_book_n_street_book_core.proto";
 import "street_book_n_post_book_core.proto";
+import "street_book_n_basket_book_core.proto";
 
 package street_book;
 
@@ -262,29 +263,6 @@ message StratLimits{
   optional int64 strat_limits_update_seq_num = 15 [(FluxFldHide) = "True"];
 }
 
-message NewChore{
-  option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_UNSPECIFIED,
-    ReadOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
-  };
-  option (FluxMsgExecutorOptions) = {
-    IsWebSocketModel: true,
-    EnableNotifyAll: true,
-    IsTopLvlModel: false,
-    ExecutorKeySequence: "security.sec_id-side"
-    IsRepeated: true
-  };
-  option (FluxMsgJsonQuery) = {
-      QueryName: "get_new_chore_from_cache"
-  };
-  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required Security security = 2;
-  required Side side = 3;
-  optional float px = 4;
-  optional int64 qty = 5;
-}
-
 message CancelChore{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
@@ -518,4 +496,5 @@ message ImportWarningAvoidDummyMessage{
   optional DummyEnumMS temp4 = 4;
   optional CommandType temp5 = 5;
   optional DummyEnumSO temp6 = 6;
+  optional ChoreSubmitType temp7 = 7;
 }

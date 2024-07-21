@@ -92,10 +92,10 @@ protected:
                     m_call_back_(m_user_data_);
                 }
                 if (status) {
-                    LOG_INFO(mp_logger_, "Received data: {}", data);
-                    LOG_INFO(mp_logger_, "Deserialized data: {} ", m_user_data_.DebugString());
+                    LOG_INFO_IMPL(mp_logger_, "Received data: {}", data);
+                    LOG_INFO_IMPL(mp_logger_, "Deserialized data: {} ", m_user_data_.DebugString());
                 } else {
-                    LOG_ERROR(mp_logger_, "Failed while decoding received Data: {};;; UserDataType: {} ",
+                    LOG_ERROR_IMPL(mp_logger_, "Failed while decoding received Data: {};;; UserDataType: {} ",
                               data, km_user_data_type_name_);
                 }
 
@@ -108,7 +108,7 @@ protected:
                 // WebSocket closed or connection reset by peer, exit the loop
                 shutdown();
             } else {
-                LOG_ERROR(mp_logger_, "Error reading from WebSocket: {}", error_code.message());
+                LOG_ERROR_IMPL(mp_logger_, "Error reading from WebSocket: {}", error_code.message());
             }
         });
 

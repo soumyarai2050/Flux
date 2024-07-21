@@ -1,6 +1,5 @@
-
-#include <filesystem>
 #include <iostream>
+#include <yaml-cpp/yaml.h>
 
 #include "logger.h"
 
@@ -80,7 +79,7 @@ std::vector<std::shared_ptr<quill::Handler>> get_log_file_handlers(std::string l
 
     if (lineHeader)
     {
-        auto logPtn = "%(time) %(log_level_id) %(thread_id) %(thread_name) %(file_name) %(line_number) - %(message)";
+        auto logPtn = "%(time) %(log_level) %(thread_id) %(thread_name) %(file_name) %(line_number) - %(message)";
         setPattern(logPtn, "%Y-%m-%d %H-%M-%S.%Qus%z");
     }
     return FileHandlers;
@@ -93,39 +92,40 @@ quill::Logger* create_logger(const char* name, quill::LogLevel level, std::vecto
     return ql;
 }
 
-void get_log_file_path(std::filesystem::path &r_log_file_path_out) {
-    // TODO: Read from config....
-    auto root_dir = std::filesystem::current_path().parent_path().parent_path().parent_path();
-    std::filesystem::current_path(root_dir);
-    auto project_dir_path = std::filesystem::current_path() / "ProjectGroup" / "market_data";
-    if (std::filesystem::exists(project_dir_path)) {
-        std::filesystem::current_path(project_dir_path);
-        r_log_file_path_out = std::filesystem::current_path();
-    } else {
-        root_dir = std::filesystem::current_path().parent_path().parent_path();
-        std::filesystem::current_path(root_dir);
-        project_dir_path = std::filesystem::current_path() / "TradeEngine" / "ProjectGroup" / "market_data";
-        std::filesystem::current_path(project_dir_path);
-        r_log_file_path_out = std::filesystem::current_path();
+void get_log_file_path(std::string &r_log_file_path_out) {
+
+    const char* config_file = getenv("CONFIG_FILE");
+    if (!config_file) {
+        throw std::runtime_error("export env variable {CONFIG_FILE}");
+    }
+    if (access(config_file, F_OK) != 0) {
+        throw std::runtime_error(std::format("{} not accessable", config_file));
+    }
+
+    YAML::Node config = YAML::LoadFile(config_file);
+    try {
+        r_log_file_path_out = config["log_file_path"].as<std::string>();
+    } catch (YAML::Exception& exception) {
+        std::cerr << "-------------------------" << config["log_file_path"].size() << "\n";
+        std::cerr << exception.msg << std::endl;
+        throw std::runtime_error((exception.what()));
     }
 }
 
-bool InitLogger()
+#ifndef USE_LOGGING
+
+void InitLogger(){}
+quill::Logger* GetLogger() {return nullptr;}
+
+#else
+
+void InitLogger()
 {
 
-    std::filesystem::path log_file_path;
+    std::string log_file_path;
     get_log_file_path(log_file_path);
-    if (std::filesystem::exists(log_file_path)) {
-        std::filesystem::current_path(log_file_path);
-        if (!std::filesystem::exists(log_file_path / "log")) {
-            std::filesystem::create_directory("log");
-        }
-        log_file_path = log_file_path / "log";
-        std::filesystem::current_path(log_file_path);
-    }
-    std::string log_dir = log_file_path.string();
-    // std::string log_file_name = std::string(db_name) + ;
-    auto handlers = get_log_file_handlers(log_file_path / "market_data.logfile-%P--%D-%T.log");
+
+    auto handlers = get_log_file_handlers(log_file_path + "/" + "market_data.logfile-%P--%D-%T.log");
     logger = create_logger("", quill::LogLevel::Debug, std::move(handlers));
 
     quill::Config cfg;
@@ -141,9 +141,6 @@ bool InitLogger()
     quill::configure(cfg);
 
     quill::start();
-
-    return true;
-
 }
 
 quill::Logger* GetLogger()
@@ -153,3 +150,5 @@ quill::Logger* GetLogger()
     return logger;
 
 }
+
+#endif

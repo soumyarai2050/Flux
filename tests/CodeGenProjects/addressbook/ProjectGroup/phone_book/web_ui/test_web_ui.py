@@ -445,7 +445,7 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
             click_button_with_name(widget=widget, button_name="Settings")
 
             if (field_name == "sec_id" or field_name == "max_rolling_tx_count" or
-                    field_name == "rolling_tx_count_period_seconds" or field_name == "sec_type"):
+                    field_name == "rolling_tx_count_period_seconds" or field_name == "sec_id_source"):
                 driver.refresh()
                 time.sleep(Delay.DEFAULT.value)
                 continue
@@ -485,7 +485,7 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
             help_txt: str = field_query.properties['help']
             # click_button_with_name(widget=widget, button_name="Settings")
             if (field_name == "sec_id" or field_name == "max_rolling_tx_count" or
-                    field_name == "rolling_tx_count_period_seconds" or field_name == "sec_type"):
+                    field_name == "rolling_tx_count_period_seconds" or field_name == "sec_id_source"):
                 continue
 
             setting_dropdown = widget.find_element(By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[3]')
@@ -1398,7 +1398,7 @@ def test_flux_fld_elaborate_title_in_widget(clean_and_set_limits, web_project, d
 
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            if field_name == "exch_id" or field_name == "company" or field_name == "sec_type":
+            if field_name == "exch_id" or field_name == "company" or field_name == "sec_id_source":
                 continue
 
             default_field: str = field_query.properties["parent_title"]

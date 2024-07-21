@@ -8,4 +8,9 @@ namespace mobile_book_handler {
     mobile_book::LastBarter last_barter_obj;
     mobile_book::MarketDepth market_depth_obj;
     const std::chrono::seconds TIME_OUT_CONNECTION = std::chrono::seconds(mobile_book_handler::connection_timeout);
+    std::atomic<bool> shutdown_db_n_ws_thread{false};
+    void signal_handler([[maybe_unused]] int signal) {
+        shutdown_db_n_ws_thread = false;
+    }
+
 }

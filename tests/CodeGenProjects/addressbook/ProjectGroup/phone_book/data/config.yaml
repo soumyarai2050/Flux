@@ -5,3 +5,7 @@ ps_db_name: "phone_book_8020"
 md_db_name: "mobile_book"
 web_project_url: "http://localhost:3020"
 run_gdb_terminal: False
+debug_mode: False
+debug_residual_mark_seconds_limit: 0
+debug_residual_wait_sec: 0
+debug_max_wait_sec: 0

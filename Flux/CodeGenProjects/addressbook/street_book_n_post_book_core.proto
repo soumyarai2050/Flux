@@ -84,10 +84,14 @@ message ChoreJournal{
     IsRepeated: true
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional ChoreBrief chore = 2;
+  optional ChoreBrief chore = 2 [(FluxFldPk) = "chore_id"];
   optional int64 chore_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
-  optional ChoreEventType chore_event = 4;
+  optional ChoreEventType chore_event = 4 [(FluxFldPk) = "true"];
   optional int32 current_period_chore_count = 8 [ (FluxFldHelp) = "total new chore count within chore_rate(s) applicable_period_seconds"];
+}
+
+message ChoreJournalList {
+    repeated ChoreJournal chore_journal = 1 [(FluxFldPk) = "true"];
 }
 
 message ChoreSnapshot{

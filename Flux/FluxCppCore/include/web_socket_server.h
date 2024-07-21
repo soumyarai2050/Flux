@@ -43,8 +43,8 @@ namespace FluxCppCore {
                 m_acceptor_ = std::make_unique<tcp::acceptor>(m_io_context_,
                     tcp::endpoint{asio::ip::make_address(km_host_), static_cast<port_type>(km_port_)});
             } catch (const boost::system::system_error& error) {
-                LOG_ERROR(mp_logger, "Failed to start server: {} in function: {}", error.what(), __func__);
-                LOG_INFO(mp_logger, "Retrying server initialization in function: {}", __func__);
+                LOG_ERROR_IMPL(mp_logger, "Failed to start server: {} in function: {}", error.what(), __func__);
+                LOG_INFO_IMPL(mp_logger, "Retrying server initialization in function: {}", __func__);
                 int32_t port = FluxCppCore::find_free_port();
                 if (RootModelType::GetDescriptor()->name() == "MarketDepth") {
                     km_port_ = port;
@@ -76,7 +76,7 @@ namespace FluxCppCore {
             m_timer_.async_wait([&](const boost::system::error_code &error_code) {
                 if (!error_code) {
                     shutdown();
-                    LOG_INFO(mp_logger, "Timeout reached");
+                    LOG_INFO_IMPL(mp_logger, "Timeout reached");
                     if(m_shutdown)
                         m_io_context_.stop();
                     else
@@ -119,7 +119,7 @@ namespace FluxCppCore {
             if (!error_code) {
                 return true;
             } else {
-                LOG_ERROR(mp_logger, "Error writing data to client: {};;; Data {}", error_code.message(), kr_send_string);
+                LOG_ERROR_IMPL(mp_logger, "Error writing data to client: {};;; Data {}", error_code.message(), kr_send_string);
                 return false;
             }
         }
@@ -159,7 +159,7 @@ namespace FluxCppCore {
                     ws_ptr->accept();
                 }
                 catch (std::exception const& error){
-                    LOG_ERROR(mp_logger, "Error while accepting client: {}", error.what());
+                    LOG_ERROR_IMPL(mp_logger, "Error while accepting client: {}", error.what());
                 }
                 // Send the HTTP response body to the WebSocket client
                 ws_vector.push_back(std::move(ws_ptr));
@@ -167,7 +167,7 @@ namespace FluxCppCore {
                 // invoke callback to let user know of this new client with index
             }
             catch (std::exception const& error) {
-                LOG_ERROR(mp_logger, "Session error: {}", error.what());
+                LOG_ERROR_IMPL(mp_logger, "Session error: {}", error.what());
             }
         }
 

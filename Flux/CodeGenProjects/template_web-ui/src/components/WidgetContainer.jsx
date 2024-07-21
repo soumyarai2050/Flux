@@ -88,7 +88,7 @@ const WidgetContainer = (props) => {
             if (commonkey.displayZero) return true;
             return false;
         }
-        else return true;
+        return true;
     }) : [];
 
     let height = 0;

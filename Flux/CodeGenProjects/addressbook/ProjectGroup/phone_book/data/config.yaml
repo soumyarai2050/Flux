@@ -45,5 +45,6 @@ multi_project_plugin:
   - "street_book"
   - "log_book"
   - "photo_book"
+  - "basket_book"
 
 cpp_app_so_module_file_name: "libmarketdataprovider.so"

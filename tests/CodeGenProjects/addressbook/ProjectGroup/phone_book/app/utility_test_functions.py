@@ -34,6 +34,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client import PhotoBookServiceHttpClient
 from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_http_client import PerformanceBenchmarkServiceHttpClient
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_http_client import BasketBookServiceHttpClient
 
 code_gen_projects_dir_path = (PurePath(__file__).parent.parent.parent.parent.parent.parent.parent
                               / "Flux" / "CodeGenProjects")
@@ -57,6 +58,10 @@ executor_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(st
 STRAT_VIEW_ENGINE_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "photo_book"
 strat_view_config_yaml_path: PurePath = STRAT_VIEW_ENGINE_DIR / "data" / "config.yaml"
 strat_view_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(strat_view_config_yaml_path))
+
+BASKET_EXECUTOR_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "basket_book"
+basket_book_config_yaml_path: PurePath = BASKET_EXECUTOR_DIR / "data" / "config.yaml"
+basket_book_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(basket_book_config_yaml_path))
 
 HOST: Final[str] = "127.0.0.1"
 
@@ -82,6 +87,11 @@ STRAT_VIEW_BEANIE_HOST: Final[str] = strat_view_config_yaml_dict.get("server_hos
 STRAT_VIEW_CACHE_PORT: Final[str] = strat_view_config_yaml_dict.get("main_server_cache_port")
 STRAT_VIEW_BEANIE_PORT: Final[str] = strat_view_config_yaml_dict.get("main_server_beanie_port")
 
+BASKET_EXECUTOR_CACHE_HOST: Final[str] = basket_book_config_yaml_dict.get("server_host")
+BASKET_EXECUTOR_BEANIE_HOST: Final[str] = basket_book_config_yaml_dict.get("server_host")
+BASKET_EXECUTOR_CACHE_PORT: Final[str] = basket_book_config_yaml_dict.get("main_server_cache_port")
+BASKET_EXECUTOR_BEANIE_PORT: Final[str] = basket_book_config_yaml_dict.get("main_server_beanie_port")
+
 perf_benchmark_web_client: PerformanceBenchmarkServiceHttpClient = (
     PerformanceBenchmarkServiceHttpClient(host=PERF_BENCH_BEANIE_HOST, port=parse_to_int(PERF_BENCH_BEANIE_PORT)))
 email_book_service_native_web_client: EmailBookServiceHttpClient = \
@@ -92,6 +102,9 @@ log_book_web_client: LogBookServiceHttpClient = (
 photo_book_web_client: PhotoBookServiceHttpClient = (
     PhotoBookServiceHttpClient.set_or_get_if_instance_exists(host=STRAT_VIEW_BEANIE_HOST,
                                                                    port=parse_to_int(STRAT_VIEW_BEANIE_PORT)))
+basket_book_web_client: BasketBookServiceHttpClient = (
+    BasketBookServiceHttpClient.set_or_get_if_instance_exists(host=BASKET_EXECUTOR_BEANIE_HOST,
+                                                                   port=parse_to_int(BASKET_EXECUTOR_BEANIE_PORT)))
 
 static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
 project_dir_path = \
@@ -124,7 +137,7 @@ def clean_all_collections_ignoring_ui_layout() -> None:
                 ignore_collections.append("StratCollection")
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=ignore_collections)
-        elif "street_book_" in db_name:
+        elif "street_book_" in db_name or db_name == "basket_book":
             drop_mongo_database(mongo_server_uri=mongo_server_uri, database_name=db_name)
 
 
@@ -267,12 +280,12 @@ def position_fixture():
     return position
 
 
-def sec_position_fixture(sec_id: str, sec_type: SecurityType):
+def sec_position_fixture(sec_id: str, sec_id_source: SecurityIdSource):
     sec_position_json = {
         "_id": SecPosition.next_id(),
         "security": {
             "sec_id": sec_id,
-            "sec_type": sec_type
+            "sec_id_source": sec_id_source
         },
         "positions": [
             position_fixture(),
@@ -284,8 +297,8 @@ def sec_position_fixture(sec_id: str, sec_type: SecurityType):
 
 
 def broker_fixture():
-    sec_position_1 = sec_position_fixture("CB_Sec_1", SecurityType.SEDOL)
-    sec_position_2 = sec_position_fixture("EQT_Sec_1.SS", SecurityType.RIC)
+    sec_position_1 = sec_position_fixture("CB_Sec_1", SecurityIdSource.SEDOL)
+    sec_position_2 = sec_position_fixture("EQT_Sec_1.SS", SecurityIdSource.RIC)
 
     broker_json = {
         "bkr_disable": False,
@@ -807,7 +820,6 @@ def placed_buy_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
-    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_UNACK
     expected_chore_snapshot_obj.last_update_date_time = expected_chore_journal.chore_event_date_time
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
@@ -964,7 +976,6 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
-    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_CXL_UNACK
     expected_chore_snapshot_obj.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
@@ -1105,7 +1116,6 @@ def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
-    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_CXL_UNACK
     expected_chore_snapshot_obj.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
@@ -1614,7 +1624,6 @@ def placed_sell_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
-    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_UNACK
     expected_chore_snapshot_obj.last_update_date_time = expected_chore_journal.chore_event_date_time
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
@@ -1884,7 +1893,6 @@ def check_cxl_receive_for_placed_sell_chore_after_all_buys(
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
-    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_CXL_UNACK
     expected_chore_snapshot_obj.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
@@ -2026,7 +2034,6 @@ def check_cxl_receive_for_placed_buy_chore_after_all_sells(
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
-    expected_chore_snapshot_obj.last_chore_status = ChoreStatusType.OE_CXL_UNACK
     expected_chore_snapshot_obj.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
@@ -3008,7 +3015,7 @@ def get_fill_journals_for_chore_id(expected_chore_id: str,
 
 def place_new_chore(sec_id: str, side: Side, px: float, qty: int,
                     executor_web_client: StreetBookServiceHttpClient):
-    security = SecurityOptional(sec_id=sec_id, sec_type=SecurityType.TICKER)
+    security = SecurityOptional(sec_id=sec_id, sec_id_source=SecurityIdSource.TICKER)
     new_chore_obj = NewChoreBaseModel(security=security, side=side, px=px, qty=qty)
     created_new_chore_obj = executor_web_client.create_new_chore_client(new_chore_obj)
 
@@ -5502,3 +5509,19 @@ def place_sanity_chores_for_executor(
 
         if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
             time.sleep(residual_wait_sec)  # wait to make this open chore residual
+
+
+def debug_callable_handler(debug_max_wait_sec: int, test_callable: Callable[..., Any], callable_params_kwargs: Dict):
+    start_time = DateTime.utcnow()
+    while True:
+        try:
+            res = test_callable(**callable_params_kwargs)
+            return res
+        except AssertionError as asser_err:
+            latest_time = DateTime.utcnow()
+            if debug_max_wait_sec:
+                if (latest_time - start_time).total_seconds() < debug_max_wait_sec:
+                    raise asser_err
+                # else continue to keep running test_callable till it passes or debug_max_wait_sec are consumed
+            else:
+                raise asser_err

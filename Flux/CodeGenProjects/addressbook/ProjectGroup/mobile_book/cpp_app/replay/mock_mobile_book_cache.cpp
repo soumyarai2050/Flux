@@ -33,6 +33,7 @@ void unlock_mutex(PyObject *p_mutex_ptr) {
 
 void initialize_database(const char *db_uri, const char *db_name, PyObject *port_dict) {
 
+    LOG_ERROR_IMPL(GetLogger(), "inside: {}", __func__);	
     MongoDBHandlerSingleton::get_instance(db_uri, db_name);
 
     // Acquire the GIL

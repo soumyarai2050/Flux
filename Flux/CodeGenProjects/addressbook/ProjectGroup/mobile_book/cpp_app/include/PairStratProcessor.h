@@ -18,7 +18,7 @@ namespace mobile_book_handler {
                 std::string m_subscription_data_str(m_subscription_data_c_str);
                 parse_subscription_data(m_subscription_data_str);
             } else {
-                LOG_ERROR(mp_logger_, "SUBSCRIPTION_DATA environment variable is not set." );
+                LOG_ERROR_IMPL(mp_logger_, "SUBSCRIPTION_DATA environment variable is not set." );
             }
         }
 
@@ -85,7 +85,7 @@ namespace mobile_book_handler {
                 if (!m_webclient_cache_.exists(symbol)) {
                     m_webclient_cache_.insert(symbol, value);
                 } else {
-                    LOG_INFO(mp_logger_, "Symbol already exists: {}", symbol);
+                    LOG_INFO_IMPL_IMPL(mp_logger_, "Symbol already exists: {}", symbol);
                 }
             }
         }

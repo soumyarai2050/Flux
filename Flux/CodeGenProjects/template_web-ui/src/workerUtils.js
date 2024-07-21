@@ -1,23 +1,25 @@
 import _, { cloneDeep } from 'lodash';
 import { ColorTypes, DB_ID, DataTypes, SeverityType } from './constants';
-import { SortComparator } from './utility/sortComparator';
+import { SortComparator, SortType } from './utility/sortComparator';
 
 const FLOAT_POINT_PRECISION = 2;
 
-export function applyFilter(arr, filters = [], grouped = false) {
+export function applyFilter(arr, filters = []) {
     if (arr && arr.length > 0) {
         let updatedArr = cloneDeep(arr);
         const filterDict = getFilterDict(filters);
         Object.keys(filterDict).forEach(key => {
             let values = filterDict[key].split(',').map(val => val.trim()).filter(val => val !== '');
-            if (grouped) {
-                updatedArr = updatedArr.filter(a => {
-                    a = a.filter(obj => values.includes(String(_.get(obj, key))));
-                    return a.length === 0;
-                })
-            } else {
-                updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
-            }
+            updatedArr = updatedArr.filter(obj => {
+                let objValue = _.get(obj, key);
+                if (objValue === null || objValue === undefined || objValue === '') {
+                    // obj key is unset, filter the obj
+                    return false;
+                }
+                // filter is set
+                objValue = String(objValue).toLowerCase();
+                return values.some(value => objValue.includes(value.toLowerCase()));
+            });
         })
         return updatedArr;
     }
@@ -142,7 +144,7 @@ export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation
                     value = [_.get(metadata, c.xpath), color];
                 } else if (c.xpath.indexOf("-") !== -1) {
                     value = c.xpath.split("-").map(xpath => {
-                        let collection = c.subCollections.filter(col => col.tableTitle === xpath)[0];
+                        let collection = c.subCollections.find(col => col.tableTitle === xpath);
                         let val = _.get(metadata, xpath);
                         if (val === undefined || val === null) {
                             val = "";
@@ -328,9 +330,11 @@ export function getColorTypeFromValue(collection, value, separator = '-') {
 }
 
 // Function to ensure each inner array is symmetric based on max counts of a specified field
-function ensureSymmetry(arr, field) {
+function ensureSymmetry(arr, joinSort) {
     // Step 1: Calculate max counts for the specified field dynamically
-    let maxCounts = {};
+    const field = joinSort.sort_order.order_by;
+    const sortType = joinSort.sort_order.sort_type;
+    const maxCounts = {};
 
     arr.forEach(innerArr => {
         let innerArrMaxCounts = {};
@@ -351,14 +355,27 @@ function ensureSymmetry(arr, field) {
             maxCounts = { ...innerArrMaxCounts };
         }
     });
+    if (joinSort.placeholders && joinSort.placeholders.length > 0) {
+        joinSort.placeholders.forEach(key => {
+            if (!maxCounts.hasOwnProperty(key)) {
+                maxCounts[key] = 1;
+            }
+        })
+    }
 
     // Step 2: Ensure symmetry based on max counts
     let grouped = arr.map(innerArr => {
         // Group objects by the specified field
         let groupedObj = {};
-        Object.keys(maxCounts).map(key => {
-            groupedObj[key] = [];
-        })
+        if (sortType === SortType.DESCENDING) {
+            Object.keys(maxCounts).sort().reverse().map(key => {
+                groupedObj[key] = [];
+            })  
+        } else {
+            Object.keys(maxCounts).sort().map(key => {
+                groupedObj[key] = [];
+            })
+        }
         let grouped = innerArr.reduce((acc, obj) => {
             let fieldValue = obj[field];
             if (!acc[fieldValue]) {
@@ -391,7 +408,7 @@ function ensureSymmetry(arr, field) {
     return grouped;
 }
 
-export function getGroupedTableRows(tableRows, groupBy, joinSortOrders = null) {
+export function getGroupedTableRows(tableRows, groupBy, joinSort = null) {
     if (groupBy && groupBy.length > 0) {
         // tableRows = Object.values(_.groupBy(tableRows, item => {
         //     const groupKeys = [];
@@ -409,10 +426,9 @@ export function getGroupedTableRows(tableRows, groupBy, joinSortOrders = null) {
         });
         tableRows = Object.values(groupedRowsDict);
 
-        if (joinSortOrders && joinSortOrders.length > 0) {
-            tableRows = tableRows.map(rows => stableSort(rows, SortComparator.getInstance(joinSortOrders)));
-            const joinOrder = joinSortOrders[0].order_by;
-            tableRows = ensureSymmetry(tableRows, joinOrder);
+        if (joinSort) {
+            tableRows = tableRows.map(rows => stableSort(rows, SortComparator.getInstance([joinSort.sort_order])));
+            tableRows = ensureSymmetry(tableRows, joinSort);
         }
     } else {
         tableRows = tableRows.map(row => [row]);

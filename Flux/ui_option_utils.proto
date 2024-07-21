@@ -64,6 +64,11 @@ message OverrideDefaultCRUD{
   repeated UIQueryParam ui_query_params = 4;
 }
 
+message JoinSort {
+  required SortOrder sort_order = 1;
+  repeated string placeholders = 2;
+}
+
 message WidgetUIDataElement {
   // key string connects Widget with Model - future better name via: [(FluxFldAlias) = 'i']
   optional string i = 1;
@@ -93,7 +98,8 @@ message WidgetUIDataElement {
   optional bool depends_on_model_name_for_port = 20 [default=false];
   repeated OverrideDefaultCRUD override_default_crud = 21;
   optional bool is_model_alert_type = 22;
-  repeated SortOrder join_sort_orders = 23;
+  optional JoinSort join_sort = 23;
+  optional bool is_read_only = 24;
 }
 
 message WidgetUIOption {

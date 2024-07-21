@@ -13,7 +13,7 @@ def single_strat_single_data():
                     "chore_id": "CB_Sec_1-2023-10-26T21:54:59.672447+00:00",
                     "security": {
                         "sec_id": "CB_Sec_1",
-                        "sec_type": "TICKER"
+                        "sec_id_source": "TICKER"
                     },
                     "side": "BUY",
                     "px": 100,
@@ -36,7 +36,7 @@ def single_strat_single_data():
                     "chore_id": "CB_Sec_1-2023-10-26T21:55:04.015464+00:00",
                     "security": {
                         "sec_id": "CB_Sec_1",
-                        "sec_type": "TICKER"
+                        "sec_id_source": "TICKER"
                     },
                     "side": "BUY",
                     "px": 100,
@@ -65,7 +65,7 @@ def single_strat_single_data():
                 "pair_buy_side_bartering_brief": {
                     "security": {
                         "sec_id": "CB_Sec_1",
-                        "sec_type": "TICKER"
+                        "sec_id_source": "TICKER"
                     },
                     "side": "BUY",
                     "last_update_date_time": "2023-10-26T21:55:04.117Z",
@@ -85,7 +85,7 @@ def single_strat_single_data():
                 "pair_sell_side_bartering_brief": {
                     "security": {
                         "sec_id": "EQT_Sec_1",
-                        "sec_type": "TICKER"
+                        "sec_id_source": "TICKER"
                     },
                     "side": "SELL",
                     "last_update_date_time": "2023-10-26T21:54:56.728Z",

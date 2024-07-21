@@ -22,8 +22,8 @@ message StratView{
   required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int32 strat_alert_count = 2;
   optional Severity strat_alert_aggregated_severity = 3 [default=Severity_UNSPECIFIED, (FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
-  optional float average_premium = 4 [(FluxFldNumberFormat) = "%"];
-  optional float market_premium = 5 [(FluxFldNumberFormat) = "%"];
+  optional float average_premium = 4 [(FluxFldNumberFormat) = "%", (FluxFldNoCommonKey) = true];
+  optional float market_premium = 5 [(FluxFldNumberFormat) = "%", (FluxFldNoCommonKey) = true];
   optional float balance_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="StratView.max_single_leg_notional", (FluxFldProgressBar) = {
     value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // chore of condition matching -> left to right (select first match)
     hover_text_type: HoverTextType_VALUE,

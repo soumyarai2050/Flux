@@ -8,7 +8,11 @@
 
 int main() {
 
+    Py_Initialize();
+
+    // std::signal(SIGTERM, signal_handler);
     std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db = MongoDBHandlerSingleton::get_instance();
+    add_symbols_to_the_cache_container();
     mobile_book::TopOfBook top_of_book;
     mobile_book::MarketDepth market_depth;
     mobile_book::LastBarter last_barter;
@@ -27,11 +31,13 @@ int main() {
 
     mobile_book_handler::MarketDepthHandler market_depth_handler(sp_mongo_db, md_websocket_server_, top_of_book_handler);
     mobile_book_handler::LastBarterHandler last_barter_handler(sp_mongo_db, lt_websocket_server_, top_of_book_handler);
+
     mobile_book_handler::HistoryManager historyManager(sp_mongo_db, last_barter_handler, market_depth_handler);
     historyManager.replay();
 
     top_of_book_websocket_thread_.join();
     last_barter_websocket_thread_.join();
     market_depth_websocket_thread_.join();
+    websocket_cleanup();
     return 0;
 }

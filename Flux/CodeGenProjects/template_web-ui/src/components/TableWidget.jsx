@@ -103,7 +103,7 @@ const TableWidget = (props) => {
             updatedCells = updatedCells.filter(cell => !cell.showLess);
         }
         updatedCells = updatedCells.filter(cell => {
-            if (commonkeys.filter(commonkey => commonkey.key === cell.key && commonkey.tableTitle === cell.tableTitle && commonkey.sourceIndex === cell.sourceIndex).length > 0 && props.mode !== Modes.EDIT_MODE) {
+            if (commonkeys.some(commonkey => commonkey.key === cell.key && commonkey.tableTitle === cell.tableTitle && commonkey.sourceIndex === cell.sourceIndex) && props.mode !== Modes.EDIT_MODE) {
                 return false;
             }
             return true;
@@ -326,7 +326,7 @@ const TableWidget = (props) => {
         }
         let updatedHeadCells = headCells.map((cell) => cell.tableTitle === key ? { ...cell, hide: hide } : cell)
         setHeadCells(updatedHeadCells);
-        let collection = props.collections.filter(c => c.tableTitle === key)[0];
+        let collection = props.collections.find(c => c.tableTitle === key);
         let enableOverride = cloneDeep(props.enableOverride);
         let disableOverride = cloneDeep(props.disableOverride);
         if (hide) {
@@ -357,7 +357,7 @@ const TableWidget = (props) => {
         let less = value;
         let updatedHeadCells = headCells.map(cell => cell.tableTitle === key ? { ...cell, showLess: less } : cell)
         setHeadCells(updatedHeadCells);
-        let collection = props.collections.filter(c => c.tableTitle === key)[0];
+        let collection = props.collections.find(c => c.tableTitle === key);
         const showLessArray = cloneDeep(props.showLess);
         if (less) {
             if (collection.showLess !== less) {
@@ -804,7 +804,6 @@ const TableWidget = (props) => {
                                 {getActiveRows(rows, page, rowsPerPage, sortOrders, true)
                                     .map((row, index) => {
                                         let cells = getFilteredCells();
-                                        // let selected = selectedRows.filter(id => id === row[0]['data-id']).length > 0;
                                         let rowKey = row[0]['data-id'];
                                         if (Number.isInteger(rowKey)) {
                                             rowKey = index;

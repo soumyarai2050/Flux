@@ -90,8 +90,22 @@ def test_min_chore_notional_breach_in_relaxed_strat_mode(
         buy_chore_, sell_chore_,
         max_loop_count_per_side, expected_chore_limits_, refresh_sec_update_fixture):
 
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    residual_wait_sec = 4 * refresh_sec_update_fixture
+    test_config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(test_config_file_path))
+    debug_mode = test_config_dict.get("debug_mode")
+    if debug_mode:
+        debug_residual_mark_seconds_limit = test_config_dict.get("debug_residual_mark_seconds_limit")
+        if debug_residual_mark_seconds_limit is not None:
+            expected_strat_limits_.residual_restriction.residual_mark_seconds = debug_residual_mark_seconds_limit
+        else:
+            expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+        debug_residual_wait_sec = test_config_dict.get("debug_residual_wait_sec")
+        if debug_residual_wait_sec is not None:
+            residual_wait_sec = debug_residual_wait_sec
+        else:
+            residual_wait_sec = 4 * refresh_sec_update_fixture
+    else:
+        expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+        residual_wait_sec = 4 * refresh_sec_update_fixture
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_strat_status_, symbol_overview_obj_list,
@@ -121,8 +135,15 @@ def test_min_chore_notional_breach_in_relaxed_strat_mode(
         update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
-                                                                              buy_symbol, executor_http_client)
+        debug_max_wait_sec = None
+        if debug_mode:
+            debug_max_wait_sec = test_config_dict.get("debug_max_wait_sec")
+
+        kwargs = {"expected_chore_event": ChoreEventType.OE_NEW,
+                  "expected_symbol": buy_symbol,
+                  "executor_web_client": executor_http_client}
+        placed_chore_journal = debug_callable_handler(debug_max_wait_sec,
+                                                      get_latest_chore_journal_with_event_and_symbol, kwargs)
 
         if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
             time.sleep(residual_wait_sec)

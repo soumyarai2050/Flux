@@ -9,3 +9,4 @@ core_or_util_files:
   - "phone_book_n_street_book_core.proto"
   - "mobile_book_n_street_book_core.proto"
   - "street_book_n_post_book_core.proto"
+  - "street_book_n_basket_book_core.proto"

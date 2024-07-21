@@ -119,11 +119,11 @@ def last_barter_fixture_list():
     yield input_data
 
 
-def empty_pair_side_bartering_brief_obj(symbol: str, side: str, sec_type: str | None = SecurityType.TICKER):
+def empty_pair_side_bartering_brief_obj(symbol: str, side: str, sec_id_source: str | None = SecurityIdSource.TICKER):
     return PairSideBarteringBriefOptional(**{
         "security": {
           "sec_id": symbol,
-          "sec_type": sec_type
+          "sec_id_source": sec_id_source
         },
         "side": side,
         "last_update_date_time": DateTime.utcnow(),
@@ -159,7 +159,7 @@ def expected_symbol_side_snapshot_():
         SymbolSideSnapshotBaseModel(**{
             "security": {
               "sec_id": "CB_Sec_1",
-              "sec_type": SecurityType.TICKER
+              "sec_id_source": SecurityIdSource.TICKER
             },
             "side": "BUY",
             "avg_px": 0,
@@ -178,7 +178,7 @@ def expected_symbol_side_snapshot_():
         SymbolSideSnapshotBaseModel(**{
             "security": {
                 "sec_id": "EQT_Sec_1",
-                "sec_type": SecurityType.TICKER
+                "sec_id_source": SecurityIdSource.TICKER
             },
             "side": "SELL",
             "avg_px": 0,
@@ -363,7 +363,7 @@ def sample_alert():
               "chore_id": "O1",
               "security": {
                 "sec_id": "CB_Sec_1",
-                "sec_type": SecurityType.TICKER
+                "sec_id_source": SecurityIdSource.TICKER
               },
               "side": Side.BUY,
               "px": 10,
@@ -396,7 +396,7 @@ def dash_():
             "leg1": {
                 "sec": {
                     "sec_id": "CB_Sec_1",
-                    "sec_type": "TICKER"
+                    "sec_id_source": "TICKER"
                 },
                 "exch_id": "EXCH1",
                 "vwap": 150,
@@ -405,7 +405,7 @@ def dash_():
             "leg2": {
                 "sec": {
                     "sec_id": "EQT_Sec_1",
-                    "sec_type": "TICKER"
+                    "sec_id_source": "TICKER"
                 },
                 "exch_id": "EXCH2",
                 "vwap": 10,

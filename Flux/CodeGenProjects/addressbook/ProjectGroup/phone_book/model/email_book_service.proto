@@ -17,7 +17,7 @@ option (FluxFileWebPageUIData) = {
 message StratLeg{
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
   required Security sec = 2;
-  optional Side side = 3 [default = SIDE_UNSPECIFIED, (FluxFldColor) = "BUY=SUCCESS,SELL=ERROR"];
+  optional Side side = 3 [default = SIDE_UNSPECIFIED, (FluxFldColor) = "BUY=SUCCESS,SELL=ERROR", (FluxFldNoCommonKey) = true];
   optional string company = 4 [(FluxFldServerPopulate) = true];
 }
 
@@ -36,8 +36,8 @@ message PairStratParams{
   // server provided via security auto complete list (if available)
   optional StratMode strat_mode = 1 [default=StratMode_Normal];
   optional StratType strat_type = 2 [default=Premium, (FluxFldOrmNoUpdate) = true];
-  required StratLeg strat_leg1 = 3 [(FluxFldElaborateTitle) = true, (FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id~PairStrat.pair_strat_params.strat_type, sec_type=TICKER", (FluxFldHelp) = "CB Tickers"];
-  optional StratLeg strat_leg2 = 4 [(FluxFldElaborateTitle) = true, (FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id:EQT_List, sec_type=TICKER, side=server_populate", (FluxFldHelp) = "EQT Tickers"];
+  required StratLeg strat_leg1 = 3 [(FluxFldElaborateTitle) = true, (FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id~PairStrat.pair_strat_params.strat_type, sec_id_source=TICKER", (FluxFldHelp) = "CB Tickers"];
+  optional StratLeg strat_leg2 = 4 [(FluxFldElaborateTitle) = true, (FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id:EQT_List, sec_id_source=TICKER, side=server_populate", (FluxFldHelp) = "EQT Tickers"];
   optional int32 exch_response_max_seconds = 5 [default = 30, (FluxFldHide) = "True", (FluxFldServerPopulate) = true];
   // these are specific to CB-EQT strat - move to derived later
   required float common_premium = 6 [(FluxFldNumberFormat) = "%", (FluxFldDiffThreshold) = 2];
@@ -259,7 +259,8 @@ message PairStrat{
       button_size: BUTTON_SIZE_MEDIUM,
       value_color_map: "StratState_READY=INFO,StratState_ACTIVE=SUCCESS,StratState_PAUSED=WARNING,StratState_ERROR=ERROR,StratState_DONE=DEBUG"
       action: "flux_trigger_strat",
-      pressed_value_as_text: "StratState_ACTIVE"
+      pressed_value_as_text: "StratState_ACTIVE",
+      allow_force_update: true
     }];
 }
 
@@ -280,9 +281,12 @@ message StratCollection{
     widget_ui_data: {
       view_layout: UI_ABBREVIATED_FILTER
     },
-    join_sort_chores: {
-      chore_by: 'Side',
-      sort_type: 'asc'
+    join_sort: {
+      sort_chore: {
+        chore_by: 'Side',
+        sort_type: 'asc'
+      },
+      placeholders: "BUY"
     }
   };
   option (FluxMsgSmallSizedCollection) = true;

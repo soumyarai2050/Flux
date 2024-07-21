@@ -47,11 +47,9 @@ namespace FluxCppCore {
 
             p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(kr_symbol.c_str(), static_cast<Py_ssize_t>(kr_symbol.size()), nullptr));
             p_mobile_book_container_instance = PyObject_CallObject(p_mobile_book_container_class, p_args);
-            if (p_mobile_book_container_instance == Py_None) {
-                return nullptr;
-            } else {
-                return p_mobile_book_container_instance;
-            }
+
+            return p_mobile_book_container_instance;
+
         }
     private:
         static PyObject* cp_module;

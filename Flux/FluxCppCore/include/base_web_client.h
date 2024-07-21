@@ -71,7 +71,7 @@ namespace FluxCppCore {
             boost::asio::connect(synchronous_socket, c_result_, connect_error);
 
             if (connect_error) {
-                LOG_ERROR(mp_logger_, "Failed to connect: {}", connect_error.message());
+                LOG_ERROR_IMPL(mp_logger_, "Failed to connect: {}", connect_error.message());
                 return false;
             }
 
@@ -79,7 +79,7 @@ namespace FluxCppCore {
             boost::beast::http::write(synchronous_socket, request, write_error);
 
             if (write_error) {
-                LOG_ERROR(mp_logger_, "Error writing request: {}", write_error.message());
+                LOG_ERROR_IMPL(mp_logger_, "Error writing request: {}", write_error.message());
                 return false;
             }
 
@@ -117,7 +117,7 @@ namespace FluxCppCore {
 
             // Check if the timer was cancelled
             if (read_error) {
-                LOG_ERROR(mp_logger_, "Error reading response: {}", read_error.message());
+                LOG_ERROR_IMPL(mp_logger_, "Error reading response: {}", read_error.message());
                 return false;
             }
 
@@ -192,12 +192,12 @@ namespace FluxCppCore {
                     try {
                         new_max_id = std::stoi(max_id_str);
                     } catch (const std::exception& e) {
-                        LOG_ERROR(m_p_logger_, "Error parsing {};;; max_id_val: {}", RootModelType::GetDescriptor()->name(), e.what());
+                        LOG_ERROR_IMPL(m_p_logger_, "Error parsing {};;; max_id_val: {}", RootModelType::GetDescriptor()->name(), e.what());
                     }
                 }
                 return new_max_id;
             } else {
-                LOG_ERROR(m_p_logger_, "Error while performing get {};;; max_id_val request: {}, url: {}",
+                LOG_ERROR_IMPL(m_p_logger_, "Error while performing get {};;; max_id_val request: {}, url: {}",
                           RootModelType::GetDescriptor()->name(), json_out, get_max_id_client_url_view);
                 return new_max_id;
             }
@@ -251,12 +251,12 @@ namespace FluxCppCore {
                     status =  m_codec.decode_model(r_obj_in_n_out, modified_json);
                     return status;
                 } else {
-                    LOG_ERROR(m_p_logger_, "Error while creating {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
+                    LOG_ERROR_IMPL(m_p_logger_, "Error while creating {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
                               json, create_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR(m_p_logger_, "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
@@ -299,12 +299,12 @@ namespace FluxCppCore {
                     status =  m_codec.decode_model(r_obj_in_n_out, modified_json);
                     return status;
                 } else {
-                    LOG_ERROR(m_p_logger_, "Error while patch {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
+                    LOG_ERROR_IMPL(m_p_logger_, "Error while patch {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
                     json, patch_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR(m_p_logger_, "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
@@ -345,12 +345,12 @@ namespace FluxCppCore {
                     }
                     status =  m_codec.decode_model(r_obj_in_n_out, modified_json);
                 } else {
-                    LOG_ERROR(m_p_logger_, "Error while put {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
+                    LOG_ERROR_IMPL(m_p_logger_, "Error while put {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
                               json, put_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR(m_p_logger_, "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
@@ -364,7 +364,7 @@ namespace FluxCppCore {
             if (status) {
                 return delete_response_json;
             } else {
-                LOG_ERROR(m_p_logger_, "Error while delete {};;; {}, id: {}, url: {}", RootModelType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(m_p_logger_, "Error while delete {};;; {}, id: {}, url: {}", RootModelType::GetDescriptor()->name(),
                 delete_response_json, kr_id, delete_client_url_view);
                 return delete_response_json;
             }
@@ -403,13 +403,13 @@ namespace FluxCppCore {
                     try {
                         new_max_id = std::stoi(max_id_str);
                     } catch (const std::exception& e) {
-                        LOG_ERROR(m_p_logger_, "Error parsing {};;; max_id_val: {}",
+                        LOG_ERROR_IMPL(m_p_logger_, "Error parsing {};;; max_id_val: {}",
                                   RootModelListType::GetDescriptor()->name(), e.what());
                     }
                 }
                 return new_max_id;
             } else {
-                LOG_ERROR(m_p_logger_, "Error while performing get {};;; max_id_val request: {}, url: {}",
+                LOG_ERROR_IMPL(m_p_logger_, "Error while performing get {};;; max_id_val request: {}, url: {}",
                           RootModelListType::GetDescriptor()->name(), json_out, get_max_id_client_url_view);
                 return new_max_id;
             }
@@ -463,16 +463,16 @@ namespace FluxCppCore {
                     status =  m_codec.decode_model_list(r_obj_in_n_out, modified_json);
                     return status;
                 } else {
-                    LOG_ERROR(m_p_logger_, "Error while creating {};;;url: {}, Json: {} ",
+                    LOG_ERROR_IMPL(m_p_logger_, "Error while creating {};;;url: {}, Json: {} ",
                              RootModelListType::GetDescriptor()->name(), create_client_url_view, json);
                     return false;
                 }
             } else {
-                LOG_ERROR(m_p_logger_, "Error while encoding {};;;{}", RootModelListType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;;{}", RootModelListType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
-            LOG_ERROR(m_p_logger_, "Error unreachable code reached {};;;{}", RootModelListType::GetDescriptor()->name(),
+            LOG_ERROR_IMPL(m_p_logger_, "Error unreachable code reached {};;;{}", RootModelListType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
             return false;
         }
@@ -512,12 +512,12 @@ namespace FluxCppCore {
                     status =  m_codec.decode_model_list(r_obj_in_n_out, decode_modified_json);
                     return status;
                 } else {
-                    LOG_ERROR(m_p_logger_, "Error while patch {};;;{} url: {}", RootModelListType::GetDescriptor()->name(),
+                    LOG_ERROR_IMPL(m_p_logger_, "Error while patch {};;;{} url: {}", RootModelListType::GetDescriptor()->name(),
                               json, patch_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR(m_p_logger_, "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
@@ -556,12 +556,12 @@ namespace FluxCppCore {
                     }
                     status =  m_codec.decode_model_list(r_obj_in_n_out, decode_modified_json);
                 } else {
-                    LOG_ERROR(m_p_logger_, "Error while put {};;; {} url: {}", RootModelListType::GetDescriptor()->name(),
+                    LOG_ERROR_IMPL(m_p_logger_, "Error while put {};;; {} url: {}", RootModelListType::GetDescriptor()->name(),
                               json, put_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR(m_p_logger_, "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
@@ -575,7 +575,7 @@ namespace FluxCppCore {
             if (status) {
                 return delete_response_json;
             } else {
-                LOG_ERROR(m_p_logger_, "Error while delete {};;; {}, url: {}", RootModelListType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(m_p_logger_, "Error while delete {};;; {}, url: {}", RootModelListType::GetDescriptor()->name(),
                           delete_response_json, delete_client_url_view);
                 return delete_response_json;
             }

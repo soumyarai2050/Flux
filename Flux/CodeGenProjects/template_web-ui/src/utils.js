@@ -250,7 +250,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             sequence.sequence += 1;
             collection.xpath = xpath ? xpath + '.' + k : k;
             collection.path = collection.xpath.replaceAll('[0]', '');
-            collection.required = currentSchema.required.filter(p => p === k).length > 0 ? true : false;
+            collection.required = currentSchema.required.some(p => p === k);
             let parentxpath = xpath ? xpath !== callerProps.parent ? xpath : null : null;
             if (parentxpath) {
                 if (callerProps.parent) {
@@ -320,7 +320,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             })
 
             let isRedundant = true;
-            if (collections.filter(col => col.tableTitle === collection.tableTitle).length === 0) {
+            if (collections.every(col => col.tableTitle !== collection.tableTitle)) {
                 if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
                     isRedundant = false;
                 }
@@ -381,7 +381,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             collection.properties = record.properties;
 
             let isRedundant = true;
-            if (collections.filter(col => col.tableTitle === collection.tableTitle).length === 0) {
+            if (collections.every(col => col.tableTitle !== collection.tableTitle)) {
                 if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
                     isRedundant = false;
                 }
@@ -441,7 +441,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             collection.properties = record.properties;
 
             let isRedundant = true;
-            if (collections.filter(col => col.tableTitle === collection.tableTitle).length === 0) {
+            if (collections.every(col => col.tableTitle === collection.tableTitle)) {
                 if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
                     isRedundant = false;
                 }
@@ -546,7 +546,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
             let ref = metadata.items.$ref.split('/');
             let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
             childSchema = cloneDeep(childSchema);
-            const required = currentSchema.required.filter(prop => prop === propname).length > 0 ? true : false;
+            const required = currentSchema.required.some(prop => prop === propname);
 
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
                 childSchema.auto_complete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
@@ -586,7 +586,7 @@ export function getDataxpath(data, xpath) {
         let found = false;
         if (_.get(data, updatedxpath + currentxpath)) {
             _.get(data, updatedxpath + currentxpath).forEach((obj, idx) => {
-                let propname = _.keys(obj).filter(key => key.startsWith('xpath_'))[0];
+                let propname = _.keys(obj).find(key => key.startsWith('xpath_'));
                 if (!propname) return;
                 let propxpath = obj[propname].substring(0, obj[propname].lastIndexOf('.'));
                 if (propxpath === originalxpath) {
@@ -661,7 +661,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
     if (attributes.hasOwnProperty('type') && primitiveDataTypes.includes(attributes.type)) {
         node.id = propname;
         node.key = propname;
-        node.required = currentSchema.required.filter(p => p === propname).length > 0 ? true : false;
+        node.required = currentSchema.required.some(p => p === propname);
         node.xpath = xpath ? xpath + '.' + propname : propname;
         node.dataxpath = dataxpath ? dataxpath + '.' + propname : propname;
         node.parentcollection = currentSchema.title;
@@ -982,7 +982,7 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
             }
             if (_.get(data, dataxpath)) {
                 _.get(data, dataxpath).map((childobject, i) => {
-                    let subpropname = _.keys(childobject).filter(key => key.startsWith('xpath_'))[0];
+                    let subpropname = _.keys(childobject).find(key => key.startsWith('xpath_'));
                     if (!subpropname) return;
                     let propxpath = childobject[subpropname];
                     let propindex = propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'));
@@ -1035,7 +1035,7 @@ function isNodeInSubtree(callerProps, xpath, dataxpath) {
         }
         if (!_.get(callerProps.subtree, xpath + '[0]')) return false;
         else {
-            let propname = _.keys(_.get(callerProps.subtree, xpath + '[0]')).filter(key => key.startsWith('xpath_'))[0];
+            let propname = _.keys(_.get(callerProps.subtree, xpath + '[0]')).find(key => key.startsWith('xpath_'));
             if (!propname) return false;
             let propxpath = xpath + '[0].' + propname
             propxpath = _.get(callerProps.subtree, propxpath);
@@ -1168,7 +1168,7 @@ function createTree(tree, currentjson, propname, count, collections) {
         if (currentjson.length === 0) return;
 
         tree[propname] = [];
-        if (collections.filter((c) => c.key === propname && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON").length > 0) {
+        if (collections.some(c => c.key === propname && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON")) {
             tree[propname] = currentjson;
         } else {
             if (currentjson[0] === null || primitiveDataTypes.includes(typeof currentjson[0])) {
@@ -1176,7 +1176,7 @@ function createTree(tree, currentjson, propname, count, collections) {
             } else {
                 let node = {};
                 tree[propname].push(node);
-                let xpath = currentjson[0][_.keys(currentjson[0]).filter(k => k.startsWith('xpath_'))[0]];
+                let xpath = currentjson[0][_.keys(currentjson[0]).find(k => k.startsWith('xpath_'))];
                 xpath = xpath ? xpath.substring(0, xpath.lastIndexOf('.')) : xpath;
                 node['data-id'] = currentjson[0].hasOwnProperty(DB_ID) ? currentjson[0][DB_ID] : xpath;
                 createTree(tree[propname], currentjson[0], 0, count, collections);
@@ -1189,7 +1189,7 @@ function createTree(tree, currentjson, propname, count, collections) {
     } else if (_.isNull(currentjson)) {
         tree[propname] = null;
     } else if (_.isObject(currentjson)) {
-        if (collections.filter((c) => c.key === propname && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON").length > 0) {
+        if (collections.some(c => c.key === propname && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON")) {
             tree[propname] = currentjson;
         } else {
             let node = tree[propname];
@@ -1293,7 +1293,7 @@ function flattenObject(jsondata, object, collections, xpath, parentxpath) {
                 object[k] = v;
             }
         } else if (Array.isArray(v)) {
-            if (collections.filter((c) => c.key === k && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON").length > 0) {
+            if (collections.some((c) => c.key === k && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON")) {
                 if (parentxpath) {
                     object[parentxpath + '.' + k] = v;
                 } else {
@@ -1304,7 +1304,7 @@ function flattenObject(jsondata, object, collections, xpath, parentxpath) {
                 flattenObject(jsondata[k][0], object, collections, xpath, updatedParentxpath);
             }
         } else if (_.isObject(v)) {
-            if (collections.filter((c) => c.key === k && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON").length > 0) {
+            if (collections.some((c) => c.key === k && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON")) {
                 if (parentxpath) {
                     object[parentxpath + '.' + k] = v;
                 } else {
@@ -1367,7 +1367,7 @@ export function getNewItem(collections, abbreviated) {
             newItem += NEW_ITEM_ID
         } else {
             let defaultValue = 'XXXX';
-            let collection = collections.filter(c => c.key === key)[0];
+            let collection = collections.find(c => c.key === key);
             if (collection) {
                 if (collection.placeholder) {
                     defaultValue = collection.placeholder;
@@ -1477,7 +1477,7 @@ export function getPriorityColorType(colorTypesSet) {
 
 export function getAlertBubbleColor(data, collections, bubbleSourcePath, bubbleColorSourcePath) {
     // let alertBubbleColorKey = alertBubbleColorXpath.split('.').pop();
-    // let collection = collections.filter(col => col.key === alertBubbleColorKey)[0];
+    // let collection = collections.find(col => col.key === alertBubbleColorKey);
     // let alertBubbleColorRelativePath = alertBubbleColorXpath.replace(alertBubbleSourceXpath, '');
     // let alertBubbleColorTypes = new Set();
     // if (_.get(data, alertBubbleSourceXpath) && _.get(data, alertBubbleSourceXpath).length > 0) {
@@ -1578,6 +1578,7 @@ export function getTableColumns(collections, mode, enableOverride = [], disableO
         })
         .filter(collection => {
             if (collection.serverPopulate && mode === Modes.EDIT_MODE) {
+                // exclude columns with serverPopulate in EDIT mode
                 return false;
             } else if (primitiveDataTypes.includes(collection.type)) {
                 return true;
@@ -1590,6 +1591,7 @@ export function getTableColumns(collections, mode, enableOverride = [], disableO
             } else if (collection.type === 'alert_bubble') {
                 return true;
             }
+            // TODO: what other cases are ignored?
             return false;
         })
 
@@ -1635,7 +1637,7 @@ export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], 
                     }
                 }
                 let matched = true;
-                for (let j = 1; j < groupedRow.length; j++) {
+                for (let j = 0; j < groupedRow.length; j++) {
                     const value = groupedRow[j][fieldName];
                     if (!(value === null || value === undefined || value === '')) {
                         if (value !== firstValue) {
@@ -1658,10 +1660,11 @@ export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], 
             if (collectionView) {
                 fieldName = column.key;
             }
-            if (!(commonColumns.includes(fieldName) && column.sourceIndex !== 0)) {
-                return true;
+            if (commonColumns.includes(fieldName) && column.sourceIndex !== 0) {
+                // exclude all common columns from non-zeroth source index
+                return false;
             }
-            return false;
+            return true;
         })
         tableColumns = tableColumns.map(column => {
             let fieldName = column.tableTitle;
@@ -1682,6 +1685,7 @@ export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], 
 
 export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false, repeatedView = false, showLess = false) {
     if (rows.length > 1) {
+        // exclude column with 'noCommonKey' as it cannot be added in common key
         tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => !column.noCommonKey);
     }
     let commonKeyCollections = [];
@@ -1690,6 +1694,8 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
         if (hasButtonType) {
             tableColumns.forEach(column => {
                 if (hide && column.hide) return;
+                if (column.joinKey || column.commonGroupKey) return;
+                if (showLess && column.showLess) return;
                 let fieldName = column.tableTitle;
                 if (collectionView) {
                     if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
@@ -1712,6 +1718,7 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
     if (rows.length > 0) {
         tableColumns.map((column) => {
             if (hide && column.hide) return;
+            if (column.joinKey || column.commonGroupKey) return;
             if (showLess && column.showLess) return;
             let fieldName = column.tableTitle;
             if (collectionView) {
@@ -1802,7 +1809,7 @@ export function getTableRows(collections, mode, originalData, data, xpath, repea
         for (let i = 0; i < originalDataTableRows.length; i++) {
             if (i < tableRows.length) {
                 if (originalDataTableRows[i]['data-id'] !== tableRows[i]['data-id']) {
-                    if (!tableRows.filter(row => row['data-id'] === originalDataTableRows[i]['data-id'])[0]) {
+                    if (!tableRows.find(row => row['data-id'] === originalDataTableRows[i]['data-id'])) {
                         let row = originalDataTableRows[i];
                         row['data-remove'] = true;
                         tableRows.splice(i, 0, row);
@@ -1815,7 +1822,7 @@ export function getTableRows(collections, mode, originalData, data, xpath, repea
             }
         }
         for (let i = 0; i < tableRows.length; i++) {
-            if (!originalDataTableRows.filter(row => row['data-id'] === tableRows[i]['data-id'])[0]) {
+            if (!originalDataTableRows.find(row => row['data-id'] === tableRows[i]['data-id'])) {
                 tableRows[i]['data-add'] = true;
             }
         }
@@ -2475,13 +2482,13 @@ export function getRowsFromAbbreviatedItems(items, itemsData, itemFieldPropertie
         items.map((item, i) => {
             let row = {};
             let id = getIdFromAbbreviatedKey(abbreviation, item);
-            let metadata = itemsData.filter(metadata => _.get(metadata, DB_ID) === id)[0];
+            let metadata = itemsData.find(metadata => _.get(metadata, DB_ID) === id);
             row['data-id'] = id;
             itemFieldProperties.forEach(c => {
                 let value = null;
                 if (c.xpath.indexOf("-") !== -1) {
                     value = c.xpath.split("-").map(xpath => {
-                        let collection = c.subCollections.filter(col => col.tableTitle === xpath)[0];
+                        let collection = c.subCollections.find(col => col.tableTitle === xpath);
                         let val = _.get(metadata, xpath);
                         if (val === undefined || val === null) {
                             val = "";
@@ -3339,7 +3346,7 @@ export function getAbbreviatedCollections(widgetCollectionsDict, loadListFieldAt
         xpath = xpath.join('-');
         const subCollections = xpath.split('-').map(path => {
             return widgetCollectionsDict[widgetName].map(col => Object.assign({}, col))
-                .filter(col => col.tableTitle === path)[0];
+                .find(col => col.tableTitle === path);
         })
         // if a single field has values from multiple source separated by hyphen, then
         // attributes of all fields are combined
@@ -3575,7 +3582,6 @@ export function getDataSourceColor(theme, dataSourceIndex, joinKey = false, comm
         return theme.palette.primary.light;
     }
     if (overrideColor && overrideColor.startsWith('#')) {
-        console.log(overrideColor);
         let updatedOverrideColor = overrideColor;
         if (overrideColor.length === 4) {
             updatedOverrideColor = '#';
@@ -3679,3 +3685,71 @@ export function getBufferAbbreviatedOptionLabel(bufferOption, bufferListFieldAtt
     }
     return bufferOption;
 } 
+
+function getContrastColor(color) {
+    // Function to convert hex to RGB
+    function hexToRgb(hex) {
+        hex = hex.replace(/^#/, '');
+        if (hex.length === 3) {
+            hex = hex.split('').map(function (hex) {
+                return hex + hex;
+            }).join('');
+        }
+        var bigint = parseInt(hex, 16);
+        return [bigint >> 16 & 255, bigint >> 8 & 255, bigint & 255];
+    }
+
+    // Function to convert color to RGB
+    function colorToRgb(color) {
+        // Check if the color is in hex format
+        if (color.startsWith('#')) {
+            return hexToRgb(color);
+        }
+        // If it's already in rgb format
+        if (color.startsWith('rgb')) {
+            var match = color.match(/(\d+), (\d+), (\d+)/);
+            return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+        }
+        // Add other color formats if needed
+        throw new Error('Unsupported color format');
+    }
+
+    // Function to convert RGB to hex
+    function rgbToHex(r, g, b) {
+        return '#' + [r, g, b].map(x => {
+            const hex = x.toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+        }).join('');
+    }
+
+    // Get RGB components of the color
+    const rgb = colorToRgb(color);
+
+    // Calculate complementary color
+    const compRgb = rgb.map(c => 255 - c);
+
+    // Convert complementary RGB to hex
+    return rgbToHex(compRgb[0], compRgb[1], compRgb[2]);
+}
+
+function getTextWidthInPx(characters, fontSize = 14) {
+    // Create a temporary canvas element
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    // Set the font size on the canvas context
+    context.font = `${fontSize}px sans-serif`; // Using a default font (sans-serif)
+
+    // Measure the text width
+    const metrics = context.measureText(characters);
+
+    // Calculate the zoom level
+    const zoomLevel = window.devicePixelRatio;
+
+    // Return the width adjusted for the zoom level
+    return metrics.width * zoomLevel;
+}
+
+export function isEmptyObject(obj) {
+    return Object.keys(obj).length === 0;
+}

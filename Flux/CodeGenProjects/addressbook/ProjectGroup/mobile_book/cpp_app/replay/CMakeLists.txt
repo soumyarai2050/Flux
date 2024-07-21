@@ -110,8 +110,8 @@ message(${Python_LIBRARIES})
 add_library(marketdataprovider SHARED ${SRC_FILES} cpp_app_launcher.cpp
         cpp_app_semaphore.cpp
         mongo_db_singleton.cpp
-        mock_mobile_book_cache.cpp
         cpp_app_shared_resource.cpp
+        mock_mobile_book_cache.cpp
         add_or_get_container_from_py_cache.cpp)
 
 # Link dependencies to the shared library
@@ -128,7 +128,7 @@ target_link_libraries(marketdataprovider
 )
 
 # Add compile options to the shared library
-target_compile_options(marketdataprovider PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-variable -Wno-error=unused-parameter)
+target_compile_options(marketdataprovider PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-variable -Wno-error=unused-parameter -DUSE_LOGGING)
 
 # Create executable
 add_executable(mobile_book_exec main.cpp ${SRC_FILES} cpp_app_semaphore.cpp
@@ -136,7 +136,7 @@ add_executable(mobile_book_exec main.cpp ${SRC_FILES} cpp_app_semaphore.cpp
         mock_mobile_book_cache.cpp
 )
 
-target_compile_options(mobile_book_exec PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-error=unused-parameter)
+target_compile_options(mobile_book_exec PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-error=unused-parameter -DUSE_LOGGING)
 ## Link the shared library to the executable
 target_link_libraries(mobile_book_exec
         /usr/lib/x86_64-linux-gnu/libpython3.12.so

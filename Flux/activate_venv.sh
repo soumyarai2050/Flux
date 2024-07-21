@@ -53,6 +53,10 @@ if [ $gcc_comparison -eq 0 ] && [ $python_comparison -eq 0 ]; then
         # Update PATH
         echo "Updating PATH"
         export PATH="/home/$USER/cpp_libs/libs_13/protobuf_25.2/bin:$PATH"
+
+#        export DEBUG=1
+        # Add PythonPath with current working directory (PWD)
+#        export PYTHONPATH="$PWD:$PYTHONPATH"
     else
         echo "Virtual environment directory '$venv_dir' not found."
     fi

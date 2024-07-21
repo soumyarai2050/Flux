@@ -230,13 +230,25 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                 continue
             # else not required: If message is not root type then avoiding id field in optional version so that
             # it's id can be generated if not provided inside root message
+
             if field.message is not None:
-                if field.cardinality.name.lower() == "repeated":
-                    output_str += (f"    {field.proto.name}: List[{field.message.proto.name}Optional] | "
-                                   f"List[{field.message.proto.name}] | None = None\n")
+                if self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root):
+                    field_type = f"{field.message.proto.name}BaseModel"
                 else:
-                    output_str += (f"    {field.proto.name}: {field.message.proto.name}Optional | "
-                                   f"{field.message.proto.name} | None = None\n")
+                    field_type = field.message.proto.name
+
+                if field.cardinality.name.lower() == "repeated":
+                    if self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root):
+                        output_str += f"    {field.proto.name}: List[{field_type}] | None = None\n"
+                    else:
+                        output_str += (f"    {field.proto.name}: List[{field.message.proto.name}Optional] | "
+                                       f"List[{field_type}] | None = None\n")
+                else:
+                    if self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root):
+                        output_str += f"    {field.proto.name}: {field_type} | None = None\n"
+                    else:
+                        output_str += (f"    {field.proto.name}: {field.message.proto.name}Optional | "
+                                       f"{field_type} | None = None\n")
             else:
                 field_type = self.proto_to_py_datatype(field)
                 if field.cardinality.name.lower() == "repeated":
