@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
 import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener, InputAdornment, IconButton } from '@mui/material';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import { ContentCopy, Error } from '@mui/icons-material';
+import { ContentCopy, Error, Clear } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
@@ -70,6 +70,7 @@ const Cell = (props) => {
     const timeoutRef = useRef(null);
     const validationError = useRef(null);
     const [inputValue, setInputValue] = useState(currentValue);
+    const [isDateTimePickerOpen, setIsDateTimePickerOpen] = useState(false);
     const inputRef = useRef(null);
     const cursorPos = useRef(null);
 
@@ -200,11 +201,7 @@ const Cell = (props) => {
                 }
             }
         } else if (type === DataTypes.DATE_TIME) {
-            if (props.truncateDateTime) {
-                value = value ? dayjs.utc(value).format('YYYY-MM-DD HH:mm') : null;
-            } else {
-                value = value ? value : null;
-            }
+            value = value || null;
         } else if (type === DataTypes.STRING) {
             // if (mode === Modes.EDIT_MODE) {
             //     value = inputValue ? inputValue : inputValue;
@@ -243,16 +240,26 @@ const Cell = (props) => {
         value = v;
         if (typeof value === DataTypes.NUMBER) {
             value = value.toLocaleString();
+        } else if (type === DataTypes.DATE_TIME) {
+            if (value !== '') {
+                const localDateTime = dayjs.utc(value).tz(localTimezone);
+                if (collection.displayType === 'datetime') {
+                    value = localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
+                } else {
+                    value = localDateTime.isSame(dayjs(), 'day') ? localDateTime.format('HH:mm:ss.SSS') : localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
+                }
+            }
         }
         const classesStr = `${classes.cell} ${selectedClass} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`;
         return (
             <TableCell
                 className={classesStr}
-                sx={{backgroundColor: dataSourceColor}}
+                sx={{ backgroundColor: dataSourceColor }}
                 align={textAlign}
                 size='small'
                 data-xpath={xpath}
                 onClick={(e) => onRowSelect(e)}
+                onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}
                 data-dataxpath={dataxpath}>
                 {value}{numberSuffix}
             </TableCell>
@@ -260,7 +267,7 @@ const Cell = (props) => {
     }
     const placeholder = collection.placeholder ? collection.placeholder : !required ? 'optional' : null;
 
-    if (mode === Modes.EDIT_MODE && active && !disabled && !(['repeatedRoot', 'abbreviatedFilter'].includes(props.widgetType) && !props.selected) && !collection.ormNoUpdate && !collection.serverPopulate) {
+    if (mode === Modes.EDIT_MODE && active && !disabled && !(['repeatedRoot', 'abbreviatedFilter'].includes(props.widgetType) && !props.selected) && (!(collection.ormNoUpdate && !dataAdd)) && !collection.serverPopulate) {
         if (collection.autocomplete) {
             validationError.current = validateConstraints(collection, value);
 
@@ -288,7 +295,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{backgroundColor: dataSourceColor}}
+                    sx={{ backgroundColor: dataSourceColor }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -334,7 +341,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{backgroundColor: dataSourceColor}}
+                    sx={{ backgroundColor: dataSourceColor }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -363,7 +370,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{backgroundColor: dataSourceColor}}
+                    sx={{ backgroundColor: dataSourceColor }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -440,7 +447,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{backgroundColor: dataSourceColor}}
+                    sx={{ backgroundColor: dataSourceColor }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -483,15 +490,29 @@ const Cell = (props) => {
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
             } : {};
+            let inputFormat = 'YYYY-MM-DD HH:mm:ss'
+            if (value) {
+                const localDateTime = dayjs.utc(value).tz(localTimezone);
+                if (collection.displayType !== 'datetime') {
+                    if (localDateTime.isSame(dayjs(), 'day')) {
+                        inputFormat = 'HH:mm:ss';
+                    }
+                }
+            }
             const classesStr = `${classes.cell_input_field} ${selectedClass}`;
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{backgroundColor: dataSourceColor}}
+                    sx={{ backgroundColor: dataSourceColor }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
                     onClick={(e) => onRowSelect(e)}
+                    onBlur={() => {
+                        if (!isDateTimePickerOpen) {
+                            onFocusOut();
+                        } 
+                    }}
                     onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DateTimePicker
@@ -504,15 +525,52 @@ const Cell = (props) => {
                             error={validationError.current !== null}
                             value={value}
                             required={required}
-                            inputFormat="YYYY-MM-DD HH:mm:ss"
+                            inputFormat={inputFormat}
                             InputProps={inputProps}
-                            onChange={(newValue) => props.onDateTimeChange(dataxpath, xpath, new Date(newValue).toISOString(), dataSourceId, collection.source)}
+                            onChange={(newValue) => {
+                                const newDate = new Date(newValue);
+                                newDate.setSeconds(0, 0);
+                                props.onDateTimeChange(dataxpath, xpath, newDate.toISOString(), dataSourceId, collection.source);
+                            }}
                             inputProps={{
                                 style: { padding: '6px 10px' },
                                 dataxpath: dataxpath,
                                 underlyingtype: collection.underlyingtype
                             }}
-                            renderInput={(props) => <TextField {...props} />}
+                            hideTabs={false}
+                            disablePast
+                            openTo='hours'
+                            open={isDateTimePickerOpen}
+                            onClose={() => setIsDateTimePickerOpen(false)}
+                            renderInput={(dateTimePickerProps) =>
+                                <TextField
+                                    {...dateTimePickerProps}
+                                    onClick={() => {
+                                        if (value === null) {
+                                            const newDate = new Date();
+                                            newDate.setSeconds(0, 0);
+                                            props.onDateTimeChange(dataxpath, xpath, newDate.toISOString());
+                                        }
+                                        setIsDateTimePickerOpen(true)
+                                    }}
+                                    InputProps={{
+                                        readOnly: true,
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton 
+                                                    onClick={(e) => {
+                                                        props.onDateTimeChange(dataxpath, xpath, null);
+                                                        e.stopPropagation();
+                                                    }} 
+                                                    disabled={!value}
+                                                    size='small'>
+                                                    <Clear fontSize='small' />
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
+                            }
                         />
                     </LocalizationProvider>
                 </TableCell>
@@ -529,7 +587,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{backgroundColor: dataSourceColor}}
+                    sx={{ backgroundColor: dataSourceColor }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -586,7 +644,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{backgroundColor: dataSourceColor}}
+                sx={{ backgroundColor: dataSourceColor }}
                 // sx={{ width: 20 }}
                 align='center'
                 size='small'
@@ -602,7 +660,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{backgroundColor: dataSourceColor}}
+                sx={{ backgroundColor: dataSourceColor }}
                 align='center'
                 size='small'
                 onClick={onFocusIn}>
@@ -628,7 +686,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{backgroundColor: dataSourceColor}}
+                    sx={{ backgroundColor: dataSourceColor }}
                     align='center'
                     size='small'
                     onClick={(e) => onRowSelect(e)}
@@ -665,7 +723,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{backgroundColor: dataSourceColor}}
+                sx={{ backgroundColor: dataSourceColor }}
                 align='center'
                 size='small'
                 onClick={(e) => onRowSelect(e)}>
@@ -699,7 +757,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{backgroundColor: dataSourceColor}}
+                    sx={{ backgroundColor: dataSourceColor }}
                     size='small'
                     onClick={(e) => onRowSelect(e)}
                 />
@@ -724,7 +782,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{backgroundColor: dataSourceColor}}
+                sx={{ backgroundColor: dataSourceColor }}
                 align='center'
                 size='small'
                 onClick={(e) => onRowSelect(e)}>
@@ -761,11 +819,11 @@ const Cell = (props) => {
             const classesStr = classesArray.join(' ');
 
             return (
-                <TableCell 
-                    className={classesStr} 
-                    sx={{backgroundColor: dataSourceColor}}
-                    align='center' 
-                    size='small' 
+                <TableCell
+                    className={classesStr}
+                    sx={{ backgroundColor: dataSourceColor }}
+                    align='center'
+                    size='small'
                     onClick={onOpenTooltip}>
                     <AbbreviatedJson open={open} onClose={onCloseTooltip} src={updatedData} />
                 </TableCell >
@@ -793,11 +851,11 @@ const Cell = (props) => {
             const classesStr = classesArray.join(' ');
 
             return (
-                <TableCell 
-                    className={classesStr} 
-                    sx={{backgroundColor: dataSourceColor}}
-                    align='center' 
-                    size='small' 
+                <TableCell
+                    className={classesStr}
+                    sx={{ backgroundColor: dataSourceColor }}
+                    align='center'
+                    size='small'
                     onClick={onOpenTooltip}>
                     <CopyToClipboard text={clipboardText} copy={clipboardText !== null} />
                     <ClickAwayListener onClickAway={onCloseTooltip}>
@@ -870,13 +928,13 @@ const Cell = (props) => {
 
         const classesStr = classesArray.join(' ');
         return (
-            <TableCell 
+            <TableCell
                 className={classesStr}
-                sx={{backgroundColor: dataSourceColor}} 
-                align={textAlign} 
-                size='small' 
-                onClick={onFocusIn} 
-                data-xpath={xpath} 
+                sx={{ backgroundColor: dataSourceColor }}
+                align={textAlign}
+                size='small'
+                onClick={onFocusIn}
+                data-xpath={xpath}
                 data-dataxpath={dataxpath}>
                 <div className={tableCellColorClass}>
                     {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
@@ -896,13 +954,13 @@ const Cell = (props) => {
         }
         const classesStr = classesArray.join(' ');
         return (
-            <TableCell 
-                className={classesStr} 
-                sx={{backgroundColor: dataSourceColor}}
-                align={textAlign} 
-                size='small' 
-                onClick={onFocusIn} 
-                data-xpath={xpath} 
+            <TableCell
+                className={classesStr}
+                sx={{ backgroundColor: dataSourceColor }}
+                align={textAlign}
+                size='small'
+                onClick={onFocusIn}
+                data-xpath={xpath}
                 data-dataxpath={dataxpath}>
                 <div className={tableCellColorClass}>
                     {/* {collection.displayType === 'time' ? <LinkText text={text} linkText={linkText} /> : */}

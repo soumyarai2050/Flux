@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <Python.h>
-#include <filesystem>
 
 #include "mobile_book_service.pb.h"
 #include "utility_functions.h"
@@ -137,14 +136,16 @@ namespace mobile_book_handler {
                         PyObject_CallObject(p_set_last_barter_exch_id, p_args);
 
 
-                        std::string exch_time = FluxCppCore::format_time(kr_last_barter_obj.exch_time());
+                        std::string exch_time;
+                        FluxCppCore::format_time(kr_last_barter_obj.exch_time(), exch_time);
                         p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(exch_time.c_str(),
                                                                       static_cast<Py_ssize_t>(
                                                                           exch_time.size()),
                                                                       nullptr));
                         PyObject_CallObject(p_set_last_barter_exch_time, p_args);
 
-                        std::string arrival_time = FluxCppCore::format_time(kr_last_barter_obj.arrival_time());
+                        std::string arrival_time;
+                        FluxCppCore::format_time(kr_last_barter_obj.arrival_time(), arrival_time);
                         p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(arrival_time.c_str(),
                                                                       static_cast<Py_ssize_t>(
                                                                           arrival_time.size()),
@@ -245,7 +246,7 @@ namespace mobile_book_handler {
                         p_top_of_book_mutex = PyObject_CallObject(p_last_barter_mutex_func, nullptr);
                     } catch (std::exception& ex) {
                         LOG_ERROR_IMPL(GetLogger(), "failed to reterive mutex from top_of_book obj for "
-                                                    "symbol: {}", kr_symbol);
+                                                    "symbol: {}, exception: {}", kr_symbol, ex.what());
                         return nullptr;
                     }
                     return PyLong_AsVoidPtr(p_top_of_book_mutex);
@@ -362,7 +363,8 @@ namespace mobile_book_handler {
                     p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_book_obj.bid_quote().premium()));
                     PyObject_CallObject(p_set_top_of_book_premium, p_args);
 
-                    std::string bid_quote_last_update_date_time = FluxCppCore::format_time(kr_top_book_obj.bid_quote().last_update_date_time());
+                    std::string bid_quote_last_update_date_time;
+                    FluxCppCore::format_time(kr_top_book_obj.bid_quote().last_update_date_time(), bid_quote_last_update_date_time);
                     p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(
                             bid_quote_last_update_date_time.c_str(),
                             static_cast<Py_ssize_t>(bid_quote_last_update_date_time.size()),
@@ -403,7 +405,8 @@ namespace mobile_book_handler {
                     p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_of_book_obj.ask_quote().premium()));
                     PyObject_CallObject(p_set_top_of_book_premium, p_args);
 
-                    std::string ask_quote_last_update_date_time = FluxCppCore::format_time(kr_top_of_book_obj.ask_quote().last_update_date_time());
+                    std::string ask_quote_last_update_date_time;
+                    FluxCppCore::format_time(kr_top_of_book_obj.ask_quote().last_update_date_time(), ask_quote_last_update_date_time);
                     p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(
                             ask_quote_last_update_date_time.c_str(),
                             static_cast<Py_ssize_t>(ask_quote_last_update_date_time.size()),
@@ -443,7 +446,8 @@ namespace mobile_book_handler {
                     p_args = PyTuple_Pack(1, PyFloat_FromDouble(kr_top_of_book_obj.last_barter().premium()));
                     PyObject_CallObject(p_set_top_of_book_premium, p_args);
 
-                    std::string last_barter_last_update_date_time = FluxCppCore::format_time(kr_top_of_book_obj.last_barter().last_update_date_time());
+                    std::string last_barter_last_update_date_time;
+                    FluxCppCore::format_time(kr_top_of_book_obj.last_barter().last_update_date_time(), last_barter_last_update_date_time);
                     p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(
                             last_barter_last_update_date_time.c_str(),
                             static_cast<Py_ssize_t>(last_barter_last_update_date_time.size()),
@@ -505,7 +509,8 @@ namespace mobile_book_handler {
                         }
                     }
 
-                    std::string last_update_date_time = FluxCppCore::format_time(kr_top_of_book_obj.last_update_date_time());
+                    std::string last_update_date_time;
+                    FluxCppCore::format_time(kr_top_of_book_obj.last_update_date_time(), last_update_date_time);
                     p_args = PyTuple_Pack(1, PyUnicode_DecodeUTF8(last_update_date_time.c_str(),
                                                                   static_cast<Py_ssize_t>(
                                                                       last_update_date_time.size()),
@@ -521,8 +526,8 @@ namespace mobile_book_handler {
             static PyObject* set_market_barter_volume(PyObject* p_mobile_book_container_instance,
                 const mobile_book::MarketBarterVolume &kr_market_barter_volume_obj) {
 
-                PyObject* p_set_func = nullptr;
-                PyObject* p_args = nullptr;
+                PyObject* p_set_func;
+                PyObject* p_args;
 
                 p_set_func = PyObject_GetAttrString(p_mobile_book_container_instance,
                     set_top_of_book_market_barter_volume_key.c_str());
@@ -634,7 +639,7 @@ namespace mobile_book_handler {
                         p_md_mutex = PyObject_CallObject(p_md_mutex_func, nullptr);
                     } catch (std::exception& ex) {
                         auto err = std::format("Failed to reterive mutex obj from container for symbol: "
-                                               "{} at position: {}", kr_symbol, position);
+                                               "{} at position: {}, exception: {}", kr_symbol, position, ex.what());
                         LOG_ERROR_IMPL(GetLogger(), "{}", err);
                         return nullptr;
                     }
@@ -677,7 +682,8 @@ namespace mobile_book_handler {
                     try {
                         p_md_mutex = PyObject_CallObject(p_md_mutex_func, nullptr);
                     } catch (std::exception& ex) {
-                        auto err = std::format("Failed to reterive mutex obj from container for symbol: {} at position: {}", kr_symbol, position);
+                        auto err = std::format("Failed to reterive mutex obj from container for symbol: {} at "
+                                               "position: {}, exception: {}", kr_symbol, position, ex.what());
                         LOG_ERROR_IMPL(GetLogger(), "{}", err);
                         return nullptr;
                     }
@@ -730,13 +736,15 @@ namespace mobile_book_handler {
                          static_cast<Py_ssize_t>(kr_market_depth_obj.symbol().size()), nullptr));
                     PyObject_CallObject(p_set_market_depth_symbol, p_args);
 
-                    std::string exch_time = FluxCppCore::format_time(kr_market_depth_obj.exch_time());
+                    std::string exch_time;
+                    FluxCppCore::format_time(kr_market_depth_obj.exch_time(), exch_time);
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8(exch_time.c_str(), static_cast<Py_ssize_t>(exch_time.size()),
                             nullptr));
                     PyObject_CallObject(p_set_market_depth_exch_time, p_args);
 
-                    std::string arrival_time = FluxCppCore::format_time(kr_market_depth_obj.arrival_time());
+                    std::string arrival_time;
+                    FluxCppCore::format_time(kr_market_depth_obj.arrival_time(), arrival_time);
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8(arrival_time.c_str(), static_cast<Py_ssize_t>(arrival_time.size()),
                             nullptr));
@@ -823,13 +831,15 @@ namespace mobile_book_handler {
                          static_cast<Py_ssize_t>(kr_market_depth_obj.symbol().size()), nullptr));
                     PyObject_CallObject(p_set_market_depth_symbol, p_args);
 
-                    std::string exch_time = FluxCppCore::format_time(kr_market_depth_obj.exch_time());
+                    std::string exch_time;
+                    FluxCppCore::format_time(kr_market_depth_obj.exch_time(), exch_time);
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8(exch_time.c_str(), static_cast<Py_ssize_t>(exch_time.size()),
                             nullptr));
                     PyObject_CallObject(p_set_market_depth_exch_time, p_args);
 
-                    std::string arrival_time = FluxCppCore::format_time(kr_market_depth_obj.arrival_time());
+                    std::string arrival_time;
+                    FluxCppCore::format_time(kr_market_depth_obj.arrival_time(), arrival_time);
                     p_args = PyTuple_Pack(2, PyLong_FromLong(kr_market_depth_obj.position()),
                         PyUnicode_DecodeUTF8(arrival_time.c_str(), static_cast<Py_ssize_t>(arrival_time.size()),
                             nullptr));

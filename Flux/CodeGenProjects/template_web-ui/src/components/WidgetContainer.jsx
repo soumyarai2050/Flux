@@ -56,6 +56,12 @@ const WidgetContainer = (props) => {
         setShowLayoutOptions(prevState => !prevState);
     }
 
+    const onDoubleClick = (e) => {
+        if (props.nestedTree) {
+            e.stopPropagation();
+        }
+    }
+
     const layoutMenu = showLayoutOptions ? (
         <ClickAwayListener onClickAway={onToggleShowLayoutOptions}>
             <ToggleButtonGroup className={classes.toggle_button_group} value={props.layout ? props.layout : Layouts.TABLE_LAYOUT} size='small'>
@@ -109,7 +115,7 @@ const WidgetContainer = (props) => {
     }
 
     return (
-        <Fragment>
+        <Box onDoubleClick={onDoubleClick}>
             <Typography variant='h6'>
                 <div className={classes.widget_header} style={{ background: backgroundColor }}>
                     <span>{props.title}</span>
@@ -135,7 +141,7 @@ const WidgetContainer = (props) => {
             <Box style={{ height: `calc(100% - 42px - ${height}px` }} ref={scrollContainerRef} className={widgetBodyClasses}>
                 {props.children}
             </Box>
-        </Fragment >
+        </Box >
     )
 }
 

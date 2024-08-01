@@ -1,6 +1,5 @@
 # system imports
 import json
-import os
 import asyncio
 import types
 from typing import List, Any, Dict, Final, Callable, Type, Tuple, TypeVar
@@ -9,9 +8,7 @@ import logging
 import websockets
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, WebSocketException
 from copy import deepcopy
-import timeit
 from pathlib import PurePath
-import functools
 import datetime
 from types import UnionType
 
@@ -31,9 +28,10 @@ from beanie.odm.operators.update.general import Set as BeanieSet
 from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
 from Flux.PyCodeGenEngine.FluxCodeGenCore.ws_connection_manager import WSData
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, compare_n_patch_dict, \
-    parse_to_int, YAMLConfigurationManager, compare_n_patch_list, execute_tasks_list_with_all_completed, \
-    get_time_it_log_pattern, parse_to_float, handle_ws
+from FluxPythonUtils.scripts.utility_functions import compare_n_patch_dict, \
+    compare_n_patch_list, execute_tasks_list_with_all_completed, handle_ws, parse_to_int, YAMLConfigurationManager
+from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_route_utils import get_aggregate_pipeline, generic_perf_benchmark
+
 
 """
 1. FilterAggregate [only filters the returned value]
@@ -46,32 +44,8 @@ from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_spec
 id_not_found: Final[DefaultWebResponse] = DefaultWebResponse(msg="Id not Found")
 del_success: Final[DefaultWebResponse] = DefaultWebResponse(msg="Deletion Successful")
 code_gen_projects_path = PurePath(__file__).parent.parent.parent / "CodeGenProjects"
-log_generic_timings = parse_to_int(log_generic_timings_env_var) \
-    if ((log_generic_timings_env_var := os.getenv("LogGenericTiming")) is not None and
-        len(log_generic_timings_env_var)) else None
 PydanticModel = TypeVar('PydanticModel', bound=BaseModel)
 DocumentModel = TypeVar('DocumentModel', bound=Document)
-
-
-# Decorator Function
-def generic_perf_benchmark(func_callable):
-    @functools.wraps(func_callable)
-    async def benchmarker(*args, **kwargs):
-        call_date_time = pendulum.DateTime.utcnow()
-        start_time = timeit.default_timer()
-        pydantic_model_type = None
-        if args and issubclass(args[0], BaseModel):
-            pydantic_model_type = args[0]
-        return_val = await func_callable(*args, **kwargs)
-        end_time = timeit.default_timer()
-        delta = parse_to_float(f"{(end_time - start_time):.6f}")
-
-        if log_generic_timings is not None and log_generic_timings == 1:
-            pattern_str = get_time_it_log_pattern(func_callable.__name__, call_date_time, delta)
-            pattern_str += f" pydantic_model: {pydantic_model_type}"
-            logging.timing(pattern_str)
-        return return_val
-    return benchmarker
 
 
 def validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type: Type[DocumentModel]):
@@ -141,7 +115,7 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], py
 
         if dummy_pydantic_model is not None:
             # if call is for delete operation
-            pydantic_obj: dummy_pydantic_model = dummy_pydantic_model(id=pydantic_obj_id)
+            pydantic_obj: dummy_pydantic_model = dummy_pydantic_model(_id=pydantic_obj_id)
         else:
             # if call is for update/create operation
             pydantic_obj = await get_obj(pydantic_class_type, pydantic_obj_id,
@@ -1086,58 +1060,8 @@ async def get_filtered_obj(filter_agg_pipeline: Dict, pydantic_class_type: Type[
         return None
 
 
-def get_aggregate_pipeline(encap_agg_pipeline: Dict):
-    filter_tuple_list = encap_agg_pipeline.get("redact")
-    match_tuple_list = encap_agg_pipeline.get("match")  # [(key1: value1), (key2: value2)]
-    additional_agg = encap_agg_pipeline.get("agg")
-    agg_pipeline = []
-    if match_tuple_list is not None:
-        agg_pipeline.append({"$match": {}})
-        for match_tuple in match_tuple_list:
-            if len(match_tuple) != 2:
-                raise Exception(f"Expected minimum 2 values (field-name, field-value) in tuple found match_tuple: "
-                                f"{match_tuple} in match_tuple_list: {match_tuple_list}")
-            match_variable_name, match_variable_value = match_tuple
-            if match_variable_name is not None and len(match_variable_name) != 0:
-                if match_variable_value is not None:
-                    match_pipeline = agg_pipeline[0].get("$match")
-                    if match_pipeline is None:
-                        agg_pipeline[0]["$match"] = {match_variable_name: {"$in": match_variable_value}}
-                    else:
-                        match_pipeline[match_variable_name] = {"$in": match_variable_value}
-                else:
-                    raise Exception(
-                        f"Error: match_variable_name passed as: {match_variable_name}, while match_variable_value "
-                        f"was passed None - not supported")
-    if filter_tuple_list is not None:
-        for filter_tuple in filter_tuple_list:
-            if len(filter_tuple) < 2:
-                raise Exception(f"Expected minimum 2 values (field-name, field-value) in tuple found filter_tuple: "
-                                f"{filter_tuple} in filter_tuple_list: {filter_tuple_list}")
-            filter_list = list(filter_tuple)
-            filtered_variable_name = filter_list[0]
-            filter_list.remove(filter_list[0])
-            # $in expects list with 1st entry as variable-name, and 2nd entry as list of variable-values
-            redact_data_filter = \
-                {
-                    "$redact": {
-                        "$cond": {
-                            "if": {"$or": [{"$in": []}, {"$not": ""}]},
-                            "then": "$$DESCEND",
-                            "else": "$$PRUNE"
-                        }
-                    }
-                }
-            updated_filtered_variable_name = "$" + filtered_variable_name
-            redact_data_filter["$redact"]["$cond"]["if"]["$or"][0]["$in"].append(updated_filtered_variable_name)
-            redact_data_filter["$redact"]["$cond"]["if"]["$or"][0]["$in"].append(filter_list)
-            redact_data_filter["$redact"]["$cond"]["if"]["$or"][1]["$not"] = updated_filtered_variable_name
-            agg_pipeline.append(redact_data_filter)
+async def get_max_val(model_class_type: Type[DocumentModel]):
+    max_val = await model_class_type.find_all().max("_id")
+    max_val = int(max_val) if max_val is not None else 0
+    return max_val
 
-    if additional_agg is not None:
-        agg_pipeline.extend(additional_agg)
-        return agg_pipeline
-    elif len(agg_pipeline) != 0:
-        return agg_pipeline
-    else:
-        return encap_agg_pipeline.get("aggregate")

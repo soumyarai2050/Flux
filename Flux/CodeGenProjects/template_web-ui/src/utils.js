@@ -1,12 +1,14 @@
-import _, { cloneDeep, isObject } from 'lodash';
+// third-party package imports
+import _, { cloneDeep, get, isObject, set } from 'lodash';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+// project imports
 import {
     ColorPriority, ColorTypes, DataTypes, HoverTextType, Modes, ShapeType, SizeType,
     DB_ID, NEW_ITEM_ID, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL, SeverityType
 } from './constants';
 import Node from './components/Node';
 import HeaderField from './components/HeaderField';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
 import * as workerUtils from './workerUtils';
 import { AlertCache } from './utility/alertCache';
 import { Theme } from './theme';
@@ -14,106 +16,161 @@ export const { applyFilter, applyGetAllWebsocketUpdate, floatToInt, getAbbreviat
     getActiveRows, getFilterDict, getIdFromAbbreviatedKey, getLocalizedValueAndSuffix,
     roundNumber, stableSort, sortAlertArray, getColorTypeFromValue, getGroupedTableRows
 } = workerUtils;
+
+// add utc support for datetime
 dayjs.extend(utc);
 
 // stores the tree expand/collapse states
 const treeState = {};
-const primitiveDataTypes = [DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM, DataTypes.DATE_TIME, DataTypes.INT64, DataTypes.FLOAT];
+// tree state setter
+export function setTreeState(xpath, state) {
+    treeState[xpath] = state;
+}
 
+// support primitive data types
+const primitiveDataTypes = [
+    DataTypes.STRING,
+    DataTypes.BOOLEAN,
+    DataTypes.NUMBER,
+    DataTypes.ENUM,  // pre-defined set of values in schema.json file
+    DataTypes.DATE_TIME,
+    DataTypes.INT64,
+    DataTypes.FLOAT
+];
+// default floating point precision for floating point values
 export const FLOAT_POINT_PRECISION = 2;
+// message constants
 export const Message = {
     REQUIRED_FIELD: 'required field cannot be null',
     UNSPECIFIED_FIELD: 'required enum field cannot be unset / UNSPECIFIED',
     MAX: 'field value exceeds the max limit',
     MIN: 'field value exceeds the min limit'
 }
-
+// support column sizes
 export const ColumnSize = {
     SMALL: 'small',
     MEDIUM: 'medium',
     LARGE: 'large',
 }
-
+// supported column direction of text
 export const ColumnDirection = {
     LTR: 'ltr',
     RTL: 'rtl',
 }
 
-// complex field properties that are to be passed to the child components
+// complex (object and array) field properties. applies/passed to child components also
 const complexFieldProps = [
+    // if set to true, field not shown in edit mode
     { propertyName: "server_populate", usageName: "serverPopulate" },
+    // if set to true, field not shown while creation but can be subsequently modified
     { propertyName: "ui_update_only", usageName: "uiUpdateOnly" },
+    // if set to true, field cannot be modified once created. shown in edit mode but not editable
     { propertyName: "orm_no_update", usageName: "ormNoUpdate" },
+    // if set, provides a set of options allowed on field (':'), and (or) assigns a default 
+    // value to field (=), and (or) set server populate on field (server_populate) 
     { propertyName: "auto_complete", usageName: "autocomplete" },
+    // if set to true, overrides the default title of field with their xpath
     { propertyName: "elaborate_title", usageName: "elaborateTitle" },
+    // if set to true, allow filter to be applied on the field
     { propertyName: "filter_enable", usageName: "filterEnable" },
+    // chart projections related options
     { propertyName: "mapping_underlying_meta_field", usageName: "mapping_underlying_meta_field" },
     { propertyName: "mapping_src", usageName: "mapping_src" },
     { propertyName: "val_meta_field", usageName: "val_meta_field" },
 ]
 
+// simple field flux properties supported by project
 const fieldProps = [
+    // sets data type of field
     { propertyName: "type", usageName: "type" },
+    // sets display title of field
     { propertyName: "title", usageName: "title" },
+    // if set to true, field is hidden by default
     { propertyName: "hide", usageName: "hide" },
+    // sets help text for the field
     { propertyName: "help", usageName: "help" },
+    // TODO: not supported
     { propertyName: "cmnt", usageName: "description" },
+    // sets default value of field, assigned when field is created
     { propertyName: "default", usageName: "default" },
+    // sets sub data type of field
     { propertyName: "underlying_type", usageName: "underlyingtype" },
+    // sets placeholder for the field, displays when field is unset
     { propertyName: "ui_placeholder", usageName: "placeholder" },
+    // sets associated value color map for the field
     { propertyName: "color", usageName: "color" },
+    // displays field as a button
     { propertyName: "button", usageName: "button" },
+    // if set to JSON, field is displayed as JSON, otherwise holds metadata for field 
+    // in collection (abbreviated filter) view
     { propertyName: "abbreviated", usageName: "abbreviated" },
+    // sets max constraint on the field
     { propertyName: "val_max", usageName: "max" },
+    // sets min constraint on the field
     { propertyName: "val_min", usageName: "min" },
+    // TODO: not supported
     { propertyName: "default_value_placeholder_string", usageName: "defaultValuePlaceholderString" },
+    // TODO: not supported
     { propertyName: "val_sort_weight", usageName: "sortWeight" },
+    // sets field as datetime field
     { propertyName: "val_is_date_time", usageName: "dateTime" },
+    // TODO: not supported
     { propertyName: "index", usageName: "index" },
+    // TODO: not supported
     { propertyName: "sticky", usageName: "sticky" },
+    // TODO: not supported
     { propertyName: "size_max", usageName: "sizeMax" },
+    // display field as a progress bar
     { propertyName: "progress_bar", usageName: "progressBar" },
+    // if set to True, overrides the default title of field with their xpath
     { propertyName: "elaborate_title", usageName: "elaborateTitle" },
+    // sets the color of field key
     { propertyName: "name_color", usageName: "nameColor" },
+    // sets the number formating (floating point precision, prefix, suffix) on the field
     { propertyName: "number_format", usageName: "numberFormat" },
+    // if set to True, field is not added to common key
     { propertyName: "no_common_key", usageName: "noCommonKey" },
+    // sets the field value display type (float to display as int)
     { propertyName: "display_type", usageName: "displayType" },
+    // sets the alignment of text in table
     { propertyName: "text_align", usageName: "textAlign" },
+    // if set to True, field with 0 values are displayed
     { propertyName: "display_zero", usageName: "displayZero" },
+    // sets the separator for multi-value field defined in abbreviated
     { propertyName: "micro_separator", usageName: "microSeparator" },
+    // chart projection related fields
     { propertyName: "val_time_field", usageName: "val_time_field" },
     { propertyName: "projections", usageName: "projections" },
     { propertyName: "mapping_projection_query_field", usageName: "mapping_projection_query_field" },
-    { propertyName: "server_running_status", usageName: "server_running_status" },
-    { propertyName: "server_ready_status", usageName: "server_ready_status" },
     { propertyName: "mapping_underlying_meta_field", usageName: "mapping_underlying_meta_field" },
     { propertyName: "mapping_src", usageName: "mapping_src" },
+    // indicates underlying server up status is derived from this field
+    { propertyName: "server_running_status", usageName: "server_running_status" },
+    // indicates underlying server ready status is derivied from this field
+    { propertyName: "server_ready_status", usageName: "server_ready_status" },
+    // sets column size of field in table
     { propertyName: "column_size", usageName: "columnSize" },
+    // sets column (text) direction of field in table
     { propertyName: "column_direction", usageName: "columnDirection" },
+    // sets the allowed diff % on field which is saved without confirmation 
     { propertyName: "diff_threshold", usageName: "diffThreshold" },
 ]
 
-// properties supported explicitly on the array types
+// additional properties supported only on array fields
 const arrayFieldProps = [
+    // sets the source field to fetch bubble count
     { propertyName: "alert_bubble_source", usageName: "alertBubbleSource" },
+    // sets the source field to fetch bubble color
     { propertyName: "alert_bubble_color", usageName: "alertBubbleColor" }
 ]
 
-const timeIt = (target, property, descriptor) => {
-    const callback = descriptor.value;
-
-    descriptor.value = function (...args) {
-        const res = callback.apply(this, args);
-        return res;
-    };
-
-    return descriptor;
+const optimizer = (fn) => {
+    /**
+     * higher order function to 
+     */
 }
 
-export function setTreeState(xpath, state) {
-    treeState[xpath] = state;
-}
-
+// TODO: generalise supported flux options by project
 const fluxOptions = []
 
 function addFieldAttributes(object, attributes) {
@@ -152,7 +209,13 @@ function addFieldAttributes(object, attributes) {
 }
 
 function addMessageAttributes(object, attributes, message) {
-
+    /* 
+    function to add field level flux option on collection object.
+    params:
+        object: collection object
+        attributes: attribute (flux option) dict set on the field
+        message:
+    */
     fluxOptions.forEach(({ propertyName, usageName }) => {
         if (attributes.hasOwnProperty(propertyName)) {
 
@@ -508,6 +571,11 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : null;
         } else if (metadata.type === DataTypes.BOOLEAN) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : false;
+        } else if (metadata.type === DataTypes.DATE_TIME) {
+            // const currentDate = new Date()
+            // currentDate.setSeconds(0, 0);
+            // object[propname] = currentDate.toISOString();
+            object[propname] = null;
         } else if (metadata.type === DataTypes.ENUM) {
             let ref = metadata.items.$ref.split('/')
             let enumdata = getEnumValues(schema, ref, metadata.type)
@@ -535,6 +603,11 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
             } else {
                 let ref = metadata.items.$ref.split('/');
                 let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
+                childSchema = cloneDeep(childSchema);
+
+                if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
+                    childSchema.auto_complete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
+                }
 
                 if (!childSchema.server_populate && !metadata.server_populate) {
                     let child = generateObjectFromSchema(schema, childSchema, null, xpath);

@@ -9,7 +9,6 @@ file_paths=(
     "ProjectGroup/basket_book/scripts/"
     "ProjectGroup/street_book/scripts/"
     "ProjectGroup/photo_book/scripts/"
-    "ProjectGroup/basket_book/scripts/"
     "ProjectGroup/phone_book/scripts/"     # phone_book is parent project importing some other projects' generated files so must be generated at last
 )
 

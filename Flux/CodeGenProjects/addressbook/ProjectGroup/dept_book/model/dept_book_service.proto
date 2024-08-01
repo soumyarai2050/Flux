@@ -4,7 +4,7 @@ import "flux_options.proto";
 import "ui_option_utils.proto";
 import "projects_core.proto";
 import "barter_core.proto";
-import "dept_book_n_mobile_book_n_street_book_core.proto";
+import "dept_book_n_mobile_book_n_street_book_n_basket_book_core.proto";
 import "dept_book_n_phone_book_core.proto";
 import "dept_book_core.proto";
 
@@ -272,7 +272,7 @@ message DashCollectionList {
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage{
   optional ButtonType temp = 1;
-  optional DummyEnumDMS temp2 = 2;
+  optional DummyEnumDMSB temp2 = 2;
   optional DummyEnumDP temp3 = 3;
   optional Severity temp4 = 4;
 }

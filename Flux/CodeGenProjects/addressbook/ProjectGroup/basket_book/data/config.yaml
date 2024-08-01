@@ -22,3 +22,5 @@ cache_override_type: "bare"
 
 is_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
+
+fetch_md_data_wait_sec: 10

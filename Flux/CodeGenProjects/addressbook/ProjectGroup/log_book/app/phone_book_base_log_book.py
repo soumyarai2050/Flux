@@ -11,7 +11,7 @@ import pendulum
 os.environ["DBType"] = "beanie"
 # Project imports
 from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
-from FluxPythonUtils.scripts.utility_functions import get_last_log_line_date_time
+from FluxPythonUtils.scripts.utility_functions import get_last_log_line_date_time, parse_to_float
 from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_book import AppLogBook
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
@@ -459,13 +459,15 @@ class PhoneBookBaseLogBook(AppLogBook):
             found_pattern = search_obj.group()
             found_pattern = found_pattern[8:-8]  # removing beginning and ending _timeit_
             found_pattern_list = found_pattern.split(self.timeit_field_separator)  # splitting pattern values
-            if len(found_pattern_list) == 3:
-                callable_name, start_time, delta = found_pattern_list
+            if len(found_pattern_list) == 4:
+                callable_name, start_time, delta, project_name = found_pattern_list
                 if callable_name != "underlying_create_raw_performance_data_http":
                     raw_performance_data_obj = RawPerformanceDataBaseModel()
                     raw_performance_data_obj.callable_name = callable_name
                     raw_performance_data_obj.start_time = pendulum.parse(start_time)
                     raw_performance_data_obj.delta = parse_to_float(delta)
+                    if project_name != "None":
+                        raw_performance_data_obj.project_name = project_name
 
                     self.raw_performance_data_queue.put(raw_performance_data_obj)
                     logging.debug(f"Created raw_performance_data entry in queue for callable {callable_name} "
@@ -473,7 +475,7 @@ class PhoneBookBaseLogBook(AppLogBook):
                 # else not required: avoiding callable underlying_create_raw_performance_data to avoid infinite loop
             else:
                 err_str_: str = f"Found timeit pattern but internally only contains {found_pattern_list}, " \
-                                f"ideally must contain callable_name, start_time & delta " \
+                                f"ideally must contain callable_name, start_time, delta & project_name" \
                                 f"seperated by '~'"
                 logging.exception(err_str_)
         # else not required: if no pattern is matched ignoring this log_message

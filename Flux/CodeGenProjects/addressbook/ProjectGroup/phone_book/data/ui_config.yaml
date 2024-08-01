@@ -74,9 +74,14 @@ ui_coordinates:
     y: 165
     w: 18
     h: 20
-  ProcessedPerformanceAnalysis:
+  BasketChore:
     x: 0
     y: 185
+    w: 18
+    h: 20
+  ProcessedPerformanceAnalysis:
+    x: 0
+    y: 205
     w: 18
     h: 20
 

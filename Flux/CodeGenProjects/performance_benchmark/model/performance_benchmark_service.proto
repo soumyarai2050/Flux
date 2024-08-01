@@ -34,7 +34,8 @@ message RawPerformanceData{
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string callable_name = 2 [(FluxFldValMetaField) = true];
   required string start_time = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
-  required float delta = 6;
+  required float delta = 4;
+  optional string project_name = 5;
 }
 
 //message RawPerfDeltaByCallable {

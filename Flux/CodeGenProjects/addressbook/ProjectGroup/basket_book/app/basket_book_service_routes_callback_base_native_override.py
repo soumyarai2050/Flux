@@ -1,11 +1,15 @@
 # standard imports
 import os
+import threading
+from queue import Queue
 from typing import Dict, Final, List, Tuple, ClassVar
 import time
 import datetime
 import logging
 from threading import Thread
 import asyncio
+import stat
+import subprocess
 
 # 3rd party imports
 from fastapi import HTTPException
@@ -13,7 +17,7 @@ from fastapi import HTTPException
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_routes_callback import BasketBookServiceRoutesCallback
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_helper import (
-    config_yaml_path, parse_to_int, config_yaml_dict, be_port, is_all_service_up)
+    config_yaml_path, parse_to_int, config_yaml_dict, be_host, be_port, is_all_service_up, CURRENT_PROJECT_DIR)
 from FluxPythonUtils.scripts.utility_functions import (
     except_n_log_alert, handle_refresh_configurable_data_members)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.Pydentic.basket_book_service_model_imports import *
@@ -24,11 +28,25 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import get_bartering_link, BarteringLinkBase, is_test_run
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import \
     get_symbol_side_key
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import MDShellEnvData, create_md_shell_script
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate import (
+    get_symbol_overview_from_symbol, get_objs_from_symbol)
+
+
+class MobileBookContainer(BaseModel):
+    tob: TopOfBook | TopOfBookBaseModel
+    so: SymbolOverview | SymbolOverviewBaseModel
 
 
 class BasketBookServiceRoutesCallbackBaseNativeOverride(BasketBookServiceRoutesCallback):
     bartering_link: ClassVar[BarteringLinkBase] = get_bartering_link()
     symbol_side_key_cache: ClassVar[Dict[str, bool]] = {}
+
+    # underlying callables
+    underlying_read_symbol_overview_http: Callable[[...], Any] | None = None
+    underlying_get_symbol_overview_from_symbol_query_http: Callable[[...], Any] | None = None
+    underlying_get_top_of_book_from_symbol_query_http: Callable[[...], Any] | None = None
+    underlying_partial_update_basket_chore_http: Callable[Any, Any] | None = None
 
     def __init__(self):
         super().__init__()
@@ -49,10 +67,14 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BasketBookServiceRoutesC
             "min_refresh_interval": "min_refresh_interval"
         }
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
+        # cache for tob and symbol_overview for each new_chore
+        self.md_cache: Dict[str, MobileBookContainer] = {}
+        self.basket_chore_queue: Queue[BasketChore | BasketChoreOptional] = Queue()
+        self.new_chore_id_cache: Dict[int, NewChore] = {}
 
     @staticmethod
     def get_symbol_side_cache_key(system_symbol: str, side: Side):
-        return f"{system_symbol}-{side}"
+        return f"{system_symbol}-{side.value}"
 
     @classmethod
     def check_unack(cls, system_symbol: str, side: Side):
@@ -84,7 +106,15 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BasketBookServiceRoutesC
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        pass
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_http_routes import (
+            underlying_read_symbol_overview_http, underlying_read_top_of_book_http,
+            underlying_get_symbol_overview_from_symbol_query_http,
+            underlying_get_top_of_book_from_symbol_query_http, underlying_partial_update_basket_chore_http)
+        cls.underlying_read_symbol_overview_http = underlying_read_symbol_overview_http
+        cls.underlying_read_top_of_book_http = underlying_read_top_of_book_http
+        cls.underlying_get_symbol_overview_from_symbol_query_http = underlying_get_symbol_overview_from_symbol_query_http
+        cls.underlying_get_top_of_book_from_symbol_query_http = underlying_get_top_of_book_from_symbol_query_http
+        cls.underlying_partial_update_basket_chore_http = underlying_partial_update_basket_chore_http
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -106,7 +136,9 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BasketBookServiceRoutesC
                 if self.service_up and self.usd_fx is not None:
                     if not self.service_ready:
                         self.service_ready = True
-                    print(f"INFO: service is ready: {datetime.datetime.now().time()}")
+                        print(f"INFO: service is ready: {datetime.datetime.now().time()}")
+                        thread = threading.Thread(target=self.handle_basket_chores, daemon=True)
+                        thread.start()
 
                 if not self.service_up:
                     try:
@@ -164,6 +196,63 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BasketBookServiceRoutesC
             logging.critical(err_str_)
             raise HTTPException(detail=err_str_, status_code=500)
 
+    def handle_basket_chores(self):
+        while True:
+            basket_chore: BasketChore | BasketChoreOptional = self.basket_chore_queue.get()      # blocking call
+            run_coro = self._handle_basket_chore(basket_chore)
+            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+            # block for task to finish
+            try:
+                future.result()
+            except Exception as e:
+                logging.exception(f"handle_new_chores failed with exception: {e}")
+
+    async def _handle_basket_chore(self, basket_chore: BasketChore | BasketChoreOptional):
+        new_chore_list = basket_chore.new_chores
+        for new_chore_obj in new_chore_list:
+            system_symbol = new_chore_obj.security.sec_id
+            sec_id_source = new_chore_obj.security.sec_id_source
+            await self._verify_mobile_book_for_symbol(system_symbol, sec_id_source)
+
+            px = new_chore_obj.px
+            qty = new_chore_obj.qty
+            side = new_chore_obj.side
+
+            usd_px = self.get_usd_px(new_chore_obj.px, system_symbol)
+            bartering_symbol, account, exchange = self.get_metadata(system_symbol)
+
+            # block new chore if any prior unack chore exist
+            if BasketBookServiceRoutesCallbackBaseNativeOverride.check_unack(system_symbol, side):
+                error_msg: str = f"past chore on {system_symbol=} is in unack state, dropping chore with " \
+                                 f"{px=}, {qty=}, {side=}, symbol_side_key: " \
+                                 f"{get_symbol_side_key([(system_symbol, side)])}"
+                logging.error(error_msg)
+                new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_FAILED
+                return None
+
+            if self._is_outside_bartering_hours():
+                err_str_ = "Secondary Block place chore - strat outside market hours"
+                logging.error(err_str_)
+                raise HTTPException(detail=err_str_, status_code=400)
+
+            # set unack for subsequent chores - this symbol to be blocked until this chore goes through
+            self.set_unack(system_symbol, side)
+            res = await self.bartering_link_place_new_chore(px, qty, side, bartering_symbol, system_symbol,
+                                                          account, exchange)
+            # reset unack for subsequent chores to go through - this chore did fail to go through
+            BasketBookServiceRoutesCallbackBaseNativeOverride.clear_unack(system_symbol, side)
+
+            if res:
+                new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_DONE
+            else:
+                new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_FAILED
+
+            self.new_chore_id_cache[new_chore_obj.id] = new_chore_obj   # updating new_chore cache
+
+        await (BasketBookServiceRoutesCallbackBaseNativeOverride.
+               underlying_partial_update_basket_chore_http(
+                    basket_chore.model_dump(by_alias=True, exclude_none=True)))
+
     def update_fx_symbol_overview_dict_from_http(self) -> bool:
         fx_symbol_overviews: List[FxSymbolOverviewBaseModel] = \
             email_book_service_http_client.get_all_fx_symbol_overview_client()
@@ -201,41 +290,97 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BasketBookServiceRoutesC
                                                                     account, exchange)
         return chore_sent_status
 
+    async def get_symbol_overview_from_symbol_query_pre(self, symbol_overview_class_type: Type[SymbolOverview],
+                                                        symbol: str):
+        return await BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_read_symbol_overview_http(
+            get_symbol_overview_from_symbol(symbol))
+
+    async def get_top_of_book_from_symbol_query_pre(self, top_of_book_class_type: Type[TopOfBook], symbol: str):
+        return await BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_read_top_of_book_http(
+            get_objs_from_symbol(symbol))
+
+    @staticmethod
+    def create_n_run_so_shell_script(sec_id: str, sec_id_source: str):
+        # creating run_symbol_overview.sh file
+        run_symbol_overview_file_path = CURRENT_PROJECT_DIR / "scripts" / f"new_ord_sec_id_{sec_id}_so.sh"
+
+        subscription_data = \
+            [
+                (sec_id, str(sec_id_source))
+            ]
+        db_name = "basket_book"
+
+        md_shell_env_data: MDShellEnvData = (
+            MDShellEnvData(subscription_data=subscription_data, host=be_host,
+                           port=be_port, db_name=db_name, project_name="basket_book"))
+
+        create_md_shell_script(md_shell_env_data, run_symbol_overview_file_path, "SO")
+        os.chmod(run_symbol_overview_file_path, stat.S_IRWXU)
+        subprocess.Popen([f"{run_symbol_overview_file_path}"])
+
+    async def loop_till_symbol_md_data_is_present(self, symbol: str):
+        wait_sec = config_yaml_dict.get("fetch_md_data_wait_sec")
+        while True:
+
+            symbol_overview_list: List[SymbolOverview] = \
+                await (BasketBookServiceRoutesCallbackBaseNativeOverride.
+                       underlying_get_symbol_overview_from_symbol_query_http(symbol))
+            top_of_book_list: List[TopOfBook] = await (BasketBookServiceRoutesCallbackBaseNativeOverride.
+                                                       underlying_get_top_of_book_from_symbol_query_http(symbol))
+
+            if symbol_overview_list and top_of_book_list:
+                top_of_book = top_of_book_list[0]
+                symbol_overview = symbol_overview_list[0]
+                self.md_cache[symbol] = MobileBookContainer(tob=top_of_book, so=symbol_overview)
+                break
+            else:
+                time.sleep(wait_sec)
+
+    async def _verify_mobile_book_for_symbol(self, sec_id: str, sec_id_source: str) -> bool:
+        if sec_id not in self.md_cache:
+            # creating script and running md cpp handling
+            self.create_n_run_so_shell_script(sec_id, sec_id_source)
+
+            # updating cache for tob and symbol_overview for this symbol
+            await self.loop_till_symbol_md_data_is_present(sec_id)
+            return False
+        # else not required: if data already exists then will be using cached data
+        return True
+
+    def _handle_non_cached_new_chores(self, basket_chore_obj: BasketChore | BasketChoreOptional):
+        non_cached_new_chore_list = []
+        for new_chore_obj in basket_chore_obj.new_chores:
+            if self.new_chore_id_cache.get(new_chore_obj.id) is None:
+                non_cached_new_chore_list.append(new_chore_obj)
+
+        if non_cached_new_chore_list:
+            self.basket_chore_queue.put(BasketChore(id=basket_chore_obj.id,
+                                                    new_chores=non_cached_new_chore_list))
+
     async def create_basket_chore_pre(self, basket_chore_obj: BasketChore):
         new_chore_list = basket_chore_obj.new_chores
 
         if new_chore_list:
             for new_chore_obj in new_chore_list:
-                px = new_chore_obj.px
-                qty = new_chore_obj.qty
-                side = new_chore_obj.side
+                # setting state to pending
+                new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_PENDING
 
-                system_symbol = new_chore_obj.security.sec_id
-                usd_px = self.get_usd_px(new_chore_obj.px, system_symbol)
-                bartering_symbol, account, exchange = self.get_metadata(system_symbol)
+    async def create_basket_chore_post(self, basket_chore_obj: BasketChore):
+        self._handle_non_cached_new_chores(basket_chore_obj)
 
-                # block new chore if any prior unack chore exist
-                if BasketBookServiceRoutesCallbackBaseNativeOverride.check_unack(system_symbol, side):
-                    error_msg: str = f"past chore on {system_symbol=} is in unack state, dropping chore with " \
-                                     f"{px=}, {qty=}, {side=}, symbol_side_key: " \
-                                     f"{get_symbol_side_key([(system_symbol, side)])}"
-                    logging.error(error_msg)
-                    new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_FAILED
-                    continue
+    async def partial_update_basket_chore_pre(self, stored_basket_chore_obj: BasketChore,
+                                              updated_basket_chore_obj_json: Dict):
 
-                if self._is_outside_bartering_hours():
-                    err_str_ = "Secondary Block place chore - strat outside market hours"
-                    logging.error(err_str_)
-                    raise HTTPException(detail=err_str_, status_code=400)
+        new_chore_list = updated_basket_chore_obj_json.get("new_chores")
 
-                # set unack for subsequent chores - this symbol to be blocked until this chore goes through
-                self.set_unack(system_symbol, side)
-                res = await self.bartering_link_place_new_chore(px, qty, side, bartering_symbol, system_symbol,
-                                                              account, exchange)
-                # reset unack for subsequent chores to go through - this chore did fail to go through
-                BasketBookServiceRoutesCallbackBaseNativeOverride.clear_unack(system_symbol, side)
+        if new_chore_list:
+            for new_chore_dict in new_chore_list:
+                if new_chore_dict.get("_id") is None:
+                    # setting state to pending
+                    new_chore_dict["chore_submit_state"] = ChoreSubmitType.ORDER_SUBMIT_PENDING
+        return updated_basket_chore_obj_json
 
-                if res:
-                    new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_DONE
-                else:
-                    new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_FAILED
+    async def partial_update_basket_chore_post(self, stored_basket_chore_obj: BasketChore,
+                                               updated_basket_chore_obj: BasketChore):
+        self._handle_non_cached_new_chores(updated_basket_chore_obj)
+

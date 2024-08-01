@@ -4,7 +4,7 @@ import "flux_options.proto";
 import "ui_option_utils.proto";
 import "projects_core.proto";
 import "barter_core.proto";
-import "dept_book_n_mobile_book_n_street_book_core.proto";
+import "dept_book_n_mobile_book_n_street_book_n_basket_book_core.proto";
 import "street_book_core.proto";
 import "phone_book_n_street_book_core.proto";
 import "mobile_book_n_street_book_core.proto";
@@ -492,7 +492,7 @@ message HandleStratActivate{
 message ImportWarningAvoidDummyMessage{
   optional ButtonType temp = 1;
   optional Severity temp2 = 2;
-  optional DummyEnumDMS temp3 = 3;
+  optional DummyEnumDMSB temp3 = 3;
   optional DummyEnumMS temp4 = 4;
   optional CommandType temp5 = 5;
   optional DummyEnumSO temp6 = 6;

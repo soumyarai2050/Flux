@@ -79,7 +79,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
+        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         output_str += (f"async def underlying_create_{message_name_snake_cased}_http({message_name_snake_cased}: "
                        f"{message.proto.name}, filter_agg_pipeline: Any = None, generic_callable: "
                        f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
@@ -164,7 +164,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
+        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         output_str += (f"async def underlying_create_all_{message_name_snake_cased}_http({message_name_snake_cased}_list: "
                        f"List[{message.proto.name}], filter_agg_pipeline: Any = None, generic_callable: "
                        f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True) -> "
@@ -257,7 +257,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
+        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         output_str += (f"async def underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
                        f"updated: {message.proto.name}, filter_agg_pipeline: Any = None, generic_callable: "
                        f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
@@ -359,7 +359,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
+        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         output_str += (f"async def underlying_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
                        f"updated_list: List[{message.proto.name}], filter_agg_pipeline: Any = None, generic_callable: "
                        f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True) -> "
@@ -474,7 +474,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self._handle_str_int_val_callable_generation(message)
         output_str += "\n"
-        output_str += "@perf_benchmark\n"
+        output_str += f"@perf_benchmark('{self.proto_file_package}')\n"
         output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http("
                        f"{message_name_snake_cased}_update_req_json: Dict, filter_agg_pipeline: Any = None, "
                        f"generic_callable: Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
@@ -732,7 +732,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self._handle_str_int_val_callable_generation(message)
         output_str += "\n"
-        output_str += "@perf_benchmark\n"
+        output_str += f"@perf_benchmark('{self.proto_file_package}')\n"
         output_str += (f"async def underlying_partial_update_all_{message_name_snake_cased}_http("
                        f"{message_name_snake_cased}_update_req_json_list: List[Dict], "
                        f"filter_agg_pipeline: Any = None, "
@@ -862,7 +862,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message, aggregation_type, id_field_type, shared_lock_list = self._unpack_kwargs_with_id_field_type(**kwargs)
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
+        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         if id_field_type is not None:
             output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_id: {id_field_type}, "
@@ -937,7 +937,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def handle_underlying_DELETE_all_gen(self, **kwargs) -> str:
         message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
+        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         output_str += (f"async def underlying_delete_all_{message_name_snake_cased}_http("
                        f"generic_callable: Callable[[...], Any] | None = None, "
                        f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
@@ -1054,7 +1054,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message, aggregation_type, id_field_type, shared_lock_list = self._unpack_kwargs_with_id_field_type(**kwargs)
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
+        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         if id_field_type is not None:
             output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
                           f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
@@ -1127,7 +1127,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                       shared_lock_list: List[str] | None = None) -> str:
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
+        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         output_str += (f"async def underlying_read_{message_name_snake_cased}_http("
                        f"filter_agg_pipeline: Any = None, generic_callable: "
                        f"Callable[[...], Any] | None = None, projection_model=None, "
@@ -1301,7 +1301,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         if return_type_str is None:
             return_type_str = message.proto.name
         if route_type is None or route_type == FastapiHttpRoutesFileHandler.flux_json_query_route_get_type_field_val:
-            output_str = "@perf_benchmark\n"
+            output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
             output_str += f"async def underlying_{query_name}_query_http({query_params_with_type_str}) -> " \
                           f"List[{return_type_str}]:\n"
             if query_params_str:
@@ -1325,7 +1325,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f"    return await underlying_{query_name}_query_http({query_params_str})"
             output_str += "\n\n\n"
         elif route_type == FastapiHttpRoutesFileHandler.flux_json_query_route_patch_type_field_val:
-            output_str = "@perf_benchmark\n"
+            output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
             output_str += f"async def underlying_{query_name}_query_http(payload_dict: Dict[str, Any]) -> " \
                           f"List[{return_type_str}]:\n"
             if query_params_str:
@@ -1399,8 +1399,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f'    """\n'
         output_str += f'    Get Query of {message.proto.name} to get max int id\n'
         output_str += f'    """\n'
-        output_str += f'    max_val = await {message.proto.name}.find_all().max("_id")\n'
-        output_str += f'    max_val = int(max_val) if max_val is not None else 0\n'
+        output_str += f'    max_val = await get_max_val({message.proto.name})\n'
         output_str += f"    return MaxId(max_id_val=max_val)\n"
         output_str += "\n\n"
         return output_str

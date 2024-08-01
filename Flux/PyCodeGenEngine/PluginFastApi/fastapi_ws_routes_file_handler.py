@@ -369,7 +369,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
     def _handle_ws_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
                              query_params_with_type_str: str, query_args_dict_str: str) -> str:
-        output_str = "@perf_benchmark\n"
+        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         output_str += (f"async def underlying_{query_name}_query_ws(websocket: WebSocket, "
                        f"{query_params_with_type_str}, need_initial_snapshot: bool | None = True):\n")
         output_str += (f"    filter_callable, filter_agg_pipeline_list = "
@@ -397,7 +397,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def _handle_projection_ws_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
                                         query_params_with_type_str: str, query_args_dict_str: str,
                                         projection_model_name: str | None = None) -> str:
-        output_str = "@perf_benchmark\n"
+        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         output_str += (f"async def underlying_{query_name}_query_ws(websocket: WebSocket, "
                        f"{query_params_with_type_str}, need_initial_snapshot: bool | None = True):\n")
         if projection_model_name:

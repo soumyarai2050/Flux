@@ -258,7 +258,8 @@ const TreeWidget = (props) => {
             menu={menu}
             menuRight={props.headerProps.menuRight}
             supportedLayouts={props.headerProps.supportedLayouts}
-            scrollLock={props.scrollLock}>
+            scrollLock={props.scrollLock}
+            nestedTree={props.nestedTree}>
             <InfinityMenu
                 tree={treeStructure}
                 disableDefaultHeaderContent={true}

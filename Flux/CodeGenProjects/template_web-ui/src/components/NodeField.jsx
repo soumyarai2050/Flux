@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { ColorTypes, DataTypes, Modes } from '../constants';
-import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment, Tooltip } from '@mui/material';
-import { Error } from '@mui/icons-material';
+import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment, Tooltip, IconButton } from '@mui/material';
+import { Error, Clear } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
 import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints, getReducerArrrayFromCollections, capitalizeCamelCase } from '../utils';
@@ -10,6 +10,13 @@ import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import classes from './NodeField.module.css';
 import { cloneDeep } from 'lodash';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+dayjs.extend(utc);
+dayjs.extend(timezone);
+const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 
 const NodeField = (props) => {
     // const state = useSelector(state => state);
@@ -29,6 +36,7 @@ const NodeField = (props) => {
     const validationError = useRef(null);
     const [inputValue, setInputValue] = useState(props.data.value);
     const [focus, setFocus] = useState(false);
+    const [isDateTimePickerOpen, setIsDateTimePickerOpen] = useState(false);
     const inputRef = useRef(null);
     const cursorPos = useRef(null);
 
@@ -263,7 +271,7 @@ const NodeField = (props) => {
             />
         )
     } else if (props.data.type === DataTypes.DATE_TIME) {
-        let value = props.data.value ? new Date(props.data.value) : null;
+        let value = props.data.value ? props.data.value : null;
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
             <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
@@ -271,6 +279,16 @@ const NodeField = (props) => {
         const inputProps = endAdornment ? {
             endAdornment: endAdornment
         } : {};
+
+        let inputFormat = 'YYYY-MM-DD HH:mm:ss'
+        if (value) {
+            const localDateTime = dayjs.utc(value).tz(localTimezone);
+            if (props.data.displayType !== 'datetime') {
+                if (localDateTime.isSame(dayjs(), 'day')) {
+                    inputFormat = 'HH:mm:ss';
+                }
+            }
+        }
 
         return (
             <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -282,15 +300,52 @@ const NodeField = (props) => {
                     error={validationError.current !== null}
                     value={value}
                     required={props.data.required}
-                    inputFormat="DD-MM-YYYY HH:mm:ss"
+                    inputFormat={inputFormat}
                     InputProps={inputProps}
-                    onChange={(newValue) => props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, new Date(newValue).toISOString())}
+                    onChange={(newValue) => {
+                        const newDate = new Date(newValue);
+                        newDate.setSeconds(0, 0);
+                        props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, newDate.toISOString());
+                    }}
                     inputProps={{
                         style: { padding: '6px 10px' },
                         dataxpath: props.data.dataxpath,
                         underlyingtype: props.data.underlyingtype
                     }}
-                    renderInput={(props) => <TextField {...props} />}
+                    hideTabs={false}
+                    disablePast
+                    openTo='hours'
+                    open={isDateTimePickerOpen}
+                    onClose={() => setIsDateTimePickerOpen(false)}
+                    renderInput={(dateTimePickerProps) =>
+                        <TextField
+                            {...dateTimePickerProps}
+                            onClick={() => {
+                                if (value === null) {
+                                    const newDate = new Date();
+                                    newDate.setSeconds(0, 0);
+                                    props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, newDate.toISOString());
+                                }
+                                setIsDateTimePickerOpen(true)
+                            }}
+                            InputProps={{
+                                readOnly: true,
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton 
+                                            onClick={(e) => {
+                                                props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, null);
+                                                e.stopPropagation();
+                                            }} 
+                                            disabled={!value}
+                                            size='small'>
+                                            <Clear fontSize='small' />
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                    }
                 />
             </LocalizationProvider>
         )
@@ -317,6 +372,8 @@ const NodeField = (props) => {
                 value={value}
                 disabled={disabled}
                 onChange={(e) => handleTextChange(e, props.data.type, props.data.xpath, e.target.value, props.data.dataxpath,
+                    validateConstraints(props.data, e.target.value))}
+                onInput={(e) => handleTextChange(e, props.data.type, props.data.xpath, e.target.value, props.data.dataxpath,
                     validateConstraints(props.data, e.target.value))}
                 variant='outlined'
                 placeholder={placeholder}

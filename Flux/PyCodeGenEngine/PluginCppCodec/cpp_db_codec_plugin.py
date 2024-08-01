@@ -188,16 +188,19 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                                   f'{message_field_name}()));\n'
                                 else:
                                     if field_type == "required":
+                                        output += f"\t\t\t\tstd::string {message_field_name};\n"
+                                        output += f"\t\t\t\tFluxCppCore::format_time({parent_field}_doc.{message_field_name}(), {message_field_name});\n"
                                         output += f'\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp(' \
                                                   f'{package_name}_handler::{message_field_name}_fld_name, '\
-                                                   f'FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time('\
-                                                    f'{parent_field}_doc.{message_field_name}()))));\n'
+                                                   f'FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
                                     else:
-                                        output += f'\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
+                                        output += f'\t\t\t\tif ({parent_field}_doc.has_{message_field_name}()) {{\n'
+                                        output += f"\t\t\t\t\tstd::string {message_field_name};\n"
+                                        output += f"\t\t\t\t\tFluxCppCore::format_time({parent_field}_doc.{message_field_name}(), {message_field_name});\n"
                                         output += f'\t\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp(' \
                                                   f'{package_name}_handler::{message_field_name}_fld_name, '\
-                                                   f'FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time('\
-                                                    f'{parent_field}_doc.{message_field_name}()))));\n'
+                                                   f'FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
+                                        output += "\t\t\t\t}\n"
                         else:
                             if message_field_name == "id":
                                 if field_type == "required":
@@ -477,15 +480,18 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                           f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
                         else:
                             if field_type == "required":
+                                output += f"\t\t\t\tstd::string {message_field_name};\n"
+                                output += f"\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}(), {message_field_name})\n"
                                 output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(kr_{message_name_snake_cased}_obj.' \
-                                          f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()))));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
                             else:
                                 output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
-                                          f"{parent_feild}().{field_name}().has_{message_field_name}())\n"
+                                          f"{parent_feild}().{field_name}().has_{message_field_name}()) {{\n"
+                                output += f"\t\t\t\t\tstd::string {message_field_name};\n"
+                                output += f"\t\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(kr_{message_name_snake_cased}_obj.' \
-                                          f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()))));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
+                                output += "\t\t\t\t}\n"
                     else:
                         if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                             if field_type == "required":
@@ -500,15 +506,18 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                           f'{initial_parent_field}().{field_name}().{message_field_name}()));\n'
                         else:
                             if field_type == "required":
+                                output += f"\t\t\t\tstd::string {message_field_name};\n"
+                                output += f"\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(kr_{message_name_snake_cased}_obj.' \
-                                          f'{initial_parent_field}().{field_name}().{message_field_name}())))));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name}))));\n'
                             else:
                                 output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
                                           f"{field_name}().has_{message_field_name}())\n"
+                                output += f"\t\t\t\t\tstd::string {message_field_name};\n"
+                                output += f"\t\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(kr_{message_name_snake_cased}_obj.' \
-                                          f'{initial_parent_field}().{field_name}().{message_field_name}())))));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name}))));\n'
+                                output += "\t\t\t\t}\n"
                 else:
                     if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                         if field_type == "required":
@@ -522,14 +531,17 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                       f'().{message_field_name}()));\n'
                     else:
                         if field_type == "required":
+                            output += f"\t\t\tstd::string {message_field_name};\n"
+                            output += f"\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}().{message_field_name}());\n"
                             output += f'\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}' \
-                                      f'().{message_field_name}()))));\n'
+                                      f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
                         else:
-                            output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}().has_{message_field_name}())\n"
+                            output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}().has_{message_field_name}()) {{\n"
+                            output +=f"\t\t\t\tstd::string {message_field_name};\n"
+                            output +=f"\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}().{message_field_name}(), {message_field_name});\n"
                             output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}' \
-                                      f'().{message_field_name}()))));\n'
+                                      f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
+                            output += "\t\t\t}\n"
             elif message_field.message is not None and field_type != "repeated":
                 if field_name != initial_parent_field:
                     output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
@@ -581,18 +593,19 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                           f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
                         else:
                             if field_type == "required":
+                                output += f"\t\t\t\t\t std::string {message_field_name};\n"
+                                output += f"\t\t\t\t\t FluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.' \
-                                          f'{message_name_snake_cased}(i).' \
-                                          f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()))));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
                             else:
                                 output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                           f"{initial_parent_field}().{parent_feild}().{field_name}()." \
-                                          f"has_{message_field_name}())\n"
+                                          f"has_{message_field_name}()) {{\n"
+                                output += f"\t\t\t\t\t\tstd::string {message_field_name};\n"
+                                output += f"\t\t\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.' \
-                                          f'{message_name_snake_cased}(i).' \
-                                          f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()))));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
+                                output += "\t\t\t\t\t}\n"
                     else:
                         if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                             if field_type == "required":
@@ -609,17 +622,18 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                           f'{message_field_name}()));\n'
                         else:
                             if field_type == "required":
+                                output += f"\t\t\t\t\tstd::string {message_field_name};\n"
+                                output += f"\t\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.' \
-                                          f'{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().' \
-                                          f'{message_field_name}()))));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
                             else:
                                 output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                          f"{initial_parent_field}().{field_name}().has_{message_field_name}())\n"
+                                          f"{initial_parent_field}().{field_name}().has_{message_field_name}()) {{\n"
+                                output += f"\t\t\t\t\t\tstd::string {message_field_name};\n"
+                                output += f"\t\t\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.' \
-                                          f'{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().' \
-                                          f'{message_field_name}()))));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
+                                output += "\t\t\t\t\t}\n"
                 else:
                     if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                         if field_type == "required":
@@ -634,15 +648,19 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                       f'(i).{field_name}().{message_field_name}()));\n'
                     else:
                         if field_type == "required":
+                            output += f"\t\t\t\tstd::string {message_field_name};\n"
+                            output += f"\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}().{message_field_name}(), {message_field_name});\n"
                             output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler' \
-                                      f'::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.'\
-                                        f'{message_name_snake_cased}(i).{field_name}().{message_field_name}()))));\n'
+                                      f'::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
                         else:
                             output += f"\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                      f"{field_name}().has_{message_field_name}())\n"
+                                      f"{field_name}().has_{message_field_name}()) {{\n"
+                            output += f"\t\t\t\t\tstd::string {message_field_name};\n"
+                            output += (f"\t\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj."
+                                       f"{message_name_snake_cased}(i).{field_name}().{message_field_name}(), {message_field_name});\n")
                             output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler' \
-                                      f'::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.'\
-                                       f'{message_name_snake_cased}(i).{field_name}().{message_field_name}()))));\n'
+                                      f'::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date({message_field_name})));\n'
+                            output += "\t\t\t\t}\n"
             elif message_field.message is not None and field_type != "repeated":
                 if field_name != initial_parent_field:
                     output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
@@ -701,16 +719,19 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                                   f"kr_{message_name_snake_cased}_obj.{field_name}()));\n"
                         else:
                             if field_type == "required":
+                                output_content += f"\t\tstd::string {field_name};\n"
+                                output_content += f"\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}(), {field_name});\n"
                                 output_content += (f"\t\tr_{message_name_snake_cased}_document.append(FluxCppCore"
                                                    f"::kvp({package_name}_handler::{field_name}_fld_name, "
-                                                   f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time("
-                                                   f"kr_{message_name_snake_cased}_obj.{field_name}()))));\n")
+                                                   f"FluxCppCore::StringUtil::convert_utc_string_to_b_date({field_name})));\n")
                             else:
-                                output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.has_{field_name}())\n"
+                                output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.has_{field_name}()) {{\n"
+                                output_content += f"\t\tstd::string {field_name};\n"
+                                output_content += f"\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}(), {field_name});\n"
                                 output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::" \
                                                   f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                                  f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time("\
-                                                  f"kr_{message_name_snake_cased}_obj.{field_name}()))));\n"
+                                                  f"FluxCppCore::StringUtil::convert_utc_string_to_b_date({field_name})));\n"
+                                output_content += "\t\t}\n"
 
                 else:
                     output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.{field_name}_size() > 0)\n"
@@ -776,19 +797,20 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                                   f"{field_name}()));\n"
                     else:
                         if field_type == "required":
+                            output_content += f"\t\t\tstd::string {field_name};\n"
+                            output_content += f"\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}(), {field_name});\n"
                             output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::" \
                                               f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                              f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time("\
-                                               f"r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                              f"{field_name}()))));\n"
+                                              f"FluxCppCore::StringUtil::convert_utc_string_to_b_date({field_name})));\n"
                         else:
                             output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                              f"has_{field_name}())\n"
+                                              f"has_{field_name}()) {{\n"
+                            output_content += f"\t\t\t\tstd::string {field_name};\n"
+                            output_content += f"\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}(), {field_name});\n"
                             output_content += f"\t\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::" \
                                               f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                              f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(FluxCppCore::format_time("\
-                                               f"r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                              f"{field_name}()))));\n"
+                                              f"FluxCppCore::StringUtil::convert_utc_string_to_b_date({field_name})));\n"
+                            output_content += "\t\t\t}\n"
                     # else:
                     #     if field_type == "required":
                     #         output_content += "\t\t\t\tif (IsUpdateOrPatch::DB_FALSE == is_update_or_patch) {\n"

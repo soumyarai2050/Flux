@@ -3,7 +3,7 @@ syntax = "proto2";
 import "flux_options.proto";
 
 
-enum DummyEnumDMS{
+enum DummyEnumDMSB{
   DUMMY_DMS = 0;
 }
 

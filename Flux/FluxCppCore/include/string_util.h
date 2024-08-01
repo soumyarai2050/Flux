@@ -15,25 +15,6 @@ namespace FluxCppCore {
         return static_cast<int64_t>(now_as_us.count());
     }
 
-    inline std::string format_time(int64_t timestamp_ms) {
-        // Convert milliseconds to microseconds
-        auto timestamp_us = std::chrono::microseconds(timestamp_ms * 1000);
-        // Convert the provided timestamp to system_clock time_point
-        auto now = std::chrono::system_clock::time_point(timestamp_us);
-        // Convert to time_t for use with gmtime
-        auto now_as_time_t = std::chrono::system_clock::to_time_t(now);
-        // Convert to tm for use with put_time
-        std::tm* now_as_tm = std::localtime(&now_as_time_t);
-        // Get the current time as microseconds since the epoch
-        auto now_as_us = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
-        // The number of microseconds that have passed since the last second
-        auto us = now_as_us.count() % 1000000;
-        // Create a stream and output the formatted time
-        std::ostringstream oss;
-        oss << std::put_time(now_as_tm, "%Y-%m-%d %H:%M:%S") << '.' << std::setfill('0') << std::setw(6) << us << "+00:00";
-        return oss.str();
-    }
-
     inline int64_t parse_time(const std::string& time_str) {
         // Create a stringstream to parse the string
         std::istringstream iss(time_str);
@@ -60,6 +41,25 @@ namespace FluxCppCore {
 
         // Return timestamp in microseconds
         return std::chrono::duration_cast<std::chrono::microseconds>(timestamp_us.time_since_epoch()).count() / 1000;
+    }
+
+    inline void format_time(int64_t timestamp_ms, std::string &time_str_out) {
+        // Convert milliseconds to microseconds
+        auto timestamp_us = std::chrono::microseconds(timestamp_ms * 1000);
+        // Convert the provided timestamp to system_clock time_point
+        auto now = std::chrono::system_clock::time_point(timestamp_us);
+        // Convert to time_t for use with gmtime
+        auto now_as_time_t = std::chrono::system_clock::to_time_t(now);
+        // Convert to tm for use with put_time
+        std::tm* now_as_tm = std::localtime(&now_as_time_t);
+        // Get the current time as microseconds since the epoch
+        auto now_as_us = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
+        // The number of microseconds that have passed since the last second
+        auto us = now_as_us.count() % 1000000;
+        // Create a stream and output the formatted time
+        std::ostringstream oss;
+        oss << std::put_time(now_as_tm, "%Y-%m-%d %H:%M:%S") << '.' << std::setfill('0') << std::setw(6) << us << "+00:00";
+        time_str_out = oss.str();
     }
 
     class StringUtil {

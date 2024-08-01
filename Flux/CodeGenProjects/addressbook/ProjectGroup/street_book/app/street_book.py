@@ -886,7 +886,7 @@ class StreetBook:
         """
         return px / self.leg1_fx
 
-    @perf_benchmark_sync_callable
+    @perf_benchmark_sync_callable("street_book")
     def _check_tob_n_place_non_systematic_chore(self, new_chore: NewChoreBaseModel, pair_strat: PairStrat,
                                                 strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel,
                                                 top_of_books: List[TopOfBookBaseModel]) -> int:
@@ -982,7 +982,7 @@ class StreetBook:
             posted_notional = px * qty
             return posted_notional
 
-    @perf_benchmark_sync_callable
+    @perf_benchmark_sync_callable("street_book")
     def _check_tob_and_place_chore(self, pair_strat: PairStratBaseModel | PairStrat, strat_brief: StratBriefBaseModel,
                                    chore_limits: ChoreLimitsBaseModel, top_of_books: List[TopOfBookBaseModel]) -> int:
         posted_leg1_notional: float = 0
@@ -1076,7 +1076,7 @@ class StreetBook:
                 logging.info(f"Can't find ask_quote in tob of symbol: {tob.symbol};;; tob: {tob}")
                 return None
 
-    @perf_benchmark_sync_callable
+    @perf_benchmark_sync_callable("street_book")
     def _check_tob_and_place_chore_test(self, pair_strat: PairStratBaseModel | PairStrat,
                                         strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel,
                                         top_of_books: List[TopOfBookBaseModel]) -> int:

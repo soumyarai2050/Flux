@@ -5,11 +5,11 @@
 
 quill::Logger* logger{nullptr};
 
-std::string expand_file_template(std::string logFile)
+void expand_file_template(const std::string& kr_log_file, std::string& r_log_file_out)
 {
-    std::string result{logFile};
+    std::string result{kr_log_file};
 
-    bool needDataAtEnd = true;
+    bool need_data_at_end = true;
 
     auto pos = result.find("%P");
     if (pos != std::string::npos)
@@ -25,7 +25,7 @@ std::string expand_file_template(std::string logFile)
         ss << std::put_time(&tm, "%Y-%m-%d");
 
         result.replace(pos, 2, ss.str() );
-        needDataAtEnd = false;
+        need_data_at_end = false;
     }
 
     pos = result.find("%T");
@@ -37,42 +37,43 @@ std::string expand_file_template(std::string logFile)
         std::stringstream ss;
         ss << std::put_time(&tm, "%T-%m-%d");
         result.replace(pos, 2, ss.str());
-        needDataAtEnd = false;
+        need_data_at_end = false;
     }
 
-    if (needDataAtEnd)
+    if (need_data_at_end)
     {
         std::filesystem::path path(result);
         auto extn = path.extension();
         result = path.replace_extension().string() + std::format("_{:%Y%m%d}{}", std::chrono::system_clock::now(), extn.string());
     }
-
-    return result;
+    r_log_file_out = result;
 }
 
-std::pair<std::shared_ptr<quill::Handler>, std::string> create_file_handler(std::string path)
+void create_file_handler(const std::string& kr_log_file_path, std::pair<std::shared_ptr<quill::Handler>, std::string>& r_file_hanler_out)
 {
     quill::FileHandlerConfig cfg;
     cfg.set_open_mode('a');
     cfg.set_append_to_filename(quill::FilenameAppend::None);
-    auto fir = quill::file_handler(path, cfg);
-    return std::make_pair(fir, std::string{});
+    auto fir = quill::file_handler(kr_log_file_path, cfg);
+    r_file_hanler_out = std::make_pair(fir, std::string{});
 }
 
-std::vector<std::shared_ptr<quill::Handler>> get_log_file_handlers(std::string logFileTemplate, bool lineHeader = true )
+void get_log_file_handlers(const std::string& kr_log_file_template, std::vector<std::shared_ptr<quill::Handler>>& r_file_handlers_out, bool lineHeader = true )
 {
-    std::vector<std::shared_ptr<quill::Handler>> FileHandlers;
-    auto logFile = expand_file_template(logFileTemplate);
-    auto fileFileHandler = create_file_handler(logFile);
-    FileHandlers.emplace_back(std::move(fileFileHandler.first));
-    auto setPattern = [&FileHandlers] (std::string logPattern, std::string timeFormat = {})
+    // std::vector<std::shared_ptr<quill::Handler>> FileHandlers;
+    std::string logFile;
+    expand_file_template(kr_log_file_template, logFile);
+    std::pair<std::shared_ptr<quill::Handler>, std::string> fileFileHandler;
+    create_file_handler(logFile, fileFileHandler);
+    r_file_handlers_out.emplace_back(std::move(fileFileHandler.first));
+    auto setPattern = [&r_file_handlers_out] (const std::string& kr_log_pattern, const std::string& kr_time_format = {})
     {
-        for (auto& h : FileHandlers)
+        for (auto& h : r_file_handlers_out)
         {
-            if (timeFormat.empty()) {h->set_pattern(logPattern);}
+            if (kr_time_format.empty()) {h->set_pattern(kr_log_pattern);}
             else
             {
-                h->set_pattern(logPattern, timeFormat);
+                h->set_pattern(kr_log_pattern, kr_time_format);
             }
         }
     };
@@ -82,13 +83,12 @@ std::vector<std::shared_ptr<quill::Handler>> get_log_file_handlers(std::string l
         auto logPtn = "%(time) %(log_level) %(thread_id) %(thread_name) %(file_name) %(line_number) - %(message)";
         setPattern(logPtn, "%Y-%m-%d %H-%M-%S.%Qus%z");
     }
-    return FileHandlers;
 }
 
-quill::Logger* create_logger(const char* name, quill::LogLevel level, std::vector<std::shared_ptr<quill::Handler>>&& fh)
+quill::Logger* create_logger(const char* name, quill::LogLevel log_level, std::vector<std::shared_ptr<quill::Handler>>&& fh)
 {
     quill::Logger* ql = quill::create_logger(name, std::move(fh));
-    ql->set_log_level(level);
+    ql->set_log_level(log_level);
     return ql;
 }
 
@@ -125,7 +125,8 @@ void InitLogger()
     std::string log_file_path;
     get_log_file_path(log_file_path);
 
-    auto handlers = get_log_file_handlers(log_file_path + "/" + "market_data.logfile-%P--%D-%T.log");
+    std::vector<std::shared_ptr<quill::Handler>> handlers;
+    get_log_file_handlers(log_file_path + "/" + "market_data.logfile-%P--%D-%T.log", handlers);
     logger = create_logger("", quill::LogLevel::Debug, std::move(handlers));
 
     quill::Config cfg;

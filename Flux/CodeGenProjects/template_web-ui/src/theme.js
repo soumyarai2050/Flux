@@ -100,6 +100,38 @@ const lightThemeComponents = {
             },
         },
     },
+    MuiPickersDay: {
+        styleOverrides: {
+            root: {
+                '&.Mui-selected': {
+                    background: cssVar('--teal-400')
+                }
+            }
+        }
+    },
+    MuiClock: {
+        styleOverrides: {
+            pin: {
+                background: cssVar('--teal-400')
+            }
+        }
+    },
+    MuiClockPointer: {
+        styleOverrides: {
+            root: {
+                background: cssVar('--teal-400')
+            }
+        }
+    },
+    MuiClockNumber: {
+        styleOverrides: {
+            root: {
+                '&.Mui-selected': {
+                    background: cssVar('--teal-400')
+                }
+            }
+        }
+    }
 }
 
 const darkThemeComponents = {
@@ -194,6 +226,38 @@ const darkThemeComponents = {
             },
         },
     },
+    MuiPickersDay: {
+        styleOverrides: {
+            root: {
+                '&.Mui-selected': {
+                    background: cssVar('--blue-accent-400')
+                }
+            }
+        }
+    },
+    MuiClock: {
+        styleOverrides: {
+            pin: {
+                background: cssVar('--blue-accent-400')
+            }
+        }
+    },
+    MuiClockPointer: {
+        styleOverrides: {
+            root: {
+                background: cssVar('--blue-accent-400')
+            }
+        }
+    },
+    MuiClockNumber: {
+        styleOverrides: {
+            root: {
+                '&.Mui-selected': {
+                    background: cssVar('--blue-accent-400')
+                }
+            }
+        }
+    }
 }
 
 export const lightTheme = createTheme({

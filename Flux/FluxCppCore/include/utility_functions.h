@@ -34,7 +34,7 @@ namespace FluxCppCore {
 
         int8_t inline get_market_depth_levels_from_config() {
             const char* config_file = getenv("CONFIG_FILE");
-            int8_t market_depth_levels{0};
+            // int8_t market_depth_levels;
             if (!config_file) {
                 throw std::runtime_error("export env variable {CONFIG_FILE}");
             }
@@ -42,8 +42,7 @@ namespace FluxCppCore {
                 throw std::runtime_error(std::format("{} not accessable", config_file));
             }
             YAML::Node config = YAML::LoadFile(config_file);
-            market_depth_levels = config["market_depth_levels"].as<int8_t>();
-            return market_depth_levels;
+            return config["market_depth_levels"].as<int8_t>();
         }
 
     struct PythonGIL
@@ -72,9 +71,11 @@ namespace FluxCppCore {
     struct MessageTypeToPythonArgs {
 
         static PyObject* message_type_to_python_args(const market_data::MarketDepth &kr_market_depth_obj) {
-            PyObject* p_args = nullptr;
-            std::string exch_time = format_time(kr_market_depth_obj.exch_time());
-            std::string arrival_time = format_time(kr_market_depth_obj.exch_time());
+            PyObject* p_args;
+            std::string exch_time;
+            format_time(kr_market_depth_obj.exch_time(), exch_time);
+            std::string arrival_time;
+            format_time(kr_market_depth_obj.exch_time(), arrival_time);
             if (kr_market_depth_obj.side() == market_data::TickType::BID) {
                 p_args = PyTuple_Pack(13, PyLong_FromLong(kr_market_depth_obj.id()),
                                 PyUnicode_DecodeUTF8(kr_market_depth_obj.symbol().c_str(),
@@ -124,8 +125,10 @@ namespace FluxCppCore {
         }
 
         static PyObject* message_type_to_python_args(const market_data::LastTrade &kr_last_trade_obj, PyObject* p_market_trade_volume) {
-            std::string exch_time = format_time(kr_last_trade_obj.exch_time());
-            std::string arrival_time = format_time(kr_last_trade_obj.exch_time());
+            std::string exch_time;
+            format_time(kr_last_trade_obj.exch_time(), exch_time);
+            std::string arrival_time;
+            format_time(kr_last_trade_obj.exch_time(), arrival_time);
             return PyTuple_Pack(9, PyLong_FromLong(kr_last_trade_obj.id()),
                                 PyUnicode_DecodeUTF8(kr_last_trade_obj.symbol_n_exch_id().symbol().c_str(),
                                                      static_cast<Py_ssize_t>(kr_last_trade_obj.symbol_n_exch_id().symbol().size()),
@@ -147,9 +150,11 @@ namespace FluxCppCore {
 
         static PyObject* message_type_to_python_args(const market_data::TopOfBook &kr_top_of_book_obj, PyObject* p_market_trade_volume) {
             PyObject* p_args = nullptr;
-            std::string last_update_date_time = format_time(kr_top_of_book_obj.last_update_date_time());
+            std::string last_update_date_time;
+            format_time(kr_top_of_book_obj.last_update_date_time(), last_update_date_time);
             if (kr_top_of_book_obj.has_bid_quote()) {
-                std::string bid_quote_last_update_date_time = format_time(kr_top_of_book_obj.bid_quote().last_update_date_time());
+                std::string bid_quote_last_update_date_time;
+                format_time(kr_top_of_book_obj.bid_quote().last_update_date_time(), bid_quote_last_update_date_time);
                 LOG_INFO_IMPL(GetLogger(), "Bid Quote: {}, total_trading_security_size: {}",
                     kr_top_of_book_obj.bid_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
                 p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
@@ -171,7 +176,8 @@ namespace FluxCppCore {
             }
 
             if (kr_top_of_book_obj.has_ask_quote()) {
-                std::string ask_quote_last_update_date_time = format_time(kr_top_of_book_obj.ask_quote().last_update_date_time());
+                std::string ask_quote_last_update_date_time;
+                format_time(kr_top_of_book_obj.ask_quote().last_update_date_time(), ask_quote_last_update_date_time);
                 LOG_INFO_IMPL(GetLogger(), "Ask Quote: {}, total_trading_security_size: {}",
                     kr_top_of_book_obj.ask_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
                 p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
@@ -194,7 +200,8 @@ namespace FluxCppCore {
             }
 
             if (kr_top_of_book_obj.has_last_trade()) {
-                std::string last_trade_last_update_date_time = format_time(kr_top_of_book_obj.last_trade().last_update_date_time());
+                std::string last_trade_last_update_date_time;
+                format_time(kr_top_of_book_obj.last_trade().last_update_date_time(), last_trade_last_update_date_time);
                 LOG_INFO_IMPL(GetLogger(), "Last Trade: {}, total_trading_security_size: {}",
                     kr_top_of_book_obj.ask_quote().DebugString(), kr_top_of_book_obj.total_trading_security_size());
                 p_args = PyTuple_Pack(17, PyLong_FromLong(kr_top_of_book_obj.id()),
@@ -228,7 +235,8 @@ namespace FluxCppCore {
         }
 
         static PyObject* message_type_to_python_args(const market_data::Quote &kr_quote_obj) {
-            std::string quote_last_update_date_time = format_time(kr_quote_obj.last_update_date_time());
+            std::string quote_last_update_date_time;
+            format_time(kr_quote_obj.last_update_date_time(), quote_last_update_date_time);
             return PyTuple_Pack(4, PyFloat_FromDouble(kr_quote_obj.px()),
                                 PyLong_FromLong(kr_quote_obj.qty()),
                                 PyFloat_FromDouble(kr_quote_obj.premium()),

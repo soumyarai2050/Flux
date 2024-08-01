@@ -304,7 +304,6 @@ const TableWidget = (props) => {
                     setData(updatedArray);
                 }
             } else {
-                console.error('else case');
                 setData(updatedData);
             }
         }
@@ -883,6 +882,7 @@ const TableWidget = (props) => {
                     subtree={props.widgetType === 'repeatedRoot' ? null : rowTrees[selectedRow]}
                     onUserChange={onUserChange}
                     scrollLock={false}
+                    nestedTree={true}
                 />
                 <Dialog
                     open={openModalPopup}

@@ -58,7 +58,7 @@
 
 .disabled {
     /* background-color: #ccc; */
-    color: var(--grey-200) !important;
+    /* color: var(--grey-200) !important; */
     background-color: var(--grey-700);
     cursor: not-allowed;
 }
