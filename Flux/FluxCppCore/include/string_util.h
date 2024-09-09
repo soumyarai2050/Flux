@@ -16,31 +16,44 @@ namespace FluxCppCore {
     }
 
     inline int64_t parse_time(const std::string& time_str) {
-        // Create a stringstream to parse the string
         std::istringstream iss(time_str);
-        // Create tm struct to store parsed time
         std::tm tm = {};
-        // Parse the string into tm struct
-        iss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+        char separator;
+        char dot;
+        int microseconds = 0;
+
+        // Check the separator between date and time
+        if (time_str.find('T') != std::string::npos) {
+            separator = 'T';
+        } else if (time_str.find(' ') != std::string::npos) {
+            separator = ' ';
+        } else {
+            throw std::runtime_error("Invalid time string format");
+        }
+
+        // Parse the string into tm struct and microseconds
+        iss >> std::get_time(&tm, ("%Y-%m-%d" + std::string(1, separator) + "%H:%M:%S").c_str()) >> dot >> microseconds;
+
         // Check if parsing succeeded
         if (iss.fail()) {
             throw std::runtime_error("Failed to parse time string");
         }
+
         // Convert tm to time_t
-        auto time_t = std::mktime(&tm);
+        time_t time_t = std::mktime(&tm);
+
+        if (time_t == -1) {
+            throw std::runtime_error("Failed to convert tm to time_t");
+        }
+
         // Convert time_t to microseconds since epoch
         auto timestamp_us = std::chrono::system_clock::from_time_t(time_t);
 
-        // Extract microseconds from the time string
-        char dot;
-        int microseconds;
-        if (iss >> dot >> microseconds) {
-            // Add microseconds to timestamp
-            timestamp_us += std::chrono::microseconds(microseconds);
-        }
+        // Add microseconds to timestamp
+        timestamp_us += std::chrono::microseconds(microseconds);
 
-        // Return timestamp in microseconds
-        return std::chrono::duration_cast<std::chrono::microseconds>(timestamp_us.time_since_epoch()).count() / 1000;
+        // Return timestamp in milliseconds
+        return std::chrono::duration_cast<std::chrono::milliseconds>(timestamp_us.time_since_epoch()).count();
     }
 
     inline void format_time(int64_t timestamp_ms, std::string &time_str_out) {
@@ -106,7 +119,7 @@ namespace FluxCppCore {
             return result;
         }
 
-        static bsoncxx::types::b_date convert_utc_string_to_b_date(const std::string& utc_time_str) {
+        static inline bsoncxx::types::b_date convert_utc_string_to_b_date(const std::string& utc_time_str) {
             std::tm tm = {};
             std::istringstream ss(utc_time_str);
             ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S"); // Parse the date-time part

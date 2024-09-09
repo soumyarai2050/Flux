@@ -4,9 +4,15 @@ import os
 from typing import List, Callable, Dict, ClassVar, Tuple, Final
 import time
 from abc import abstractmethod
+from enum import auto
+import copy
+
+# 3rd party imports
+from pathlib import PurePath
 
 # project imports
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
+from fastapi_restful.enums import StrEnum
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
@@ -16,7 +22,13 @@ import protogen
 
 # empty main import below is required for making main accessible to derived classes
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_to_camel_case
+from FluxPythonUtils.scripts.utility_functions import convert_to_camel_case, convert_to_capitalized_camel_case
+
+
+class ModelType(StrEnum):
+    Beanie = auto()
+    Dataclass = auto()
+    Msgspec = auto()
 
 
 class BaseFastapiPlugin(BaseProtoPlugin):
@@ -58,13 +70,15 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         self.ws_client_file_name: str = ""
         self.ws_ui_proxy_config_file_name: Final[str] = "ui_uri_to_server_uri_config.yaml"
         self.launch_file_name: str = ""
+        self.routes_callback_file_name: str = ""
         self.routes_callback_class_name: str = ""
+        self.routes_callback_import_file_name: str = ""
+        self.http_routes_import_file_name: str = ""
         self.base_native_override_routes_callback_class_name: str = ""
         self.beanie_native_override_routes_callback_class_name: str = ""
         self.beanie_bare_override_routes_callback_class_name: str = ""
         self.cache_native_override_routes_callback_class_name: str = ""
         self.cache_bare_override_routes_callback_class_name: str = ""
-        self.routes_callback_class_name_capital_camel_cased: str = ""
         self.int_id_message_list: List[protogen.Message] = []
         self.callback_override_set_instance_file_name: str = ""
         self.reentrant_lock_non_required_msg: List[protogen.Message] = [
@@ -239,10 +253,45 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             meta_data_field_name_to_field_proto_dict[meta_field.proto.name] = meta_field
         return meta_data_field_name_to_field_proto_dict
 
+    def _import_current_routes_callback(self) -> List[str]:
+        import_statements: List[str] = []
+        model_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_callback_file_name)
+        import_statements.append(f"            from {model_file_path} import {self.routes_callback_class_name}\n")
+        return import_statements
+
+    def handle_routes_callback_import_file_gen(self) -> str:
+        model_import_file_name = self.routes_callback_import_file_name + ".py"
+        return self.handle_import_file_gen(model_import_file_name, self._import_current_routes_callback)
+
+    def _import_current_http_routes(self) -> List[str]:
+        import_statements: List[str] = []
+        model_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
+        import_statements.append(f"            from {model_file_path} import *\n")
+        return import_statements
+
+    def handle_http_routes_import_file_gen(self) -> str:
+        model_import_file_name = self.http_routes_import_file_name + ".py"
+        return self.handle_import_file_gen(model_import_file_name, self._import_current_http_routes)
 
     @abstractmethod
     def handle_fastapi_initialize_file_gen(self):
         raise NotImplementedError
+
+    def _get_if_pass_stored_obj_to_pre_post_callback(
+            self, pass_stored_obj_pre_post_callback_field_name: str, **kwargs) -> bool:
+        json_root_option_val = kwargs.get("json_root_option_val")
+        if json_root_option_val is not None:
+            pass_stored_obj_to_pre_post_callback: bool | None = (
+                json_root_option_val.get(pass_stored_obj_pre_post_callback_field_name))
+
+            if pass_stored_obj_to_pre_post_callback is not None:
+                return pass_stored_obj_to_pre_post_callback
+            else:
+                return False
+        else:
+            err_str_ = "json_root_option_val not found in passed kwarg to put route generation"
+            logging.error(err_str_)
+            raise Exception(err_str_)
 
     @abstractmethod
     def set_req_data_members(self, file: protogen.File):
@@ -258,10 +307,10 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         self.base_routes_file_name = f'{self.proto_file_name}_base_routes'
         self.http_routes_file_name = f'{self.proto_file_name}_http_routes'
         self.ws_routes_file_name = f'{self.proto_file_name}_ws_routes'
-        self.routes_callback_class_name = f"{self.proto_file_name}_routes_callback"
-        routes_callback_class_name_camel_cased: str = convert_to_camel_case(self.routes_callback_class_name)
-        self.routes_callback_class_name_capital_camel_cased: str = \
-            routes_callback_class_name_camel_cased[0].upper() + routes_callback_class_name_camel_cased[1:]
+        self.routes_callback_class_name = f"{convert_to_capitalized_camel_case(self.proto_file_name)}RoutesCallback"
+        self.routes_callback_file_name = f"{self.proto_file_name}_routes_callback"
+        self.routes_callback_import_file_name = f"{self.proto_file_name}_routes_callback_imports"
+        self.http_routes_import_file_name = f"{self.proto_file_name}_http_routes_imports"
         self.base_native_override_routes_callback_class_name: str = \
             f"{self.proto_file_name}_routes_callback_base_native_override"
         self.beanie_native_override_routes_callback_class_name = \

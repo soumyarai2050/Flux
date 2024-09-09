@@ -28,7 +28,6 @@ raw_perf_data_config:
 # to be used in loop wait in script to update performance analysis data
 raw_performance_data_processor_loop_wait: 2  # sec
 
-is_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
 
 # to run log analyzer in simulator mode

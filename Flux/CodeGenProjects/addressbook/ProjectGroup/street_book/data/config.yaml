@@ -22,14 +22,18 @@ avoid_last_barter_db_update: True  # to be used in routes to bypass db updates i
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
+msgspec_override_type: "native"
+dataclass_override_type: "native"
 beanie_override_type: "native"
 cache_override_type: "bare"
 
 # to be used in loop wait in script to update performance analysis data
 raw_performance_data_processor_loop_wait: 2  # sec
 
-is_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
-allow_multiple_open_chores_per_strat: False
+allow_multiple_unfilled_chore_pairs_per_strat: False
+total_barter_qty_by_aggregated_window_first_n_lst_barters: True
+inst_id: "SIM"  # instance id for simulator
 
 pause_fulfill_post_chore_dod: False   # if true pauses strat which gets chore update to make any chore_snapshot fully filled post chore is DOD
+max_spread_in_bips: 50

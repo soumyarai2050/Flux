@@ -62,6 +62,8 @@ message MessageJsonRoot{
   optional AggregateType DeleteAllOp = 9;
   optional AggregateType ReadByIDWebSocketOp = 10;
   optional bool SetReentrantLock = 11 [default=true];
+  optional bool PassStoredObjToUpdatePrePostCallback = 12 [default=false];
+  optional bool PassStoredObjToUpdateAllPrePostCallback = 13 [default=false];
 }
 
 enum TimeSeriesGranularityType{
@@ -71,14 +73,12 @@ enum TimeSeriesGranularityType{
     }
 
 message MessageJsonRootTimeSeries{
-  required float MongoVersion = 1;   // currently supports 5.0
-  // allowed for v5.0
+  required float MongoVersion = 1;
   optional AggregateType CreateOp = 2;
   optional AggregateType CreateAllOp = 3;
   optional AggregateType ReadOp = 4;
   optional AggregateType ReadByIDWebSocketOp = 5;
   optional AggregateType DeleteAllOp = 6;
-  // Pending to be impl with above version
   optional AggregateType UpdateOp = 7;
   optional AggregateType UpdateAllOp = 8;
   optional AggregateType PatchOp = 9;
@@ -89,17 +89,21 @@ message MessageJsonRootTimeSeries{
   optional int64 ExpireAfterSeconds = 13;
   optional string SecondaryField = 14;  // not supported yet
   optional bool SetReentrantLock = 15 [default=true];
+  optional bool PassStoredObjToUpdatePrePostCallback = 16 [default=false];
+  optional bool PassStoredObjToUpdateAllPrePostCallback = 17 [default=false];
 }
 
 enum QueryTypeEnum{
   HTTP = 0;
   WS = 1;
-  BOTH = 2;
+  HTTP_FILE = 2;
+  BOTH = 3;
 }
 
 enum QueryRouteTypeEnum{
   GET = 0;
   PATCH = 1;
+  POST = 2;
 }
 
 message MessageJsonQuery{

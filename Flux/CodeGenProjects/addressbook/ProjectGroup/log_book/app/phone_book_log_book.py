@@ -5,7 +5,6 @@ import signal
 import sys
 import inspect
 
-os.environ["DBType"] = "beanie"
 # Project imports
 from FluxPythonUtils.log_book.log_book import get_transaction_counts_n_timeout_from_config
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_base_log_book import (

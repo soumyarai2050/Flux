@@ -17,46 +17,54 @@ namespace FluxCppCore {
 
     template <class T> struct Monitor
     {
-        typedef std::queue<T> queue_t;
         void push(const T& data)
         {
-            std::unique_lock<std::mutex> lock(m_);
-            q_.push(data);
-            lock.unlock();
-            c_.notify_all();
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                queue_.push(data);
+            }
+            condition_.notify_one(); // Notify all waiting threads
         }
+
         void push(T&& data)
         {
-            std::unique_lock<std::mutex> lock(m_);
-            q_.push(std::move(data));
-            lock.unlock();
-            c_.notify_all();
-        }
-
-        auto  size() {
-            return q_.size();
-        }
-
-        QueueStatus pop(T& val)
-        {
-            std::unique_lock<std::mutex> lock(m_);
-            if(q_.empty())
             {
-                std::cv_status wakeup_status = c_.wait_for(lock, std::chrono::seconds(60));
-                if (wakeup_status == std::cv_status::timeout) {return QueueStatus::TIMEOUT;}
+                std::unique_lock<std::mutex> lock(mutex_);
+                queue_.push(std::move(data));
             }
-            if(!q_.empty())
+            condition_.notify_one(); // Notify all waiting threads
+        }
+
+        size_t size()
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            return queue_.size();
+        }
+
+        QueueStatus pop(T& val, std::chrono::milliseconds timeout = std::chrono::seconds(300))
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            while (queue_.empty()) // Loop to handle spurious wakeups
             {
-                val = q_.front();
-                q_.pop();
+                if (condition_.wait_for(lock, timeout) == std::cv_status::timeout)
+                {
+                    return QueueStatus::TIMEOUT;
+                }
+            }
+
+            if (!queue_.empty())
+            {
+                val = std::move(queue_.front());
+                queue_.pop();
                 return QueueStatus::DATA_CONSUMED;
             }
             return QueueStatus::SPURIOUS_WAKEUP;
         }
+
     private:
-        queue_t q_;
-        mutable std::mutex m_;
-        mutable std::condition_variable c_;
+        std::queue<T> queue_;
+        std::mutex mutex_;
+        std::condition_variable condition_;
     };
 }
 

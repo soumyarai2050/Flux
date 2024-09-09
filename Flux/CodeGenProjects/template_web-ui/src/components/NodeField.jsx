@@ -221,7 +221,7 @@ const NodeField = (props) => {
 
         // let value = props.data.value ? props.data.value : props.data.value === 0 ? 0 : props.data.value === -0 ? -0 : '';
         let value = inputValue ? cloneDeep(inputValue) : inputValue === 0 ? 0 : inputValue === -0 ? -0 : '';
-        if (props.data.displayType == DataTypes.INTEGER && props.data.value !== -0 && value !== '') {
+        if (props.data.displayType == DataTypes.INTEGER && value !== -0 && value !== '') {
             value = floatToInt(value);
         }
         validationError.current = validateConstraints(props.data, value, min, max);
@@ -233,6 +233,9 @@ const NodeField = (props) => {
                 )}
                 {props.data.numberFormat && props.data.numberFormat === 'bps' && (
                     <InputAdornment position='end'>bps</InputAdornment>
+                )}
+                {props.data.numberFormat && props.data.numberFormat === '$' && (
+                    <InputAdornment position='end'>$</InputAdornment>
                 )}
                 {validationError.current && (
                     <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
@@ -271,7 +274,7 @@ const NodeField = (props) => {
             />
         )
     } else if (props.data.type === DataTypes.DATE_TIME) {
-        let value = props.data.value ? props.data.value : null;
+        let value = props.data.value || null;
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
             <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
@@ -279,7 +282,7 @@ const NodeField = (props) => {
         const inputProps = endAdornment ? {
             endAdornment: endAdornment
         } : {};
-
+        // default input format
         let inputFormat = 'YYYY-MM-DD HH:mm:ss'
         if (value) {
             const localDateTime = dayjs.utc(value).tz(localTimezone);
@@ -287,8 +290,11 @@ const NodeField = (props) => {
                 if (localDateTime.isSame(dayjs(), 'day')) {
                     inputFormat = 'HH:mm:ss';
                 }
+                // else not same day - use default input format
             }
+            // else displayType is datetime -  use default input format
         }
+        // else date is null - use default input format
 
         return (
             <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -326,12 +332,12 @@ const NodeField = (props) => {
                                     newDate.setSeconds(0, 0);
                                     props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, newDate.toISOString());
                                 }
-                                setIsDateTimePickerOpen(true)
+                                setIsDateTimePickerOpen(true);
                             }}
                             InputProps={{
                                 readOnly: true,
                                 endAdornment: (
-                                    <InputAdornment position="end">
+                                    <InputAdornment position='end'>
                                         <IconButton 
                                             onClick={(e) => {
                                                 props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, null);
@@ -342,7 +348,7 @@ const NodeField = (props) => {
                                             <Clear fontSize='small' />
                                         </IconButton>
                                     </InputAdornment>
-                                ),
+                                )
                             }}
                         />
                     }

@@ -39,7 +39,7 @@ message BasketChore{
     IsRepeated: true
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  repeated NewChore new_chores = 2 [(FluxFldAutoComplete) = "algo:ALGO_List"];
+  repeated NewChore new_chores = 2 [(FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "algo:ALGO_List, force_bkr:BrokerCode_List, sec_id:CB_List, mstrat:Mstrat_List, sec_id_source=TICKER"];
 }
 
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning

@@ -60,6 +60,9 @@ class BareFastapiPluginHttpHttp(FastapiCallbackFileHandler,
             self.callback_override_set_instance_file_name + ".py":
                 self.handle_callback_override_set_instance_file_gen(),
 
+            # Adding callback import file
+            self.routes_callback_import_file_name + ".py": self.handle_routes_callback_import_file_gen(),
+
             # Adding dummy callback override class file
             "dummy_" + self.beanie_native_override_routes_callback_class_name + ".py": self.handle_callback_override_file_gen(),
 
@@ -67,7 +70,10 @@ class BareFastapiPluginHttpHttp(FastapiCallbackFileHandler,
             self.base_routes_file_name + ".py": self.handle_base_routes_file_gen(),
 
             # Adding project's http routes.py
-            self.http_routes_file_name + ".py": self.handle_http_routes_file_gen(),
+            self.http_routes_file_name + ".py": self.handle_http_pydantic_routes_file_gen(),
+
+            # adding http routes import file
+            self.http_routes_import_file_name + ".py": self.handle_http_routes_import_file_gen(),
 
             # Adding project's ws routes.py
             self.ws_routes_file_name + ".py": self.handle_ws_routes_file_gen(),

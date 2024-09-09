@@ -16,12 +16,25 @@ if __name__ == '__main__':
     db = client['performance_benchmark']
     collection = db['RawPerformanceData']
 
+    # project name for which report needs to be created
+    # project_name = "pair_strat"
+    project_name = "log_analyzer"
+
     # Define the specific date
-    start_date = pendulum.parse("2024-04-22T21:42:39.397+00:00")
-    last_time = pendulum.parse("2024-04-22T21:58:39.397+00:00")
-    # last_time = None
+    # start_date = pendulum.parse("2024-07-10T21:40:39.397+00:00")
+    start_date = pendulum.parse("2024-08-13T18:22:39.397+00:00")
+    # last_time = pendulum.parse("2024-07-10T22:30:39.397+00:00")
+    last_time = None
 
     pipeline = [
+        {
+            '$match': {
+                'project_name': {
+                    "$regex": project_name,
+                    "$options": "i"
+                },
+            }
+        },
         {
             '$match': {
                 'start_time': {}
@@ -130,11 +143,12 @@ if __name__ == '__main__':
     ]
 
     if start_date:
-        pipeline[0]['$match']['start_time']['$gte'] = start_date
+        pipeline[1]['$match']['start_time']['$gte'] = start_date
     if last_time:
-        pipeline[0]['$match']['start_time']['$lte'] = last_time
+        pipeline[1]['$match']['start_time']['$lte'] = last_time
 
     result = list(collection.aggregate(pipeline))
+    print(result)
     data = pd.DataFrame(result)
     print(data)
 
@@ -145,7 +159,7 @@ if __name__ == '__main__':
         os.makedirs(perf_data_dir)
 
     datetime_str: str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_name = f'performance_data_{datetime_str}.csv'
+    file_name = f'{project_name}_performance_data_{datetime_str}.csv'
     data.to_csv(perf_data_dir / file_name, columns=['callable_name', 'count', 'min', 'max', 'median', 'perc_25',
                                                     'perc_50', 'perc_75', 'perc_90', 'perc_95'])
 

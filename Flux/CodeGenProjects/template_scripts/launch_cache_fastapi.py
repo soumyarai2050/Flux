@@ -13,17 +13,17 @@ if __name__ == "__main__":
     config_yaml_path = project_dir / "data" / "config.yaml"
     config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
     code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
-    db_type: str = "cache"
+    model_type: str = "cache"
     datetime_str: str = datetime.now().strftime("%Y%m%d")
-    port = 8000 if ((config_port := config_yaml_dict.get(f"{db_type}_port")) is None or
+    port = 8000 if ((config_port := config_yaml_dict.get(f"{model_type}_port")) is None or
                     len(config_port) == 0) else parse_to_int(config_port)
     env_dict = {
         "RELOAD": "false",
         "DEBUG_SLEEP_TIME": "0",
         "LOG_FILE_DIR_PATH": f"{project_dir / 'log' }",
-        "LOG_FILE_NAME": f"template_project_name_{db_type}_logs_{datetime_str}.log",
-        "FASTAPI_FILE_NAME": f"template_model_service_{db_type}_fastapi",
-        "DBType": f"{db_type}",
+        "LOG_FILE_NAME": f"template_project_name_{model_type}_logs_{datetime_str}.log",
+        "FASTAPI_FILE_NAME": f"template_model_service_{model_type}_fastapi",
+        "ModelType": f"{model_type}",
         "PORT": f"{port}",
     }
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_", "_", env_dict)

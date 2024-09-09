@@ -1,5 +1,6 @@
 import os.path
 import sys
+import signal
 from pathlib import PurePath
 from datetime import datetime
 home_dir_path = PurePath(__file__).parent.parent.parent.parent.parent
@@ -15,7 +16,7 @@ if __name__ == "__main__":
     host = config_yaml_dict.get("server_host")
     if host is None or len(host) == 0:
         raise Exception("Couldn't find 'server_host' key in data/config.yaml file")
-    db_type: str = "beanie"
+    model_type: str = "beanie"
 
     port = config_yaml_dict.get(f"main_server_beanie_port")
     if port is None:
@@ -26,9 +27,9 @@ if __name__ == "__main__":
         "RELOAD": "false",
         "DEBUG_SLEEP_TIME": "0",
         "LOG_FILE_DIR_PATH": f"{project_dir / 'log'}",
-        "FASTAPI_FILE_NAME": f"template_model_service_{db_type}_fastapi",
+        "FASTAPI_FILE_NAME": f"template_model_service_{model_type}_fastapi",
         "HOST": host,
-        "DBType": f"{db_type}"
+        "ModelType": f"{model_type}"
     }
 
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_", "_", env_dict)
@@ -46,3 +47,12 @@ if __name__ == "__main__":
         template_model_service_launch_server
 
     template_model_service_launch_server()
+
+    # killing current process
+
+    # Get the current process ID
+    pid = os.getpid()
+
+    # Kill the process
+    os.kill(pid, signal.SIGKILL)  # or signal.SIGKILL for immediate termination
+

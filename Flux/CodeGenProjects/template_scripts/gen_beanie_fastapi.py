@@ -18,6 +18,7 @@ if __name__ == "__main__":
     env_var_dict = CodeGenEngineEnvManager.default_gen_env_var_dict
     env_var_dict["PLUGIN_FILE_NAME"] = "beanie_fastapi_plugin.py"
     env_var_dict["HOST"] = host
+    env_var_dict["ModelType"] = "beanie"
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_",
                                                              "PluginFastApi", env_var_dict)
 

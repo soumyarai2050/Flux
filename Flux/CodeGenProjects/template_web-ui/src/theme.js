@@ -104,7 +104,10 @@ const lightThemeComponents = {
         styleOverrides: {
             root: {
                 '&.Mui-selected': {
-                    background: cssVar('--teal-400')
+                    background: cssVar('--teal-400'),
+                    '&:hover': {
+                        backgroundColor: cssVar('--teal-400')
+                    }
                 }
             }
         }
@@ -127,7 +130,10 @@ const lightThemeComponents = {
         styleOverrides: {
             root: {
                 '&.Mui-selected': {
-                    background: cssVar('--teal-400')
+                    background: cssVar('--teal-400'),
+                    '&:hover': {
+                        backgroundColor: cssVar('--teal-400')
+                    }
                 }
             }
         }
@@ -230,7 +236,10 @@ const darkThemeComponents = {
         styleOverrides: {
             root: {
                 '&.Mui-selected': {
-                    background: cssVar('--blue-accent-400')
+                    background: cssVar('--blue-accent-400'),
+                    '&:hover': {
+                        backgroundColor: cssVar('--blue-accent-400')
+                    }
                 }
             }
         }
@@ -253,7 +262,10 @@ const darkThemeComponents = {
         styleOverrides: {
             root: {
                 '&.Mui-selected': {
-                    background: cssVar('--blue-accent-400')
+                    background: cssVar('--blue-accent-400'),
+                    '&:hover': {
+                        backgroundColor: cssVar('--blue-accent-400')
+                    }
                 }
             }
         }

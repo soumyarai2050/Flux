@@ -94,6 +94,8 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         # output_content += f'#include "../CppUtilGen/{class_name}_key_handler.h"\n'
         # output_content += f'#include "../../FluxCppCore/include/market_data_json_codec.h"\n'
         # output_content += f'#include "../CppUtilGen/{class_name}_max_id_handler.h"\n'
+        output_content += f'#include <bsoncxx/builder/basic/document.hpp>\n'
+        output_content += f'#include "mongo_db_handler.h"\n\n'
         output_content += f'#include "../../../../../../FluxCppCore/include/json_codec.h"\n'
         output_content += f'#include "../CppUtilGen/market_data_get_str_from_enum.h"\n'
         output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n\n'

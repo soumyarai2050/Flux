@@ -1,17 +1,32 @@
+import copy
+import logging
+import os
+import sys
+import stat
+import math
+from threading import Lock
 import inspect
+from typing import Set
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
     get_ongoing_or_all_pair_strats_by_sec_id, get_ongoing_pair_strat_filter)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import \
-    EmailBookServiceHttpClient
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
+    EmailBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_strat_db_updates, UpdateType)
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import StratViewBaseModel
+from FluxPythonUtils.scripts.utility_functions import (
+    YAMLConfigurationManager, except_n_log_alert, parse_to_int)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import (
+    StratViewBaseModel)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensions import BrokerUtil
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecord, SecType
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_symbol_side_key)
 
+if os.getenv("DASH_MODE"):
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import (
+        dept_book_service_http_client, DeptBookServiceHttpClient)
 CURRENT_PROJECT_DIR = PurePath(__file__).parent.parent
 CURRENT_PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
 CURRENT_PROJECT_SCRIPTS_DIR = PurePath(__file__).parent.parent / 'scripts'
@@ -33,6 +48,8 @@ street_book_config_yaml_dict = (
     YAMLConfigurationManager.load_yaml_configurations(str(street_book_config_yaml_path)))
 
 update_portfolio_status_lock: Lock = Lock()
+force_clear_positions_priority: int = 9
+force_clear_brokers = ["zerodha"]  # comparison is always lower cased
 
 
 def patch_portfolio_status(overall_buy_notional: float | None, overall_sell_notional: float | None) -> None:
@@ -70,8 +87,84 @@ def patch_portfolio_status(overall_buy_notional: float | None, overall_sell_noti
         # else not action required - no action to take - ignore and continue
     except Exception as e:
         logging.critical(
-            f"something serious is wrong: update_portfolio_status is throwing an exception!;;; exception: {e}",
-            exc_info=True)
+            f"something serious is wrong: update_portfolio_status is throwing an exception!;;; "
+            f"exception: {e}", exc_info=True)
+
+
+def write_md_subscribe_cmd_header(open_script_file, exch_code: str, debug_cn_cb_pair: Tuple[str, str] | None,
+                                  debug_cn_a_eqt: str | None):
+    # generate header
+    open_script_file.write("#!/bin/bash -li\n")  # alias requires interactive shell (li)
+    open_script_file.write("#shopt -s expand_aliases\n")  # allows cdm alias to work
+    open_script_file.write("echo $PWD\n")  # pre-cdm dir
+    open_script_file.write("cdm\n")  # cdm assumed alias in external shell that takes to MD executable dir
+    open_script_file.write(f"export EXCHANGE_CODE={exch_code}\n")
+    # generate debug run function
+    open_script_file.write("_debug_run(){\n")
+    is_cn_cb_pair_good: bool = False
+    if debug_cn_cb_pair:
+        cn_cb_ticker, cn_a_eqt_ticker = debug_cn_cb_pair
+        if debug_cn_cb_pair and cn_a_eqt_ticker:
+            open_script_file.write(f"  export SYMBOL_PAIRS={cn_cb_ticker}:{cn_a_eqt_ticker},\n")
+            is_cn_cb_pair_good = True
+    is_cn_a_eqt_good: bool = False
+    if debug_cn_a_eqt:
+        open_script_file.write(f"  export CN_EQT={debug_cn_a_eqt},\n")
+        is_cn_a_eqt_good = True
+    if (not is_cn_cb_pair_good) or (not is_cn_a_eqt_good):
+        raise Exception(f"cn_cb_pair or cn_a_eqt must be passed with valid values; found {debug_cn_cb_pair=}, "
+                        f"{debug_cn_a_eqt}")
+    open_script_file.write("  ./run.sh &\n")
+    open_script_file.write("  #./run_md_native_replay.sh &\n")
+    open_script_file.write("  exit 0\n}\n")
+    # generate run function
+    open_script_file.write("_run(){\n")
+    open_script_file.write("  if [ -z \"$GDB_DEBUG\" ] && [ -z \"$LIMITED_RUN\" ] ; then\n")
+    open_script_file.write("    ./run.sh &\n")
+    open_script_file.write("    #./run_md_native_replay.sh &\n")
+    open_script_file.write("  else\n")
+    open_script_file.write("    _debug_run\n")
+    open_script_file.write("  fi\n}\n")
+    # return generated run function
+    md_run_cmd: str = "\n_run\n"
+    return md_run_cmd
+
+
+def write_md_subscribe_cmd_footer(open_script_file):
+    open_script_file.write("cd -\n")  # cd - takes back to mobile_book scripts dir
+    open_script_file.write("echo $PWD\n")  # reverted: pre-cdm dir
+    # TODO urgent: post with (file closed):
+    #  1. update generated file mode : chmod +x
+    #  2. Execute generated file as script
+
+
+# currently only supports CB-A pairs - extend to add A-H support
+def create_md_subscription_script(static_data, exch_code: str,
+                                  debug_cn_cb_pair: Tuple[str, str] | None, debug_eqt_symbol: str | None = None,
+                                  bucket_size: int = 20) -> None:
+    # "SYMBOL_PAIRS=127069:000928,128111:002738,113025:601677,113534:603876"
+    # Write/Read ('w+'): opens file for both reading/writing. Any existing text is overwritten/deleted from file
+    md_run_script: str = f"md-dash-{exch_code.lower()}.sh"
+    with open(md_run_script, "w+") as md_subscription_trigger_script:
+        md_cmd_run = write_md_subscribe_cmd_header(md_subscription_trigger_script, exch_code, debug_cn_cb_pair,
+                                                   debug_eqt_symbol)
+        matched_pair_count: int = 0
+        for cb_ticker, eqt_ticker in static_data.barter_ready_eqt_ticker_by_cb_ticker.items():
+            if matched_pair_count % bucket_size == 0:
+                if matched_pair_count != 0:
+                    md_subscription_trigger_script.write(export_sym_pairs_cmd)
+                    md_subscription_trigger_script.write(md_cmd_run)
+                    matched_pair_count = 0
+                export_sym_pairs_cmd = "\nexport SYMBOL_PAIRS="
+            ticker_exch_code: str = static_data.get_ric_suffix_from_ticker(eqt_ticker)
+            if ticker_exch_code == exch_code:
+                matched_pair_count += 1
+                export_sym_pairs_cmd += f"{cb_ticker}:{eqt_ticker},"
+        if matched_pair_count % bucket_size != 0:
+            md_subscription_trigger_script.write(export_sym_pairs_cmd)
+            md_subscription_trigger_script.write(md_cmd_run)
+        write_md_subscribe_cmd_footer(md_subscription_trigger_script)
+    os.chmod(md_run_script, stat.S_IRWXU)
 
 
 def is_service_up(ignore_error: bool = False, is_server: bool = False):
@@ -87,15 +180,55 @@ def is_service_up(ignore_error: bool = False, is_server: bool = False):
         return False
 
 
-def is_ongoing_strat(pair_strat: PairStrat | PairStratBaseModel) -> bool:
+def is_ongoing_strat(pair_strat: PairStrat | PairStratBaseModel | None) -> bool:
+    if not pair_strat:
+        logging.error(f"is_ongoing_strat invoked with {pair_strat=}, returning False")
+        return False
     return pair_strat.strat_state not in [StratState.StratState_UNSPECIFIED,
                                           StratState.StratState_READY,
                                           StratState.StratState_DONE,
                                           StratState.StratState_SNOOZED]
 
 
+@except_n_log_alert()
+def create_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> PortfolioLimitsBaseModel:
+    portfolio_limits_obj: PortfolioLimitsBaseModel = get_new_portfolio_limits(eligible_brokers, external_source=True)
+    web_client_internal = get_internal_web_client()
+    created_portfolio_limits: PortfolioLimitsBaseModel = (
+        web_client_internal.create_portfolio_limits_client(portfolio_limits_obj))
+    logging.info(f"{created_portfolio_limits=}")
+    return created_portfolio_limits
+
+
+@except_n_log_alert()
+def get_portfolio_limits() -> PortfolioLimitsBaseModel | None:
+    web_client = get_internal_web_client()
+    portfolio_limits_list: List[PortfolioLimitsBaseModel] = web_client.get_all_portfolio_limits_client()
+    if 0 == len(portfolio_limits_list):
+        return None
+    elif 1 < len(portfolio_limits_list):
+        err_str_ = (f"multiple: {len(portfolio_limits_list)} portfolio_limits entries not supported at this time! "
+                    f"use swagger UI to delete redundant entries: {portfolio_limits_list} from DB and retry")
+        raise Exception(err_str_)
+    else:
+        return portfolio_limits_list[0]
+
+
+@except_n_log_alert()
+def get_chore_limits() -> ChoreLimitsBaseModel | None:
+    chore_limits_list: List[ChoreLimitsBaseModel] = email_book_service_http_client.get_all_chore_limits_client()
+    if 0 == len(chore_limits_list):
+        return None
+    elif 1 < len(chore_limits_list):
+        err_str_ = (f"multiple: {len(chore_limits_list)} chore_limits entries not supported at this time! "
+                    f"use swagger UI to delete redundant entries: {chore_limits_list} from DB and retry")
+        raise Exception(err_str_)
+    else:
+        return chore_limits_list[0]
+
+
 def get_new_portfolio_status() -> PortfolioStatus:
-    portfolio_status: PortfolioStatus = PortfolioStatus(_id=1, overall_buy_notional=0,
+    portfolio_status: PortfolioStatus = PortfolioStatus(id=1, overall_buy_notional=0,
                                                         overall_sell_notional=0,
                                                         overall_buy_fill_notional=0,
                                                         overall_sell_fill_notional=0,
@@ -103,52 +236,57 @@ def get_new_portfolio_status() -> PortfolioStatus:
     return portfolio_status
 
 
-def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> PortfolioLimits:
+def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None,
+                             external_source: bool = False) -> PortfolioLimits | PortfolioLimitsBaseModel:
     if eligible_brokers is None:
         eligible_brokers = []
     # else using provided value
+    pydantic_class = PortfolioLimits
+    if external_source:
+        pydantic_class = PortfolioLimitsBaseModel
 
     rolling_max_chore_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
-
-    portfolio_limits_obj = PortfolioLimits(_id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
-                                           max_gross_n_open_notional=2_400_000,
-                                           rolling_max_chore_count=rolling_max_chore_count,
-                                           rolling_max_reject_count=rolling_max_reject_count,
-                                           eligible_brokers=eligible_brokers,
-                                           eligible_brokers_update_count=0)
+    portfolio_limits_obj = pydantic_class(id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
+                                          max_gross_n_open_notional=2_400_000,
+                                          rolling_max_chore_count=rolling_max_chore_count,
+                                          rolling_max_reject_count=rolling_max_reject_count,
+                                          eligible_brokers=eligible_brokers,
+                                          eligible_brokers_update_count=0)
     return portfolio_limits_obj
 
 
 def get_new_chore_limits() -> ChoreLimits:
-    ord_limit_obj: ChoreLimits = ChoreLimits(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                                             max_chore_qty=500, max_chore_notional=90_000)
+    ord_limit_obj: ChoreLimits = ChoreLimits(id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
+                                             max_chore_qty=500, max_chore_notional=90_000, max_basis_points_algo=1500,
+                                             max_px_deviation_algo=20, max_chore_qty_algo=500,
+                                             max_chore_notional_algo=90_000)
     return ord_limit_obj
 
 
 def get_new_strat_view_obj(obj_id: int) -> StratViewBaseModel:
-    strat_view_obj: StratViewBaseModel = StratViewBaseModel(_id=obj_id, strat_alert_count=0)
+    strat_view_obj: StratViewBaseModel = StratViewBaseModel(id=obj_id, strat_alert_count=0)
     return strat_view_obj
 
 
 def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
-    match_level: int = 6
+    match_level: int = 6  # no match
     if pair_strat.pair_strat_params.strat_leg1.sec.sec_id == sec_id:
         if pair_strat.pair_strat_params.strat_leg1.side == side:
-            match_level = 1
+            match_level = 1  # symbol side match
         else:
-            match_level = 2
+            match_level = 2  # symbol match side mismatch
     elif pair_strat.pair_strat_params.strat_leg2.sec.sec_id == sec_id:
         if pair_strat.pair_strat_params.strat_leg2.side == side:
             match_level = 1
         else:
             match_level = 2
-    return match_level  # no match
+    return match_level
 
 
 # caller must take any locks as required for any read-write consistency - function operates without lock
 async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairStrat], List[PairStrat]]:
-    from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_routes import \
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_msgspec_routes import \
         underlying_read_pair_strat_http
     read_pair_strat_filter = get_ongoing_pair_strat_filter(sec_id)
     pair_strats: List[PairStrat] = await underlying_read_pair_strat_http(read_pair_strat_filter)
@@ -157,9 +295,9 @@ async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tupl
     match_level_2_pair_strats: List[PairStrat] = []
     for pair_strat in pair_strats:
         match_level: int = get_match_level(pair_strat, sec_id, side)
-        if match_level == 1:
+        if match_level == 1:  # symbol side match
             match_level_1_pair_strats.append(pair_strat)
-        elif match_level == 2:
+        elif match_level == 2:  # symbol match side mismatch
             match_level_2_pair_strats.append(pair_strat)
         # else not a match ignore
     return match_level_1_pair_strats, match_level_2_pair_strats
@@ -169,10 +307,10 @@ async def get_single_exact_match_strat_from_symbol_n_side(sec_id: str, side: Sid
     match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
     if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
         logging.info(f"No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
-        return
+        return None
     else:
         pair_strat: PairStrat | None = None
-        if len(match_level_1_pair_strats) == 1:
+        if len(match_level_1_pair_strats) == 1:  # symbol match side mismatch
             pair_strat = match_level_1_pair_strats[0]
         else:
             logging.error(f"error: processing {get_symbol_side_key([(sec_id, side)])} pair_strat should be "
@@ -188,6 +326,44 @@ async def get_single_exact_match_strat_from_symbol_n_side(sec_id: str, side: Sid
                     f"{get_symbol_side_key([(sec_id, side)])} found, one "
                     f"match expected, found: {len(match_level_2_pair_strats)}")
         return pair_strat
+
+
+async def get_matching_strat_from_symbol_n_side(sec_id: str, side: Side,
+                                                no_ongoing_ok: bool = False) -> List[PairStrat] | None:
+    """TODO: Use flexible [if passed True by caller] to handle multi strats where non-active side is perfect match"""
+    match_level_1_pair_strats: List[PairStrat]
+    match_level_2_pair_strats: List[PairStrat]
+    match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
+    if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
+        logging.info(f"No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+        return
+    else:
+        pair_strats: List[PairStrat] | None = None
+        if len(match_level_1_pair_strats) == 1:  # single strat found with both symbol side match
+            pair_strats = [match_level_1_pair_strats[0]]
+        else:
+            if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 1:
+                logging.info(f"No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+                return
+            else:
+                logging.error(f"error: processing {get_symbol_side_key([(sec_id, side)])} same symbol side pair_strat "
+                              f"should be found only 1, found {len(match_level_1_pair_strats)};;;"
+                              f"{match_level_1_pair_strats}")
+        if not pair_strats:  # both symbol-side match not found, try "symbol match side mismatch" - i.e. level 2
+            if len(match_level_2_pair_strats) == 1:  # symbol match side mismatch
+                found_strat: PairStrat = match_level_2_pair_strats[0]
+                logging.warning(f"No ongoing pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}; "
+                                f"found {found_strat.id=} with same symbol but different side;;;{found_strat=}")
+                return
+            elif len(match_level_2_pair_strats) == 2:  # symbol match side mismatch for 2 exact pair strats
+                # this is okay for roundtrip or intraday tradable symbols
+                pair_strats = match_level_2_pair_strats
+            else:
+                logging.error(
+                    f"error: multiple ongoing pair strats matching symbol_side_key: "
+                    f"{get_symbol_side_key([(sec_id, side)])} found, one match expected, found: "
+                    f"{len(match_level_2_pair_strats)}")
+        return pair_strats
 
 
 def get_strat_key_from_pair_strat(pair_strat: PairStrat | PairStratBaseModel):
@@ -218,7 +394,7 @@ def pair_strat_client_call_log_str(pydantic_basemodel_type: Type | None, client_
     return log_str
 
 
-def guaranteed_call_pair_strat_client(pydantic_basemodel_type: Type | None, client_callable: Callable,
+def guaranteed_call_pair_strat_client(pydantic_basemodel_type: MsgspecModel | None, client_callable: Callable,
                                       **kwargs):
     """
     Call phone_book client call but if call fails for connection error or server not ready error logs it
@@ -235,10 +411,10 @@ def guaranteed_call_pair_strat_client(pydantic_basemodel_type: Type | None, clie
         if pydantic_basemodel_type is not None:
             # Handling for DB operations: create/update/partial_update
 
-            pydantic_basemodel_type_obj = pydantic_basemodel_type(**kwargs)
+            pydantic_basemodel_type_obj = pydantic_basemodel_type.from_dict(kwargs)
 
             if str(client_callable.__name__).startswith("patch_"):
-                client_callable(jsonable_encoder(pydantic_basemodel_type_obj, by_alias=True, exclude_none=True))
+                client_callable(pydantic_basemodel_type_obj.to_dict(exclude_none=True))
             else:
                 client_callable(pydantic_basemodel_type_obj)
         else:
@@ -277,7 +453,8 @@ class MDShellEnvData(BaseModel):
     exch_code: str | None = None
 
 
-def create_md_shell_script(md_shell_env_data: MDShellEnvData, generation_start_file_path: str, mode: str):
+def create_md_shell_script(md_shell_env_data: MDShellEnvData, generation_start_file_path: str, mode: str,
+                           instance_id: str = ""):
     script_file_name = os.path.basename(generation_start_file_path)
     log_file_path = PurePath(generation_start_file_path).parent.parent / "log" / f"{script_file_name}.log"
     with open(generation_start_file_path, "w") as fl:
@@ -290,6 +467,7 @@ def create_md_shell_script(md_shell_env_data: MDShellEnvData, generation_start_f
         fl.write("cdm >>${LOG_FILE_PATH} 2>&1\n")
         fl.write("#export GDB_DEBUG=1  # uncomment if you want the process to start in GDB\n")
         fl.write(f"export PROJECT_NAME='{str(md_shell_env_data.project_name)}'\n")
+        fl.write(f'export INSTANCE_ID={instance_id}\n')
         # for FX , exclude exch_code, SUBSCRIPTION_DATA instead export FX=1 with mode SO
         if md_shell_env_data.exch_code is not None and md_shell_env_data.subscription_data is not None:
             fl.write(f"export EXCHANGE_CODE={md_shell_env_data.exch_code}\n")
@@ -316,6 +494,339 @@ def create_md_shell_script(md_shell_env_data: MDShellEnvData, generation_start_f
         fl.write("        ./run.sh\n")
         fl.write("fi\n")
 
+
+@except_n_log_alert()
+def get_internal_web_client():
+    web_client: EmailBookServiceHttpClient | DeptBookServiceHttpClient
+    if os.environ.get("DASH_MODE"):
+        web_client = dept_book_service_http_client
+    else:
+        web_client = email_book_service_http_client
+    return web_client
+
+
+def update_ticker_to_positions_list(ticker: str, position: Position,
+                                    ticker_to_positions: Dict[str, List[Position]]):
+    if positions_list := ticker_to_positions.get(ticker):
+        positions_list.append(position)
+    else:
+        ticker_to_positions[ticker] = [position]
+    if not position.acquire_cost:
+        position.acquire_cost = 1000  # default acquire cost if no acquire cost is found
+
+
+def prioritize_by_cost(compressed_eligible_broker_list: List[Broker]):
+    ticker_to_sod_positions: Dict[str, List[Position]] = {}
+    ticker_to_pth_locate_positions: Dict[str, List[Position]] = {}
+
+    def get_ticker_from_ric(ric_code: str) -> str:
+        return (ric_code.split(".", 2))[0]
+
+    compressed_eligible_broker: Broker
+    for compressed_eligible_broker in compressed_eligible_broker_list:
+        for sec_position in compressed_eligible_broker.sec_positions:
+            ticker_or_sedol: str = sec_position.security.sec_id if (sec_position.security.sec_id_source ==
+                                                                    SecurityIdSource.SEDOL) else (
+                get_ticker_from_ric(sec_position.security.sec_id))  # TODO Call static data TICKER FROM RIC HERE
+            position: Position
+            for position in sec_position.positions:
+                if position.type == PositionType.SOD:
+                    # prioritize force clear broker positions with pre-fixed priority
+                    if compressed_eligible_broker.broker.lower() in force_clear_brokers:
+                        position.priority = force_clear_positions_priority
+                    # store
+                    update_ticker_to_positions_list(ticker_or_sedol, position, ticker_to_sod_positions)
+                elif position.type == PositionType.LOCATE or position.type == PositionType.PTH:
+                    update_ticker_to_positions_list(ticker_or_sedol, position, ticker_to_pth_locate_positions)
+    for ticker_or_sedol, sod_positions in ticker_to_sod_positions.items():
+        # sort the highest cost to the lowest cost [we ought to clear highest cost SOD first]
+        try:
+            sod_positions.sort(key=lambda x: x.acquire_cost, reverse=True)
+        except TypeError as te:
+            logging.exception(f"TypeError: {te}")
+        # start prioritize from 10 to allow room for easy user overrides below 10 [higher priority]
+        cur_highest_priority_even_number: int = 10
+        for sod_position in sod_positions:
+            # avoid re-prioritizing force_clear_broker_positions
+            if not (sod_position.priority is not None and sod_position.priority == force_clear_positions_priority):
+                sod_position.priority = cur_highest_priority_even_number
+                cur_highest_priority_even_number += 2
+        # all SODs are prioritized, now prioritize PTH and Locates
+        for ticker_or_sedol, pth_locate_positions in ticker_to_pth_locate_positions.items():
+            sod_positions = ticker_to_sod_positions.get(ticker_or_sedol)
+            cur_highest_priority_number: int
+            if sod_positions:
+                # start priority at after last SOD priority
+                cur_highest_priority_number = sod_positions[-1].priority + 2
+            else:
+                cur_highest_priority_number = 20  # if no SOD found - start at 20
+                # sort by lowest cost to the highest cost [if no SOD, we ought to consume the lowest cost locate/pth first]
+            pth_locate_positions.sort(key=lambda x: x.acquire_cost)
+            for pth_locate_position in pth_locate_positions:
+                pth_locate_position.priority = cur_highest_priority_number
+                cur_highest_priority_number += 2
+
+
+def compress_eligible_broker_positions(eligible_broker_list: List[Broker]):
+    if eligible_broker_list is None:
+        return None
+    compressed_eligible_broker_list: List[Broker] = [BrokerUtil.compress(broker) for broker in eligible_broker_list]
+    # make this by configuration - default fixed priority done internally
+    prioritize_by_cost(compressed_eligible_broker_list)
+    return compressed_eligible_broker_list
+
+
+def get_percentage_change(new_val: float, old_val: float):
+    return (old_val - new_val) / old_val * 100
+
+
+def get_premium(conv_px: float, eqt_px: float, cb_px: float) -> float:
+    conv_ratio: Final[float] = 100 / conv_px
+    parity: Final[float] = eqt_px * conv_ratio
+    premium: Final[float] = ((cb_px / parity) - 1) * 100
+    return premium
+
+
+def compute_max_single_leg_notional(static_data, brokers: List[Broker | BrokerOptional], cb_symbol: str,
+                                    eqt_symbol: str, side: Side, usd_fx: float, cb_close_px_: float | None,
+                                    eqt_close_px_: float | None,
+                                    orig_intra_day_bot: int | None = None,
+                                    orig_intra_day_sld: int | None = None) -> Tuple[int, int, int]:
+    """
+    TOH: returns compute_max_single_leg_notional + computed bot and sld if passed onne in last two return params, else
+    passed orig_intra_day_bot and orig_intra_day_sld are returned as-is
+    """
+    if cb_close_px_ is None and eqt_close_px_ is None:
+        error_: str = (f"invalid close px for {cb_symbol=}, {eqt_symbol=}, {cb_close_px_=}, {eqt_close_px_=};;;"
+                       f"{get_symbol_side_key([(cb_symbol, side)])}")
+        logging.critical(error_)
+        raise HTTPException(status_code=400, detail=error_)
+
+    cb_eqt_ratio: float
+    if math.isclose(eqt_close_px_, 0):
+        cb_eqt_ratio = 0
+    else:
+        cb_eqt_ratio = cb_close_px_ / eqt_close_px_
+    if not brokers:
+        logging.warning(
+            f"compute_max_single_leg_notional: no brokers found for cb/eqt pair: {cb_symbol}/{eqt_symbol} side: {side}"
+            f";;;{get_symbol_side_key([(cb_symbol, side)])}")
+        return 0, orig_intra_day_bot, orig_intra_day_sld  # send max cb notional as 0
+    max_cb_size, orig_intra_day_bot, orig_intra_day_sld = compute_max_cb_size(static_data, brokers, side, cb_eqt_ratio,
+                                                                              orig_intra_day_bot, orig_intra_day_sld)
+    max_single_leg_notional: float = max_cb_size * get_usd_px(cb_close_px_, usd_fx)
+    return int(max_single_leg_notional), orig_intra_day_bot, orig_intra_day_sld
+
+
+def get_usd_px(px: float, usd_fx: float):
+    """
+    assumes single currency strat for now - may extend to accept symbol and send revised px according to
+    underlying bartering currency
+    """
+    return px / usd_fx
+
+
+def get_filtered_brokers_by_sec_id_list(brokers: List[Broker], sec_id_list: List[str],
+                                        broker_sec_pos_dict: Dict[str, Dict[str, SecPosition]]) \
+        -> List[BrokerOptional]:
+    filtered_brokers: List[BrokerOptional] = []
+    for broker in brokers:
+        sec_positions: List[SecPosition] = []
+        sec_pos_dict: Dict[str, SecPosition] = broker_sec_pos_dict[broker.broker]
+        for sec_id in sec_id_list:
+            if sec_position := sec_pos_dict.get(sec_id):
+                sec_positions.append(copy.deepcopy(sec_position))
+        if sec_positions:
+            updated_broker = BrokerOptional(broker_disable=broker.bkr_disable, broker=broker.broker,
+                                            sec_positions=sec_positions)
+            filtered_brokers.append(updated_broker)
+    return filtered_brokers
+
+
+def get_sod_borrow_intraday(sec_rec_by_sec_id_dict: Dict[str, SecurityRecord], leg_sec_type: SecType,
+                            brokers: List[Broker], leg_side: Side = Side.SELL,
+                            non_systematic_brokers: Set[str] | None = None) -> Tuple[int, int, int, int]:
+    """
+    Done
+    Helps compute how much we are allowed to SELL by computing and returning: sod_sum, borrow_sum, intraday_sum
+     1. sod_sum: SOD Longs [settled prior BUYs]
+     2. borrow_sum: Any borrows if available [PTHs and Locates]
+     3. intraday_bot: Intraday Longs or None for Locate / PTH only
+     4. intraday_sld: Intraday Shorts [short is send -ive] or None for Locate / PTH
+    """
+
+    sod_sum: int = 0
+    borrow_sum: int = 0
+    intraday_bot: int = 0
+    intraday_sld: int = 0
+
+    for broker in brokers:
+        if broker.bkr_disable:
+            continue
+        for sec_position in broker.sec_positions:
+            sec_rec: SecurityRecord | None
+            if not (sec_rec := sec_rec_by_sec_id_dict.get(sec_position.security.sec_id)):
+                continue  # process only tradable sec_rec found in sec_rec_by_sec_id_dict
+            elif sec_rec.sec_type != leg_sec_type:
+                logging.error(f"Unexpected: get_sod_borrow_intraday found non-matching {sec_rec.sec_type=} and "
+                              f"{leg_sec_type=}; for {sec_position.security.sec_id} only happens if bug in system, "
+                              f"ignoring the sec_position an continuing;;;{sec_position=} found {sec_rec=}")
+                continue
+            ticker = sec_rec.ticker
+            for position in sec_position.positions:
+                if position.pos_disable:  # ignore disabled positions
+                    continue
+                # ignore any non-systematic-brokers
+                if non_systematic_brokers and (broker.broker.lower() in non_systematic_brokers):
+                    logging.warning(f"ignoring non_systematic_broker {broker.broker} {position.type=} for {ticker=};;;"
+                                    # since CB is SELL, EQT is BUY
+                                    f"{position=}; {get_symbol_side_key([(ticker, Side.BUY)])}")
+                    continue
+
+                if position.type == PositionType.SOD:
+
+                    # 1. Handle SOD [only long affects the outcome]
+                    if position.available_size > 0:  # only long SODs can be used for intraday shorts
+                        if not sec_rec.settled_tradable:
+                            logging.warning(f"ignoring SOD: {position.available_size} for {ticker=}, found not "
+                                            f"settled_tradable")
+                            # only settled_tradable position's SOD(s) are party to compute [the line may have intraday
+                            # (position.consumed_size) - don't continue the loop - carry on to apply intraday]
+                        else:  # this is settled_tradable and +ive - add to SOD sum
+                            sod_sum += position.available_size
+                    # else no action, strat is adding more short on this leg; just ignore prior day SID available_size
+                    # not to be confused with "intraday short" (i.e. position.consumed_size) handled below
+
+                    # 2. Handle Intraday [both long and short affect the outcome]
+                    # explicit check bot and dls sizes [they may have settled barterd and cancelled in consumed_size]
+                    if (position.bot_size is None or position.bot_size == 0) and (
+                            position.sld_size is None or position.sld_size == 0):
+                        continue  # no intraday bot ot sld on this position yet
+                    if not sec_rec.executed_tradable:
+                        # executed_tradable intraday bot or sld, we warn and ignore long side - but we apply sell
+                        # side [prior or current run consumption on sell side eats from what we are allowed to sell
+                        # max allowed is always computed by remaining allowed to sell]
+                        intraday_sld += position.sld_size if position.sld_size else 0
+                        bot_str = "" if position.bot_size else f"{ position.bot_size=}"
+                        logging.warning(f"ignoring intraday: {bot_str} for {ticker=}, found out "
+                                        f"executed_tradable")
+                        continue
+                    else:  # since executed_tradable Intraday positions: update bot/sld compute
+                        intraday_bot += position.bot_size if position.bot_size else 0
+                        intraday_sld += position.sld_size if position.sld_size else 0
+
+                elif position.type == PositionType.LOCATE or position.type == PositionType.PTH:
+                    if position.available_size < 0:  # PTHs / LOCATE(s) are always positive
+                        ticker = sec_rec.ticker
+                        logging.error(f"Unexpected: -ive position found on {ticker} {leg_sec_type=} {leg_side=} strat "
+                                      f"from {broker.broker}, for {str(position.type)}, sending 0 "
+                                      f"max_single_leg_notional for the strat;;;{position=}; "
+                                      f"{get_symbol_side_key([(ticker, leg_side)])}")
+                        return 0, 0, 0, 0
+                    else:
+                        borrow_sum += position.available_size
+    return sod_sum, borrow_sum, intraday_bot, intraday_sld
+
+
+def compute_max_cb_size_(sod_sum: int, borrow_sum: int, intraday_bot: int, intraday_sld: int, sec_type: SecType,
+                         sec_rec_by_sed_id_dict: Dict, divide_ratio_: float,
+                         orig_intra_day_bot: int | None, orig_intra_day_sld: int | None) -> Tuple[int, int, int]:
+    def none_to_0(val):
+        return val if val else 0
+
+    # handle borrow
+    max_size: int = borrow_sum
+
+    # handle SOD
+    if sod_sum > 0:
+        max_size += sod_sum
+    # else not required: sec_type sod is negative, strat is going further short - ignore prior SOD short
+
+    # handle intraday
+    pre_intraday_max_size = max_size
+    if intraday_bot != 0:
+        # intraday long control is via static data intraday eligibility - code won't end up here unless eligible
+        # log warning and proceed
+        if (not orig_intra_day_bot) and (not orig_intra_day_sld):  # we're in process's starting up case
+            # intraday BUY adds to max-size we can sell and intraday_sld depletes max_size
+            max_size += intraday_bot + intraday_sld
+        else:
+            # the strat is ongoing - use orig sld, new sld don't deplete max-size, they are likely from this strat
+            # sell strat Found intraday_sld represents prior run consumption if any + current run
+            # prior run consumption is valid depletion so apply orig sld
+            # found intraday BUY is from some other strat this adds to max-size we can sell
+            max_size += intraday_bot + (orig_intra_day_sld if orig_intra_day_sld else 0)
+        orig_intra_day_bot = none_to_0(intraday_bot)
+        orig_intra_day_sld = none_to_0(intraday_sld)
+        logging.warning(f"found intraday eligible long {intraday_bot} {sec_type} position while strat is to short "
+                        f"{sec_type}, positively affecting {pre_intraday_max_size=} to: {max_size=};;;prevent intraday "
+                        f"based max_size change via static data intraday eligibility; check get_sod_borrow_intraday")
+        # sec_type intraday blocked via static data executed_tradable [as of today]
+    elif intraday_sld != 0:
+        # we have intraday short position on sec_type (-ive value) adding to max_size will reduce the max_size
+        # do this only if strat is not ongoing - enables recovering consumption at executor strat [for ongoing see else]
+        # 0 is valid start position
+        if orig_intra_day_bot is None and orig_intra_day_sld is None:
+            max_size += intraday_sld
+            orig_intra_day_bot = none_to_0(intraday_bot)
+            orig_intra_day_sld = none_to_0(intraday_sld)
+            logging.warning(f"found short {intraday_sld} {sec_type} position while strat is to short {sec_type}, this "
+                            f"will negatively affect {pre_intraday_max_size=} to make it: {max_size=}")
+        else:
+            # the strat is ongoing - use orig_intra_day(s) and ignore found intraday_sld (its current run
+            # consumption + prior run consumption if any)
+            max_size += none_to_0(orig_intra_day_bot) + none_to_0(orig_intra_day_sld)
+    else:
+        # intraday bot/sld both == 0 if we're here, so no intraday yet, make startup done by setting orig bot/sld to 0
+        orig_intra_day_bot = none_to_0(intraday_bot)
+        orig_intra_day_sld = none_to_0(intraday_sld)
+    if math.isclose(divide_ratio_, 0):
+        max_size = 0
+    else:
+        max_size = int(max_size / divide_ratio_)
+    return int(max_size), orig_intra_day_bot, orig_intra_day_sld
+
+
+def compute_max_cb_size(static_data, brokers: List[Broker], cb_side: Side, cb_eqt_ratio_: float,
+                        orig_intra_day_bot: int | None = None,
+                        orig_intra_day_sld: int | None = None) -> Tuple[int, int, int]:
+    """
+    # TODO: Generalize this function get_max_size by sending short leg symbol based sec_rec_by_short_leg_symbol_dict
+    if EQT on BUY side, CB can only be sold limited to SOD available other PTH + LOCATE + positive-SOD
+    (negative SOD is assumed to have been located/PTH before)
+    """
+    if not brokers:
+        logging.warning("compute_max_cb_size: no brokers found")
+
+    max_size: int = 0
+
+    intraday_bot: int
+    intraday_sld: int
+    sod_sum: int
+    borrow_sum: int
+    if cb_side == Side.BUY:
+        # implies EQT is SELL [intraday long contributes in max_size, intraday shorts are to be ignored]
+        # only interested in EQT SOD/Borrow/Intraday - rest are ignored if not found in sec_rec_by_sec_id_dict
+        sec_rec_by_sec_id_dict: Dict[str, SecurityRecord] = static_data.barter_ready_eqt_records_by_ric
+        sod_sum, borrow_sum, intraday_bot, intraday_sld = get_sod_borrow_intraday(sec_rec_by_sec_id_dict, SecType.EQT,
+                                                                                  brokers)
+        max_size, orig_intra_day_bot, orig_intra_day_sld = (
+            compute_max_cb_size_(sod_sum, borrow_sum, intraday_bot, intraday_sld, SecType.EQT, sec_rec_by_sec_id_dict,
+                                 cb_eqt_ratio_, orig_intra_day_bot, orig_intra_day_sld))
+    else:  # CB is Sell EQT is Buy
+        # only interested in CB SOD/Borrow/Intraday - rest are ignored if not found in sec_rec_by_sec_id_dict
+        sec_rec_by_sec_id_dict: Dict[str, SecurityRecord] = static_data.barter_ready_cb_records_by_sedol
+        sod_sum, borrow_sum, intraday_bot, intraday_sld = get_sod_borrow_intraday(sec_rec_by_sec_id_dict, SecType.CB,
+                                                                                  brokers, Side.SELL, {"ubs"})
+        max_size, orig_intra_day_bot, orig_intra_day_sld = (
+            compute_max_cb_size_(sod_sum, borrow_sum, intraday_bot, intraday_sld, SecType.CB, sec_rec_by_sec_id_dict,
+                                 1, orig_intra_day_bot, orig_intra_day_sld))
+    if not orig_intra_day_bot:
+        orig_intra_day_bot = 0  # we started with no intraday bot
+    if not orig_intra_day_sld:
+        orig_intra_day_sld = 0  # we started with no intraday sld
+    return int(max_size), orig_intra_day_bot, orig_intra_day_sld
+        
 
 def get_reset_log_book_cache_wrapper_pattern():
     return "-~-"

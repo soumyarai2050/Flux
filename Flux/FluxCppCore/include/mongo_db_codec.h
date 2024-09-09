@@ -1,6 +1,5 @@
 #pragma once
 
-#include <market_data_max_id_handler.h>
 #include <mongocxx/exception/query_exception.hpp>
 
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppCodec/market_data_mongo_db_codec.h"
@@ -22,21 +21,65 @@ namespace FluxCppCore {
                               m_mongo_db_collection(m_sp_mongo_db->market_data_service_db[get_root_model_name()]),
                               m_p_logger_(p_logger) {}
 
+        int32_t insert(const RootModelType &kr_root_model_type) {
+            bsoncxx::builder::basic::document bson_doc;
+            prepare_doc(kr_root_model_type, bson_doc);
+            auto new_generated_id = get_next_insert_id();
+            update_id_in_document(bson_doc, new_generated_id);
+            try {
+                auto insert_result = m_mongo_db_collection.insert_one(bson_doc.view());
+                auto inserted_id = insert_result->inserted_id().get_int32().value;
+                LOG_INFO(GetLogger(), "last trdae inserted on id: {}, {}", inserted_id, kr_root_model_type.DebugString());
+                assert( new_generated_id == inserted_id);
+            } catch (mongocxx::query_exception& qe) {
+                std::cerr << "Error: while insert: " << qe.what() << "\n";
+            }
+            return new_generated_id;
+        }
+
+
         bool insert(bsoncxx::builder::basic::document &r_bson_doc, const std::string &kr_root_model_key,
                     int32_t &r_new_generated_id_out) {
-            r_new_generated_id_out = get_next_insert_id();
-            update_id_in_document(r_bson_doc, r_new_generated_id_out);
-            LOG_DEBUG_IMPL(GetLogger(), "bson_doc: {}", bsoncxx::to_json(r_bson_doc));
-            try {
-                auto insert_result = m_mongo_db_collection.insert_one(r_bson_doc.view());
-                auto inserted_id = insert_result->inserted_id().get_int32().value;
-                m_root_model_key_to_db_id[kr_root_model_key] = r_new_generated_id_out;
-                return (inserted_id == r_new_generated_id_out);
-            } catch (const std::exception &e) {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while inserting document: {}", e.what());
-                return false;
-            }
+        r_new_generated_id_out = get_next_insert_id();
+        update_id_in_document(r_bson_doc, r_new_generated_id_out);
+        try {
+            auto insert_result = m_mongo_db_collection.insert_one(r_bson_doc.view());
+            auto inserted_id = insert_result->inserted_id().get_int32().value;
+            m_root_model_key_to_db_id[kr_root_model_key] = r_new_generated_id_out;
+            return (inserted_id == r_new_generated_id_out);
+        } catch (const std::exception &e) {
+            LOG_ERROR_IMPL(GetLogger(), "Error while inserting document: {}", e.what());
+            return false;
         }
+    }
+
+    int32_t insert_or_update(RootModelType &kr_root_model_obj) {
+    	int32_t r_new_generated_id_out{0};
+        std::string root_model_key;
+    	kr_root_model_obj.set_id(r_new_generated_id_out);
+        if(CheckInitializedAndGetKey(kr_root_model_obj, root_model_key)){
+        	insert_or_update(kr_root_model_obj, root_model_key, r_new_generated_id_out);
+        }
+        return r_new_generated_id_out; // not initialized or missing required fields
+    }
+
+    bool insert_or_update(const RootModelType &kr_root_model_obj, std::string &r_root_model_key_in_n_out,
+                          int32_t &r_new_generated_id_out) {
+        bool status = false;
+        bsoncxx::builder::basic::document bson_doc{};
+        auto found = m_root_model_key_to_db_id.find(r_root_model_key_in_n_out);
+        if (found == m_root_model_key_to_db_id.end()) {
+            // Key does not exist, so it's a new object. Insert it into the database
+            prepare_doc(kr_root_model_obj, bson_doc);
+            status = insert(bson_doc, r_root_model_key_in_n_out, r_new_generated_id_out);
+
+        } else {
+            prepare_doc(kr_root_model_obj, bson_doc);
+            status = update_or_patch(found->second, bson_doc);
+            r_new_generated_id_out = found->second;
+        }
+        return status;
+    }
 
         bool bulk_insert(const RootModelListType &kr_root_model_list_obj,
                          const std::vector<std::string> &kr_root_model_key_list,
@@ -61,35 +104,6 @@ namespace FluxCppCore {
             } else {
                 return false;
             }
-        }
-
-        // Insert or update the data
-        bool insert_or_update(const RootModelType &kr_root_model_obj, int32_t &r_new_generated_id_out) {
-
-            std::string root_model_key;
-            if(CheckInitializedAndGetKey(kr_root_model_obj, root_model_key)){
-                return insert_or_update(kr_root_model_obj, root_model_key, r_new_generated_id_out);
-            }
-            return false; // not initialized or missing required fields
-        }
-
-        bool insert_or_update(const RootModelType &kr_root_model_obj, std::string &r_root_model_key_in_n_out,
-                              int32_t &r_new_generated_id_out) {
-            bool status = false;
-            bsoncxx::builder::basic::document bson_doc{};
-            auto found = m_root_model_key_to_db_id.find(r_root_model_key_in_n_out);
-            if (found == m_root_model_key_to_db_id.end()) {
-                // Key does not exist, so it's a new object. Insert it into the database
-                prepare_doc(kr_root_model_obj, bson_doc);
-
-                status = insert(bson_doc, r_root_model_key_in_n_out, r_new_generated_id_out);
-
-            } else {
-                prepare_doc(kr_root_model_obj, bson_doc);
-                status = update_or_patch(found->second, bson_doc);
-                r_new_generated_id_out = found->second;
-            }
-            return status;
         }
 
         //Patch the data (update specific document)

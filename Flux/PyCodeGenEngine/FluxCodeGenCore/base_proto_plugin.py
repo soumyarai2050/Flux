@@ -1,9 +1,14 @@
 #!/usr/bin/env python
 import os
 import re
-from typing import List, Dict, ClassVar, Any, Set
+from typing import List, Dict, ClassVar, Any, Set, Tuple, Callable
 import logging
 from abc import ABC, abstractmethod
+from pathlib import PurePath
+import copy
+
+# 3rd party imports
+import numpy as np
 import protogen
 
 # project imports
@@ -60,9 +65,12 @@ class BaseProtoPlugin(ABC):
     flux_json_query_route_type_field: ClassVar[str] = "QueryRouteType"
     flux_json_query_route_get_type_field_val: ClassVar[str] = "GET"
     flux_json_query_route_patch_type_field_val: ClassVar[str] = "PATCH"
+    flux_json_query_route_post_type_field_val: ClassVar[str] = "POST"
     flux_json_query_require_js_slice_changes_field: ClassVar[str] = "RequireJsSliceChanges"
     flux_json_root_ts_mongo_version_field: ClassVar[str] = "MongoVersion"
     flux_json_root_ts_granularity_field: ClassVar[str] = "Granularity"
+    flux_json_root_pass_stored_obj_to_update_pre_post_callback: ClassVar[str] = "PassStoredObjToUpdatePrePostCallback"
+    flux_json_root_pass_stored_obj_to_update_all_pre_post_callback: ClassVar[str] = "PassStoredObjToUpdateAllPrePostCallback"
     flux_fld_val_time_field: ClassVar[str] = "FluxFldValTimeField"
     flux_fld_val_meta_field: ClassVar[str] = "FluxFldValMetaField"
     flux_json_root_ts_expire_after_sec_field: ClassVar[str] = "ExpireAfterSeconds"
@@ -653,6 +661,92 @@ class BaseProtoPlugin(ABC):
                 # other values are mapped to same value itself
                 projection_val_to_projection_query_name_dict[projection_val] = projection_val
         return projection_val_to_projection_query_name_dict
+
+    def get_time_series_data_from_msg(
+            self, message: protogen.Message) -> Tuple[str, str | None, str | None, int | None]:
+        option_value_dict = (
+            self.get_complex_option_value_from_proto(message, BaseProtoPlugin.flux_msg_json_root_time_series))
+
+        # getting time_field
+        for field in message.fields:
+            if BaseProtoPlugin.is_option_enabled(field, BaseProtoPlugin.flux_fld_val_time_field):
+                time_field = field.proto.name
+                break
+        else:
+            err_str = (f"Couldn't find any field with {BaseProtoPlugin.flux_fld_val_time_field} option "
+                       f"set for message {message.proto.name} having "
+                       f"{BaseProtoPlugin.flux_msg_json_root_time_series} option")
+            logging.exception(err_str)
+            raise Exception(err_str)
+
+        # getting meta_field
+        meta_field: str | None = None
+        for field in message.fields:
+            if BaseProtoPlugin.is_option_enabled(field, BaseProtoPlugin.flux_fld_val_meta_field):
+                meta_field = field.proto.name
+                break
+
+        granularity = option_value_dict.get(BaseProtoPlugin.flux_json_root_ts_granularity_field)
+        expire_after_sec = option_value_dict.get(BaseProtoPlugin.flux_json_root_ts_expire_after_sec_field)
+
+        return time_field, meta_field, granularity, expire_after_sec
+
+    def handle_import_file_gen(self, model_import_file_name: str, import_str_callable: Callable[..., Any]) -> str:
+        if (output_dir_path := os.getenv("PLUGIN_OUTPUT_DIR")) is not None and len(output_dir_path):
+            model_import_file_path = PurePath(output_dir_path) / model_import_file_name
+            current_import_statements = import_str_callable()
+            if (model_type_env_name := os.getenv("ModelType")) is None or len(model_type_env_name) == 0:
+                err_str = f"env var ModelType received as {model_type_env_name}"
+                logging.exception(err_str)
+                raise Exception(err_str)
+            if not os.path.exists(model_import_file_path):
+                output_str = "import logging\n"
+                output_str += "import os\n\n"
+                output_str += 'if (model_type := os.getenv("ModelType")) is None or len(model_type) == 0:\n'
+                output_str += '    err_str = f"env var DBType must not be {model_type}"\n'
+                output_str += '    logging.exception(err_str)\n'
+                output_str += '    raise Exception(err_str)\n'
+                output_str += 'else:\n'
+                output_str += '    match model_type.lower():\n'
+                output_str += f'        case "{model_type_env_name}":\n'
+                for import_statement in current_import_statements:
+                    output_str += import_statement
+                output_str += f'        case other:\n'
+                output_str += '            err_str = f"unsupported db type {model_type}"\n'
+                output_str += f'            logging.exception(err_str)\n'
+                output_str += f'            raise Exception(err_str)\n'
+                return output_str
+            else:
+                with open(model_import_file_path) as import_file:
+                    imports_file_content: List[str] = import_file.readlines()
+                    imports_file_content_copy: List[str] = copy.deepcopy(imports_file_content)
+                    match_str_index = imports_file_content.index("    match model_type.lower():\n")
+
+                    # checking if already imported
+                    for content in imports_file_content[match_str_index:]:
+                        if "case" in content and model_type_env_name in content:
+                            # getting ending import line for current model_type_env_name
+                            for line in imports_file_content[imports_file_content.index(content)+1:]:
+                                if "case" in line:
+                                    next_model_type_imports_index = imports_file_content.index(line)
+                                    break
+                            counter = 0
+                            for index in range(imports_file_content.index(content), next_model_type_imports_index):
+                                # if current model_type already exists in match statement then removing old import
+                                del imports_file_content_copy[index-counter]
+                                counter += 1
+                            break
+                        # else not required: if current model_type already not in match statement then no need
+                        # to remove it
+                    imports_file_content_copy.insert(match_str_index+1, f'        case "{model_type_env_name}":\n')
+                    for index, import_statement in enumerate(current_import_statements):
+                        imports_file_content_copy.insert(match_str_index+1+(index+1), import_statement)
+
+                return "".join(imports_file_content_copy)
+        else:
+            err_str = f"Env var 'PLUGIN_OUTPUT_DIR' received as {output_dir_path}"
+            logging.exception(err_str)
+            raise Exception(err_str)
 
     def _process(self, plugin: ExtendedProtogenPlugin) -> None:
         """

@@ -3,6 +3,8 @@ import logging
 import time
 from threading import Thread
 from typing import Type, Callable
+
+import msgspec
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from queue import Queue
@@ -11,16 +13,20 @@ from pydantic import BaseModel
 import datetime
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.FastApi.post_book_service_routes_callback import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.FastApi.post_book_service_routes_msgspec_callback import (
     PostBookServiceRoutesCallback)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client)
 from FluxPythonUtils.scripts.utility_functions import except_n_log_alert, handle_refresh_configurable_data_members
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.aggregate import get_open_chore_counts, get_last_n_sec_chores_by_events
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.aggregate import (
+    get_open_chore_counts, get_last_n_sec_chores_by_events)
 
 
-class ContainerObject(BaseModel):
+MsgspecType = TypeVar('MsgspecType', bound=msgspec.Struct)
+
+
+class ContainerObject(msgspec.Struct, kw_only=True):
     chore_journals: List[ChoreJournal]
     chore_snapshots: List[ChoreSnapshot]
     strat_brief: StratBrief | None = None
@@ -40,7 +46,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
 
     @classmethod
     def initialize_underlying_http_routes(cls):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.FastApi.post_book_service_http_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.FastApi.post_book_service_http_routes_imports import (
             underlying_read_chore_journal_http, underlying_read_chore_snapshot_http,
             underlying_create_all_chore_snapshot_http, underlying_update_all_chore_snapshot_http,
             underlying_create_all_chore_journal_http, underlying_read_strat_brief_http,
@@ -72,7 +78,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             self.min_refresh_interval = 30
         self.portfolio_limit_check_queue: Queue = Queue()
         self.update_portfolio_status_queue: Queue = Queue()
-        self.container_model: Type = ContainerObject
+        self.container_model: MsgspecType = ContainerObject
         self.chore_id_to_chore_snapshot_cache_dict: Dict[str, ChoreSnapshot] = {}
         self.chore_id_to_open_chore_snapshot_cache_dict: Dict[str, ChoreSnapshot] = {}
         self.strat_id_to_strat_brief_cache_dict: Dict[int, StratBrief] = {}
@@ -104,7 +110,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                         Thread(target=self.portfolio_limit_check_queue_handler, daemon=True).start()
                         Thread(target=self._update_portfolio_status_n_check_portfolio_limits, daemon=True).start()
                     self.service_ready = True
-                    print(f"INFO: service is ready: {datetime.datetime.now().time()}")
+                    print(f"INFO: post barter engine service is ready: {datetime.datetime.now().time()}")
 
                 if not self.service_up:
                     try:
@@ -180,8 +186,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=503)
 
-    async def update_chore_snapshot_pre(self, stored_chore_snapshot_obj: ChoreSnapshot,
-                                        updated_chore_snapshot_obj: ChoreSnapshot):
+    async def update_chore_snapshot_pre(self, updated_chore_snapshot_obj: ChoreSnapshot):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
             err_str_ = "update_chore_snapshot_pre not ready - service is not initialized yet"
@@ -205,7 +210,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=503)
 
-    async def update_strat_brief_pre(self, stored_strat_brief_obj: StratBrief, updated_strat_brief_obj: StratBrief):
+    async def update_strat_brief_pre(self, updated_strat_brief_obj: StratBrief):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
             err_str_ = "update_strat_brief_pre not ready - service is not initialized yet"
@@ -306,7 +311,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         chore_journal: ChoreJournal | None = None
         if (chore_journal_dict := payload_dict.get("chore_journal")) is not None:
             chore_journal_dict["_id"] = ChoreJournal.next_id()  # overriding id for this server db if exists
-            chore_journal = ChoreJournal(**chore_journal_dict)
+            chore_journal = ChoreJournal.from_dict(chore_journal_dict)
         # else not required: Fills update doesn't contain chore_journal
         return chore_journal
 
@@ -322,10 +327,10 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                 chore_id = chore_brief.get("chore_id")
             cached_chore_snapshot = self.chore_id_to_chore_snapshot_cache_dict.get(chore_id)
             if cached_chore_snapshot is None:
-                chore_snapshot_dict["_id"] = ChoreSnapshot.next_id()    # overriding id for this server db if exists
+                chore_snapshot_dict["_id"] = ChoreSnapshot.next_id()  # overriding id for this server db if exists
             else:
-                chore_snapshot_dict["_id"] = cached_chore_snapshot.id   # updating _id from existing cache object
-            chore_snapshot = ChoreSnapshot(**chore_snapshot_dict)
+                chore_snapshot_dict["_id"] = cached_chore_snapshot.id  # updating _id from existing cache object
+            chore_snapshot = ChoreSnapshot.from_dict(chore_snapshot_dict)
             self.chore_id_to_chore_snapshot_cache_dict[chore_snapshot.chore_brief.chore_id] = chore_snapshot
 
             # updating open_chore_snapshots
@@ -338,13 +343,13 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         if (strat_brief_dict := payload_dict.get("strat_brief")) is not None:
             # _id override for strat brief is not required since it will have same id as
             # it's respective executor strat_id, so it will be unique here too
-            strat_brief = StratBrief(**strat_brief_dict)
+            strat_brief = StratBrief.from_dict(strat_brief_dict)
         return strat_brief
 
     def _get_portfolio_status_updates_from_payload(self, payload_dict: Dict[str, Any]):
         portfolio_status_updates: PortfolioStatusUpdatesContainer | None = None
         if (portfolio_status_updates_dict := payload_dict.get("portfolio_status_updates")) is not None:
-            portfolio_status_updates = PortfolioStatusUpdatesContainer(**portfolio_status_updates_dict)
+            portfolio_status_updates = PortfolioStatusUpdatesContainer.from_dict(portfolio_status_updates_dict)
         return portfolio_status_updates
 
     def update_strat_id_list_n_dict_from_payload(self, strat_id_list: List[int],
@@ -400,6 +405,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                                                  chore_snapshots=[chore_snapshot],
                                                  strat_brief=strat_brief,
                                                  portfolio_status_updates=portfolio_status_updates_list)
+
             strat_id_to_container_obj_dict[strat_id] = container_obj
         return None
 
@@ -459,17 +465,18 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                 logging.exception(f"create_or_update_strat_brief failed "
                                   f"with exception: {e}")
 
-    def check_max_open_baskets(self, max_open_baskets: int, open_chores: int) -> bool:
+    def check_max_open_baskets(self, max_open_baskets: int, open_chore_count: int) -> bool:
         pause_all_strats = False
 
-        if max_open_baskets - open_chores < 0:
+        if max_open_baskets - open_chore_count < 0:
             # this is kept < (less than) and not <= (less than equal) intentionally - this avoids all strat
             # pause on consumable value which is exact same as limit, above limit all strat pause is called
 
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.error(f"max_open_baskets breached, allowed {max_open_baskets=}, current {open_chores=} - "
-                          f"initiating all strat pause")
+            logging.critical(
+                f"max_open_baskets breached, allowed {max_open_baskets=}, current {open_chore_count=} - "
+                f"initiating all strat pause")
             pause_all_strats = True
         return pause_all_strats
 
@@ -485,7 +492,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             rolling_new_chore_count = chore_count_updated_chore_journals[-1].current_period_chore_count
         elif len(chore_count_updated_chore_journals) > 1:
             err_str_ = ("Must receive only one object in list by get_last_n_sec_chores_by_events_query, "
-                        f"received {len(chore_count_updated_chore_journals)}, avoiding this check, "
+                        f"received {len(chore_count_updated_chore_journals)}, skipping rolling_max_chore_count check, "
                         f"received list: {chore_count_updated_chore_journals}")
             logging.error(err_str_)
             return False
@@ -494,11 +501,10 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         if rolling_new_chore_count > max_rolling_tx_count:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.error(f"max_allowed_chores_within_period breached: "
-                          f"{chore_count_updated_chore_journals[0].current_period_chore_count} "
-                          f"chores in past {rolling_chore_count_period_seconds} secs, "
-                          f"allowed chores within this period is {max_rolling_tx_count}"
-                          f"- initiating all strat pause")
+            logging.critical(f"rolling_max_chore_count breached: "
+                             f"{chore_count_updated_chore_journals[0].current_period_chore_count} "
+                             f"chores in past {rolling_chore_count_period_seconds} secs, allowed chores within this "
+                             f"period is {max_rolling_tx_count}, initiating all strat pause")
             pause_all_strats = True
         return pause_all_strats
 
@@ -523,11 +529,11 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         if rolling_rej_chore_count > max_rolling_tx_count:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.error(f"max_allowed_rejection_within_period breached: "
-                          f"{chore_count_updated_chore_journals[0].current_period_chore_count} "
-                          f"rejections in past {rolling_rej_count_period_seconds} secs, "
-                          f"allowed rejections within this period is {max_rolling_tx_count}"
-                          f"- initiating all strat pause")
+            logging.critical(f"max_allowed_rejection_within_period breached: "
+                             f"{chore_count_updated_chore_journals[0].current_period_chore_count} "
+                             f"rejections in past {rolling_rej_count_period_seconds} secs, "
+                             f"allowed rejections within this period is {max_rolling_tx_count}"
+                             f"- initiating all strat pause")
             pause_all_strats = True
         return pause_all_strats
 
@@ -558,19 +564,19 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         if portfolio_limits.max_open_notional_per_side < total_buy_open_notional:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.error(f"max_open_notional_per_side breached for BUY side, "
-                          f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
-                          f"current {total_buy_open_notional=}"
-                          f" - initiating all strat pause")
+            logging.critical(f"max_open_notional_per_side breached for BUY side, "
+                             f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
+                             f"current {total_buy_open_notional=}"
+                             f" - initiating all strat pause")
             pause_all_strats = True
 
         if portfolio_limits.max_open_notional_per_side < total_sell_open_notional:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.error(f"max_open_notional_per_side breached for SELL side, "
-                          f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
-                          f"current {total_sell_open_notional=}"
-                          f" - initiating all strat pause")
+            logging.critical(f"max_open_notional_per_side breached for SELL side, "
+                             f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
+                             f"current {total_sell_open_notional=}"
+                             f" - initiating all strat pause")
             pause_all_strats = True
 
         # Checking portfolio_limits.max_gross_n_open_notional
@@ -580,25 +586,25 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         if portfolio_limits.max_gross_n_open_notional < total_gross_n_open_notional:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.error(f"max_gross_n_open_notional breached, "
-                          f"allowed {portfolio_limits.max_gross_n_open_notional=}, "
-                          f"current {total_gross_n_open_notional=}"
-                          f" - initiating all strat pause")
+            logging.critical(f"max_gross_n_open_notional breached, "
+                             f"allowed {portfolio_limits.max_gross_n_open_notional=}, "
+                             f"current {total_gross_n_open_notional=}"
+                             f" - initiating all strat pause")
             pause_all_strats = True
 
         # Checking portfolio_limits.rolling_max_chore_count
         rolling_max_chore_count_breached: bool = await self.check_rolling_max_chore_count(
-                portfolio_limits.rolling_max_chore_count.rolling_tx_count_period_seconds,
-                portfolio_limits.rolling_max_chore_count.max_rolling_tx_count)
+            portfolio_limits.rolling_max_chore_count.rolling_tx_count_period_seconds,
+            portfolio_limits.rolling_max_chore_count.max_rolling_tx_count)
         if rolling_max_chore_count_breached:
-            pause_all_strats = True
+            pause_all_strats = True  # any failure logged in check_rolling_max_chore_count
 
         # checking portfolio_limits.rolling_max_reject_count
         rolling_max_rej_count_breached: bool = await self.check_rolling_max_rej_count(
-                portfolio_limits.rolling_max_reject_count.rolling_tx_count_period_seconds,
-                portfolio_limits.rolling_max_reject_count.max_rolling_tx_count)
+            portfolio_limits.rolling_max_reject_count.rolling_tx_count_period_seconds,
+            portfolio_limits.rolling_max_reject_count.max_rolling_tx_count)
         if rolling_max_rej_count_breached:
-            pause_all_strats = True
+            pause_all_strats = True  # any failure logged in check_rolling_max_chore_count
         return pause_all_strats
 
     def _portfolio_limit_check_queue_handler(self, strat_id_list: List[int],
@@ -679,7 +685,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                         overall_sell_fill_notional=sell_fill_notional_update,
                         open_chore_count=len(self.chore_id_to_open_chore_snapshot_cache_dict))
                 except Exception as e:
-                    res = self.check_connection_or_service_not_ready_error(e)   # True if connection or service up error
+                    res = self.check_connection_or_service_not_ready_error(e)  # True if connection or service up error
                     if not res:
                         logging.exception(
                             f"update_portfolio_status_by_chore_or_fill_data_query_client failed with exception: {e}")
@@ -699,7 +705,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                 try:
                     pause_all_strats: bool = future.result()
                 except Exception as e:
-                    res = self.check_connection_or_service_not_ready_error(e)   # True if connection or service up error
+                    res = self.check_connection_or_service_not_ready_error(e)  # True if connection or service up error
                     if not res:
                         logging.exception(f"check_all_portfolio_limits failed, exception: {e}")
                         return None
@@ -748,7 +754,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             strat_id_list: List[int] = []
             strat_id_to_container_obj_dict: Dict[int, ContainerObject] = {}
             update_counter = 0
-            payload_dict: Dict[str, Any] = self.portfolio_limit_check_queue.get()   # blocking call
+            payload_dict: Dict[str, Any] = self.portfolio_limit_check_queue.get()  # blocking call
             self.update_strat_id_list_n_dict_from_payload(strat_id_list,
                                                           strat_id_to_container_obj_dict, payload_dict)
             update_counter += 1

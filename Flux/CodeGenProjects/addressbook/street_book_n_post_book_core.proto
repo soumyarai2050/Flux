@@ -3,11 +3,11 @@ syntax = "proto2";
 import "flux_options.proto";
 import "barter_core.proto";
 
-enum DummyEnumSO{
+enum DummyEnumSO {
   DUMMY_S_O = 0;
 }
 
-enum ChoreEventType{
+enum ChoreEventType {
   OE_UNSPECIFIED = 0;
   OE_NEW = 1;
   OE_ACK = 2;
@@ -27,7 +27,7 @@ enum ChoreEventType{
   OE_LAPSE = 16;
 }
 
-enum ChoreStatusType{
+enum ChoreStatusType {
   OE_UNACK = 0;
   OE_ACKED = 1;
   OE_CXL_UNACK = 2;
@@ -39,7 +39,7 @@ enum ChoreStatusType{
   OE_OVER_CXLED = 8;
 }
 
-message ChoreJournal{
+message ChoreJournal {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
@@ -59,7 +59,8 @@ message ChoreJournal{
     },
     depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true
+    depends_on_other_model_for_dynamic_url: true,
+    is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_last_n_sec_chores_by_events",
@@ -94,7 +95,7 @@ message ChoreJournalList {
     repeated ChoreJournal chore_journal = 1 [(FluxFldPk) = "true"];
 }
 
-message ChoreSnapshot{
+message ChoreSnapshot {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
@@ -116,7 +117,8 @@ message ChoreSnapshot{
     },
     depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true
+    depends_on_other_model_for_dynamic_url: true,
+    is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_chore_snapshots_from_cache"
@@ -139,23 +141,24 @@ message ChoreSnapshot{
   optional ChoreBrief chore_brief = 3;
   optional int64 filled_qty = 4;
   optional float avg_fill_px = 5;
-  optional float fill_notional = 6 [(FluxFldDisplayType) = "int"];
+  optional float fill_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldTitle) = "fill $", (FluxFldNumberFormat) = "$"];
   optional int64 last_update_fill_qty = 7;
   optional float last_update_fill_px = 8;
   optional int64 pending_amend_dn_qty = 9;
   optional int64 pending_amend_up_qty = 10;
-  optional int64 pending_amend_dn_px = 11;
-  optional int64 pending_amend_up_px = 12;
+  optional float pending_amend_dn_px = 11;
+  optional float pending_amend_up_px = 12;
   optional int64 total_amend_dn_qty = 13;
   optional int64 total_amend_up_qty = 14;
   optional int64 last_lapsed_qty = 15;
   optional int64 total_lapsed_qty = 16;
-  optional int64 cxled_qty = 17;
-  optional float avg_cxled_px = 18;
-  optional float cxled_notional = 19 [(FluxFldDisplayType) = "int"];
-  optional int64 create_date_time = 20 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
-  optional int64 last_update_date_time = 21 [(FluxFldValIsDateTime) = true];
-  optional int64 last_n_sec_total_qty = 22 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec chore qty
+  optional int64 total_amd_rej_qty = 17;
+  optional int64 cxled_qty = 18;
+  optional float avg_cxled_px = 19;
+  optional float cxled_notional = 20 [(FluxFldDisplayType) = "int", (FluxFldTitle) = "cxled $", (FluxFldNumberFormat) = "$"];
+  optional int64 create_date_time = 21 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 22 [(FluxFldValIsDateTime) = true];
+  optional int64 last_n_sec_total_qty = 23 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec chore qty
 }
 
 message PairSideBarteringBrief{
@@ -163,8 +166,8 @@ message PairSideBarteringBrief{
   required Side side = 2;
   required int64 last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
   optional float consumable_open_chores = 4 [(FluxFldHelp) = "max_open_chores_per_side - open_chores for this symbol side"];
-  optional float consumable_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_single_leg_notional - filled_notional - open_notional"];
-  optional float consumable_open_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_open_single_leg_notional - open_notional"];
+  optional float consumable_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldTitle) = "consumable $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "max_single_leg_notional - filled_notional - open_notional"];
+  optional float consumable_open_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldTitle) = "consumable open $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "max_open_single_leg_notional - open_notional"];
   optional int64 consumable_concentration = 7 [(FluxFldHelp) = "(total_bartering_security_size/100*max_concentration) - (open_qty + filled_qty)"];
   optional float participation_period_chore_qty_sum = 8 [(FluxFldHelp) = "aggregate sum of all chore qty in the MarketBarterVolumeParticipation.applicable_period_seconds irrespective of how the chore fared in the market: open, filled, cancelled; if applicable_period_seconds is 0, directly use SymbolSideSnapshot.total_qty"];
   optional float consumable_cxl_qty = 9 [(FluxFldHelp) = "((filled_qty + open_qty + all_bkr_cxlled_qty)/100*max_cxl_rate) - all_bkr_cxlled_qty"];
@@ -174,11 +177,11 @@ message PairSideBarteringBrief{
   // Another hybrid total_bartering_security_size (refer total_bartering_security_size description to understand handling of such hybrids)
   optional float indicative_consumable_residual = 11 [(FluxFldHelp) = "max_residual - ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px))"];
   optional int64 all_bkr_cxlled_qty = 12 [(FluxFldHelp) = "sum of all bkr cancels for this leg"];
-  optional float open_notional = 13 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "(symbol specific total qty * symbol_avg_px) - fill notional - (cxlled/rejected qty * symbol_avg_px)"];
+  optional float open_notional = 13 [(FluxFldDisplayType) = "int", (FluxFldTitle) = "open $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "(symbol specific total qty * symbol_avg_px) - fill notional - (cxlled/rejected qty * symbol_avg_px)"];
   optional int64 open_qty = 14 [(FluxFldHelp) = "sum of all open chore qty for this leg: reduce if chore is filled / rejected / cancelled (symbol side snapshot based compute)"];
 }
 
-message StratBrief{
+message StratBrief {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -198,7 +201,8 @@ message StratBrief{
     is_repeated: true,
     depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true
+    depends_on_other_model_for_dynamic_url: true,
+    is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_strat_brief_from_symbol",

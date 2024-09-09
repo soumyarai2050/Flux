@@ -2,19 +2,32 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_STANDARD 23)
 list(APPEND CMAKE_MODULE_PATH "../cmake/")
 message (WARNING ${CMAKE_MODULE_PATH})
+
+set(HOME $ENV{HOME})
+message(WARNING ${HOME})
 find_package(Mongo REQUIRED)
-#find_package(Protobuf REQUIRED)
-#find_package(quill REQUIRED)
 find_package(Python REQUIRED COMPONENTS Development)
 
-set(libabsl_ROOT_PATH  /home/subham/cpp_libs/libs_13/protobuf_25.2/lib)
-set(ABSL_INCLUDE_DIR /home/subham/cpp_libs/libs_13/protobuf_25.2/include)
+set(LIBS_ROOT_DIR ${HOME}/cpp_libs/libs_13)
+message(WARNING ${LIBS_ROOT_DIR})
 
-set(CPP_YAML_INCLUDE_DIR /home/subham/cpp_libs/libs_13/cpp_yaml/include/)
-set(CPP_YAML_LIB /home/subham/cpp_libs/libs_13/cpp_yaml/lib/libyaml-cpp.so)
+set(libabsl_ROOT_PATH  ${LIBS_ROOT_DIR}/protobuf_25.2/lib)
+set(ABSL_INCLUDE_DIR ${LIBS_ROOT_DIR}/protobuf_25.2/include)
+
+set(CPP_YAML_INCLUDE_DIR ${LIBS_ROOT_DIR}/cpp_yaml/include/)
+set(CPP_YAML_LIB ${LIBS_ROOT_DIR}/cpp_yaml/lib/libyaml-cpp.so)
 
 set(protobuf_lib ${libabsl_ROOT_PATH}/libprotobuf.a)
 set(lib_utf ${libabsl_ROOT_PATH}/libutf8_validity.a)
+
+set(PYTHON_INCLUDE /usr/include/python3.12)
+set(PYTHON_LIB /usr/lib/x86_64-linux-gnu/libpython3.12.so)
+
+set(Boost_INCLUDE_DIRS ${LIBS_ROOT_DIR}/boost/include)
+set(Boost_INCLUDE_LIBS ${LIBS_ROOT_DIR}/boost/lib)
+
+set(QUILL_INCLUDE ${LIBS_ROOT_DIR}/quill/include)
+set(QUILL_LIB ${LIBS_ROOT_DIR}/quill/lib)
 
 set(protobuf_ABSL_USED_TARGETS ${libabsl_ROOT_PATH}/libabsl_log_severity.a ${libabsl_ROOT_PATH}/libabsl_raw_logging_internal.a
         ${libabsl_ROOT_PATH}/libabsl_bad_optional_access.a ${libabsl_ROOT_PATH}/libabsl_die_if_null.a
@@ -54,8 +67,6 @@ set(protobuf_ABSL_USED_TARGETS ${libabsl_ROOT_PATH}/libabsl_log_severity.a ${lib
         ${libabsl_ROOT_PATH}/libabsl_debugging_internal.a ${libabsl_ROOT_PATH}/libabsl_int128.a
         ${libabsl_ROOT_PATH}/libabsl_base.a)
 
-set(Boost_INCLUDE_DIRS /home/subham/cpp_libs/libs_13/boost/include)
-set(Boost_INCLUDE_LIBS /home/subham/cpp_libs/libs_13/boost/lib)
 set(Boost_INCLUDE_LIBS_TARGET ${Boost_INCLUDE_LIBS}/libboost_atomic.so ${Boost_INCLUDE_LIBS}/libboost_chrono.so
          ${Boost_INCLUDE_LIBS}/libboost_container.so ${Boost_INCLUDE_LIBS}/libboost_context.so
          ${Boost_INCLUDE_LIBS}/libboost_contract.so ${Boost_INCLUDE_LIBS}/libboost_coroutine.so
@@ -92,7 +103,7 @@ message(WARNING ${BSON_INCLUDE_DIR})
 
 include_directories(${MONGO_INCLUDE_DIR} ${BSON_THIRD_PARTY_INCLUDE_DIR} ${BSON_INCLUDE_DIR} ${Boost_INCLUDE_DIRS}
         ${Protobuf_INCLUDE_DIRS} ${ABSL_INCLUDE_DIR} ${CppCodec} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
-        /home/subham/cpp_libs/libs_13/quill/include /usr/include/python3.12 ${CPP_YAML_INCLUDE_DIR})
+         ${PYTHON_INCLUDE} ${QUILL_INCLUDE} ${CPP_YAML_INCLUDE_DIR})
 
 set(MD_MODEL ../../generated/CppProto2)
 # protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/mobile_book_service.proto)
@@ -108,21 +119,20 @@ message(SRC_FILES ${SRC_FILES})
 message(${Python_LIBRARIES})
 # Create shared library including dependencies
 add_library(marketdataprovider SHARED ${SRC_FILES} cpp_app_launcher.cpp
-        cpp_app_semaphore.cpp
         mongo_db_singleton.cpp
         cpp_app_shared_resource.cpp
         mock_mobile_book_cache.cpp
-        add_or_get_container_from_py_cache.cpp)
+)
 
 # Link dependencies to the shared library
 target_link_libraries(marketdataprovider
-        /usr/lib/x86_64-linux-gnu/libpython3.12.so
+        ${PYTHON_LIB}
         ${MONGO_LIB}
         ${BSON_LIB}
         ${protobuf_lib}
         ${lib_utf}
         ${protobuf_ABSL_USED_TARGETS}
-        /home/subham/cpp_libs/libs_13/quill/lib/libquill.a
+        ${QUILL_LIB}/libquill.a
         ${Boost_INCLUDE_LIBS_TARGET}
         ${CPP_YAML_LIB}
 )
@@ -131,24 +141,21 @@ target_link_libraries(marketdataprovider
 target_compile_options(marketdataprovider PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-variable -Wno-error=unused-parameter -DUSE_LOGGING)
 
 # Create executable
-add_executable(mobile_book_exec main.cpp ${SRC_FILES} cpp_app_semaphore.cpp
-        mongo_db_singleton.cpp cpp_app_shared_resource.cpp add_or_get_container_from_py_cache.cpp
+add_executable(mobile_book_exec main.cpp ${SRC_FILES}
+        mongo_db_singleton.cpp cpp_app_shared_resource.cpp
         mock_mobile_book_cache.cpp
 )
 
 target_compile_options(mobile_book_exec PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-error=unused-parameter -DUSE_LOGGING)
 ## Link the shared library to the executable
 target_link_libraries(mobile_book_exec
-        /usr/lib/x86_64-linux-gnu/libpython3.12.so
+        ${PYTHON_LIB}
         ${MONGO_LIB}
         ${BSON_LIB}
         ${protobuf_lib}
         ${lib_utf}
         ${protobuf_ABSL_USED_TARGETS}
-        /home/subham/cpp_libs/libs_13/quill/lib/libquill.a
+        ${QUILL_LIB}/libquill.a
         ${Boost_INCLUDE_LIBS_TARGET}
         ${CPP_YAML_LIB}
         )
-
-# Link the shared library to the executable
-#target_link_libraries(mobile_book_exec mobile_book)

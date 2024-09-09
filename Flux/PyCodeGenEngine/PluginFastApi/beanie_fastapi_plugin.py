@@ -230,7 +230,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         # Adding messages from core proto files having json_root option
         project_dir = os.getenv("PROJECT_DIR")
         if project_dir is None or not project_dir:
-            err_str = f"env var DBType received as {project_dir}"
+            err_str = f"env var PROJECT_DIR received as {project_dir}"
             logging.exception(err_str)
             raise Exception(err_str)
 
@@ -269,9 +269,12 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
             # Adding route's callback class
             self.routes_callback_class_name + ".py": self.handle_callback_class_file_gen(),
 
-            # Adding callback override set_instance file
+            # Adding callback override set_instance file and generate override files if not available
             self.callback_override_set_instance_file_name + ".py":
                 self.handle_callback_override_set_instance_file_gen(),
+
+            # Adding callback import file
+            self.routes_callback_import_file_name + ".py": self.handle_routes_callback_import_file_gen(),
 
             # Adding dummy callback override class file
             "dummy_" + self.beanie_native_override_routes_callback_class_name + ".py":
@@ -281,7 +284,10 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
             self.base_routes_file_name + ".py": self.handle_base_routes_file_gen(),
 
             # Adding project's http routes.py
-            self.http_routes_file_name + ".py": self.handle_http_routes_file_gen(),
+            self.http_routes_file_name + ".py": self.handle_http_pydantic_routes_file_gen(),
+
+            # adding http routes import file
+            self.http_routes_import_file_name + ".py": self.handle_http_routes_import_file_gen(),
 
             # Adding project's ws routes.py
             self.ws_routes_file_name + ".py": self.handle_ws_routes_file_gen(),

@@ -26,9 +26,8 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
         output_str = "# below import is to set derived callback's instance if implemented in the script\n"
         callback_override_set_instance_file_path = ".".join(callback_override_set_instance_file_path.split("."))
         output_str += f"from {callback_override_set_instance_file_path} import config_yaml_dict, host\n"
-        callback_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", f"{self.routes_callback_class_name}")
-        routes_callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
-        output_str += f"from {callback_file_path} import {routes_callback_class_name_camel_cased}\n\n\n"
+        callback_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", f"{self.routes_callback_file_name}")
+        output_str += f"from {callback_file_path} import {self.routes_callback_class_name}\n\n\n"
 
         return output_str
 
@@ -51,23 +50,29 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
         output_str += "import uvicorn\n"
         output_str += "import datetime\n"
         output_str += "import logging\n"
+        output_str += "import sys\n"
         output_str += "from pathlib import PurePath\n"
-        output_str += self._handle_callback_override_set_instance_import()
-        routes_callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
         output_str += (f"from FluxPythonUtils.scripts.utility_functions import configure_logger, add_logging_levels, "
-                       f"parse_to_int\n\n")
+                       f"parse_to_int, YAMLConfigurationManager\n\n")
+        output_str += f'config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"config.yaml"\n'
+        output_str += f'config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))\n'
         output_str += f'custom_log_lvls = config_yaml_dict.get("custom_logger_lvls") \n'
         output_str += f'add_logging_levels([] if custom_log_lvls is None else custom_log_lvls)\n'
         output_str += f'log_lvl = config_yaml_dict.get("log_level")\n'
-        output_str += f'log_file_name = os.getenv("LOG_FILE_NAME")\n'
-        output_str += f'if log_file_name is None:\n'
-        output_str += f'    datetime_str: str = datetime.datetime.now().strftime("%Y%m%d")\n'
-        output_str += f'    log_file_name = f"{self.proto_file_package}_logs_'+'{datetime_str}.log"\n'
+        output_str += f'unique_id: str | int | None = None\n'
+        output_str += f'if len(sys.argv) > 2:\n'
+        output_str += f'    unique_id = sys.argv[1]\n'
+        output_str += f'datetime_str: str = datetime.datetime.now().strftime("%Y%m%d")\n'
+        output_str += f'if unique_id is None:\n'
+        output_str += f'    log_file_name = f"{self.proto_file_package}_logs_' + '{datetime_str}.log"\n'
+        output_str += f'else:\n'
+        output_str += f'    log_file_name = f"{self.proto_file_package}' + '_{unique_id}_logs_{datetime_str}.log"\n'
         output_str += f'configure_logger(log_lvl, log_file_dir_path=os.getenv("LOG_FILE_DIR_PATH"), \n'
         output_str += f'                 log_file_name=log_file_name)\n'
         output_str += "\n\n"
+        output_str += self._handle_callback_override_set_instance_import()
         output_str += f'def {self.launch_file_name}():\n'
-        output_str += f'    callback_instance = {routes_callback_class_name_camel_cased}().get_instance()\n'
+        output_str += f'    callback_instance = {self.routes_callback_class_name}().get_instance()\n'
         output_str += f'    callback_instance.app_launch_pre()\n'
         output_str += f'    os.environ["PORT"] = str(callback_instance.port)\n'
         output_str += (f'    os.environ[f"{self.proto_file_package}_' + '{callback_instance.port}"] = "0"  '

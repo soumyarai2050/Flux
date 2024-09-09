@@ -10,16 +10,16 @@ if __name__ == "__main__":
 
     project_dir: PurePath = PurePath(__file__).parent.parent
     code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
-    db_type: str = "bare"
+    model_type: str = "bare"
     datetime_str: str = datetime.now().strftime("%Y%m%d")
     env_dict = {
         "RELOAD": "false",
         "DEBUG_SLEEP_TIME": "0",
         "LOG_FILE_DIR_PATH": f"{project_dir / 'log' }",
-        "LOG_FILE_NAME": f"template_project_name_{db_type}_logs_{datetime_str}.log",
+        "LOG_FILE_NAME": f"template_project_name_{model_type}_logs_{datetime_str}.log",
         "LOG_LEVEL": "debug",
-        "FASTAPI_FILE_NAME": f"template_model_service_{db_type}_fastapi",
-        "DBType": f"{db_type}"
+        "FASTAPI_FILE_NAME": f"template_model_service_{model_type}_fastapi",
+        "ModelType": f"{model_type}"
     }
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_", "_", env_dict)
 

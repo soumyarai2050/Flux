@@ -7,29 +7,37 @@ import os
 import logging
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int, get_time_it_log_pattern, parse_to_float
+from FluxPythonUtils.scripts.utility_functions import parse_to_int, parse_to_float
+from Flux.PyCodeGenEngine.FluxCodeGenCore.perf_benchmark_decorators import get_time_it_log_pattern
 
 log_generic_timings = parse_to_int(log_generic_timings_env_var) \
     if ((log_generic_timings_env_var := os.getenv("LogGenericTiming")) is not None and
         len(log_generic_timings_env_var)) else None
 
 
-# Decorator Function
-def generic_perf_benchmark(func_callable):
-    @functools.wraps(func_callable)
-    async def benchmarker(*args, **kwargs):
-        call_date_time = pendulum.DateTime.utcnow()
-        start_time = timeit.default_timer()
-        return_val = await func_callable(*args, **kwargs)
-        end_time = timeit.default_timer()
-        delta = parse_to_float(f"{(end_time - start_time):.6f}")
+if log_generic_timings is not None and log_generic_timings == 1:
+    # Decorator Function
+    def generic_perf_benchmark(func_callable):
+        @functools.wraps(func_callable)
+        async def benchmarker(*args, **kwargs):
+            call_date_time = pendulum.DateTime.utcnow()
+            start_time = timeit.default_timer()
+            return_val = await func_callable(*args, **kwargs)
+            end_time = timeit.default_timer()
+            delta = parse_to_float(f"{(end_time - start_time):.6f}")
 
-        if log_generic_timings is not None and log_generic_timings == 1:
-            pattern_str = get_time_it_log_pattern(func_callable.__name__, call_date_time, delta, "generic")
+            pattern_str = get_time_it_log_pattern(func_callable.__name__, call_date_time, delta)
             pattern_str += f" model_type: {args[0]}"
             logging.timing(pattern_str)
-        return return_val
-    return benchmarker
+            return return_val
+        return benchmarker
+else:
+    # Decorator Function
+    def generic_perf_benchmark(func_callable):
+        async def benchmarker(*args, **kwargs):
+            return_val = await func_callable(*args, **kwargs)
+            return return_val
+        return benchmarker
 
 
 def get_aggregate_pipeline(encap_agg_pipeline: Dict):

@@ -1,4 +1,5 @@
 import time
+# from asyncio import exceptions
 from typing import Optional
 
 from selenium import webdriver
@@ -11,8 +12,8 @@ from selenium.common import NoSuchElementException, ElementNotInteractableExcept
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-# from CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
-from FluxCodeGenEngine.tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
+# from .tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import test_config_file_path, \
     email_book_service_native_web_client, create_tob
@@ -31,7 +32,7 @@ def get_driver(config_dict: Dict, driver_type: DriverType) -> WebDriver:
     match driver_type:
         case DriverType.CHROME:
             options = ChromeOptions()
-            options.add_argument("--headless=new")  # Runs browser in headless mode.
+            # options.add_argument("--headless=new")  # Runs browser in headless mode.
             driver: webdriver.Chrome = webdriver.Chrome(driver_path, chrome_options=options)
         case DriverType.EDGE:
             options = EdgeOptions()
@@ -66,8 +67,6 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     click_button_with_name(widget=strat_collection_widget, button_name="Create")
 
     pair_strat_params_widget = driver.find_element(By.ID, "pair_strat_params")
-    xpath: str
-    value: str
 
     # select strat_leg1.sec.sec_id
     xpath = "pair_strat_params.strat_leg1.sec.sec_id"
@@ -82,7 +81,8 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     name = "side"
     set_dropdown_field(widget=pair_strat_params_widget, xpath=xpath, name=name, value=value)
 
-    show_nested_fld_in_tree_layout(widget=pair_strat_params_widget)
+    xpath = "pair_strat_params.strat_leg2"
+    show_nested_fld_in_tree_layout(widget=pair_strat_params_widget, fld_xpath=xpath)
 
     # select strat_leg2.sec.sec_id
     xpath = "pair_strat_params.strat_leg2.sec.sec_id"
@@ -100,28 +100,22 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     name = "common_premium"
     set_tree_input_field(widget=pair_strat_params_widget, xpath=xpath, name=name, value=value)
 
-    # save strat collection
     click_button_with_name(widget=strat_collection_widget, button_name="Save")
     confirm_save(driver)
+    click_id_fld_inside_strat_collection(strat_collection_widget)
     validate_pair_strat_params(widget=pair_strat_params_widget, pair_strat=pair_strat)
 
-    # wait for host and port to be populated in pair strat - is_partially_running - add 5 sec sleep
-    # get executor client
-    # create symbol overviews
-    # wait for strat limits, strat status, strat alerts to be created - is_executor_running - add 5 sec sleep
     host: str = "127.0.0.1"
     port: int = 8020
     email_book_service_http_client = EmailBookServiceHttpClient(host, port)
     pair_strat_list: List[PairStratBaseModel] = email_book_service_http_client.get_all_pair_strat_client()
-
     pair_strat: PairStratBaseModel = pair_strat_list[-1]
 
     while not pair_strat.is_partially_running:
         pair_strat_list = email_book_service_http_client.get_all_pair_strat_client()
         pair_strat = pair_strat_list[-1]
-        time.sleep(5)
+        time.sleep(Delay.DEFAULT.value)
 
-    # asset is partially running true
     assert pair_strat.is_partially_running
 
     executor_web_client = StreetBookServiceHttpClient(pair_strat.host, pair_strat.port)
@@ -132,9 +126,8 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     while not pair_strat.is_executor_running:
         pair_strat_list = email_book_service_http_client.get_all_pair_strat_client()
         pair_strat = pair_strat_list[-1]
-        time.sleep(5)
+        time.sleep(Delay.DEFAULT.value)
 
-    # asset is executor running true
     assert pair_strat.is_executor_running
     # fetch strat limits and strat status from executor client by pair strat id
     # strat_limits: StratLimitsBaseModel = executor_web_client.get_strat_limits_client(pair_strat.id)
@@ -150,8 +143,15 @@ def verify_supported_search_type(search_type: SearchType = SearchType.NAME) -> b
     else:
         return True
 
+def click_id_fld_inside_strat_collection(widget: WebElement):
+    # TODO LAZY: in pair strat widget not showing the created pair strat fields after saving, we have to click inside strat collection widget
+    widget.find_element(By.XPATH, get_table_input_field_xpath("_id")).click()
 
-def get_tree_input_field_xpath(xpath: str) -> str:
+
+
+def get_tree_input_field_xpath(xpath: str, data_add: bool = False) -> str:
+    if data_add:
+        return f"//button[@data-add='{xpath}']"
     return f"//div[@data-xpath='{xpath}']"
 
 
@@ -206,33 +206,39 @@ def set_dropdown_field(widget: WebElement, xpath: str, name: str, value: str) ->
 
 def validate_pair_strat_params(widget: WebElement, pair_strat: Dict) -> None:
     # strat_leg1.sec.sec_id
-    value_stratleg1_sec = widget.find_element(By.XPATH, "//div[@data-xpath='pair_strat_params.strat_leg1.sec.sec_id']")
-    stratleg1_sec = value_stratleg1_sec.find_element(By.TAG_NAME, "input").get_attribute('value')
+    strat_leg1_sec_ele = widget.find_element(By.XPATH, "//div[@data-xpath='pair_strat_params.strat_leg1.sec.sec_id']")
+    strat_leg1_sec_value = strat_leg1_sec_ele.find_element(By.TAG_NAME, "input").get_attribute('value')
 
     # strat_leg1.side
-    value_strat_leg1_side = widget.find_element(By.XPATH,
+    strat_leg1_side_ele = widget.find_element(By.XPATH,
                                                 "//div[@data-xpath='pair_strat_params.strat_leg1.side']")
-    strat_side = value_strat_leg1_side.find_element(By.TAG_NAME, "input").get_attribute('value')
+    strat_side_value = strat_leg1_side_ele.find_element(By.TAG_NAME, "input").get_attribute('value')
 
     # strat_leg2.sec.sec_id
-    value_stratleg2_sec = widget.find_element(By.XPATH, "//div[@data-xpath='pair_strat_params."
+    strat_leg2_sec_ele = widget.find_element(By.XPATH, "//div[@data-xpath='pair_strat_params."
                                                         "strat_leg2.""sec.sec_id']")
-    stratleg2_sec_id = value_stratleg2_sec.find_element(By.TAG_NAME, "input").get_attribute(
-        'value')
+    strat_leg2_sec_id_value = strat_leg2_sec_ele.find_element(By.TAG_NAME, "input").get_attribute('value')
 
     # pair_strat_params.common_premium
-    value_of_strat_common_prem = widget.find_element(By.XPATH, "//div[@data-xpath='pair_strat_params.common_premium']")
-    strat_common_prem = value_of_strat_common_prem.find_element(By.NAME, 'common_premium') \
-        .get_attribute('value')
+    common_prem_ele = widget.find_element(By.XPATH, "//div[@data-xpath='pair_strat_params.common_premium']")
+    strat_common_prem_val = common_prem_ele.find_element(By.NAME, 'common_premium').get_attribute('value')
 
     pair_strat_params = pair_strat["pair_strat_params"]
-    assert stratleg1_sec == pair_strat_params["strat_leg1"]["sec"]["sec_id"]
-    assert strat_side == pair_strat_params["strat_leg1"]["side"]
-    assert stratleg2_sec_id == pair_strat_params["strat_leg2"]["sec"]["sec_id"]
-    assert strat_common_prem == str(pair_strat_params["common_premium"])
+
+    assert strat_leg1_sec_value == pair_strat_params["strat_leg1"]["sec"]["sec_id"], \
+        f"Mismatch in strat_leg1_sec_value: expected {pair_strat_params['strat_leg1']['sec']['sec_id']}, got {strat_leg1_sec_value}"
+
+    assert strat_side_value == pair_strat_params["strat_leg1"]["side"], \
+        f"Mismatch in strat_side_value: expected {pair_strat_params['strat_leg1']['side']}, got {strat_side_value}"
+
+    assert strat_leg2_sec_id_value == pair_strat_params["strat_leg2"]["sec"]["sec_id"], \
+        f"Mismatch in strat_leg2_sec_id_value: expected {pair_strat_params['strat_leg2']['sec']['sec_id']}, got {strat_leg2_sec_id_value}"
+
+    assert strat_common_prem_val == str(pair_strat_params["common_premium"]), \
+        f"Mismatch in strat_common_prem_val: expected {str(pair_strat_params['common_premium'])}, got {strat_common_prem_val}"
 
 
-def update_max_value_field_strats_limits(widget: WebElement, xpath: str, name: str, input_value: int) -> None:
+def update_max_value_field_strat_limits(widget: WebElement, xpath: str, name: str, input_value: int) -> None:
     input_div_xpath: str = get_tree_input_field_xpath(xpath=xpath)
     div_xpath = widget.find_element(By.XPATH, input_div_xpath)
     input_element = div_xpath.find_element(By.ID, name)
@@ -245,103 +251,77 @@ def update_max_value_field_strats_limits(widget: WebElement, xpath: str, name: s
 def create_strat_limits_using_tree_view(driver: WebDriver, strat_limits: Dict, layout: Layout) -> None:
     strat_limits_widget = driver.find_element(By.ID, "strat_limits")
 
-    # strat_limits.max_open_chores_per_side
-    xpath = "max_open_chores_per_side"
-    value = strat_limits["max_open_chores_per_side"]
-    name = "max_open_chores_per_side"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
+    fields_xpath_n_fixture_value = {
+        "max_open_chores_per_side": strat_limits["max_open_chores_per_side"],
+        "max_single_leg_notional": strat_limits["max_single_leg_notional"],
+        "max_open_single_leg_notional": strat_limits["max_open_single_leg_notional"],
+        "max_net_filled_notional": strat_limits["max_net_filled_notional"],
+        "max_concentration": strat_limits["max_concentration"],
+        "min_chore_notional": strat_limits["min_chore_notional"],
+        "limit_up_down_volume_participation_rate": strat_limits["limit_up_down_volume_participation_rate"],
+        "cancel_rate.max_cancel_rate": strat_limits["cancel_rate"]["max_cancel_rate"],
+        "cancel_rate.applicable_period_seconds": strat_limits["cancel_rate"]["applicable_period_seconds"],
+        "cancel_rate.waived_initial_chores": strat_limits["cancel_rate"]["waived_initial_chores"],
+        "cancel_rate.waived_min_rolling_notional": strat_limits["cancel_rate"]["waived_min_rolling_notional"],
+        "cancel_rate.waived_min_rolling_period_seconds": strat_limits["cancel_rate"][
+            "waived_min_rolling_period_seconds"],
+        "market_barter_volume_participation.max_participation_rate": strat_limits["market_barter_volume_participation"][
+            "max_participation_rate"],
+        "market_barter_volume_participation.applicable_period_seconds":
+            strat_limits["market_barter_volume_participation"]["applicable_period_seconds"],
+        "market_barter_volume_participation.min_allowed_notional": strat_limits["market_barter_volume_participation"][
+            "min_allowed_notional"],
+        "market_depth.participation_rate": strat_limits["market_depth"]["participation_rate"],
+        "market_depth.depth_levels": strat_limits["market_depth"]["depth_levels"],
+        "residual_restriction.max_residual": strat_limits["residual_restriction"]["max_residual"],
+        "residual_restriction.residual_mark_seconds": strat_limits["residual_restriction"]["residual_mark_seconds"],
+    }
 
-    xpath = "max_single_leg_notional"
-    value = strat_limits["max_single_leg_notional"]
-    name = "max_single_leg_notional"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # strat_limits.max_open_cb_notional
-    xpath = "max_open_single_leg_notional"
-    value = strat_limits["max_open_single_leg_notional"]
-    name = "max_open_single_leg_notional"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # strat_limits.max_net_filled_notional
-    xpath = "max_net_filled_notional"
-    value = strat_limits["max_net_filled_notional"]
-    name = "max_net_filled_notional"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # strat_limits.max_concentration
-    xpath = "max_concentration"
-    value = strat_limits["max_concentration"]
-    name = "max_concentration"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # strat_limits.limit_up_down_volume_participation_rate
-    xpath = "limit_up_down_volume_participation_rate"
-    value = strat_limits["limit_up_down_volume_participation_rate"]
-    name = "limit_up_down_volume_participation_rate"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # strat_limits.cancel_rate.max_cancel_rate
-    xpath = "cancel_rate.max_cancel_rate"
-    value = strat_limits["cancel_rate"]["max_cancel_rate"]
-    name = "max_cancel_rate"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # applicable_period_seconds
-    xpath = "cancel_rate.applicable_period_seconds"
-    value = strat_limits["cancel_rate"]["applicable_period_seconds"]
-    name = "applicable_period_seconds"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    if layout == Layout.NESTED:
-        nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
-        input_residual_mark_second_element = nested_tree_dialog.find_element(By.ID, "residual_mark_seconds")
-    else:
-        strats_limits_widget = driver.find_element(By.ID, "strat_limits")
-        input_residual_mark_second_element = strats_limits_widget.find_element(By.ID, "residual_mark_seconds")
+    for xpath, value in fields_xpath_n_fixture_value.items():
+        if layout == Layout.NESTED:
+            nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
+            input_residual_mark_second_element = nested_tree_dialog.find_element(By.ID, "residual_mark_seconds")
+        else:
+            input_residual_mark_second_element = strat_limits_widget.find_element(By.ID, "residual_mark_seconds")
+        scroll_into_view(driver=driver, element=input_residual_mark_second_element)
+        name = xpath.split('.')[-1]
+        set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
 
-    scroll_into_view(driver=driver, element=input_residual_mark_second_element)
-    # strat_limits.cancel_rate.waived_min_chores
-    xpath = "cancel_rate.waived_min_chores"
-    value = strat_limits["cancel_rate"]["waived_min_chores"]
-    name = "waived_min_chores"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
+def validate_strat_limits(widget: WebElement, strat_limits: Dict, layout: Layout) -> None:
+    fields_to_validate = {
+        "max_open_chores_per_side": ["max_open_chores_per_side"],
+        "max_single_leg_notional": ["max_single_leg_notional"],
+        "max_open_single_leg_notional": ["max_open_single_leg_notional"],
+        "max_net_filled_notional": ["max_net_filled_notional"],
+        "max_concentration": ["max_concentration"],
+        "min_chore_notional": ["min_chore_notional"],
+        "limit_up_down_volume_participation_rate": ["limit_up_down_volume_participation_rate"],
+        "cancel_rate.max_cancel_rate": ["cancel_rate", "max_cancel_rate"],
+        "cancel_rate.applicable_period_seconds": ["cancel_rate", "applicable_period_seconds"],
+        "cancel_rate.waived_initial_chores": ["cancel_rate", "waived_initial_chores"],
+        "cancel_rate.waived_min_rolling_notional": ["cancel_rate", "waived_min_rolling_notional"],
+        "cancel_rate.waived_min_rolling_period_seconds": ["cancel_rate", "waived_min_rolling_period_seconds"],
+        "market_barter_volume_participation.max_participation_rate": ["market_barter_volume_participation", "max_participation_rate"],
+        "market_barter_volume_participation.applicable_period_seconds": ["market_barter_volume_participation", "applicable_period_seconds"],
+        "market_barter_volume_participation.min_allowed_notional": ["market_barter_volume_participation",
+                                                                        "min_allowed_notional"],
+        "market_depth.participation_rate": ["market_depth", "participation_rate"],
+        "market_depth.depth_levels": ["market_depth", "depth_levels"],
+        "residual_restriction.max_residual": ["residual_restriction", "max_residual"],
+        "residual_restriction.residual_mark_seconds": ["residual_restriction", "residual_mark_seconds"]
+    }
 
-    # strat_limits.market_barter_volume_participation.max_participation_rate
-    xpath = "market_barter_volume_participation.max_participation_rate"
-    value = strat_limits["market_barter_volume_participation"]["max_participation_rate"]
-    name = "max_participation_rate"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # mrket_trde_applicable_periods_seconds
-    xpath = "market_barter_volume_participation.applicable_period_seconds"
-    value = strat_limits["market_barter_volume_participation"]["applicable_period_seconds"]
-    name = "applicable_period_seconds"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # strat_limits.market_depth.participation_rate
-    xpath = "market_depth.participation_rate"
-    value = strat_limits["market_depth"]["participation_rate"]
-    name = "participation_rate"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # strat_limits.market_depth.depth_levels
-    xpath = "market_depth.depth_levels"
-    value = strat_limits["market_depth"]["depth_levels"]
-    name = "depth_levels"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # strat_limits.residual_restriction.max_residual
-    xpath = "residual_restriction.max_residual"
-    value = strat_limits["residual_restriction"]["max_residual"]
-    name = "max_residual"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
-
-    # strat_limits.residual_restriction.residual_mark_seconds
-    xpath = "residual_restriction.residual_mark_seconds"
-    value = strat_limits["residual_restriction"]["residual_mark_seconds"]
-    name = "residual_mark_seconds"
-    set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
+    for xpath, keys in fields_to_validate.items():
+        created_strat_value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
+        if ","  in created_strat_value:
+            created_strat_value = created_strat_value.replace(",", "")
+        expected_value = strat_limits
+        for key in keys:
+            expected_value = expected_value[key]
+            if "notional" in key:
+                expected_value = created_strat_value
+        assert created_strat_value == str(expected_value), f"Assertion failed for {xpath}: expected_value {expected_value}, got {created_strat_value}"
 
 
 def get_value_from_input_field(widget: WebElement, xpath: str, layout: Layout)-> str:
@@ -358,87 +338,6 @@ def get_value_from_input_field(widget: WebElement, xpath: str, layout: Layout)->
     input_element = parent_element.find_element(By.TAG_NAME, "input")
     value = input_element.get_attribute("value")
     return value
-
-
-def validate_strat_limits(widget: WebElement, strat_limits: Dict,  layout: Layout) -> None:
-    # max_open_chores_per_side
-    xpath = "max_open_chores_per_side"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["max_open_chores_per_side"])
-
-    # max_single_leg_notional
-    xpath = "max_single_leg_notional"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    value = value.replace(",", '')
-    assert value == str(strat_limits["max_single_leg_notional"])
-
-    # max_open_single_leg_notional
-    xpath = "max_open_single_leg_notional"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    value = value.replace(",", '')
-    assert value == str(strat_limits["max_open_single_leg_notional"])
-
-    # max_net_filled_notional
-    xpath = "max_net_filled_notional"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    value = value.replace(",", '')
-    assert value == str(strat_limits["max_net_filled_notional"])
-
-    # max_concentration
-    xpath = "max_concentration"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["max_concentration"])
-
-    # limit_up_down_volume_participation_rate
-    xpath = "limit_up_down_volume_participation_rate"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["limit_up_down_volume_participation_rate"])
-
-    # max_cancel_rate
-    xpath = "cancel_rate.max_cancel_rate"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["cancel_rate"]["max_cancel_rate"])
-
-    # applicable_period_seconds
-    xpath = "cancel_rate.applicable_period_seconds"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["cancel_rate"]["applicable_period_seconds"])
-
-    # waived_min_chores
-    xpath = "cancel_rate.waived_min_chores"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["cancel_rate"]["waived_min_chores"])
-
-    # max_participation_rate
-    xpath = "market_barter_volume_participation.max_participation_rate"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["market_barter_volume_participation"]["max_participation_rate"])
-
-    # applicable_period_seconds
-    xpath = "market_barter_volume_participation.applicable_period_seconds"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["market_barter_volume_participation"]["applicable_period_seconds"])
-
-    # participation_rate
-    xpath = "market_depth.participation_rate"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["market_depth"]["participation_rate"])
-
-    # depth_levels
-    xpath = "market_depth.depth_levels"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["market_depth"]["depth_levels"])
-
-    # max_residual
-    xpath = "residual_restriction.max_residual"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    value = value.replace(",", "")
-    assert value == str(strat_limits["residual_restriction"]["max_residual"])
-
-    # residual_mark_seconds
-    xpath = "residual_restriction.residual_mark_seconds"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    assert value == str(strat_limits["residual_restriction"]["residual_mark_seconds"])
 
 
 def get_widget_type(widget_schema: Dict) -> WidgetType | None:
@@ -567,16 +466,18 @@ def get_xpath_from_field_name(schema_dict: Dict[str, any], widget_type: WidgetTy
 
 
 def override_default_limits(chore_limits: ChoreLimitsBaseModel, portfolio_limits: PortfolioLimitsBaseModel) -> None:
-    updated_chore_limits: ChoreLimitsBaseModel = ChoreLimitsBaseModel(_id=chore_limits.id, max_basis_points=150,
-                                                                      max_px_deviation=2, min_chore_notional=1_000,
-                                                                      max_chore_notional=400000)
+    updated_chore_limits: ChoreLimitsBaseModel = ChoreLimitsBaseModel(id=chore_limits.id, max_basis_points=150,
+                                                                      max_px_deviation=2,
+                                                                      max_px_levels=0, max_chore_qty=0, max_contract_qty=0, max_chore_notional=0,
+                                                                      max_basis_points_algo=0, max_px_deviation_algo=0, max_chore_notional_algo=0,
+                                                                      max_contract_qty_algo=0, max_chore_qty_algo=0)
     email_book_service_native_web_client.patch_chore_limits_client(jsonable_encoder(
-        updated_chore_limits, by_alias=True, exclude_none=True))
+        updated_chore_limits.to_dict(by_alias=True, exclude_none=True)))
 
     updated_portfolio_limits: PortfolioLimitsBaseModel = \
-        PortfolioLimitsBaseModel(_id=portfolio_limits.id, max_open_baskets=200)
+        PortfolioLimitsBaseModel(id=portfolio_limits.id, max_open_baskets=200)
     email_book_service_native_web_client.patch_portfolio_limits_client(jsonable_encoder(
-        updated_portfolio_limits, by_alias=True, exclude_none=True))
+        updated_portfolio_limits.to_dict(by_alias=True, exclude_none=True)))
 
 
 def override_strat_limit(street_book_service_http_client: StreetBookServiceHttpClient)-> None:
@@ -587,10 +488,10 @@ def override_strat_limit(street_book_service_http_client: StreetBookServiceHttpC
         market_barter_volume_participation: MarketBarterVolumeParticipationOptional = \
             MarketBarterVolumeParticipationOptional(max_participation_rate=20)
         updated_strat_limit: StratLimitsBaseModel = \
-            StratLimitsBaseModel(_id=strat_limit.id, cancel_rate=cancel_rate,
+            StratLimitsBaseModel(id=strat_limit.id, cancel_rate=cancel_rate,
                                  market_barter_volume_participation=market_barter_volume_participation)
         street_book_service_http_client.patch_strat_limits_client(jsonable_encoder(
-            updated_strat_limit, by_alias=True, exclude_none=True))
+            updated_strat_limit.to_dict(by_alias=True, exclude_none=True)))
 
 
 def switch_layout(widget: WebElement, layout: Layout) -> None:
@@ -610,27 +511,32 @@ def switch_layout(widget: WebElement, layout: Layout) -> None:
         raise Exception(f"failed to switch to layout: {layout};;; exception: {e}")
 
 def activate_strat(widget: WebElement, driver: WebDriver) -> None:
-    # Find the button with the name 'strat_state'
-    activate_btn_element = widget.find_element(By.NAME, "strat_state")
+    tr_element = widget.find_element(By.CSS_SELECTOR,
+                                     ".MuiTableRow-root.AbbreviatedFilterWidget_row__8S-pB.css-4etz12-MuiTableRow-root")
 
-    # Get the button text
-    button_text = activate_btn_element.text
+    activate_btn_element = tr_element.find_elements(By.TAG_NAME, "td")
+    activate_btn = activate_btn_element[4].find_element(By.TAG_NAME, "button")
+
+    btn_caption = activate_btn.text
 
     # Check if the button text is ACTIVATE, ERROR, or PAUSED
-    assert button_text in ["ACTIVATE", "ERROR", "PAUSE"], "Unknown button state."
+    assert btn_caption in ["ACTIVATE", "ERROR", "PAUSE"], "Unknown button state."
 
-    if button_text == "ACTIVATE":
-        # Activate the strat
-        activate_btn_element.click()
+    if btn_caption == "ACTIVATE":
+        activate_btn.click()
         time.sleep(Delay.SHORT.value)
         confirm_save(driver=driver)
 
         # Verify if the strat is in active state
-        btn_caption = widget.find_element(By.XPATH, '//*[@id="strat_collection"]/h6/div/div/button[1]').text
+        tr_element = widget.find_element(By.CSS_SELECTOR,
+                                         ".MuiTableRow-root.AbbreviatedFilterWidget_row__8S-pB.css-4etz12-MuiTableRow-root")
+
+        activate_btn_element = tr_element.find_elements(By.TAG_NAME, "td")
+        btn_caption = activate_btn_element[4].find_element(By.TAG_NAME, "button").text
         assert btn_caption == "PAUSE", "Failed to activate strat."
 
-    elif button_text in ["ERROR", "PAUSE"]:
-        print(f"Strat is in {button_text} state. Cannot activate.")
+    elif btn_caption in ["ERROR", "PAUSE"]:
+        print(f"Strat is in {btn_caption} state. Cannot activate.")
 
 
 def confirm_save(driver: WebDriver) -> None:
@@ -922,11 +828,12 @@ def get_replaced_str(default_field_value: str) -> int:
     return int(default_field_value)
 
 
-def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_list,
-                              market_depth_list: List[MarketDepthBaseModel], last_barter_list: List[LastBarterBaseModel],
-                              fills_journal_list: List[FillsJournalBaseModel],
-                              chore_snapshot_list: List[ChoreSnapshotBaseModel],
-                              chore_journal_list: List[ChoreJournalBaseModel]) -> None:
+def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_fixture: List,
+                              market_depth_basemodel_fixture: List[MarketDepthBaseModel],
+                              last_barter_basemodel_fixture: List[LastBarterBaseModel],
+                              fills_journal_basemodel_fixture: List[FillsJournalBaseModel],
+                              chore_snapshot_basemodel_fixture: List[ChoreSnapshotBaseModel],
+                              chore_journal_basemodel_fixture: List[ChoreJournalBaseModel]) -> None:
     """
 
     Function for creating top_of_book, market_depth, last_barter,
@@ -950,57 +857,40 @@ def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_list,
         pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
         pair_strat: PairStratBaseModel = pair_strat_list[-1]
         time.sleep(Delay.SHORT.value)
-
     assert pair_strat.is_executor_running
 
     executor_web_client = StreetBookServiceHttpClient(pair_strat.host, pair_strat.port)
+    create_tob("CB_Sec_1", "EQT_Sec_1", top_of_book_fixture, executor_web_client)
 
+    # Market Depth
+    created_market_depth_list: List[MarketDepthBaseModel] = executor_web_client.create_all_market_depth_client(
+        market_depth_basemodel_fixture)
+    assert created_market_depth_list == market_depth_basemodel_fixture, f"MarketDepth mismatch: Expected {market_depth_basemodel_fixture}, but got {created_market_depth_list}"
 
-    create_tob("CB_Sec_1", "EQT_Sec_1", top_of_book_list, executor_web_client)
-    expected_market_depth_list: List[MarketDepthBaseModel] = (
-        executor_web_client.create_all_market_depth_client(market_depth_list))
-    for expected_market_depth, market_depth in zip(expected_market_depth_list, market_depth_list):
-        assert market_depth.id == expected_market_depth.id
-        assert market_depth.symbol == expected_market_depth.symbol
-        assert market_depth.exch_time == expected_market_depth.exch_time
-        assert market_depth.arrival_time == expected_market_depth.arrival_time
-        assert market_depth.side == expected_market_depth.side
-        assert market_depth.px == expected_market_depth.px
-        assert market_depth.qty == expected_market_depth.qty
-        assert market_depth.premium == expected_market_depth.premium
-        assert market_depth.position == expected_market_depth.position
-        assert market_depth.market_maker == expected_market_depth.market_maker
-        assert market_depth.is_smart_depth == expected_market_depth.is_smart_depth
+    # Last Barter
+    created_last_barter_list: List[LastBarterBaseModel] = executor_web_client.create_all_last_barter_client(
+        last_barter_basemodel_fixture)
+    assert created_last_barter_list == last_barter_basemodel_fixture, f"LastBarter mismatch: Expected {last_barter_basemodel_fixture}, but got {created_last_barter_list}"
 
-    expected_last_barter_list: List[LastBarterBaseModel] = (
-        executor_web_client.create_all_last_barter_client(last_barter_list))
-    assert last_barter_list == expected_last_barter_list
+    # Fills Journal
+    for expected_fills_journal in fills_journal_basemodel_fixture:
+        created_fills_journal: FillsJournalBaseModel = executor_web_client.create_fills_journal_client(
+            expected_fills_journal)
+        expected_fills_journal.fill_notional = created_fills_journal.fill_notional
+        assert created_fills_journal == expected_fills_journal, f"FillsJournal mismatch: Expected {expected_fills_journal}, but got {created_fills_journal}"
 
-    for fills_journal in fills_journal_list:
-        expected_fills_journal: FillsJournalBaseModel = executor_web_client.create_fills_journal_client(fills_journal)
-        assert fills_journal.id == expected_fills_journal.id
-        assert fills_journal.chore_id == expected_fills_journal.chore_id
-        assert fills_journal.fill_px == expected_fills_journal.fill_px
-        assert fills_journal.fill_qty == expected_fills_journal.fill_qty
-        assert fills_journal.fill_symbol == expected_fills_journal.fill_symbol
-        assert fills_journal.fill_side == expected_fills_journal.fill_side
-        assert fills_journal.underlying_account == expected_fills_journal.underlying_account
-        assert fills_journal.fill_date_time == expected_fills_journal.fill_date_time
-        assert fills_journal.fill_id == expected_fills_journal.fill_id
-        assert (fills_journal.underlying_account_cumulative_fill_qty ==
-                expected_fills_journal.underlying_account_cumulative_fill_qty)
+    # Chore Snapshot
+    for expected_chore_snapshot in chore_snapshot_basemodel_fixture:
+        created_chore_snapshot: ChoreSnapshotBaseModel = executor_web_client.create_chore_snapshot_client(
+            expected_chore_snapshot)
+        assert created_chore_snapshot == expected_chore_snapshot, f"ChoreSnapshot mismatch: Expected {expected_chore_snapshot}, but got {created_chore_snapshot}"
 
-    for chore_snapshot in chore_snapshot_list:
-        expected_chore_snapshot: ChoreSnapshotBaseModel = (
-            executor_web_client.create_chore_snapshot_client(chore_snapshot))
-        assert chore_snapshot == expected_chore_snapshot
-
-    for chore_journal in chore_journal_list:
-        expected_chore_journal: ChoreJournalBaseModel = executor_web_client.create_chore_journal_client(chore_journal)
-        assert chore_journal.id == expected_chore_journal.id
-        assert chore_journal.chore_event == expected_chore_journal.chore_event
-        assert chore_journal.current_period_chore_count == expected_chore_journal.current_period_chore_count
-        # assert chore_journal == expected_chore_journal
+    # Chore Journal
+    for expected_chore_journal in chore_journal_basemodel_fixture:
+        created_chore_journal: ChoreJournalBaseModel = executor_web_client.create_chore_journal_client(
+            expected_chore_journal)
+        expected_chore_journal.chore.chore_notional = created_chore_journal.chore.chore_notional
+        assert expected_chore_journal == created_chore_journal, f"ChoreJournal mismatch: Expected {expected_chore_journal}, but got {created_chore_journal}"
 
 
 def delete_tob_md_ld_fj_os_oj() -> None:
@@ -1320,16 +1210,14 @@ def validate_val_max_n_default_fld_value_equal_or_not(val_max: int, replaced_def
         return True
     return False
 
-def show_nested_fld_in_tree_layout(widget: WebElement):
-    try:
-        options_btn = widget.find_element(By.XPATH, "//button[@aria-label='options']")
-        options_btn.click()
-        time.sleep(Delay.SHORT.value)
-        plus_btn = widget.find_element(By.CSS_SELECTOR, "div[class^='HeaderField_menu']")
-        plus_btn.click()
-        time.sleep(Delay.SHORT.value)
-    except NoSuchElementException as e:
-        raise Exception(f"failed to click on plus button, nested fld is already visible in {widget}: ;;; exception: {e}")
+def show_nested_fld_in_tree_layout(widget: WebElement, fld_xpath):
+    xpath = get_tree_input_field_xpath(fld_xpath)
+    header_fld = widget.find_element(By.XPATH, xpath)
+    options_btn = header_fld.find_element(By.TAG_NAME, "button")
+    options_btn.click()
+    # plus btn
+    data_add_xpath = get_tree_input_field_xpath(fld_xpath, data_add=True)
+    widget.find_element(By.XPATH, data_add_xpath).click()
 
 
 def get_val_min_n_val_max_of_fld(field_query: Any) -> Tuple[str, str]:

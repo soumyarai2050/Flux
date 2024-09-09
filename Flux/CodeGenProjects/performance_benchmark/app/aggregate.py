@@ -5,7 +5,6 @@ import os
 # 3rd party imports
 from pendulum import DateTime
 
-os.environ["DBType"] = "beanie"
 # Below unused import is used by generated beanie file
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 

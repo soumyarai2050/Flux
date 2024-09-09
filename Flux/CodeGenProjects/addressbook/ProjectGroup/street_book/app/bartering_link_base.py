@@ -1,15 +1,17 @@
 import asyncio
 import logging
 from abc import abstractmethod, ABC
-from typing import List, ClassVar, final, Dict, Final, Callable, Any
+from typing import List, ClassVar, final, Dict, Final, Callable, Any, Tuple
 from pendulum import DateTime
 import os
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import \
-    Security, Side
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import \
-    ChoreBrief, ChoreJournal, ChoreEventType
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.phone_book_n_street_book_client import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
+    Security, Side)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
+    ChoreBrief, ChoreJournal, ChoreEventType)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
+    EmailBookServiceHttpClient, email_book_service_http_client)
 
 
 def add_to_texts(chore_brief: ChoreBrief, msg: str):
@@ -37,9 +39,17 @@ class BarteringLinkBase(ABC):
                                               "kill_switch_simulate_config.yaml")
     portfolio_config_dict: ClassVar[Dict | None] = load_configs(str(portfolio_config_path))
 
+    def __init__(self, inst_id: str | None = None):
+        self.inst_id = inst_id
+        self.log_key: str | None = None
+
     def subscribe(self, listener_id: str, asyncio_loop: asyncio.AbstractEventLoop,
-                  ric_filters: List[str] | None, sedol_filters: List[str] | None):
+                  ric_filters: List[str] | None, sedol_filters: List[str] | None,
+                  block_bartering_symbol_side_events: Dict[str, Tuple[Side, str]]):
         logging.warning("Warning: BarteringLinkBase subscribe invoked - subscribe call has no effect")
+
+    def unsubscribe(self):
+        logging.warning("Warning: BarteringLinkBase unsubscribe invoked - unsubscribe call has no effect")
 
     @classmethod
     def reload_portfolio_configs(cls):
@@ -78,15 +88,17 @@ class BarteringLinkBase(ABC):
     @classmethod
     @abstractmethod
     async def place_new_chore(cls, px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str,
-                              account: str, exchange: str | None = None, text: List[str] | None = None) -> bool:
+                              symbol_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
+                              internal_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
         """
-        derived to implement connector to underlying link provider
+        derived to implement connector to underlying link provider, and
+        return bool indicating success/fail and unique-id-str/err-description in second param
         """
 
     @classmethod
     @abstractmethod
-    async def place_cxl_chore(cls, chore_id: str, side: Side, bartering_sec_id: str,
-                              system_sec_id: str, underlying_account: str | None = None) -> bool:
+    async def place_cxl_chore(cls, chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
+                              system_sec_id: str | None = None, underlying_account: str | None = None) -> bool:
         """
         derived to implement connector to underlying link provider
         """

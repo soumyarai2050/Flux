@@ -187,7 +187,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         # Adding messages from core proto files having json_root option
         project_dir = os.getenv("PROJECT_DIR")
         if project_dir is None or not project_dir:
-            err_str = f"env var DBType received as {project_dir}"
+            err_str = f"env var PROJECT_DIR received as {project_dir}"
             logging.exception(err_str)
             raise Exception(err_str)
 

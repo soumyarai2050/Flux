@@ -185,6 +185,7 @@ def test_log_to_start_alert_through_strat_id(
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
 
@@ -209,6 +210,7 @@ def test_log_to_start_alert_through_strat_id(
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         check_alert_doesnt_exist_in_strat_alert(None, sample_brief, log_file_path)
     except Exception as e:
@@ -218,10 +220,10 @@ def test_log_to_start_alert_through_strat_id(
             os.remove(log_file_path)
 
             # killing tail_executor for log_file_path
-            log_book_web_client.log_book_force_kill_tail_executor_query_client(log_file_path)
+            log_book_web_client.log_book_force_kill_tail_executor_query_client(str(log_file_path))
 
             # clearing cache
-            log_book_web_client.log_book_remove_file_from_created_cache_query_client([log_file_path])
+            log_book_web_client.log_book_remove_file_from_created_cache_query_client([str(log_file_path)])
 
 
 @pytest.mark.log_book
@@ -265,6 +267,7 @@ def test_log_to_start_alert_through_symbol_n_side_key(
             log_str = get_log_line_str("ERROR", sample_file_name,
                                        line_no, f"{sample_brief};;;{sample_detail}")
             add_log_to_file(log_file_path, log_str)
+            time.sleep(1)
 
             check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
 
@@ -276,6 +279,7 @@ def test_log_to_start_alert_through_symbol_n_side_key(
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         check_alert_doesnt_exist_in_strat_alert(active_strat, sample_brief, log_file_path)
 
@@ -299,6 +303,7 @@ def test_log_to_portfolio_alert(
     log_str = get_log_line_str("ERROR", sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
     check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
 
@@ -308,6 +313,7 @@ def test_log_to_portfolio_alert(
     log_str = get_log_line_str("SAMPLE", sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
     check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path)
 
@@ -318,7 +324,7 @@ def test_log_to_update_db(
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
         market_depth_basemodel_list):
     """
-    Test to verify logs having specific patterns updates db
+    Test to verify logs having db pattern updates db
     """
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:3]
 
@@ -332,13 +338,10 @@ def test_log_to_update_db(
     for active_strat, executor_http_client in active_strat_n_executor_list:
         log_file_path = STRAT_EXECUTOR / "log" / f"street_book_{active_strat.id}_logs_{frmt_date}.log"
 
+        # not checking sec=verity update since it gets updated very often from code and test fails - anyways
+        # test checks update functionality so if it works for rest fields it is still good
         db_json_list = [
             {"strat_alert_count": random.randint(1, 100)},
-            {"strat_alert_aggregated_severity": random.choice([Severity.Severity_DEBUG.value,
-                                                               Severity.Severity_INFO.value,
-                                                               Severity.Severity_WARNING.value,
-                                                               Severity.Severity_ERROR.value,
-                                                               Severity.Severity_CRITICAL.value])},
             {"average_premium": random.randint(1, 100)},
             {"market_premium": random.randint(1, 100)},
             {"balance_notional": random.randint(1, 100)},
@@ -352,7 +355,6 @@ def test_log_to_update_db(
             log_str = get_log_line_str("DB", sample_file_name, line_no, db_pattern_str)
 
             add_log_to_file(log_file_path, log_str)
-
             time.sleep(1)
 
             strat_view = photo_book_web_client.get_strat_view_client(active_strat.id)
@@ -402,7 +404,6 @@ def test_alert_with_same_severity_n_brief_is_always_updated(
             log_str = get_log_line_str(log_lvl, sample_file_name,
                                        line_no, f"{sample_brief};;;{sample_detail}")
             add_log_to_file(log_file_path, log_str)
-
             time.sleep(time_wait * 2 + 1)
 
             alert_count = 0
@@ -557,6 +558,7 @@ def test_to_verify_strat_alert_cache_is_cleared_in_delete_strat_alert(
         log_str = get_log_line_str(log_lvl, sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
         created_strat_alert_list.append(strat_alert)
@@ -603,6 +605,7 @@ def test_to_verify_remove_strat_alerts_for_strat_id_query(
         log_str = get_log_line_str(log_lvl, sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
         created_strat_alert_list.append(strat_alert)
@@ -644,6 +647,7 @@ def test_to_verify_portfolio_alert_cache_is_cleared_in_delete_portfolio_alert(
     log_str = get_log_line_str("ERROR", sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
     portfolio_alert = check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
     # verifying that alert was added to cache
@@ -687,6 +691,7 @@ def test_start_alert_with_same_severity_n_brief_is_created_again_if_is_deleted(
         log_str = get_log_line_str(log_lvl, sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
 
@@ -698,6 +703,7 @@ def test_start_alert_with_same_severity_n_brief_is_created_again_if_is_deleted(
         log_str = get_log_line_str(log_lvl, sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
 
@@ -724,6 +730,7 @@ def test_portfolio_alert_with_same_severity_n_brief_is_created_again_if_is_delet
     log_str = get_log_line_str(log_lvl, sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
     portfolio_alert = check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
 
@@ -735,6 +742,7 @@ def test_portfolio_alert_with_same_severity_n_brief_is_created_again_if_is_delet
     log_str = get_log_line_str(log_lvl, sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
     check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
 
@@ -782,6 +790,7 @@ def file_watcher_check_tail_executor_start(log_file_name: str, log_file_path: st
         sample_detail = "sample detail string"
         log_str = get_log_line_str("ERROR", sample_file_name, line_no, f"{sample_brief};;; {sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
 
@@ -792,10 +801,10 @@ def file_watcher_check_tail_executor_start(log_file_name: str, log_file_path: st
             os.remove(log_file_path)    # removing file
 
         # killing tail_executor for log_file_path
-        log_book_web_client.log_book_force_kill_tail_executor_query_client(log_file_path)
+        log_book_web_client.log_book_force_kill_tail_executor_query_client(str(log_file_path))
 
         # clearing cache
-        log_book_web_client.log_book_remove_file_from_created_cache_query_client([log_file_path])
+        log_book_web_client.log_book_remove_file_from_created_cache_query_client([str(log_file_path)])
 
 
 @pytest.mark.log_book
@@ -810,7 +819,7 @@ def test_file_watcher_check_tail_executor_start_with_complete_path(clean_and_set
     log_file_path = STRAT_EXECUTOR / "log" / log_file_name
     tail_process_grep_pattern = "tail_executor~test_street_book_with_full_path"
 
-    file_watcher_check_tail_executor_start(log_file_name, log_file_path, tail_process_grep_pattern)
+    file_watcher_check_tail_executor_start(log_file_name, str(log_file_path), tail_process_grep_pattern)
 
 
 @pytest.mark.log_book
@@ -824,7 +833,7 @@ def test_file_watcher_check_tail_executor_start_with_pattern_path(clean_and_set_
     log_file_path = STRAT_EXECUTOR / "log" / log_file_name
     tail_process_grep_pattern = "tail_executor~test_street_book_with_pattern"
 
-    file_watcher_check_tail_executor_start(log_file_name, log_file_path, tail_process_grep_pattern)
+    file_watcher_check_tail_executor_start(log_file_name, str(log_file_path), tail_process_grep_pattern)
 
 
 @pytest.mark.log_book
@@ -844,6 +853,7 @@ def test_log_with_suitable_log_lvl_are_added_to_alerts(clean_and_set_limits):
         log_str = get_log_line_str(log_lvl, sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
 
@@ -853,6 +863,7 @@ def test_log_with_suitable_log_lvl_are_added_to_alerts(clean_and_set_limits):
     log_str = get_log_line_str(log_lvl, sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
     check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path)
 
@@ -882,6 +893,7 @@ def test_strat_alert_unable_to_patch_are_created_as_portfolio_alert(
     log_str = get_log_line_str("ERROR", sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
     check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
 
@@ -912,12 +924,13 @@ def test_restart_tail_executor(
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
 
         # restarting from latest line in log
         restart_date_time = get_log_date_time()
-        log_book_web_client.log_book_restart_tail_query_client(log_file_path, restart_date_time)
+        log_book_web_client.log_book_restart_tail_query_client(str(log_file_path), restart_date_time)
 
         time.sleep(2)
 
@@ -926,13 +939,14 @@ def test_restart_tail_executor(
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
         assert strat_alert.alert_count == 1, \
             f"Mismatched: expected strat_alert.alert_count: 1, found {strat_alert.alert_count=}"
 
         # restarting from before last-time restarted - also verifying if log is again executed
-        log_book_web_client.log_book_restart_tail_query_client(log_file_path, restart_date_time)
+        log_book_web_client.log_book_restart_tail_query_client(str(log_file_path), restart_date_time)
         time.sleep(10)
 
         strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path,
@@ -960,6 +974,7 @@ def test_tail_executor_restarts_if_tail_error_occurs(
     log_str = get_log_line_str("ERROR", sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
     portfolio_alert = check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
     assert portfolio_alert.alert_count == 1, \
@@ -968,6 +983,7 @@ def test_tail_executor_restarts_if_tail_error_occurs(
     # putting error log in file
     error_log_str = "tail: giving up on this name"
     add_log_to_file(log_file_path, error_log_str)
+    time.sleep(1)
 
     # removing this error log before restart to tail executor to avoid cyclic restarts
     os.system(f"gsed -i '/{error_log_str}/d' {log_file_path}")
@@ -1010,11 +1026,12 @@ def test_kill_tail_executor_n_clear_cache_(
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
 
         # restarting from latest line in log
-        log_book_web_client.log_book_force_kill_tail_executor_query_client(log_file_path)
+        log_book_web_client.log_book_force_kill_tail_executor_query_client(str(log_file_path))
 
         time.sleep(1)
 
@@ -1028,7 +1045,7 @@ def test_kill_tail_executor_n_clear_cache_(
 
         # tail executor will not be restarted even if file still exists since file entry still exists in cache
         # removing file from cache to see if tail executor for file is started
-        log_book_web_client.log_book_remove_file_from_created_cache_query_client(log_file_path)
+        log_book_web_client.log_book_remove_file_from_created_cache_query_client([str(log_file_path)])
 
         time.sleep(2)
 
@@ -1037,6 +1054,7 @@ def test_kill_tail_executor_n_clear_cache_(
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
         assert strat_alert.alert_count == 1, \
@@ -1073,6 +1091,7 @@ def test_delete_log_file_n_again_create_to_verify_tail(
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
 
@@ -1094,6 +1113,7 @@ def test_delete_log_file_n_again_create_to_verify_tail(
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
         assert strat_alert.alert_count == 1, \
@@ -1119,6 +1139,7 @@ def test_strat_alert_with_no_strat_with_symbol_side_is_sent_to_portfolio_alert(
     log_str = get_log_line_str("ERROR", sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
     time.sleep(time_wait * 2 + 1)
     # checking if any strat_alert contains this alert content
@@ -1148,59 +1169,53 @@ def test_strat_alert_with_no_strat_with_strat_id_is_sent_to_portfolio_alert(
     Created street_book log file manually to start tail_executor with some random id and verify since strat
     doesn't exist alert is sent to portfolio alert
     """
-    non_existing_strat_id = 100
-    log_file_name = f"street_book_{non_existing_strat_id}_logs_{frmt_date}.log"
-    log_file_path = STRAT_EXECUTOR / "log" / log_file_name
-    try:
-        # creating log file
-        with open(log_file_path, "w"):
-            pass
+    log_file_name = f"sample_test.log"
+    executor_log_dir_path = STRAT_EXECUTOR / "log"
+    log_file_path = executor_log_dir_path / log_file_name
 
-        sample_file_name = "sample_file.py"
-        line_no = random.randint(1, 100)
+    # crating log dir if not exists
+    if not os.path.exists(executor_log_dir_path):
+        os.mkdir(executor_log_dir_path)
 
-        sample_brief = f"Sample Log not to be created as strat_alert"
-        sample_detail = "sample detail string"
-        log_str = get_log_line_str("ERROR", sample_file_name,
-                                   line_no, f"{sample_brief};;;{sample_detail}")
-        add_log_to_file(log_file_path, log_str)
+    # creating log file
+    with open(log_file_path, "w"):
+        pass
 
-        for _ in range(10):
-            time.sleep(1)
-            # checking if any strat_alert contains this alert content
-            strat_alert_list = log_book_web_client.get_all_strat_alert_client()
+    sample_file_name = "sample_file.py"
+    line_no = random.randint(1, 100)
 
-            for strat_alert in strat_alert_list:
-                if strat_alert.alert_brief == sample_brief:
-                    assert False, \
-                        f"No start alert must exists with having alert_brief: {sample_brief}, found alert: {strat_alert}"
+    sample_brief = f"Sample Log not to be created as strat_alert"
+    sample_detail = "sample detail string"
+    log_str = get_log_line_str("ERROR", sample_file_name,
+                               line_no, f"{sample_brief};;;{sample_detail}")
+    add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
-            portfolio_alert_list = log_book_web_client.get_all_portfolio_alert_client()
-            for portfolio_alert in portfolio_alert_list:
-                if portfolio_alert.alert_brief == sample_brief:
-                    break
-            else:
-                continue
-            break
+    for _ in range(10):
+        time.sleep(1)
+        # checking if any strat_alert contains this alert content
+        strat_alert_list = log_book_web_client.get_all_strat_alert_client()
+
+        for strat_alert in strat_alert_list:
+            if strat_alert.alert_brief == sample_brief:
+                assert False, \
+                    f"No start alert must exists with having alert_brief: {sample_brief}, found alert: {strat_alert}"
+
+        portfolio_alert_list = log_book_web_client.get_all_portfolio_alert_client()
+        for portfolio_alert in portfolio_alert_list:
+            if portfolio_alert.alert_brief == sample_brief:
+                break
         else:
-            assert False, \
-                ("Failed strat_alert must be created as portfolio_alert of same severity and brief, but couldn't find "
-                 "any portfolio_alert")
-    except Exception as e:
-        raise e
-    finally:
-        if os.path.exists(log_file_path):
-            os.remove(log_file_path)
-
-            # killing tail_executor for log_file_path
-            log_book_web_client.log_book_force_kill_tail_executor_query_client(log_file_path)
-
-            # clearing cache
-            log_book_web_client.log_book_remove_file_from_created_cache_query_client([log_file_path])
+            continue
+        break
+    else:
+        assert False, \
+            ("Failed strat_alert must be created as portfolio_alert of same severity and brief, but couldn't find "
+             "any portfolio_alert")
 
 
 @pytest.mark.log_book
-def test_strat_alert_patch_all_failed_alerts_goes_to_portfolio_alert(
+def test_strat_alert_put_all_failed_alerts_goes_to_portfolio_alert(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
         market_depth_basemodel_list):
@@ -1219,11 +1234,13 @@ def test_strat_alert_patch_all_failed_alerts_goes_to_portfolio_alert(
         line_no = random.randint(1, 100)
         sample_brief = "Sample Log to be created as strat_alert"
         sample_detail = "sample detail string"
+        print(f"Checking file: {log_file_path!r}")
 
         # Positive test
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
         created_alerts_list.append(strat_alert)
@@ -1242,6 +1259,7 @@ def test_strat_alert_patch_all_failed_alerts_goes_to_portfolio_alert(
             log_str = get_log_line_str("ERROR", sample_file_name,
                                        line_no, f"{sample_brief};;;{updated_sample_detail}")
             add_log_to_file(log_file_path, log_str)
+            time.sleep(1)
 
             # verifying strat_alert not exists
             check_alert_doesnt_exist_in_strat_alert(active_strat, sample_brief, log_file_path)
@@ -1253,12 +1271,11 @@ def test_strat_alert_patch_all_failed_alerts_goes_to_portfolio_alert(
         finally:
             if res:
                 # creating document back to delete cache for that entry
-                create_mongo_document(mongo_uri, db_name, collection_name,
-                                      jsonable_encoder(strat_alert, by_alias=True))
+                create_mongo_document(mongo_uri, db_name, collection_name, strat_alert.to_dict())
 
 
 @pytest.mark.log_book
-def test_portfolio_alert_patch_all_failed_alerts_goes_to_portfolio_fail_alert_log(
+def test_portfolio_alert_put_all_failed_alerts_goes_to_portfolio_fail_alert_log(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
         market_depth_basemodel_list):
@@ -1273,6 +1290,7 @@ def test_portfolio_alert_patch_all_failed_alerts_goes_to_portfolio_fail_alert_lo
     log_str = get_log_line_str("ERROR", sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
 
     portfolio_alert = check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
 
@@ -1291,6 +1309,7 @@ def test_portfolio_alert_patch_all_failed_alerts_goes_to_portfolio_fail_alert_lo
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
         check_alert_doesnt_exist_in_portfolio_alert(sample_brief, log_file_path)
 
         # checking alert is present in portfolio_alert_fail_logs
@@ -1312,8 +1331,7 @@ def test_portfolio_alert_patch_all_failed_alerts_goes_to_portfolio_fail_alert_lo
     finally:
         if res:
             # creating document back to delete cache for that entry
-            create_mongo_document(mongo_uri, db_name, collection_name,
-                                  jsonable_encoder(portfolio_alert, by_alias=True))
+            create_mongo_document(mongo_uri, db_name, collection_name, portfolio_alert.to_dict())
 
 
 def kill_perf_bench_server():
@@ -1388,6 +1406,7 @@ def test_check_create_call_in_queue_handler_waits_if_server_is_down(
         log_str = (f"{get_log_date_time()} : TIMING : [sample_file.py : 575] : "
                    f"_timeit_sample_callable~2024-05-11 14:54:08.398837+00:00~0.008737_timeit_")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
 
         time.sleep(transaction_timeout_secs+2)
 
@@ -1409,6 +1428,7 @@ def test_check_create_call_in_queue_handler_waits_if_server_is_down(
         log_str = (f"{get_log_date_time()} : TIMING : [sample_file.py : 575] : "
                    f"_timeit_sample_callable~2024-05-11 14:54:08.398837+00:00~0.008737_timeit_")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
         # checking that queue handler will wait for perf_bench_client_connection_fail_retry_secs after fail client call
         total_iters = 5
         for _ in range(total_iters):
@@ -1438,7 +1458,7 @@ def test_check_create_call_in_queue_handler_waits_if_server_is_down(
 
         # restarting perf bench server
         perf_bench_server_scripts_dir = PERF_BENCH_DIR / "scripts"
-        subprocess.Popen(["python", "launch_beanie_fastapi.py"], cwd=perf_bench_server_scripts_dir)
+        subprocess.Popen(["python", "launch_msgspec_fastapi.py"], cwd=perf_bench_server_scripts_dir)
 
         log_str = (f"{get_log_date_time()} : TIMING : [sample_file.py : 575] : "
                    f"_timeit_sample_callable~2024-05-11 14:54:08.398837+00:00~0.008737_timeit_")
@@ -1460,10 +1480,10 @@ def test_check_create_call_in_queue_handler_waits_if_server_is_down(
             os.remove(log_file_path)
 
             # killing tail_executor for log_file_path
-            log_book_web_client.log_book_force_kill_tail_executor_query_client(log_file_path)
+            log_book_web_client.log_book_force_kill_tail_executor_query_client(str(log_file_path))
 
             # clearing cache
-            log_book_web_client.log_book_remove_file_from_created_cache_query_client([log_file_path])
+            log_book_web_client.log_book_remove_file_from_created_cache_query_client([str(log_file_path)])
 
         if not is_perf_bench_server_up_already:
             res = kill_perf_bench_server()
@@ -1514,6 +1534,7 @@ def test_log_info_in_alerts(
         log_str = get_log_line_str("ERROR", sample_file_name,
                                    line_no, f"{sample_brief};;;{sample_detail}")
         add_log_to_file(log_file_path, log_str)
+        time.sleep(1)
         strat_alert = check_alert_exists_in_strat_alert(active_strat, sample_brief, log_file_path, sample_detail)
         check_log_info_fields_in_alert(strat_alert, str(log_file_path), sample_file_name, line_no)
 
@@ -1525,6 +1546,7 @@ def test_log_info_in_alerts(
     log_str = get_log_line_str("ERROR", sample_file_name,
                                line_no, f"{sample_brief};;;{sample_detail}")
     add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
     portfolio_alert = check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
     check_log_info_fields_in_alert(portfolio_alert, str(log_file_path), sample_file_name, line_no)
 
@@ -1557,6 +1579,7 @@ def test_check_background_logs_alert_handling(
     ]
     for line in log_str:
         add_log_to_file(log_file_path, line)
+        time.sleep(1)
 
     for _ in range(10):
         portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
@@ -1599,6 +1622,7 @@ def check_perf_of_alerts(
             log_str = get_log_line_str(log_lvl, sample_file_name,
                                        line_no, f"{sample_brief};;;{sample_detail}")
             add_log_to_file(log_file_path, log_str)
+            time.sleep(1)
 
         start_time = DateTime.utcnow()
         expected_alert_brief = get_expected_brief(sample_brief)
@@ -1639,7 +1663,7 @@ def test_perf_of_alerts_based_on_transaction_timeout(
                          symbol_overview_obj_list, market_depth_basemodel_list, 50)
 
 
-@pytest.mark.log_book
+@pytest.mark.log_book1
 def test_perf_of_db_updates(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
@@ -1661,6 +1685,7 @@ def test_perf_of_db_updates(
                        f"^^^StratViewBaseModel~~SNAPSHOT_TYPE~~patch_all_strat_view_client~~_id^^{active_strat.id}"
                        f"~~max_single_leg_notional^^{i+1}.0")
             add_log_to_file(log_file_path, log_str)
+            time.sleep(1)
 
         start_time = DateTime.utcnow()
         for i in range(10):

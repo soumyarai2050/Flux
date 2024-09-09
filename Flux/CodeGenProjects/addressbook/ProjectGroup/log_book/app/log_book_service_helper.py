@@ -7,9 +7,10 @@ import re
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import (
-    YAMLConfigurationManager)
+    YAMLConfigurationManager, parse_to_int)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
     LogBookServiceHttpClient)
 
@@ -50,14 +51,14 @@ def create_alert(
         kwargs['alert_meta'] = alert_meta
     if strat_id is not None:
         kwargs["strat_id"] = strat_id
-        start_alert = strat_alert_type(**kwargs)
+        start_alert = strat_alert_type.from_dict(kwargs)
         if hasattr(strat_alert_type, "next_id"):
             # used in server process since db is initialized in that process -
             # putting id so that object can be cached with id - to avoid put http with cached obj without id
             start_alert.id = strat_alert_type.next_id()
         return start_alert
     else:
-        portfolio_alert = portfolio_alert_type(**kwargs)
+        portfolio_alert = portfolio_alert_type.from_dict(kwargs)
         if hasattr(portfolio_alert_type, "next_id"):
             # used in server process since db is initialized in that process -
             # putting id so that object can be cached with id - to avoid put http with cached obj without id
@@ -189,10 +190,10 @@ def get_update_obj_list_for_journal_type_update(
         return "EXIT"
 
     if parse_to_pydantic:
-        pydantic_object = pydantic_basemodel_class_type(**kwargs)
-        update_dict_list.append(jsonable_encoder(pydantic_object, by_alias=True, exclude_none=True))
+        pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs, strict=False)
+        update_dict_list.append(pydantic_object.to_dict(exclude_none=True))
     else:
-        update_dict_list.append(jsonable_encoder(fetch_counts, by_alias=True, exclude_none=True))
+        update_dict_list.append(kwargs)
 
     while not patch_queue.empty():
         kwargs: Dict = patch_queue.get()
@@ -204,18 +205,25 @@ def get_update_obj_list_for_journal_type_update(
             return "EXIT"
 
         if parse_to_pydantic:
-            pydantic_object = pydantic_basemodel_class_type(**kwargs)
-            update_dict_list.append(jsonable_encoder(pydantic_object, by_alias=True, exclude_none=True))
+            pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs, strict=False)
+            update_dict_list.append(pydantic_object.to_dict(exclude_none=True))
         else:
-            update_dict_list.append(jsonable_encoder(fetch_counts, by_alias=True, exclude_none=True))
+            update_dict_list.append(kwargs)
 
         if fetch_counts >= max_fetch_from_queue:
             return update_dict_list
     return update_dict_list
 
 
+def get_obj_id_to_put_as_key(obj_id) -> str:
+    # type-casting to str to avoid duplicate key generation if obj_id is of varying types like str and int - this
+    # happens when obj are passed from logs and direct json calls due to which obj_id is str in logs case and
+    # specific type like int for direct json call cases
+    return str(obj_id)
+
+
 def get_update_obj_for_snapshot_type_update(
-        pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
+        pydantic_basemodel_class_type: Type[MsgspecBaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
         max_fetch_from_queue: int, err_handler_callable: Callable,
         parse_to_pydantic: bool | None = None) -> List[Dict] | str:  # blocking function
     id_to_obj_dict = {}
@@ -232,11 +240,16 @@ def get_update_obj_for_snapshot_type_update(
     # _id from the kwargs dict is of string type which may or may not be same as datatype of pydantic_object.id
     # use obj_id to store/fetch item from dict for consistency
     obj_id = kwargs.get("_id")
-    if parse_to_pydantic:
-        pydantic_object = pydantic_basemodel_class_type(**kwargs)
-        id_to_obj_dict[obj_id] = pydantic_object
+
+    if obj_id is not None:
+        obj_id = get_obj_id_to_put_as_key(obj_id)
+        if parse_to_pydantic:
+            pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs, strict=False)
+            id_to_obj_dict[obj_id] = pydantic_object
+        else:
+            id_to_obj_dict[obj_id] = kwargs
     else:
-        id_to_obj_dict[obj_id] = kwargs
+        err_handler_callable()
 
     while not patch_queue.empty():
         kwargs: Dict = patch_queue.get()
@@ -250,20 +263,24 @@ def get_update_obj_for_snapshot_type_update(
         obj_id = kwargs.get("_id")
 
         if obj_id is not None:
+            obj_id = get_obj_id_to_put_as_key(obj_id)
             pydantic_object_or_kwargs = id_to_obj_dict.get(obj_id)
 
             if pydantic_object_or_kwargs is None:
                 if parse_to_pydantic:
-                    pydantic_object = pydantic_basemodel_class_type(**kwargs)
+                    pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs, strict=False)
                     id_to_obj_dict[obj_id] = pydantic_object
                 else:
                     id_to_obj_dict[obj_id] = kwargs
             else:
                 # updating already existing object
                 if parse_to_pydantic:
+                    pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs, strict=False)
                     for key, val in kwargs.items():
+                        if key == "_id":
+                            key = "id"
                         cached_pydantic_object = pydantic_object_or_kwargs
-                        setattr(cached_pydantic_object, key, val)
+                        setattr(cached_pydantic_object, key, getattr(pydantic_object, key))
                 else:
                     cached_kwargs = pydantic_object_or_kwargs
                     cached_kwargs.update(kwargs)
@@ -273,9 +290,13 @@ def get_update_obj_for_snapshot_type_update(
         if fetch_counts >= max_fetch_from_queue:
             break
 
-    obj_json_list: List[Dict] = []
-    for _, obj in id_to_obj_dict.items():
-        obj_json_list.append(jsonable_encoder(obj, by_alias=True, exclude_none=True))
+    obj_json_list: List[Dict]
+    if parse_to_pydantic:
+        obj_json_list = []
+        for _, obj in id_to_obj_dict.items():
+            obj_json_list.append(obj.to_dict(exclude_none=True))
+    else:
+        obj_json_list = list(id_to_obj_dict.values())
 
     return obj_json_list
 
@@ -309,7 +330,7 @@ def handle_patch_db_queue_updater(
 
         patch_queue.put(update_data)
     else:
-        raise Exception(f"Unsupported {update_type = } in handle_dynamic_queue_updater")
+        raise Exception(f"Unsupported {update_type=} in handle_dynamic_queue_updater")
 
 
 def handle_dynamic_queue_for_patch_n_patch_all(pydantic_basemodel_type: str, method_name: str,
@@ -320,54 +341,78 @@ def handle_dynamic_queue_for_patch_n_patch_all(pydantic_basemodel_type: str, met
                                                max_fetch_from_queue: int,
                                                snapshot_type_callable_err_handler: Callable,
                                                parse_to_pydantic: bool | None = None):
-    pydantic_basemodel_class_type: Type[BaseModel] = eval(pydantic_basemodel_type)
+    try:
+        pydantic_basemodel_class_type: Type[BaseModel] = eval(pydantic_basemodel_type)
 
-    while 1:
-        try:
-            if update_type == UpdateType.JOURNAL_TYPE:
-                # blocking call
-                update_res: List[Any] | Any = (
-                    journal_type_handler_callable(pydantic_basemodel_class_type, update_type, method_name, patch_queue,
-                                                  max_fetch_from_queue, parse_to_pydantic))
+        while 1:
+            try:
+                if update_type == UpdateType.JOURNAL_TYPE:
+                    # blocking call
+                    update_res: List[Any] | Any = (
+                        journal_type_handler_callable(pydantic_basemodel_class_type, update_type, method_name, patch_queue,
+                                                      max_fetch_from_queue, parse_to_pydantic))
 
-            else:  # if update_type is UpdateType.SNAPSHOT_TYPE
-                # blocking call
-                update_res: List[Any] | Any = (
-                    snapshot_type_handler_callable(pydantic_basemodel_class_type, update_type, method_name, patch_queue,
-                                                   max_fetch_from_queue, snapshot_type_callable_err_handler,
-                                                   parse_to_pydantic))
+                else:  # if update_type is UpdateType.SNAPSHOT_TYPE
+                    # blocking call
+                    update_res: List[Any] | Any = (
+                        snapshot_type_handler_callable(pydantic_basemodel_class_type, update_type, method_name, patch_queue,
+                                                       max_fetch_from_queue, snapshot_type_callable_err_handler,
+                                                       parse_to_pydantic))
 
-            if update_res == "EXIT":
-                return
+                if update_res == "EXIT":
+                    return
 
-            while 1:
-                try:
-                    update_handler_callable(update_res)
-                    logging.info(f"called {update_handler_callable.__name__} with {update_res = } in "
-                                 f"handle_dynamic_queue_for_patch_n_patch_all")
-                    break
-                except Exception as e:
-                    if not should_retry_due_to_server_down(e):
-                        raise Exception(e)
-        except Exception as e:
-            error_handler_callable(pydantic_basemodel_type, update_type, e)
+                while 1:
+                    try:
+                        update_handler_callable(update_res)
+                        logging.info(f"called {update_handler_callable.__name__} with {update_res=} in "
+                                     f"handle_dynamic_queue_for_patch_n_patch_all")
+                        break
+                    except Exception as e:
+                        if not should_retry_due_to_server_down(e):
+                            logging.exception(e)
+                            raise Exception(e)
+            except Exception as e:
+                error_handler_callable(pydantic_basemodel_type, update_type, e)
+    except Exception as e:
+        logging.exception(e)
+        raise Exception(e)
 
 
 def _alert_queue_handler_err_handler(e, pydantic_obj_list, queue_obj, err_handling_callable,
                                      web_client_callable, client_connection_fail_retry_secs):
     # Handling patch-all race-condition if some obj got removed before getting updated due to wait
-    pattern = ".*objects with ids: {(.*)} out of requested .*"
-    match_list: List[str] = re.findall(pattern, str(e))
-    if match_list:
+    # pattern1: happens in patch_all and in put_all when stored_obj is fetched before update operation and hence
+    #           error is raised before updating obj
+    pattern1 = ".*objects with ids: {(.*)} out of requested .*"
+    match_list1: List[str] = re.findall(pattern1, str(e))
+
+    # pattern2: happens in put_all when obj is updated and then missing ids are found and error is raised
+    pattern2 = "Can't find document objects with ids: [(.*)] to update"
+    match_list2: List[str] = re.findall(pattern2, str(e))
+
+    if match_list1:
         # taking first occurrence
         non_existing_id_list: List[int] = [parse_to_int(_id.strip())
-                                           for _id in match_list[0].split(",")]
+                                           for _id in match_list1[0].split(",")]
         non_existing_obj = []
         for pydantic_obj in pydantic_obj_list:
             if pydantic_obj.id in non_existing_id_list:
                 non_existing_obj.append(pydantic_obj)
             else:
                 queue_obj.put(pydantic_obj)  # putting back all other existing jsons
+        logging.debug(f"Calling Error handler func provided with param: {non_existing_obj}")
+        err_handling_callable(non_existing_obj)
+    elif match_list2:
+        # taking first occurrence
+        non_existing_id_list: List[int] = [parse_to_int(_id.strip())
+                                           for _id in match_list1[0].split(",")]
+        non_existing_obj = []
+        for pydantic_obj in pydantic_obj_list:
+            if pydantic_obj.id in non_existing_id_list:
+                non_existing_obj.append(pydantic_obj)
+            # else not required: if obj's id is not in non-existing list then doing nothing since it got updated
+            # already in put_all call (patch_all always belongs to pattern1)
         logging.debug(f"Calling Error handler func provided with param: {non_existing_obj}")
         err_handling_callable(non_existing_obj)
     elif "Failed to establish a new connection: [Errno 111] Connection refused" in str(e):
@@ -611,9 +656,14 @@ async def async_update_strat_alert_cache(
 
 def get_alert_meta_obj(component_path: str | None = None,
                        source_file_name: str | None = None, line_num: int | None = None,
-                       alert_create_date_time: DateTime | None = None,
-                       first_detail: str | None = None, latest_detail: str | None = None) -> AlertMeta | None:
-    alert_meta = AlertMeta()
+                       alert_create_date_time: DateTime | None = None, first_detail: str | None = None,
+                       latest_detail: str | None = None,
+                       alert_meta_type: Type[AlertMeta] | Type[AlertMetaBaseModel] | None = None
+                       ) -> AlertMetaBaseModel | AlertMeta | None:
+    if alert_meta_type is None:
+        alert_meta_type = AlertMetaBaseModel
+
+    alert_meta = alert_meta_type()
     alert_meta_has_update = False
     if component_path is not None:
         alert_meta_has_update = True

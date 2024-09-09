@@ -66,27 +66,32 @@ class UpdateWebUIConfiguration:
 
         content = re.sub(
             r'export const API_PUBLIC_URL = [^;]+;',
-            f'export const API_PUBLIC_URL = \'http://{self.server_host}:{self.ui_port}/\';', content)
-
+            f'export const API_PUBLIC_URL = \'http://{self.server_host}:{self.ui_port}\';', content)
 
         with open(self.project_constants_path, 'w') as f:
             f.write(content)
 
         logging.debug(f"constants.js updated successfully for {self.project_name}")
 
+    def _update_schema_connection_details(self, widget_schema):
+        connection_details: Dict | None = widget_schema.get("connection_details")
+        if connection_details is not None:
+            dynamic_url: bool = connection_details["dynamic_url"]
+            if not dynamic_url:
+                project_name: str = connection_details["project_name"]
+                host_and_port: Tuple[str, int] = (
+                    self.__get_host_and_port_from_specific_project_config(project_name=project_name))
+                connection_details["host"], connection_details["port"] = host_and_port
+
     def _update_schema_json(self):
         with open(str(self.project_schema_path), 'r') as f:
             schema_dict: Dict[str, any] = json.loads(f.read())
 
         for widget_name, widget_schema in schema_dict.items():
-            connection_details: Dict | None = widget_schema.get("connection_details")
-            if connection_details is not None:
-                dynamic_url: bool = connection_details["dynamic_url"]
-                if not dynamic_url:
-                    project_name: str = connection_details["project_name"]
-                    host_and_port: Tuple[str, int] = (
-                        self.__get_host_and_port_from_specific_project_config(project_name=project_name))
-                    connection_details["host"], connection_details["port"] = host_and_port
+            self._update_schema_connection_details(widget_schema)
+
+        for widget_name, widget_schema in schema_dict["definitions"].items():
+            self._update_schema_connection_details(widget_schema)
 
         with open(str(self.project_schema_path), 'w') as f:
             json.dump(schema_dict, f, indent=2)

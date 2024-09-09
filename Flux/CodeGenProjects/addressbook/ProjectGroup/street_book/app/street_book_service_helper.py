@@ -1,18 +1,26 @@
 # standard imports
 import ctypes
 import logging
+import os.path
 import sys
 import threading
+import math
 
 # project imports
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecord, SecurityRecordManager
+
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import (
     StreetBookServiceKeyHandler)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.phone_book_n_street_book_client import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
+    PairStrat)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    get_symbol_side_key)
+    email_book_service_http_client, get_symbol_side_key)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import log_book_service_http_client
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import post_book_service_http_client
 
 update_strat_status_lock: threading.Lock = threading.Lock()
 
@@ -70,6 +78,12 @@ def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_er
 #     email_book_service_http_client.patch_pair_strat_client(pair_strat_updated.dict(by_alias=True,
 #                                                                                       exclude_none=True),
 #                                                               return_obj_copy=False)
+
+def get_new_chore_log_key(new_ord: NewChore | NewChoreBaseModel | NewChoreOptional):
+    sec_id = new_ord.security.sec_id
+    side = new_ord.side
+    symbol_side_key = get_symbol_side_key([(sec_id, side)])
+    return symbol_side_key
 
 
 def get_chore_journal_log_key(chore_journal: ChoreJournal | ChoreJournalBaseModel | ChoreJournalOptional):
@@ -148,7 +162,7 @@ def get_consumable_participation_qty_http(symbol: str, side: Side, applicable_pe
 
 async def get_consumable_participation_qty_underlying_http(symbol: str, side: Side, applicable_period_seconds: int,
                                                            max_participation_rate: float) -> int | None:
-    from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes_imports import (
         underlying_get_executor_check_snapshot_query_http)
 
     executor_check_snapshot_list: List[ExecutorCheckSnapshot] = \
@@ -166,16 +180,18 @@ async def get_consumable_participation_qty_underlying_http(symbol: str, side: Si
 
 
 def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratLimits:
-    cancel_rate: CancelRate = CancelRate(max_cancel_rate=60, applicable_period_seconds=0, waived_min_chores=5)
+    # setting waived_min_rolling_notional to 0 disables waived_min_rolling_notional addon from cancel_rate check impl
+    cancel_rate: CancelRate = CancelRate(max_cancel_rate=60, applicable_period_seconds=0, waived_initial_chores=5,
+                                         waived_min_rolling_notional=0, waived_min_rolling_period_seconds=180)
     market_barter_volume_participation: MarketBarterVolumeParticipation = \
         MarketBarterVolumeParticipation(max_participation_rate=40,
-                                       applicable_period_seconds=180)
+                                       applicable_period_seconds=180, min_allowed_notional=0)
     market_depth: OpenInterestParticipation = OpenInterestParticipation(participation_rate=10, depth_levels=3)
     residual_restriction: ResidualRestriction = ResidualRestriction(max_residual=30_000, residual_mark_seconds=4)
     strat_limits: StratLimits = StratLimits(max_open_chores_per_side=5,
                                             max_single_leg_notional=get_default_max_notional(),
-                                            max_open_single_leg_notional=30_000,
-                                            max_net_filled_notional=160_000,
+                                            max_open_single_leg_notional=get_default_max_open_single_leg_notional(),
+                                            max_net_filled_notional=get_default_max_net_filled_notional(),
                                             max_concentration=10,
                                             limit_up_down_volume_participation_rate=1,
                                             eligible_brokers=eligible_brokers,
@@ -183,21 +199,21 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
                                             market_barter_volume_participation=market_barter_volume_participation,
                                             market_depth=market_depth,
                                             residual_restriction=residual_restriction,
-                                            min_chore_notional=100
+                                            min_chore_notional=100, min_chore_notional_allowance=10
                                             )
     return strat_limits
 
 
 def get_new_strat_status(strat_limits_obj: StratLimits) -> StratStatus:
-    strat_status = StratStatus(fills_brief=[], open_chores_brief=[], total_buy_qty=0,
+    strat_status = StratStatus(total_buy_qty=0,
                                total_sell_qty=0, total_chore_qty=0, total_open_buy_qty=0,
                                total_open_sell_qty=0, avg_open_buy_px=0.0, avg_open_sell_px=0.0,
                                total_open_buy_notional=0.0, total_open_sell_notional=0.0,
                                total_open_exposure=0.0, total_fill_buy_qty=0,
                                total_fill_sell_qty=0, avg_fill_buy_px=0.0, avg_fill_sell_px=0.0,
                                total_fill_buy_notional=0.0, total_fill_sell_notional=0.0,
-                               total_fill_exposure=0.0, total_cxl_buy_qty=0.0,
-                               total_cxl_sell_qty=0.0, avg_cxl_buy_px=0.0, avg_cxl_sell_px=0.0,
+                               total_fill_exposure=0.0, total_cxl_buy_qty=0,
+                               total_cxl_sell_qty=0, avg_cxl_buy_px=0.0, avg_cxl_sell_px=0.0,
                                total_cxl_buy_notional=0.0, total_cxl_sell_notional=0.0,
                                total_cxl_exposure=0.0, average_premium=0.0,
                                balance_notional=strat_limits_obj.max_single_leg_notional,
@@ -206,20 +222,44 @@ def get_new_strat_status(strat_limits_obj: StratLimits) -> StratStatus:
 
 
 def create_stop_md_script(running_process_name: str, generation_stop_file_path: str):
+    script_file_name = os.path.basename(generation_stop_file_path)
+    log_file_path = PurePath(generation_stop_file_path).parent.parent / "log" / f"{script_file_name}.log"
     # stop file generator
     with open(generation_stop_file_path, "w") as fl:
         fl.write("#!/bin/bash\n")
-        fl.write(f"PROCESS_COUNT=`pgrep {running_process_name} | wc -l`\n")
+        fl.write(f"LOG_FILE_PATH={log_file_path}\n")
+        fl.write("echo Log_file_path: ${LOG_FILE_PATH}\n")
+        fl.write("shopt -s expand_aliases >>${LOG_FILE_PATH} 2>&1\n")
+        fl.write("source ${HOME}/.bashrc\n")
+        # create this as alias in your bashrc to cd into market data run.sh script dir
+        fl.write("cdm >>${LOG_FILE_PATH} 2>&1\n")
+        fl.write(f"PROCESS_COUNT=`pgrep -f {running_process_name} | wc -l`\n")
         fl.write('if [ "$PROCESS_COUNT" -eq 0 ]; then\n')
-        fl.write('  echo "nothing to kill"\n')
+        fl.write('  echo "nothing to kill" >>${LOG_FILE_PATH} 2>&1\n')
         fl.write('else\n')
-        fl.write('  echo "PC: $PROCESS_COUNT"\n')
-        fl.write(f'  `pgrep {running_process_name} | xargs kill`\n')
+        fl.write('  echo "PC: $PROCESS_COUNT" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write(f'  pids=$(pgrep -f {running_process_name})\n')
+        fl.write('  for pid in $pids; do\n')
+        fl.write('    ./kill_passthrough_service_by_pid.sh PID="$pid" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('  done\n')
         fl.write('fi\n')
 
 
 def get_default_max_notional() -> int:
     return 300_000
+
+
+def get_default_max_open_single_leg_notional() -> int:
+    return 300_000
+
+
+def get_default_max_net_filled_notional() -> int:
+    return 160_000
+
+
+def get_bkr_from_underlying_account(underlying_account: str, inst_type: InstrumentType) -> str | None:
+    bkr: str = underlying_account.split("_", 4)[2]
+    return bkr
 
 
 TERMINAL_STATES: Final[List[ChoreStatusType]] = [ChoreStatusType.OE_DOD]
@@ -229,6 +269,7 @@ NON_FILLED_TERMINAL_STATES: Final[List[ChoreStatusType]] = [ChoreStatusType.OE_D
                                                             ChoreStatusType.OE_OVER_FILLED,
                                                             ChoreStatusType.OE_OVER_CXLED]
 
+
 def is_chore_status_terminal(chore_status: ChoreStatusType) -> bool:
     return chore_status in TERMINAL_STATES + OTHER_TERMINAL_STATES
 
@@ -237,26 +278,101 @@ def chore_has_terminal_state(chore_snapshot: ChoreSnapshot) -> bool:
     return chore_snapshot.chore_status in TERMINAL_STATES + OTHER_TERMINAL_STATES
 
 
+def check_n_update_conv_px(ticker: str, conv_px: float | None, security_record: SecurityRecord):
+    if (not conv_px) or (math.isclose(conv_px, 0)):
+        err: str = f"Unexpected! {conv_px=} for {ticker=}, in MD symbol_overview_obj"
+        if security_record:
+            err += f"enriching from static data instead, {security_record.conv_px=}"
+            conv_px = security_record.conv_px
+        # else not required - handled via "iff err and not security_record" section
+    elif security_record and security_record.conv_px and (not math.isclose(security_record.conv_px, 0)):
+        if not math.isclose(security_record.conv_px, conv_px):
+            logging.error(f"static data conv_px: {security_record.conv_px} mismatches symbol_overview conv_px: "
+                          f"{conv_px}, proceeding with static data conv_px for {security_record.ticker=}")
+            conv_px = security_record.conv_px
+    return conv_px
+
+
+def create_symbol_overview_pre_helper(static_data: SecurityRecordManager, symbol_overview_obj: SymbolOverview):
+    ticker: str = symbol_overview_obj.symbol
+    security_record: SecurityRecord | None = static_data.get_security_record_from_ticker(ticker)
+    err: str | None = None
+    if (not symbol_overview_obj.limit_dn_px) or (math.isclose(symbol_overview_obj.limit_dn_px, 0)) or (
+            not symbol_overview_obj.limit_up_px) or (math.isclose(symbol_overview_obj.limit_up_px, 0)):
+        err: str = (f"Unexpected: {symbol_overview_obj.limit_up_px=}, {symbol_overview_obj.limit_dn_px=} for "
+                    f"{ticker=}, in MD symbol_overview_obj, ")
+        if security_record:
+            err += (f"enriching from static data instead, {security_record.limit_up_px=} and "
+                    f"{security_record.limit_dn_px}")
+            symbol_overview_obj.limit_up_px = security_record.limit_up_px
+            symbol_overview_obj.limit_dn_px = security_record.limit_dn_px
+        # else not required - handled via "iff err and not security_record" section
+
+    symbol_overview_obj.conv_px = check_n_update_conv_px(ticker, symbol_overview_obj.conv_px, security_record)
+
+    if (not symbol_overview_obj.lot_size) or (math.isclose(symbol_overview_obj.lot_size, 0)):
+        err: str = f"Unexpected! {symbol_overview_obj.lot_size=} for {ticker=}, in MD symbol_overview_obj"
+        if security_record:
+            err += f"enriching from static data instead, {security_record.lot_size=}"
+            symbol_overview_obj.lot_size = security_record.lot_size
+        # else not required - handled via "if err and not security_record" section
+
+    if err and not security_record:
+        err += f"enriching from static data failed too, no security_record found for {ticker}"
+        logging.warning(err)
+
+    # check and add last update datetime to current time if not present [log warning]
+    if not symbol_overview_obj.last_update_date_time:
+        local_now: DateTime = DateTime.now(tz="Asia/Shanghai")
+        symbol_overview_obj.last_update_date_time = local_now
+        logging.warning(f"symbol_overview_obj.last_update_date_time not found, set to local: {local_now}")
+
+
+def update_symbol_overview_pre_helper(static_data: SecurityRecordManager, stored_symbol_overview_obj: SymbolOverview,
+                                      updated_symbol_overview_obj: SymbolOverview):
+    # don't act if stored and updated are same - stored was cleaned in such cases
+    if stored_symbol_overview_obj and stored_symbol_overview_obj.conv_px and updated_symbol_overview_obj.conv_px and (
+            not math.isclose(stored_symbol_overview_obj.conv_px, updated_symbol_overview_obj.conv_px)):
+        ticker = updated_symbol_overview_obj.symbol if (
+            updated_symbol_overview_obj.symbol) else stored_symbol_overview_obj.symbol
+        security_record: SecurityRecord | None = static_data.get_security_record_from_ticker(ticker)
+        updated_symbol_overview_obj.conv_px = check_n_update_conv_px(ticker, updated_symbol_overview_obj.conv_px,
+                                                                     security_record)
+    return updated_symbol_overview_obj
+
+
+def partial_update_symbol_overview_pre_helper(static_data: SecurityRecordManager,
+                                              stored_symbol_overview_obj_json: Dict,
+                                              updated_symbol_overview_obj_json: Dict):
+    # don't act if stored and updated are same - stored was cleaned in such cases
+    updated_conv_px = updated_symbol_overview_obj_json.get("conv_px")
+    stored_conv_px = stored_symbol_overview_obj_json.get("conv_px")
+    symbol_ = stored_symbol_overview_obj_json.get("symbol")
+    if stored_symbol_overview_obj_json and stored_conv_px and updated_conv_px and (
+            not math.isclose(stored_conv_px, updated_conv_px)):
+        ticker = symbol_ if symbol_ else updated_symbol_overview_obj_json.get("symbol")
+        security_record: SecurityRecord | None = static_data.get_security_record_from_ticker(ticker)
+        updated_symbol_overview_obj_json["conv_px"] = check_n_update_conv_px(ticker, updated_conv_px, security_record)
+    return updated_symbol_overview_obj_json
+
+
 class MobileBookMutexManager:
-    def __init__(self, mobile_book_provider: ctypes.CDLL, *args):
-        self.mobile_book_provider = mobile_book_provider
-        self._mutex_list = []
+    def __init__(self, *args):
+        self._mutex_list: List[threading.Lock] = []
         for arg in args:
-            if arg is not None:
-                try:
-                    mutex = arg.get_mutex()
-                except AttributeError as attr_err:
-                    logging.exception(f"get_mutex failed for one of passed argument, exception: {attr_err}")
-                except Exception as e_:
-                    logging.exception(f"Something went wrong with get_mutex call for one of "
-                                      f"passed argument, exception: {e_}")
-                else:
-                    self._mutex_list.append(mutex)
+            try:
+                mutex: threading.Lock = arg.get_lock()
+            except AttributeError as attr_err:
+                logging.exception(f"{arg} does not have a 'lock' attribute. Exception: {attr_err}")
+            except Exception as e_:
+                logging.exception(f"An error occurred while accessing 'lock' attribute on {arg}. Exception: {e_}")
+            else:
+                self._mutex_list.append(mutex)
 
     def __enter__(self):
         for mutex in self._mutex_list:
-            self.mobile_book_provider.lock_mutex(mutex)
+            mutex.acquire()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         for mutex in self._mutex_list:
-            self.mobile_book_provider.unlock_mutex(mutex)
+            mutex.release()

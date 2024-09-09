@@ -1,6 +1,5 @@
 import os
 
-os.environ["DBType"] = "beanie"
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
@@ -210,34 +209,43 @@ def get_all_pair_strat_from_symbol_n_side(sec_id: str, side: Side):
         "aggregate": [
             {
                 "$match": {
-                    "$or": [
+                    "$and": [
                         {
-                            "$and": [
+                            "$or": [
                                 {
-                                    "pair_strat_params.strat_leg1.sec.sec_id": {
-                                        "$eq": sec_id
-                                    }
+                                    "$and": [
+                                        {
+                                            "pair_strat_params.strat_leg1.sec.sec_id": {
+                                                "$eq": sec_id
+                                            }
+                                        },
+                                        {
+                                            "pair_strat_params.strat_leg1.side": {
+                                                "$eq": side
+                                            }
+                                        }
+                                    ]
                                 },
                                 {
-                                    "pair_strat_params.strat_leg1.side": {
-                                        "$eq": side
-                                    }
+                                    "$and": [
+                                        {
+                                            "pair_strat_params.strat_leg2.sec.sec_id": {
+                                                "$eq": sec_id
+                                            }
+                                        },
+                                        {
+                                            "pair_strat_params.strat_leg2.side": {
+                                                "$eq": side
+                                            }
+                                        }
+                                    ]
                                 }
                             ]
                         },
                         {
-                            "$and": [
-                                {
-                                    "pair_strat_params.strat_leg2.sec.sec_id": {
-                                        "$eq": sec_id
-                                    }
-                                },
-                                {
-                                    "pair_strat_params.strat_leg2.side": {
-                                        "$eq": side
-                                    }
-                                }
-                            ]
+                            "is_executor_running": {
+                                "$eq": True
+                            }
                         }
                     ]
                 }

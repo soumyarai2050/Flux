@@ -5,7 +5,7 @@ import pytest
 import os
 import copy
 
-os.environ["DBType"] = "beanie"
+os.environ["DBType"] = "msgspec"
 
 # Project Imports
 from tests.CodeGenProjects.BarterEngine.ProjectGroup.phone_book.app.utility_test_functions import *
@@ -25,8 +25,8 @@ def static_data_(cb_eqt_security_records_):
 @pytest.fixture()
 def pair_securities_with_sides_():
     yield {
-        "security1": {"sec_id": "CB_Sec_1", "sec_id_source": "TICKER"}, "side1": "BUY",
-        "security2": {"sec_id": "EQT_Sec_1", "sec_id_source": "TICKER"}, "side2": "SELL"
+        "security1": {"sec_id": "CB_Sec_1", "sec_id_source": "TICKER", "inst_type": "CB"}, "side1": "BUY",
+        "security2": {"sec_id": "EQT_Sec_1", "sec_id_source": "TICKER", "inst_type": "EQT"}, "side2": "SELL"
     }
 
 
@@ -42,7 +42,17 @@ def leg1_leg2_symbol_list():
         ("CB_Sec_7", "EQT_Sec_7"),
         ("CB_Sec_8", "EQT_Sec_8"),
         ("CB_Sec_9", "EQT_Sec_9"),
-        ("CB_Sec_10", "EQT_Sec_10")
+        ("CB_Sec_10", "EQT_Sec_10"),
+        ("CB_Sec_11", "EQT_Sec_11"),
+        ("CB_Sec_12", "EQT_Sec_12"),
+        ("CB_Sec_13", "EQT_Sec_13"),
+        ("CB_Sec_14", "EQT_Sec_14"),
+        ("CB_Sec_15", "EQT_Sec_15"),
+        ("CB_Sec_16", "EQT_Sec_16"),
+        ("CB_Sec_17", "EQT_Sec_17"),
+        ("CB_Sec_18", "EQT_Sec_18"),
+        ("CB_Sec_19", "EQT_Sec_19"),
+        ("CB_Sec_20", "EQT_Sec_20")
     ]
 
 
@@ -145,7 +155,7 @@ def market_depth_basemodel_list():
                 }
             ])
 
-    market_depth_basemodel_list = [MarketDepthBaseModel(**market_depth_json) for market_depth_json in input_data]
+    market_depth_basemodel_list = [MarketDepthBaseModel.from_dict(market_depth_json) for market_depth_json in input_data]
 
     yield market_depth_basemodel_list
 
@@ -155,13 +165,14 @@ def symbol_overview_obj_list():
     symbol_overview_obj_list = []
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
         symbol_overview_obj_list.append(
-            SymbolOverviewBaseModel(**{
+            SymbolOverviewBaseModel.from_dict({
               "symbol": symbol,
               "limit_up_px": 150,
               "limit_dn_px": 50,
               "conv_px": 90,
-              "closing_px": 95,
-              "open_px": 95,
+              "closing_px": 80,
+              "open_px": 80,
+              "lot_size": 100,  # should be greater than 100
               "last_update_date_time": get_utc_date_time(),
               "force_publish": False
             })
@@ -171,26 +182,30 @@ def symbol_overview_obj_list():
 
 @pytest.fixture()
 def pair_strat_(pair_securities_with_sides_):
-    yield PairStratBaseModel(**{
+    yield PairStratBaseModel.from_dict({
         "last_active_date_time": get_utc_date_time(),
         "frequency": 1,
-        "pair_strat_params": {
+        "pair_strat_params": PairStratParamsBaseModel.from_dict({
             "strat_mode": StratMode.StratMode_Normal,
             "strat_type": StratType.Premium,
-            "strat_leg1": {
-              "exch_id": "E1",
+            "strat_leg1": StratLegBaseModel.from_dict({
+              "exch_id": "SSE",
               "sec": pair_securities_with_sides_["security1"],
-              "side": pair_securities_with_sides_["side1"]
-            },
-            "strat_leg2": {
-              "exch_id": "E1",
+              "side": pair_securities_with_sides_["side1"],
+              "fallback_broker": "ZERODHA",
+              "fallback_route": "BR_QFII"
+            }),
+            "strat_leg2": StratLegBaseModel.from_dict({
+              "exch_id": "SSE",
               "sec": pair_securities_with_sides_["security2"],
-              "side": pair_securities_with_sides_["side2"]
-            },
+              "side": pair_securities_with_sides_["side2"],
+              "fallback_broker": "ZERODHA",
+              "fallback_route": "BR_CONNECT"
+            }),
             "exch_response_max_seconds": 5,
             "common_premium": 40,
-            "hedge_ratio": 5
-        },
+            "hedge_ratio": 1
+        }),
         "pair_strat_params_update_seq_num": 0,
         "market_premium": 0
     })
@@ -198,7 +213,7 @@ def pair_strat_(pair_securities_with_sides_):
 
 @pytest.fixture()
 def expected_strat_limits_():
-    yield StratLimitsBaseModel(**{
+    yield StratLimitsBaseModel.from_dict({
       "max_open_chores_per_side": 5,
       "max_single_leg_notional": 300000,
       "max_open_single_leg_notional": 300000,
@@ -208,11 +223,12 @@ def expected_strat_limits_():
       "cancel_rate": {
         "max_cancel_rate": 60,
         "applicable_period_seconds": 0,
-        "waived_min_chores": 5
+        "waived_initial_chores": 5
       },
       "market_barter_volume_participation": {
         "max_participation_rate": 40,
-        "applicable_period_seconds": 180
+        "applicable_period_seconds": 180,
+        "min_allowed_notional": 0
       },
       "market_depth": {
         "participation_rate": 10,
@@ -225,61 +241,72 @@ def expected_strat_limits_():
       "eligible_brokers": [],
       "strat_limits_update_seq_num": 0,
       "min_chore_notional": 100,
-      "min_chore_notional_allowance": 1000
+      "min_chore_notional_allowance": 1000,
+      "eqt_sod_disable": False
     })
 
 
 @pytest.fixture()
 def expected_chore_limits_():
-    yield ChoreLimitsBaseModel(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                               max_chore_qty=500, max_chore_notional=90_000)
+    yield ChoreLimitsBaseModel.from_kwargs(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
+                               max_chore_qty=500, max_chore_notional=90_000, max_basis_points_algo=1500,
+                               max_px_deviation_algo=20, max_chore_qty_algo=500, max_chore_notional_algo=90_000)
 
 
 @pytest.fixture()
 def expected_portfolio_limits_(expected_brokers_):
-    rolling_max_chore_count = RollingMaxChoreCountOptional(max_rolling_tx_count=15, rolling_tx_count_period_seconds=2)
-    rolling_max_reject_count = RollingMaxChoreCountOptional(max_rolling_tx_count=15, rolling_tx_count_period_seconds=2)
+    rolling_max_chore_count = RollingMaxChoreCountBaseModel.from_kwargs(max_rolling_tx_count=15,
+                                                                        rolling_tx_count_period_seconds=2)
+    rolling_max_reject_count = RollingMaxChoreCountBaseModel.from_kwargs(max_rolling_tx_count=15,
+                                                                         rolling_tx_count_period_seconds=2)
 
-    portfolio_limits_obj = PortfolioLimitsBaseModel(_id=1, max_open_baskets=20, max_open_notional_per_side=2_000_000,
-                                                    max_gross_n_open_notional=2_400_000,
-                                                    rolling_max_chore_count=rolling_max_chore_count,
-                                                    rolling_max_reject_count=rolling_max_reject_count,
-                                                    eligible_brokers=expected_brokers_)
+    portfolio_limits_obj = (
+        PortfolioLimitsBaseModel.from_kwargs(_id=1, max_open_baskets=20, max_open_notional_per_side=2_000_000,
+                                             max_gross_n_open_notional=2_400_000,
+                                             rolling_max_chore_count=rolling_max_chore_count,
+                                             rolling_max_reject_count=rolling_max_reject_count,
+                                             eligible_brokers=expected_brokers_, eligible_brokers_update_count=0))
     return portfolio_limits_obj
 
 
 @pytest.fixture()
-def expected_brokers_(leg1_leg2_symbol_list) -> List[BrokerOptional]:
-    sec_positions: List[SecPositionOptional] = []
+def expected_brokers_(leg1_leg2_symbol_list) -> List[BrokerBaseModel]:
+    sec_positions: List[SecPositionBaseModel] = []
     for buy_symbol, sell_symbol in leg1_leg2_symbol_list:
-        cb_sec_position: SecPositionOptional = (
-            SecPositionOptional(security=SecurityOptional(sec_id=buy_symbol, sec_id_source=SecurityIdSource.SEDOL)))
-        cb_positions: List[PositionOptional] = [PositionOptional(type=PositionType.SOD, priority=0,
-                                                                 available_size=10_000, allocated_size=10_000,
-                                                                 consumed_size=0,
-                                                                 pos_disable=False, premium_percentage=2)]
+        cb_sec_position: SecPositionBaseModel = (
+            SecPositionBaseModel.from_kwargs(
+                security=SecurityBaseModel.from_kwargs(sec_id=buy_symbol, sec_id_source=SecurityIdSource.SEDOL)))
+        cb_positions: List[PositionBaseModel] = \
+            [PositionBaseModel.from_kwargs(type=PositionType.SOD, priority=0,
+                                           available_size=10_000, allocated_size=10_000,
+                                           consumed_size=0,
+                                           pos_disable=False, premium_percentage=2)]
         cb_sec_position.positions = cb_positions
         sec_positions.append(cb_sec_position)
-        eqt_sec_position: SecPositionOptional = (
-            SecPositionOptional(security=SecurityOptional(sec_id=f"{sell_symbol}.SS", sec_id_source=SecurityIdSource.RIC)))
-        eqt_positions: List[PositionOptional] = [
-            PositionOptional(type=PositionType.SOD, priority=0, available_size=10_000, allocated_size=10_000,
-                             consumed_size=0, pos_disable=False, premium_percentage=2),
-            PositionOptional(type=PositionType.LOCATE, priority=1, available_size=10_000, allocated_size=10_000,
-                             consumed_size=0, pos_disable=False, premium_percentage=2),
-            PositionOptional(type=PositionType.PTH, priority=2, available_size=10_000, allocated_size=10_000,
-                             consumed_size=0, pos_disable=False, premium_percentage=2)
+        eqt_sec_position: SecPositionBaseModel = (
+            SecPositionBaseModel.from_kwargs(security=SecurityBaseModel.from_kwargs(sec_id=f"{sell_symbol}.SS",
+                                                            sec_id_source=SecurityIdSource.RIC)))
+        eqt_positions: List[PositionBaseModel] = [
+            PositionBaseModel.from_kwargs(type=PositionType.SOD, priority=0,
+                                          available_size=10_000, allocated_size=10_000,
+                                          consumed_size=0, pos_disable=False, premium_percentage=2),
+            PositionBaseModel.from_kwargs(type=PositionType.LOCATE, priority=1,
+                                          available_size=10_000, allocated_size=10_000,
+                                          consumed_size=0, pos_disable=False, premium_percentage=2),
+            PositionBaseModel.from_kwargs(type=PositionType.PTH, priority=2, available_size=10_000,
+                                          allocated_size=10_000, consumed_size=0,
+                                          pos_disable=False, premium_percentage=2)
         ]
         eqt_sec_position.positions = eqt_positions
         sec_positions.append(eqt_sec_position)
-    broker: BrokerOptional = BrokerOptional(broker="BKR", bkr_priority=10, bkr_disable=False,
-                                            sec_positions=sec_positions)
+    broker: BrokerBaseModel = BrokerBaseModel.from_kwargs(broker="ZERODHA", bkr_priority=10, bkr_disable=False,
+  												    		sec_positions=sec_positions)
     return [broker]
 
 
 @pytest.fixture()
 def expected_portfolio_status_():
-    yield PortfolioStatusBaseModel(**{
+    yield PortfolioStatusBaseModel.from_dict({
         "_id": 1,
         "overall_buy_notional": 0,
         "overall_sell_notional": 0,
@@ -291,12 +318,12 @@ def expected_portfolio_status_():
 
 @pytest.fixture()
 def expected_system_control_():
-    yield SystemControlBaseModel(_id=1, kill_switch=False, pause_all_strats=False)
+    yield SystemControlBaseModel.from_kwargs(_id=1, kill_switch=False, pause_all_strats=False)
 
 
 @pytest.fixture()
 def expected_strat_status_(pair_securities_with_sides_):
-    yield StratStatusBaseModel(**{
+    yield StratStatusBaseModel.from_dict({
       "total_buy_qty": 0,
       "total_sell_qty": 0,
       "total_chore_qty": 0,

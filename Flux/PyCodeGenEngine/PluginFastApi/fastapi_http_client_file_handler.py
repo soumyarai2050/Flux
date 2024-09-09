@@ -239,7 +239,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             query_type = str(aggregate_value[FastapiHttpClientFileHandler.query_type_key]).lower() \
                 if aggregate_value[FastapiHttpClientFileHandler.query_type_key] is not None else None
 
-            if query_type is None or query_type == "http" or query_type == "both":
+            if query_type is None or query_type == "http" or query_type == "both" or query_type == "http_file":
                 url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
                       f"{self.proto_file_package}/" + f"query-{query_name}'"
                 output_str += " " * 8 + f"{url}\n"
@@ -275,16 +275,20 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                 ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
             if route_type is None or route_type == FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val:
                 output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
-                output_str += " " * 4 + ("    query_params_dict = jsonable_encoder(query_params_dict, "
+                output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
                                          "exclude_none=True)   # removes none values from dict\n")
                 output_str += " " * 4 + f"    return generic_http_get_query_client(self.query_{query_name}_url, " \
-                                        f"query_params_dict, {container_model_name})\n\n"
+                                        f"query_params_data, {container_model_name})\n\n"
             else:
                 output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
-                output_str += " " * 4 + ("    query_params_dict = jsonable_encoder(query_params_dict, "
+                output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
                                          "exclude_none=True)   # removes none values from dict\n")
-                output_str += " " * 4 + f"    return generic_http_patch_query_client(self.query_{query_name}_url, " \
-                                        f"query_params_dict, {container_model_name})\n\n"
+                if route_type == FastapiHttpClientFileHandler.flux_json_query_route_patch_type_field_val:
+                    output_str += " " * 4 + (f"    return generic_http_patch_query_client(self.query_{query_name}"
+                                             f"_url, query_params_data, {container_model_name})\n\n")
+                else:
+                    output_str += " " * 4 + (f"    return generic_http_post_query_client(self.query_{query_name}"
+                                             f"_url, query_params_data, {container_model_name})\n\n")
         else:
             if route_type == FastapiHttpClientFileHandler.flux_json_query_route_patch_type_field_val:
                 err_str = f"Patch web client can't be generated without payload parameters, query_name: {query_name} " \
@@ -295,6 +299,26 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                                    f"List[{message_name}]:\n"
             output_str += " " * 4 + f"    return generic_http_get_query_client(self.query_{query_name}_url, " \
                                     "{}, " + f"{container_model_name})\n\n"
+        return output_str
+
+    def _handle_client_http_file_query_output(self, message_name: str, query_name: str, query_params: List[str],
+                                              params_str: str, route_type: str | None = None):
+        container_model_name = message_name + "BaseModel"
+        if query_params:
+            output_str = " " * 4 + (f"def {query_name}_query_client(self, file_path: str | PurePath, {params_str}) "
+                                    f"-> List[{container_model_name}]:\n")
+            params_dict_str = \
+                ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
+            output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
+            output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
+                                     "exclude_none=True)   # removes none values from dict\n")
+            output_str += " " * 4 + f"    return generic_http_file_query_client(self.query_{query_name}_url, " \
+                                    f"file_path, query_params_data, {container_model_name})\n\n"
+        else:
+            output_str = " " * 4 + f"def {query_name}_query_client(self) -> " \
+                                   f"List[{message_name}]:\n"
+            output_str += " " * 4 + f"    return generic_http_file_query_client(self.query_{query_name}_url, " \
+                                    "file_path, {}, " + f"{container_model_name})\n\n"
         return output_str
 
     def _handle_client_query_methods(self, message: protogen.Message) -> str:
@@ -318,6 +342,8 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             if query_type is None or query_type == "http" or query_type == "both":
                 output_str += self._handle_client_http_query_output(message_name, query_name, query_params,
                                                                     params_str, query_route_type)
+            elif query_type == "http_file":
+                output_str += self._handle_client_http_file_query_output(message_name, query_name, query_params, params_str)
             # else not required: ws handling is done by ws client plugin
         return output_str
 
@@ -447,9 +473,9 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
 
         output_str = f'# standard imports\n'
         output_str += f'from typing import Dict, List, Callable, Any\n'
+        output_str += f'from fastapi import UploadFile\n'
         output_str += f'import threading\n\n'
-        output_str += f'# 3rd party imports\n'
-        output_str += f'from fastapi.encoders import jsonable_encoder\n\n'
+        output_str += f'# 3rd party imports\n\n'
         output_str += f'# project imports\n'
         generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client")
         output_str += f'from {generic_web_client_path} import *\n'

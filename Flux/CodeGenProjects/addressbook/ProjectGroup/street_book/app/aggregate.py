@@ -183,17 +183,17 @@ def get_last_n_sec_total_barter_qty(symbol: str, last_n_sec: float):
     return {"aggregate": [
         {
             "$match": {
-                "symbol_n_exch_id.symbol": symbol
-            }
-        },
-        {
-            "$match": {
                 "$expr": {
                     "$gte": [
                         "$exch_time",
                         {"$dateSubtract": {"startDate": "$$NOW", "unit": "second", "amount": last_n_sec}}
                     ]
                 }
+            }
+        },
+        {
+            "$match": {
+                "symbol_n_exch_id.symbol": symbol
             }
         },
         {
@@ -479,11 +479,18 @@ def get_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
             {
                 "$addFields": {
                     "cumulative_avg_px": {
-                        "$divide": [
-                            "$cumulative_notional",
-                            "$cumulative_qty"
-                        ]
+                        "$cond": {
+                            "if": {"$ne": ["$cumulative_qty", 0]},
+                            "then": {"$divide": ["$cumulative_notional", "$cumulative_qty"]},
+                            "else": 0
+                        }
                     }
+                    # "cumulative_avg_px": {
+                    #     "$divide": [
+                    #         "$cumulative_notional",
+                    #         "$cumulative_qty"
+                    #     ]
+                    # }
                 }
             },
             {

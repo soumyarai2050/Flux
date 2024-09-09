@@ -53,32 +53,6 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         indent_count = indent_times * 4
         return output_str, indent_count
 
-    def _unpack_kwargs_with_id_field_type(self, **kwargs) -> Tuple[protogen.Message, str, str, List[str]]:
-        message: protogen.Message | None = kwargs.get("message")
-        aggregation_type: str | None = kwargs.get("aggregation_type")
-        id_field_type: str | None = kwargs.get("id_field_type")
-        shared_lock_list: List[str] | None = kwargs.get("shared_lock_list")
-
-        if message is None or aggregation_type is None or id_field_type is None:
-            err_str = (f"Received kwargs having some None values out of message: "
-                       f"{message.proto.name if message is not None else message}, "
-                       f"aggregation_type: {aggregation_type}, id_field_type: {id_field_type}")
-            logging.exception(err_str)
-            raise Exception(err_str)
-        return message, aggregation_type, id_field_type, shared_lock_list
-
-    def _unpack_kwargs_without_id_field_type(self, **kwargs):
-        message: protogen.Message | None = kwargs.get("message")
-        aggregation_type: str | None = kwargs.get("aggregation_type")
-        shared_lock_list: List[str] | None = kwargs.get("shared_lock_list")
-        if message is None or aggregation_type is None:
-            err_str = (f"Received kwargs having some None values out of message: "
-                       f"{message.proto.name if message is not None else message}, "
-                       f"aggregation_type: {aggregation_type}")
-            logging.exception(err_str)
-            raise Exception(err_str)
-        return message, aggregation_type, shared_lock_list
-
     def _get_filter_tuple_str(self, index_fields: List[protogen.Field]) -> str:
         filter_tuples_str = ""
         for field in index_fields:
@@ -134,7 +108,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         return output_str
 
     def handle_underlying_GET_ws_gen(self, **kwargs):
-        message, aggregation_type, id_field_type, shared_lock_list = self._unpack_kwargs_with_id_field_type(**kwargs)
+        message, aggregation_type, id_field_type, shared_lock_list, _ = self._unpack_kwargs_with_id_field_type(**kwargs)
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
@@ -183,7 +157,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         return output_str
 
     def handle_GET_ws_gen(self, **kwargs):
-        message, _, id_field_type, _ = self._unpack_kwargs_with_id_field_type(**kwargs)
+        message, _, id_field_type, _, _ = self._unpack_kwargs_with_id_field_type(**kwargs)
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = self.handle_underlying_GET_ws_gen(**kwargs)
@@ -207,7 +181,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = (f"async def underlying_read_{message_name_snake_cased}_ws(websocket: WebSocket, " \
+        output_str = (f"async def underlying_read_{message_name_snake_cased}_ws(websocket: WebSocket, "
                       f"filter_agg_pipeline: Any = None, need_initial_snapshot: bool | None = True, "
                       f"limit_obj_count: int | None = None) -> None:\n")
         output_str += f'    """ Get All {message_name} using websocket """\n'
@@ -369,7 +343,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
     def _handle_ws_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
                              query_params_with_type_str: str, query_args_dict_str: str) -> str:
-        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
+        output_str = f"@perf_benchmark\n"
         output_str += (f"async def underlying_{query_name}_query_ws(websocket: WebSocket, "
                        f"{query_params_with_type_str}, need_initial_snapshot: bool | None = True):\n")
         output_str += (f"    filter_callable, filter_agg_pipeline_list = "
@@ -397,7 +371,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def _handle_projection_ws_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
                                         query_params_with_type_str: str, query_args_dict_str: str,
                                         projection_model_name: str | None = None) -> str:
-        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
+        output_str = f"@perf_benchmark\n"
         output_str += (f"async def underlying_{query_name}_query_ws(websocket: WebSocket, "
                        f"{query_params_with_type_str}, need_initial_snapshot: bool | None = True):\n")
         if projection_model_name:

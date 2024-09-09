@@ -103,12 +103,16 @@ void get_log_file_path(std::string &r_log_file_path_out) {
     }
 
     YAML::Node config = YAML::LoadFile(config_file);
-    try {
+    // Try to get the log_file_path from the YAML file
+    if (config["log_file_path"]) {
         r_log_file_path_out = config["log_file_path"].as<std::string>();
-    } catch (YAML::Exception& exception) {
-        std::cerr << "-------------------------" << config["log_file_path"].size() << "\n";
-        std::cerr << exception.msg << std::endl;
-        throw std::runtime_error((exception.what()));
+    } else {
+        // If not found in YAML, try to get the LOG_FILE_PATH from the environment variable
+        if (const char* log_file_path_env = getenv("LOG_FILE_PATH")) {
+            r_log_file_path_out = log_file_path_env;
+        } else {
+            throw std::runtime_error("No log_file_path found in YAML or LOG_FILE_PATH environment variable not set");
+        }
     }
 }
 

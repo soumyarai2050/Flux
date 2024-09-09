@@ -3,9 +3,9 @@ import random
 import time
 from typing import List
 
-from Flux.CodeGenProjects.dept_book.generated.Pydentic.dept_book_service_model_imports import *
-from Flux.CodeGenProjects.dept_book.generated.FastApi.dept_book_service_http_client import \
-    DeptBookServiceHttpClient
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.Pydentic.dept_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_http_client import (
+    DeptBookServiceHttpClient)
 
 dept_book_service_web_client: DeptBookServiceHttpClient = \
     DeptBookServiceHttpClient.set_or_get_if_instance_exists("127.0.0.1", 8010)
@@ -89,7 +89,7 @@ def test_sanity_underlying_time_series(dash_, dash_filter_, bar_data_):
             leg2 = DashLegOptional(vwap=leg2_bar_data.vwap, vwap_change=leg2_bar_data.vwap_change)
             rt_dash = RTDashOptional(leg1=leg1, leg2=leg2, mkt_premium=leg1_bar_data.premium,
                                      mkt_premium_change=leg1_bar_data.premium_change)
-            updated_dash = DashBaseModel(_id=dash.id, rt_dash=rt_dash)
+            updated_dash = DashBaseModel(id=dash.id, rt_dash=rt_dash)
             pending_dashes.append(jsonable_encoder(updated_dash, by_alias=True, exclude_none=True))
 
         dept_book_service_web_client.create_all_bar_data_client(pending_bars)

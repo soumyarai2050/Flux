@@ -34,7 +34,7 @@ if core_or_util_files is not None and core_or_util_files:
 
 project_dir = os.getenv("PROJECT_DIR")
 if project_dir is None or not project_dir:
-    err_str = f"env var DBType received as {project_dir}"
+    err_str = f"env var PROJECT_DIR received as {project_dir}"
     logging.exception(err_str)
     raise Exception(err_str)
 
@@ -85,6 +85,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         self.proto_file_name: str = ""
         self.proto_package_name: str = ""
         self.model_file_name: str = ""
+        self.model_file_suffix: str = ""
         self.generic_routes_file_name: str = ""
         self.model_import_file_name: str = ""
         self.reentrant_lock_non_required_msg: List[protogen.Message] = []
@@ -272,22 +273,26 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         if has_id_field:
             output_str += self._add_config_attribute()
         for dt_field in datetime_field_list:
-            output_str += "\n"
-            output_str += self.add_datetime_validator(dt_field)
+            datetime_validator_str = self.add_datetime_validator(dt_field)
+            if datetime_validator_str:
+                output_str += "\n"
+                output_str += datetime_validator_str
         output_str += "\n\n"
         return output_str
 
     def handle_dummy_message_gen(self, message: protogen.Message,
-                                 datetime_field_list: List[protogen.Field] | None = None) -> str:
+                                 datetime_field_list: List[protogen.Field] | None = None, **kwargs) -> str:
         message_name = message.proto.name
-        output_str = f"class {message_name}BaseModel(BaseModel):\n"
+        output_str = f"class {message_name}BaseModel(PydanticBaseModel):\n"
         has_id_field = BasePydanticModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
         output_str += self._underlying_handle_none_default_fields(message, has_id_field)
         output_str += self._add_config_attribute()
         output_str += "\n"
         for dt_field in datetime_field_list:
-            output_str += "\n"
-            output_str += self.add_datetime_validator(dt_field)
+            datetime_validator_str = self.add_datetime_validator(dt_field)
+            if datetime_validator_str:
+                output_str += "\n"
+                output_str += datetime_validator_str
         output_str += "\n"
         return output_str
 
@@ -481,30 +486,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str += self._add_config_attribute()
 
         if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series):
-            option_value_dict = (
-                self.get_complex_option_value_from_proto(message, BasePydanticModelPlugin.flux_msg_json_root_time_series))
+            time_field, meta_field, granularity, expire_after_sec = self.get_time_series_data_from_msg(message)
 
-            # getting time_field
-            for field in message.fields:
-                if BasePydanticModelPlugin.is_option_enabled(field, BasePydanticModelPlugin.flux_fld_val_time_field):
-                    time_field = field.proto.name
-                    break
-            else:
-                err_str = (f"Couldn't find any field with {BasePydanticModelPlugin.flux_fld_val_time_field} option "
-                           f"set for message {message.proto.name} having "
-                           f"{BasePydanticModelPlugin.flux_msg_json_root_time_series} option")
-                logging.exception(err_str)
-                raise Exception(err_str)
-
-            # getting meta_field
-            meta_field: str | None = None
-            for field in message.fields:
-                if BasePydanticModelPlugin.is_option_enabled(field,
-                                                             BasePydanticModelPlugin.flux_fld_val_meta_field):
-                    meta_field = field.proto.name
-                    break
-
-            granularity = option_value_dict.get(BasePydanticModelPlugin.flux_json_root_ts_granularity_field)
             match granularity:
                 case "Sec":
                     granularity_str = "Granularity.seconds"
@@ -517,8 +500,6 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                                f"message {message.proto.name}")
                     logging.exception(err_str)
                     raise Exception(err_str)
-            expire_after_sec = option_value_dict.get(BasePydanticModelPlugin.flux_json_root_ts_expire_after_sec_field)
-
             output_str += "\n"
             output_str += "    class Settings:\n"
             output_str += "        timeseries = TimeSeriesConfig(\n"
@@ -557,8 +538,10 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     output_str += "        ]\n"
 
         for dt_field in datetime_field_list:
-            output_str += "\n"
-            output_str += self.add_datetime_validator(dt_field)
+            datetime_validator_str = self.add_datetime_validator(dt_field)
+            if datetime_validator_str:
+                output_str += "\n"
+                output_str += datetime_validator_str
 
         output_str += "\n\n"
 
@@ -601,7 +584,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str = ""
         for message in self.root_message_list:
             if message in file.messages:
-                output_str += f'class {message.proto.name}BaseModelList(RootModel):\n'
+                output_str += f'class {message.proto.name}BaseModelList(RootModel, ListModelBase):\n'
                 output_str += f'    root: List[{message.proto.name}BaseModel]\n\n\n'
         return output_str
 
@@ -618,16 +601,16 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     if file_.proto.name in root_core_proto_files:
                         gen_model_import_path = (
                             self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
-                                                          f"Pydantic.{file_.generated_filename_prefix}_beanie_model"))
+                                                          f"Pydantic.{file_.generated_filename_prefix}_{self.model_file_suffix}"))
                     elif file_.proto.name in project_grp_core_proto_files:
                         project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
                         gen_model_import_path = (
                             self.import_path_from_path_str(str(project_grp_root_dir),
-                                                           f"{file_.generated_filename_prefix}_beanie_model"))
+                                                           f"{file_.generated_filename_prefix}_{self.model_file_suffix}"))
                     else:
                         gen_model_import_path = (
                             self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
-                                                          f"{file_.generated_filename_prefix}_beanie_model"))
+                                                          f"{file_.generated_filename_prefix}_{self.model_file_suffix}"))
                     output_str += f"from {gen_model_import_path} import *\n"
             output_str += "\n\n"
 
@@ -645,10 +628,13 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str += self.list_model_content(file)
 
         # adding class to be used by query to get max_id of any model
-        output_str += f"class MaxId(BaseModel):\n"
-        output_str += f"    max_id_val: int\n\n"
+        output_str += self._handle_max_id_model()
 
         return output_str
+
+    @abstractmethod
+    def _handle_max_id_model(self) -> str:
+        raise NotImplementedError("Must handle MaxId model use for getting max_id set for any model in query")
 
     def _import_current_models(self) -> List[str]:
         import_statements: List[str] = []
@@ -659,62 +645,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         return import_statements
 
     def handle_model_import_file_gen(self) -> str:
-        if (output_dir_path := os.getenv("PLUGIN_OUTPUT_DIR")) is not None and len(output_dir_path):
-            model_import_file_name = self.model_import_file_name + ".py"
-            model_import_file_path = PurePath(output_dir_path) / model_import_file_name
-            current_import_statements = self._import_current_models()
-            if (db_type_env_name := os.getenv("DBType")) is None or len(db_type_env_name) == 0:
-                err_str = f"env var DBType received as {db_type_env_name}"
-                logging.exception(err_str)
-                raise Exception(err_str)
-            if not os.path.exists(model_import_file_path):
-                output_str = "import logging\n"
-                output_str += "import os\n\n"
-                output_str += 'if (db_type := os.getenv("DBType")) is None or len(db_type) == 0:\n'
-                output_str += '    err_str = f"env var DBType must not be {db_type}"\n'
-                output_str += '    logging.exception(err_str)\n'
-                output_str += '    raise Exception(err_str)\n'
-                output_str += 'else:\n'
-                output_str += '    match db_type.lower():\n'
-                output_str += f'        case "{db_type_env_name}":\n'
-                for import_statement in current_import_statements:
-                    output_str += import_statement
-                output_str += f'        case other:\n'
-                output_str += '            err_str = f"unsupported db type {db_type}"\n'
-                output_str += f'            logging.exception(err_str)\n'
-                output_str += f'            raise Exception(err_str)\n'
-                return output_str
-            else:
-                with open(model_import_file_path) as import_file:
-                    imports_file_content: List[str] = import_file.readlines()
-                    imports_file_content_copy: List[str] = copy.deepcopy(imports_file_content)
-                    match_str_index = imports_file_content.index("    match db_type.lower():\n")
-
-                    # checking if already imported
-                    for content in imports_file_content[match_str_index:]:
-                        if "case" in content and db_type_env_name in content:
-                            # getting ending import line for current db_type_env_name
-                            for line in imports_file_content[imports_file_content.index(content)+1:]:
-                                if "case" in line:
-                                    next_db_type_imports_index = imports_file_content.index(line)
-                                    break
-                            counter = 0
-                            for index in range(imports_file_content.index(content), next_db_type_imports_index):
-                                # if current db_type already exists in match statement then removing old import
-                                del imports_file_content_copy[index-counter]
-                                counter += 1
-                            break
-                        # else not required: if current db_type already not in match statement then no need
-                        # to remove it
-                    imports_file_content_copy.insert(match_str_index+1, f'        case "{db_type_env_name}":\n')
-                    for index, import_statement in enumerate(current_import_statements):
-                        imports_file_content_copy.insert(match_str_index+1+(index+1), import_statement)
-
-                return "".join(imports_file_content_copy)
-        else:
-            err_str = f"Env var 'PLUGIN_OUTPUT_DIR' received as {output_dir_path}"
-            logging.exception(err_str)
-            raise Exception(err_str)
+        model_import_file_name = self.model_import_file_name + ".py"
+        return self.handle_import_file_gen(model_import_file_name, self._import_current_models)
 
     def assign_required_data_members(self, file: protogen.File):
         self.proto_file_name = str(file.proto.name).split('.')[0]
@@ -747,7 +679,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         # Adding pydantic model file
         output_dict[self.model_file_name + ".py"] = self.handle_pydantic_class_gen(file, is_main_file=True)
         for file_ in all_dependency_protogen_file_list:
-            file_name = f"{file_.generated_filename_prefix}_beanie_model.py"
+            file_name = f"{file_.generated_filename_prefix}_{self.model_file_suffix}.py"
             output_dict[file_name] = self.handle_pydantic_class_gen(file_)
 
         return output_dict

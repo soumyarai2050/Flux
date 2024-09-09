@@ -1,13 +1,15 @@
 import random
 import datetime
+
+import pendulum
 import pytest
 
 from selenium.webdriver.support import expected_conditions as EC  # noqa
 
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import *
-from FluxCodeGenEngine.tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import get_driver, wait, \
-    get_web_project_url, test_config_file_path, create_pair_strat, override_default_limits
+    get_web_project_url, create_pair_strat, override_default_limits
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
     FxSymbolOverviewBaseModel, EmailBookServiceHttpClient)
@@ -15,13 +17,10 @@ from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_
 
 
 @pytest.fixture()
-def market_depth_basemodel_list():
+def market_depth_basemodel_fixture() -> List[MarketDepthBaseModel]:
     input_data = []
-    start_date = datetime.datetime(2023, 1, 1)
-    end_date = datetime.datetime(2023, 12, 31)
+
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
-        random_date = start_date + datetime.timedelta(seconds=random.randint(0, int((end_date - start_date).total_seconds())))
-        formatted_date = random_date.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
         for side, px, qty, dev in [("BID", 100, 90, -1), ("ASK", 110, 70, 1)]:
             for position in range(1, 6):
                 id_value = len(input_data) + 1  # Using the length of input_data as id
@@ -30,8 +29,8 @@ def market_depth_basemodel_list():
                     {
                         "id": id_value,
                         "symbol": symbol,
-                        "exch_time": formatted_date,
-                        "arrival_time": formatted_date,
+                        "exch_time":pendulum.DateTime.utcnow(),
+                        "arrival_time":pendulum.DateTime.utcnow(),
                         "side": side,
                         "px": random.uniform(10.0, 10000.0),
                         "qty": random.randint(10, 1000),
@@ -47,35 +46,36 @@ def market_depth_basemodel_list():
 
 
 @pytest.fixture()
-def last_barter_fixture_list():
+def last_barter_basemodel_fixture() -> List[LastBarterBaseModel]:
     input_data = []
     id: int = 0
-    for index, symbol in enumerate(["CB_Sec_1", "EQT_Sec_1"]):
-        id += 1
-        input_data.extend([
-            {
-                "id": id,
-                "symbol_n_exch_id": {
-                    "symbol": symbol,
-                    "exch_id": "Exch"
-                },
-                "exch_time": "2023-03-10T09:19:12.019Z",
-                "arrival_time": "2023-03-10T09:19:12.019Z",
-                "px": 116,
-                "qty": 150,
-                "market_barter_volume": {
-                    "participation_period_last_barter_qty_sum": 0,
-                    "applicable_period_seconds": 0
-                }
-            }
-        ])
 
-    last_barter_list = [LastBarterBaseModel(**last_barter_json) for last_barter_json in input_data]
-    yield last_barter_list
+    for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
+        id += 1
+        symbol_n_exch_id = SymbolNExchIdBaseModel(symbol=symbol, exch_id="Exch")
+        market_barter_volume = MarketBarterVolumeBaseModel(id=str(id),
+            participation_period_last_barter_qty_sum=0,
+            applicable_period_seconds=0
+        )
+
+        input_data.append(
+            LastBarterBaseModel(
+                id=id,
+                symbol_n_exch_id=symbol_n_exch_id,
+                exch_time=pendulum.DateTime.utcnow(),
+                arrival_time=pendulum.DateTime.utcnow(),
+                px=1.16,
+                qty=150,
+                premium=1.5,
+                market_barter_volume=market_barter_volume
+            )
+        )
+
+    yield input_data
 
 
 @pytest.fixture()
-def fills_journal_fixture_list():
+def fills_journal_basemodel_fixture() -> List[FillsJournalBaseModel]:
     input_data: List[FillsJournalBaseModel] = []
     id_counter: int = 0
 
@@ -85,67 +85,25 @@ def fills_journal_fixture_list():
             input_data.append(
                 FillsJournalBaseModel(
                     id=id_counter,
-                    chore_id=f"Chore_{id_counter}",
+                    chore_id=f"Chore_{str(id_counter)}",
                     fill_px=120.5 + id_counter,
                     fill_qty=100 + id_counter,
-                    fill_notional=12050 + id_counter,
+                    fill_notional=1.4 + id_counter,
                     fill_symbol=symbol,
+                    fill_bartering_symbol=symbol,
                     fill_side=Side.BUY,
                     underlying_account=f"Account_{id_counter}",
-                    fill_date_time="2023-03-10T09:30:00.000Z",
+                    fill_date_time=pendulum.DateTime.utcnow(),
                     fill_id=f"FillID_{id_counter}",
-                    underlying_account_cumulative_fill_qty=500 + id_counter
+                    underlying_account_cumulative_fill_qty=500 + id_counter,
+                    user_data="random"
                 )
             )
-
     yield input_data
 
 
 @pytest.fixture()
-def chore_snapshot_fixture_list():
-    input_data = []
-    id_counter: int = 0
-
-    for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
-        for _ in range(5):  # Adjust the range as needed
-            id_counter += 1
-            input_data.append(
-                ChoreSnapshotBaseModel(
-                    id=id_counter,
-                    chore_status=ChoreStatusType.OE_ACKED,
-                    chore_brief={
-                        "chore_id": f"Chore_{id_counter}",
-                        "security": {
-                            "sec_id": symbol,
-                            "sec_id_source": SecurityIdSource.RIC
-                        },
-                        "side": Side.BUY,
-                        "px": 120.5,
-                        "qty": 100,
-                        "chore_notional": 12050,
-                        "underlying_account": f"Account_{id_counter}",
-                        "exchange": "Exchange123",
-                        "text": ["Text1", "Text2"]
-                    },
-                    filled_qty=50,
-                    avg_fill_px=121.0,
-                    fill_notional=6050,
-                    last_update_fill_qty=25,
-                    last_update_fill_px=121.5,
-                    cxled_qty=10,
-                    avg_cxled_px=119.0,
-                    cxled_notional=1190,
-                    create_date_time="2023-03-10T09:30:00.000Z",
-                    last_update_date_time="2023-03-10T09:35:00.000Z",
-                    last_n_sec_total_qty=200
-                )
-            )
-
-    yield input_data
-
-
-@pytest.fixture()
-def chore_journal_fixture_list():
+def chore_journal_basemodel_fixture() -> List[ChoreJournalBaseModel]:
     input_data = []
     id_counter: int = 0
 
@@ -155,18 +113,22 @@ def chore_journal_fixture_list():
             input_data.append(
                 ChoreJournalBaseModel(
                     id=id_counter,
-                    chore=ChoreBrief(
+                    chore=ChoreBriefBaseModel(
                         chore_id=f"Chore_{id_counter}",
-                        security=Security(sec_id=symbol, sec_id_source=SecurityIdSource.RIC),
+                        security=SecurityBaseModel(
+                            sec_id=symbol, sec_id_source=SecurityIdSource.RIC, inst_type=InstrumentType.EQT),
+                        bartering_security=SecurityBaseModel(
+                            sec_id=symbol, sec_id_source=SecurityIdSource.RIC, inst_type=InstrumentType.EQT),
                         side=Side.BUY,
                         px=120.5 + id_counter,
                         qty=100 + id_counter,
-                        chore_notional=12050 + id_counter,
+                        chore_notional=12.5 + id_counter,
                         underlying_account=f"Account_{id_counter}",
                         exchange="Exchange123",
-                        text=["Text1", "Text2"]
+                        text=["Text1", "Text2"],
+                        user_data="random"
                     ),
-                    chore_event_date_time="2023-03-10T09:30:00.000Z",
+                    chore_event_date_time=pendulum.DateTime.utcnow(),
                     chore_event=ChoreEventType.OE_ACK,
                     current_period_chore_count=10
                 )
@@ -176,7 +138,63 @@ def chore_journal_fixture_list():
 
 
 @pytest.fixture()
-def top_of_book_list_():
+def chore_snapshot_basemodel_fixture() -> list[ChoreSnapshotBaseModel]:
+    input_data = []
+    id_counter: int = 0
+    for i in range(5):
+        id_counter += 1
+        input_data.append(
+            ChoreSnapshotBaseModel(
+                id=id_counter,
+                chore_status=ChoreStatusType.OE_ACKED,
+                chore_brief=ChoreBriefBaseModel(
+                    chore_id=f"Chore_{id_counter}",
+                    side=Side.BUY,
+                    px=50.0,
+                    qty=100,
+                    chore_notional=15.0,
+                    underlying_account="GlobalEquity_Account",
+                    exchange="SELL",
+                    text=["text1", "text2"],
+                    user_data="none",
+                    security=SecurityBaseModel(
+                        sec_id=str(id_counter),
+                        sec_id_source=SecurityIdSource.RIC,
+                        inst_type=InstrumentType.EQT),
+                    bartering_security=SecurityBaseModel(
+                            sec_id=str(id_counter),
+                            sec_id_source=SecurityIdSource.RIC,
+                            inst_type=InstrumentType.EQT)
+                ),
+
+                filled_qty=50,
+                avg_fill_px=50.0,
+                fill_notional=0.0,
+                last_update_fill_qty=100,
+                last_update_fill_px=10.0,
+                pending_amend_dn_qty=150,
+                pending_amend_up_qty=200,
+                pending_amend_dn_px=20.0,
+                pending_amend_up_px=25.0,
+                total_amend_dn_qty=300,
+                total_amend_up_qty=350,
+                last_lapsed_qty=400,
+                total_lapsed_qty=450,
+                total_amd_rej_qty=500,
+                cxled_qty=550,
+                avg_cxled_px=60.0,
+                cxled_notional=65.0,
+                create_date_time=pendulum.DateTime.utcnow(),
+                last_update_date_time=pendulum.DateTime.utcnow(),
+                last_n_sec_total_qty=700
+            )
+        )
+
+    yield input_data
+
+
+@pytest.fixture()
+def top_of_book_fixture() -> List:
     input_data = []
     id: int = 0
     for index, symbol in enumerate(["CB_Sec_1", "EQT_Sec_1"]):
@@ -216,13 +234,15 @@ def top_of_book_list_():
 
 
 @pytest.fixture()
-def expected_chore_limits_():
+def expected_chore_limits_() -> ChoreLimitsBaseModel:
     yield ChoreLimitsBaseModel(id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                               max_chore_qty=500, min_chore_notional=100, max_chore_notional=90_000)
+                               max_chore_qty=500, max_contract_qty=0, max_chore_notional=0.0, max_basis_points_algo=0,
+                               max_px_deviation_algo=0.0,
+                               max_chore_notional_algo=0.0, max_contract_qty_algo=0, max_chore_qty_algo=0)
 
 
 @pytest.fixture()
-def expected_portfolio_limits_(expected_brokers_):
+def expected_portfolio_limits_(expected_brokers_) -> PortfolioLimitsBaseModel:
     rolling_max_chore_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
 
@@ -235,20 +255,18 @@ def expected_portfolio_limits_(expected_brokers_):
 
 
 @pytest.fixture()
-def expected_portfolio_status_():
+def expected_portfolio_status_() -> PortfolioStatusBaseModel:
     yield PortfolioStatusBaseModel(**{
-        "_id": 1,
-        "kill_switch": False,
-        "portfolio_alerts": [],
         "overall_buy_notional": 0,
         "overall_sell_notional": 0,
         "overall_buy_fill_notional": 0,
-        "overall_sell_fill_notional": 0
+        "overall_sell_fill_notional": 0,
+        "open_chores": 0
     })
 
 
 @pytest.fixture
-def db_names_list(buy_sell_symbol_list):
+def db_names_list(buy_sell_symbol_list) -> List:
     db_names_list = [
         f"phone_book_{PAIR_STRAT_BEANIE_PORT}",
         f"log_book_{LOG_ANALYZER_BEANIE_PORT}",
@@ -283,7 +301,7 @@ def expected_brokers_(buy_sell_symbol_list) -> List[Broker]:
 
 
 @pytest.fixture()
-def buy_sell_symbol_list():
+def buy_sell_symbol_list() -> List:
     return [
         ("CB_Sec_1", "EQT_Sec_1"),
         ("CB_Sec_2", "EQT_Sec_2"),
@@ -309,7 +327,7 @@ def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, exp
     clean_executors_and_today_activated_symbol_side_lock_file()
 
     # cleaning all collections
-    clean_all_collections_ignoring_ui_layout(db_names_list)
+    clean_all_collections_ignoring_ui_layout()
     clear_cache_in_model()
 
     # updating portfolio_alert
@@ -341,7 +359,7 @@ def schema_dict() -> Dict[str, any]:
 
 @pytest.fixture()
 def config_dict() -> Dict[str, any]:
-    config_dict: Dict[str, any] = YAMLConfigurationManager.load_yaml_configurations(str(test_config_file_path))
+    config_dict: dict[str, any] = YAMLConfigurationManager.load_yaml_configurations(str(test_config_file_path))
     yield config_dict
 
 
@@ -359,10 +377,14 @@ def driver(driver_type, config_dict) -> WebDriver:
 
 
 @pytest.fixture()
-def web_project(driver, pair_strat, expected_chore_limits_, expected_portfolio_limits_, top_of_book_list_,
-                market_depth_basemodel_list, last_barter_fixture_list, fills_journal_fixture_list,
-                chore_snapshot_fixture_list, chore_journal_fixture_list):
-    # TODO: create fx symbol overview
+def web_project(driver: WebDriver, pair_strat: Dict, expected_chore_limits_: ChoreLimitsBaseModel,
+                expected_portfolio_limits_: PortfolioLimitsBaseModel, top_of_book_fixture: List,
+                market_depth_basemodel_fixture: List[MarketDepthBaseModel],
+                last_barter_basemodel_fixture: List[LastBarterBaseModel],
+                fills_journal_basemodel_fixture: List[FillsJournalBaseModel],
+                chore_snapshot_basemodel_fixture: List[ChoreSnapshotBaseModel],
+                chore_journal_basemodel_fixture: List[ChoreJournalBaseModel]):
+
     host: str = "127.0.0.1"
     port: int = 8020
     email_book_service_http_client = EmailBookServiceHttpClient(host, port)
@@ -374,7 +396,7 @@ def web_project(driver, pair_strat, expected_chore_limits_, expected_portfolio_l
     time.sleep(Delay.SHORT.value)
     driver.get(get_web_project_url())
     # verify is portfolio status is created
-    time.sleep(5)
+    time.sleep(Delay.DEFAULT.value)
     # wait(driver).until(EC.presence_of_element_located((By.ID, "portfolio_status")))
     # portfolio_status_widget = driver.find_element(By.ID, "portfolio_status")
     # scroll_into_view(driver=driver, element=portfolio_status_widget)
@@ -388,14 +410,14 @@ def web_project(driver, pair_strat, expected_chore_limits_, expected_portfolio_l
     click_button_with_name(system_control_widget, "Create")
     wait(driver).until(EC.presence_of_element_located((By.NAME, "kill_switch")))
     kill_switch_btn = system_control_widget.find_element(By.NAME, "kill_switch")
-
     assert kill_switch_btn.is_displayed(), "failed to load web project, kill switch button not found"
     create_pair_strat(driver=driver, pair_strat=pair_strat)
-    create_tob_md_ld_fj_os_oj(driver=driver, top_of_book_list=top_of_book_list_,
-                              market_depth_list=market_depth_basemodel_list, last_barter_list=last_barter_fixture_list,
-                              fills_journal_list=fills_journal_fixture_list,
-                              chore_snapshot_list=chore_snapshot_fixture_list,
-                              chore_journal_list=chore_journal_fixture_list)
+    create_tob_md_ld_fj_os_oj(driver=driver, top_of_book_fixture=top_of_book_fixture,
+                              market_depth_basemodel_fixture=market_depth_basemodel_fixture,
+                              last_barter_basemodel_fixture=last_barter_basemodel_fixture,
+                              fills_journal_basemodel_fixture=fills_journal_basemodel_fixture,
+                              chore_snapshot_basemodel_fixture=chore_snapshot_basemodel_fixture,
+                              chore_journal_basemodel_fixture=chore_journal_basemodel_fixture)
 
 
 @pytest.fixture()
@@ -424,7 +446,6 @@ def pair_strat() -> Dict[str, any]:
 def pair_strat_edit() -> Dict[str, any]:
     pair_strat_edit = {
         "pair_strat_params": {
-
             "common_premium": 55,
             "hedge_ratio": 60
         }
@@ -440,15 +461,19 @@ def strat_limits() -> Dict[str, any]:
         "max_open_single_leg_notional": 600,
         "max_net_filled_notional": 700,
         "max_concentration": 7,
+        "min_chore_notional": 1000,
         "limit_up_down_volume_participation_rate": 20,
         "cancel_rate": {
             "max_cancel_rate": 10,
             "applicable_period_seconds": 9,
-            "waived_min_chores": 2
+            "waived_initial_chores": 120,
+            "waived_min_rolling_notional": 240,
+            "waived_min_rolling_period_seconds": 360,
         },
         "market_barter_volume_participation": {
             "max_participation_rate": 15,
-            "applicable_period_seconds": 25
+            "applicable_period_seconds": 25,
+            "min_allowed_notional": 30
         },
         "market_depth": {
             "participation_rate": 90,
@@ -456,7 +481,7 @@ def strat_limits() -> Dict[str, any]:
         },
         "residual_restriction": {
             "max_residual": 4000,
-            "residual_mark_seconds": 1
+            "residual_mark_seconds": 1,
         }
     }
     yield strat_limits
@@ -476,7 +501,7 @@ def set_micro_seperator_and_clean(schema_dict: Dict[str, any]):
 
 
 @pytest.fixture
-def ui_layout_list_(schema_dict):
+def ui_layout_list_(schema_dict) -> UILayoutBaseModel:
     ui_layout: UILayoutBaseModel = UILayoutBaseModel()
     ui_layout.id = 1
     ui_layout.profile_id = "test"

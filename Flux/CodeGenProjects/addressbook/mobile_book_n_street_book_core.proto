@@ -8,7 +8,6 @@ enum DummyEnumMS{
   DUMMY_MS = 0;
 }
 
-
 message TopOfBook {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
@@ -33,7 +32,8 @@ message TopOfBook {
     depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true,
-    depends_on_model_name_for_port: true
+    depends_on_model_name_for_port: true,
+    is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "get_top_of_book_from_symbol",
@@ -94,7 +94,8 @@ message MarketDepth {
     depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true
-    depends_on_model_name_for_port: true
+    depends_on_model_name_for_port: true,
+    is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "get_market_depths",
@@ -113,7 +114,7 @@ message MarketDepth {
   required int32 position = 8 [(FluxFldPk) = "true"];
   optional string market_maker = 9;
   optional bool is_smart_depth = 10;
-  optional float cumulative_notional = 11 [(FluxFldDynamicAggUpdate)=true];
+  optional float cumulative_notional = 11 [(FluxFldDynamicAggUpdate)=true, (FluxFldTitle) = "cumulative $", (FluxFldNumberFormat) = "$"];
   optional int64 cumulative_qty = 12 [(FluxFldDynamicAggUpdate)=true];
   optional float cumulative_avg_px = 13 [(FluxFldDynamicAggUpdate)=true];
 }
@@ -141,7 +142,8 @@ message LastBarter {
     depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true
-    depends_on_model_name_for_port: true
+    depends_on_model_name_for_port: true,
+    is_read_only: true
   };
   option (FluxMsgUIGetAllLimit) = "-100";
 

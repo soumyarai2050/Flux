@@ -29,11 +29,18 @@ message NewChore{
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required Security security = 2;
   required Side side = 3;
-  optional float px = 4;
-  optional int64 qty = 5;
-  optional ChoreSubmitType chore_submit_state = 6 [(FluxFldServerPopulate) = true];
-  optional string algo = 7;
-  optional float pov = 8; // percentage of volume
-  optional string activate_dt = 9 [(FluxFldValIsDateTime) = true];
-  optional string deactivate_dt = 10 [(FluxFldValIsDateTime) = true];
+  optional float px = 4 [(FluxFldNumberFormat) = ".3"];
+  optional float usd_px = 5 [(FluxFldServerPopulate) = true];
+  optional int64 qty = 6;
+  optional bool finishing_chore = 7 [(FluxFldServerPopulate) = true];
+  optional int32 lot_size = 8 [(FluxFldServerPopulate) = true];
+  optional string force_bkr = 9 [(FluxFldHelp) = "helps force specific broker for the chore"];
+  optional string mstrat = 10 [(FluxFldHelp) = "default micro strategy used if not set - not mandatory"];
+  optional ChoreSubmitType chore_submit_state = 11 [(FluxFldServerPopulate) = true];
+  optional string algo = 12;
+  optional float pov = 13 [(FluxFldTitle) = "Pov", (FluxFldNumberFormat) = "%"]; // percentage of volume
+  optional string activate_dt = 14 [(FluxFldValIsDateTime) = true, (FluxFldTitle) = "Activate", (FluxFldHide) = "True"];
+  optional string deactivate_dt = 15 [(FluxFldValIsDateTime) = true, (FluxFldTitle) = "Deactivate", (FluxFldHide) = "True"];
+  optional string ord_entry_time = 16 [(FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Chore Entry", (FluxFldHide) = "True"];
+  optional string text = 17 [(FluxFldTitle) = "Text", (FluxFldAbbreviated) = "JSON", (FluxFldServerPopulate) = true];
 }

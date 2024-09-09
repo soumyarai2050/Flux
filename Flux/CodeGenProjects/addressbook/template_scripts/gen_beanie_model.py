@@ -14,7 +14,7 @@ if __name__ == "__main__":
     code_gen_engine_env_manager = BarteringGenEngineEnv.get_instance()
     env_var_dict = BarteringGenEngineEnv.default_gen_env_var_dict
     env_var_dict["PLUGIN_FILE_NAME"] = "beanie_model_plugin.py"
-    env_var_dict["DBType"] = "beanie"
+    env_var_dict["ModelType"] = "beanie"
 
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_", "PluginPydentic", env_var_dict)
 

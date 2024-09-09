@@ -4,16 +4,23 @@ from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_cache import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.strat_cache import StratCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
-    get_fills_journal_log_key, get_chore_journal_log_key)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import is_ongoing_strat
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import is_test_run
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_ws_data_manager import \
-    EmailBookServiceDataManager
+    get_fills_journal_log_key, get_chore_journal_log_key, get_chore_snapshot_log_key)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
+    is_ongoing_strat, ps_host, ps_port)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
+    get_pair_strat_log_key)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import market, get_bartering_link
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_ws_data_manager import (
+    EmailBookServiceDataManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_ws_data_manager import (
     StreetBookServiceDataManager)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.phone_book_n_street_book_client import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import PairStrat, PairStratBaseModel, FxSymbolOverviewBaseModel
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
+    StreetBookServiceHttpClient)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
+    PairStrat, PairStratBaseModel, FxSymbolOverviewBaseModel)
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
 port = os.environ.get("PORT")
 if port is None or len(port) == 0:
@@ -52,12 +59,11 @@ class BarteringDataManager(EmailBookServiceDataManager, StreetBookServiceDataMan
             logging.error(err_str_)
             raise Exception(err_str)
 
-        if is_test_run:
-            err_str_: str = f"strat executor running in test mode, {is_test_run = }"
+        if market.is_test_run:
+            err_str_: str = f"strat executor running in test mode, {market.is_test_run=}"
             print(f"CRITICAL: {err_str_}")
             logging.critical(err_str_)
         # else not required
-
 
         # TODO IMPORTANT Enable this when we add formal ws support for market depth
         # self.market_depth_ws_cont = WSReader(f"{mobile_book_base_url}/get-all-market_depth-ws", MarketDepthBaseModel,
@@ -106,6 +112,10 @@ class BarteringDataManager(EmailBookServiceDataManager, StreetBookServiceDataMan
                 cached_pair_strat = None
                 if pair_strat_tuple is not None:
                     cached_pair_strat, _ = pair_strat_tuple
+                if cached_pair_strat is not None and cached_pair_strat.strat_state != pair_strat_.strat_state:
+                    logging.warning(f"Strat state changed from {cached_pair_strat.strat_state} to "
+                                    f"{pair_strat_.strat_state};;;pair_strat_log_key: "
+                                    f"{get_pair_strat_log_key(pair_strat_)}")
                 if self.street_book is None:
                     # this is a new pair strat for processing, start its own thread with new strat executor object
                     self.strat_cache.stopped = False
@@ -122,9 +132,25 @@ class BarteringDataManager(EmailBookServiceDataManager, StreetBookServiceDataMan
                 with self.strat_cache.re_ent_lock:
                     # demon thread will tear down itself if strat_cache.stopped is True, it will also invoke
                     # set_pair_strat(None) on cache, enabling future reactivation + stops any processing until then
+                    pair_strat_tuple = self.strat_cache.get_pair_strat()
+                    cached_pair_strat = None
+                    if pair_strat_tuple is not None:
+                        cached_pair_strat, _ = pair_strat_tuple
+                    if cached_pair_strat is not None and cached_pair_strat.strat_state != pair_strat_.strat_state:
+                        logging.warning(f"Strat state changed from {cached_pair_strat.strat_state} to "
+                                        f"{pair_strat_.strat_state};;;pair_strat_log_key: "
+                                        f"{get_pair_strat_log_key(pair_strat_)}")
                     self.strat_cache.set_pair_strat(pair_strat_)
                     self.strat_cache.stopped = True
-                    self.strat_cache.notify_semaphore.release()
+                    # @@@ trigger streaming unsubscribe
+                    if bartering_link := get_bartering_link():
+                        bartering_link.unsubscribe()
+                        self.strat_cache.notify_semaphore.release()
+                    else:
+                        logging.error("Unexpected: get_bartering_link() returned None in handle_pair_strat_get_by_id_ws,"
+                                      " bartering_link.unsubscribe not done for non ongoing pair-strat "
+                                      f"{get_pair_strat_log_key(pair_strat_)}")
+
                 logging.warning(f"handle_pair_strat_get_by_id_ws: removed cache entry of non ongoing strat;;;"
                                 f"{pair_strat_ = }")
             # else not required: fine if strat cache is non-ongoing and is not running(stopped is True)
@@ -138,45 +164,71 @@ class BarteringDataManager(EmailBookServiceDataManager, StreetBookServiceDataMan
                           f"side_bartering_brief;;; {strat_brief_ = }")
 
     def underlying_handle_fills_journal_ws(self, **kwargs):
-        fills_journal_ = kwargs.get("fills_journal_")
-        key, symbol = StratCache.get_key_n_symbol_from_fills_journal(fills_journal_)
-        cached_pair_strat, _ = self.strat_cache.get_pair_strat()
+        # fills_journal_ = kwargs.get("fills_journal_")
+        # key, symbol = StratCache.get_key_n_symbol_from_fills_journal(fills_journal_)
+        # cached_pair_strat, _ = self.strat_cache.get_pair_strat()
+        #
+        # symbol_side_tuple = StratCache.chore_id_to_symbol_side_tuple_dict.get(fills_journal_.chore_id)
+        # if not symbol_side_tuple:
+        #     logging.error(f"Unknown chore id: {fills_journal_.chore_id} found for fill "
+        #                   f"{get_fills_journal_log_key(fills_journal_)}, avoiding set_has_unack_leg update;;;"
+        #                   f" {fills_journal_ = }")
+        #     return
+        # symbol, side = symbol_side_tuple
+        #
+        # if symbol == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+        #     self.strat_cache.set_has_unack_leg1(False)
+        # elif symbol == cached_pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+        #     self.strat_cache.set_has_unack_leg2(False)
+        # else:
+        #     logging.error(f"unexpected: fills general with non-matching symbol found in pre-matched strat-cache "
+        #                   f"with {key = }, fill journal {symbol = }, fill_journal_key: "
+        #                   f"{get_fills_journal_log_key(fills_journal_)}")
+        pass
 
-        symbol_side_tuple = StratCache.chore_id_to_symbol_side_tuple_dict.get(fills_journal_.chore_id)
-        if not symbol_side_tuple:
-            logging.error(f"Unknown chore id: {fills_journal_.chore_id} found for fill "
-                          f"{get_fills_journal_log_key(fills_journal_)}, avoiding set_has_unack_leg update;;;"
-                          f" {fills_journal_ = }")
-            return
-        symbol, side = symbol_side_tuple
+    # disabled - we are using chore snapshot instead - if we enable this back, ensure to remove the unack logic
+    # def underlying_handle_chore_journal_ws(self, **kwargs):
+    #     chore_journal_ = kwargs.get("chore_journal_")
+    #     with self.strat_cache.re_ent_lock:
+    #         is_unack = False
+    #         if chore_journal_.chore_event in [ChoreEventType.OE_NEW, ChoreEventType.OE_CXL]:
+    #             is_unack = True
+    #             if chore_journal_.chore_event == ChoreEventType.OE_NEW:
+    #                 StratCache.chore_id_to_symbol_side_tuple_dict[chore_journal_.chore.chore_id] = \
+    #                     (chore_journal_.chore.security.sec_id, chore_journal_.chore.side)
+    #
+    #     cached_pair_strat, _ = self.strat_cache.get_pair_strat()
+    #     if chore_journal_.chore.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+    #         self.strat_cache.set_has_unack_leg1(is_unack)
+    #     elif chore_journal_.chore.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+    #         self.strat_cache.set_has_unack_leg2(is_unack)
+    #     else:
+    #         logging.error(f"unexpected: chore journal with non-matching symbol found in pre-matched strat-cache, "
+    #                       f"chore_journal_key: {get_chore_journal_log_key(chore_journal_)}")
 
-        if symbol == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
-            self.strat_cache.set_has_unack_leg1(False)
-        elif symbol == cached_pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
-            self.strat_cache.set_has_unack_leg2(False)
-        else:
-            logging.error(f"unexpected: fills general with non-matching symbol found in pre-matched strat-cache "
-                          f"with {key = }, fill journal {symbol = }, fill_journal_key: "
-                          f"{get_fills_journal_log_key(fills_journal_)}")
-
-    def underlying_handle_chore_journal_ws(self, **kwargs):
-        chore_journal_ = kwargs.get("chore_journal_")
+    def underlying_handle_chore_snapshot_ws(self, **kwargs):
+        chore_snapshot_: ChoreSnapshotBaseModel | ChoreSnapshot = kwargs.get("chore_snapshot_")
         with self.strat_cache.re_ent_lock:
-            is_unack = False
-            if chore_journal_.chore_event in [ChoreEventType.OE_NEW, ChoreEventType.OE_CXL]:
+            is_unack: bool = False
+            # ChoreStatusType.OE_CXL_UNACK not included here - this leads to seconds leg block cases - max open chore to
+            # prevent more chores from going to market if / when too many cancel un-ack chores are pending
+            if chore_snapshot_.chore_status == ChoreStatusType.OE_UNACK:
                 is_unack = True
-                if chore_journal_.chore_event == ChoreEventType.OE_NEW:
-                    StratCache.chore_id_to_symbol_side_tuple_dict[chore_journal_.chore.chore_id] = \
-                        (chore_journal_.chore.security.sec_id, chore_journal_.chore.side)
+                StratCache.chore_id_to_symbol_side_tuple_dict[chore_snapshot_.chore_brief.chore_id] = \
+                    (chore_snapshot_.chore_brief.security.sec_id, chore_snapshot_.chore_brief.side)
 
         cached_pair_strat, _ = self.strat_cache.get_pair_strat()
-        if chore_journal_.chore.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
-            self.strat_cache.set_has_unack_leg1(is_unack)
-        elif chore_journal_.chore.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
-            self.strat_cache.set_has_unack_leg2(is_unack)
+        if chore_snapshot_.chore_brief.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+            if chore_snapshot_.chore_brief.user_data:
+                self.strat_cache.set_has_unack_leg1(is_unack, chore_snapshot_.chore_brief.user_data)
+            # else not required, external chore TODO: Add check for specific user data
+        elif chore_snapshot_.chore_brief.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+            if chore_snapshot_.chore_brief.user_data:
+                self.strat_cache.set_has_unack_leg2(is_unack, chore_snapshot_.chore_brief.user_data)
+            # else not required, external chore TODO: Add check for specific user data
         else:
-            logging.error(f"unexpected: chore general with non-matching symbol found in pre-matched strat-cache, "
-                          f"chore_journal_key: {get_chore_journal_log_key(chore_journal_)}")
+            logging.error(f"unexpected: chore snapshot with non-matching symbol found in pre-matched strat-cache, "
+                          f"chore_snapshot_key: {get_chore_snapshot_log_key(chore_snapshot_)};;;{chore_snapshot_=}")
 
     def handle_fx_symbol_overview_get_all_ws(self, fx_symbol_overview_: FxSymbolOverviewBaseModel, **kwargs):
         if fx_symbol_overview_.symbol in StratCache.fx_symbol_overview_dict:

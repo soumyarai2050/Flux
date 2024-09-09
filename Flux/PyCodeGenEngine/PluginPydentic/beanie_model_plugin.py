@@ -215,7 +215,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                 if is_msg_root:
                     output_str = f"class {message.proto.name}(Document):\n"
                 else:
-                    output_str = f"class {message.proto.name}(BaseModel):\n"
+                    output_str = f"class {message.proto.name}(PydanticBaseModel):\n"
         elif self.response_field_case_style.lower() == "camel":
             if auto_gen_id_type == IdType.INT_ID:
                 if is_msg_root:
@@ -231,7 +231,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                 if is_msg_root:
                     output_str = f"class {message.proto.name}(Document, CamelBaseModel):\n"
                 else:
-                    output_str = f"class {message.proto.name}(BaseModel):\n"
+                    output_str = f"class {message.proto.name}(PydanticBaseModel):\n"
         else:
             err_str = f"{self.response_field_case_style} is not supported response type"
             logging.exception(err_str)
@@ -266,6 +266,11 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         else:
             return ""
 
+    def _handle_max_id_model(self) -> str:
+        output_str = f"class MaxId(PydanticBaseModel):\n"
+        output_str += f"    max_id_val: int\n\n"
+        return output_str
+
     def handle_imports(self) -> str:
         output_str = "# standard imports\n"
         output_str += "from typing import List, ClassVar, Dict\n"
@@ -288,9 +293,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                                                                    "ws_connection_manager")
         output_str += f"from {ws_connection_manager_path} import PathWSConnectionManager, " \
                       f"\\\n\tPathWithIdWSConnectionManager\n"
-        incremental_id_camel_base_model_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
-                                                                             "incremental_id_basemodel")
-        output_str += f'from {incremental_id_camel_base_model_path} import *\n'
+        output_str += f"from FluxPythonUtils.scripts.model_base_utils import *\n"
         generic_utils_import_path= self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_utils")
         output_str += f"from {generic_utils_import_path} import validate_pendulum_datetime\n"
         output_str += f"from FluxPythonUtils.scripts.async_rlock import AsyncRLock\n"
@@ -300,7 +303,8 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
 
     def assign_required_data_members(self, file: protogen.File):
         super().assign_required_data_members(file)
-        self.model_file_name = f'{self.proto_file_name}_beanie_model'
+        self.model_file_suffix = "beanie_model"
+        self.model_file_name = f'{self.proto_file_name}_{self.model_file_suffix}'
         self.generic_routes_file_name = f'generic_beanie_routes'
 
 

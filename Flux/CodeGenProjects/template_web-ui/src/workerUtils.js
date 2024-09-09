@@ -86,6 +86,8 @@ export function getLocalizedValueAndSuffix(metadata, value) {
             adornment = ' %';
         } else if (metadata.numberFormat.includes('bps')) {
             adornment = ' bps';
+        } else if (metadata.numberFormat.includes('$')) {
+            adornment = ' $';
         }
     }
     if (metadata.displayType === DataTypes.INTEGER) {
@@ -292,6 +294,8 @@ export function sortAlertArray(alertArray) {
         } else {  // same severity
             if (a.last_update_analyzer_time > b.last_update_analyzer_time) {
                 return -1;
+            } else if (b.last_update_analyzer_time > a.last_update_analyzer_time) {
+                return 1;
             } else {  // same last update date time
                 if (a.alert_count >= b.alert_count) {
                     return -1;

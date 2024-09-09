@@ -14,7 +14,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 import protogen
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, \
     parse_string_to_original_types, convert_to_capitalized_camel_case
-from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin
+from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin, ModelType
 
 
 class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
@@ -26,12 +26,12 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         self.message_to_link_messages_dict: Dict[protogen.Message, List[protogen.Message]] = {}
 
     def _handle_routes_callback_import(self) -> str:
-        routes_callback_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_callback_class_name)
-        output_str = f"from {routes_callback_path} import {self.routes_callback_class_name_capital_camel_cased}\n"
+        routes_callback_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_callback_file_name)
+        output_str = f"from {routes_callback_path} import {self.routes_callback_class_name}\n"
         return output_str
 
     def _handle_routes_callback_instantiate(self):
-        output_str = f"callback_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n\n\n"
+        output_str = f"callback_class = {self.routes_callback_class_name}.get_instance()\n\n\n"
         return output_str
 
     def _set_shared_lock_name_to_pydentic_class_dict(self):
@@ -239,20 +239,21 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += "import copy\n"
         output_str += "\n"
         output_str += "# third-party modules\n"
-        output_str += "from fastapi import APIRouter, Request, Query\n"
+        output_str += "from fastapi import APIRouter, Request, Query, UploadFile\n"
         output_str += "from fastapi.templating import Jinja2Templates\n"
         output_str += "\n"
         output_str += "# project imports\n"
         output_str += self._handle_routes_callback_import()
         output_str += self._handle_model_imports()
-        incremental_id_basemodel_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
-                                                                      "incremental_id_basemodel")
         if self.response_field_case_style.lower() == "camel":
-            output_str += f'from {incremental_id_basemodel_path} import to_camel\n'
+            output_str += f"from FluxPythonUtils.scripts.model_base_utils import to_camel\n"
+        output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n"
         # else not required: if response type is not camel type then avoid import
         default_web_response_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "default_web_response")
-        output_str += f'from {default_web_response_file_path} import DefaultWebResponse\n'
-        output_str += f"from FluxPythonUtils.scripts.utility_functions import perf_benchmark\n"
+        output_str += f'from {default_web_response_file_path} import *\n'
+        perf_benchmark_decorators_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
+                                                                      "perf_benchmark_decorators")
+        output_str += f"from {perf_benchmark_decorators_path} import perf_benchmark\n"
         output_str += f"from FluxPythonUtils.scripts.async_rlock import AsyncRLock\n"
         aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
         output_str += f'from {aggregate_file_path} import *'
@@ -271,3 +272,31 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"{self.api_router_app_name} = APIRouter()\n"
         output_str += self._handle_routes_callback_instantiate()
         return output_str
+
+    def _unpack_kwargs_with_id_field_type(self, **kwargs) -> Tuple[protogen.Message, str, str, List[str], bool]:
+        message: protogen.Message | None = kwargs.get("message")
+        aggregation_type: str | None = kwargs.get("aggregation_type")
+        id_field_type: str | None = kwargs.get("id_field_type")
+        shared_lock_list: List[str] | None = kwargs.get("shared_lock_list")
+        model_type: bool | None = kwargs.get("model_type")
+
+        if message is None or aggregation_type is None or id_field_type is None:
+            err_str = (f"Received kwargs having some None values out of message: "
+                       f"{message.proto.name if message is not None else message}, "
+                       f"aggregation_type: {aggregation_type}, id_field_type: {id_field_type}")
+            logging.exception(err_str)
+            raise Exception(err_str)
+        return message, aggregation_type, id_field_type, shared_lock_list, model_type
+
+    def _unpack_kwargs_without_id_field_type(self, **kwargs):
+        message: protogen.Message | None = kwargs.get("message")
+        aggregation_type: str | None = kwargs.get("aggregation_type")
+        shared_lock_list: List[str] | None = kwargs.get("shared_lock_list")
+        model_type: ModelType | None = kwargs.get("model_type")
+        if message is None or aggregation_type is None:
+            err_str = (f"Received kwargs having some None values out of message: "
+                       f"{message.proto.name if message is not None else message}, "
+                       f"aggregation_type: {aggregation_type}")
+            logging.exception(err_str)
+            raise Exception(err_str)
+        return message, aggregation_type, shared_lock_list, model_type

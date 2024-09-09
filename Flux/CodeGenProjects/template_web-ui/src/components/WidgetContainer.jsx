@@ -115,7 +115,7 @@ const WidgetContainer = (props) => {
     }
 
     return (
-        <Box onDoubleClick={onDoubleClick}>
+        <Box sx={{ height: '100%' }} onDoubleClick={onDoubleClick}>
             <Typography variant='h6'>
                 <div className={classes.widget_header} style={{ background: backgroundColor }}>
                     <span>{props.title}</span>

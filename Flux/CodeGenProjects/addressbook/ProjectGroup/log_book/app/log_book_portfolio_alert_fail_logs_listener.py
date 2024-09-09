@@ -5,7 +5,7 @@ import os
 from threading import Thread
 from typing import List, Dict
 
-os.environ["DBType"] = "beanie"
+os.environ["ModelType"] = "msgspec"
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     portfolio_alert_fail_log, simulator_portfolio_alert_fail_log)

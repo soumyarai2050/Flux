@@ -112,13 +112,11 @@ class PydanticModelPlugin(BasePydanticModelPlugin):
                 output_str += "from fastapi_restful.enums import StrEnum\n"
             # else not required: if enum type is not proper then it would be already handled in init
 
-        incremental_id_camel_base_model_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
-                                                                             "incremental_id_basemodel")
         if self.response_field_case_style.lower() == "snake":
-            output_str += f'from {incremental_id_camel_base_model_path} import BareBaseModel\n'
+            output_str += f"from FluxPythonUtils.scripts.model_base_utils import BareBaseModel\n"
         elif self.response_field_case_style.lower() == "camel":
-            output_str += f'from {incremental_id_camel_base_model_path} import BareCamelBaseModel, ' \
-                          f'CamelCacheBaseModel\n'
+            output_str += (f"from FluxPythonUtils.scripts.model_base_utils import BareCamelBaseModel, "
+                           f"CamelCacheBaseModel\n")
         else:
             err_str = f"{self.response_field_case_style} is not supported response type"
             logging.exception(err_str)

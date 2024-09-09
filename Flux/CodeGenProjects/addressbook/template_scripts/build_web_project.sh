@@ -32,20 +32,11 @@ mkdir -p  ../log
 mkdir -p ../generated
 mkdir -p ../web-ui/src/widgets
 python gen_json_sample.py
-python gen_cached_pydantic_model.py
-python gen_cached_fastapi.py
-python gen_beanie_model.py
-python gen_beanie_fastapi.py
+python gen_msgspec_model.py
+python gen_msgspec_fastapi.py
 python gen_js_layouts.py
 python gen_json_schema.py
 python gen_executor_files.py
-
-# cython file to cpp generation
-cd ../app
-if [ -f "setup.py" ]; then
-    python setup.py build_ext --inplace
-fi
-cd -
 
 # cpp plugins
 python gen_cpp_db_codec.py

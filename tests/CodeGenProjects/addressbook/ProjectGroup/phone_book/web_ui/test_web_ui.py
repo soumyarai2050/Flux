@@ -1,48 +1,26 @@
 import os
 from typing import Dict, List, Set
-import random
 import time
 import copy
-
 import pytest
 from fastapi.encoders import jsonable_encoder
 
 # third party imports
-from selenium.webdriver import Keys
-from selenium.common import NoSuchElementException
-from selenium.webdriver.chrome.webdriver import WebDriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC  # noqa
 
 # project specific imports
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import (
-    click_button_with_name, set_tree_input_field, confirm_save, create_strat_limits_using_tree_view, switch_layout,
-    activate_strat, validate_strat_limits, set_table_input_field,
-    save_layout, get_common_keys, get_replaced_common_keys, get_table_headers, get_select_box_value,
-    save_nested_strat, get_widgets_by_flux_property, get_xpath_from_field_name,
-    scroll_into_view, validate_property_that_it_contain_val_min_val_max_or_none,
-    get_unsaved_changes_discarded_key, click_on_okay_button_unsaved_changes_popup,
-    set_autocomplete_field, email_book_service_native_web_client, flux_fld_default_widget, get_all_keys_from_table,
-    get_element_text_list_from_filter_popup, get_web_project_url, flux_fld_title_in_widgets,
-    flux_fld_autocomplete_in_widgets, flux_fld_sequence_number_in_widget, flux_fld_ui_place_holder_in_widget,
-    validate_unpressed_n_pressed_btn_txt, validate_hide_n_show_in_common_key,
-    validate_flux_fld_display_type_in_widget, get_widget_type,validate_flux_flx_display_zero_in_widget,
-    get_val_min_n_val_max_of_fld, select_or_unselect_checkbox, get_commonkey_items, change_layout,
-    double_click, hover_over_on_element, set_val_max_input_fld,
-    set_val_min_input_fld, get_server_populate_fld, set_input_value_for_comma_seperated,
-    get_val_max_from_input_fld, input_n_validate_progress_bar, is_table_cell_enabled, get_number_format_from_input_fld)
-from FluxCodeGenEngine.tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
                                                                                              SearchType)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import TopOfBookBaseModel, QuoteOptional
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_routes import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_msgspec_routes import TopOfBookBaseModel, QuoteOptional
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_msgspec_routes import (
     PairStratBaseModel, StratState, UILayoutBaseModel, WidgetUIDataElementOptional)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import \
     StreetBookServiceHttpClient
 
 # to parameterize all tests. to add support for other browsers, add the DriverType here
-# pytestmark = pytest.mark.parametrize("driver_type", [DriverType.CHROME])
-pytestmark = pytest.mark.parametrize("driver_type", [DriverType.EDGE])
+pytestmark = pytest.mark.parametrize("driver_type", [DriverType.CHROME])
+# pytestmark = pytest.mark.parametrize("driver_type", [DriverType.EDGE])
 
 
 def test_create_pair_strat(clean_and_set_limits, driver_type, web_project):
@@ -64,159 +42,74 @@ def test_update_pair_strat_n_create_n_activate_strat_limits_using_tree_view(clea
     strat_collection_widget = driver.find_element(By.ID, "strat_collection")
     click_button_with_name(widget=strat_collection_widget, button_name="Edit")
 
-    # pair_strat_params.common_premium
-    xpath: str = "pair_strat_params.common_premium"
-    value = pair_strat_edit["pair_strat_params"]["common_premium"]
-    name: str = "common_premium"
-    set_tree_input_field(widget=pair_strat_params_widget, xpath=xpath, name=name, value=value)
-
-    # pair_strat_params.hedge_ratio
-    xpath: str = "pair_strat_params.hedge_ratio"
-    value = pair_strat_edit["pair_strat_params"]["hedge_ratio"]
-    name: str = "hedge_ratio"
-    set_tree_input_field(widget=pair_strat_params_widget, xpath=xpath, name=name, value=value)
-
+    fields = {
+        "pair_strat_params.common_premium": pair_strat_edit["pair_strat_params"]["common_premium"],
+        "pair_strat_params.hedge_ratio": pair_strat_edit["pair_strat_params"]["hedge_ratio"]
+    }
+    for xpath, value in fields.items():
+        name = xpath.split('.')[-1]
+        set_tree_input_field(widget=pair_strat_params_widget, xpath=xpath, name=name, value=value)
     click_button_with_name(widget=strat_collection_widget, button_name="Save")
     confirm_save(driver=driver)
 
     scroll_into_view(driver=driver, element=strat_collection_widget)
     click_button_with_name(widget=strat_limits_widget, button_name="Edit")
-
     switch_layout(widget=strat_limits_widget, layout=Layout.TREE)
-
     create_strat_limits_using_tree_view(driver=driver, strat_limits=strat_limits, layout=Layout.TREE)
 
     click_button_with_name(strat_limits_widget, "Save")
     confirm_save(driver=driver)
+    click_id_fld_inside_strat_collection(strat_collection_widget)
     activate_strat(widget=strat_collection_widget, driver=driver)
 
     # validate_strat_limits
     switch_layout(widget=strat_limits_widget, layout=Layout.TREE)
     click_button_with_name(widget=strat_collection_widget, button_name="Edit")
     validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TREE)
-    driver.quit()
-
 
 def test_update_strat_limits_n_activate_using_table_view(clean_and_set_limits, driver_type, web_project, driver,
-                                                         pair_strat: Dict, strat_limits: Dict):
-
+                                                             pair_strat: Dict, strat_limits: Dict):
     strat_limits_widget = driver.find_element(By.ID, "strat_limits")
     strat_collection_widget = driver.find_element(By.ID, "strat_collection")
-
     click_button_with_name(widget=strat_limits_widget, button_name="Edit")
 
-    # max_open_per_chores_side
-    xpath = "max_open_chores_per_side"
-    value = strat_limits["max_open_chores_per_side"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
+    fields_to_update = {
+        "max_open_chores_per_side": strat_limits["max_open_chores_per_side"],
+        "max_single_leg_notional": strat_limits["max_single_leg_notional"],
+        "max_open_single_leg_notional": strat_limits["max_open_single_leg_notional"],
+        "max_net_filled_notional": strat_limits["max_net_filled_notional"],
+        "max_concentration": strat_limits["max_concentration"],
+        "min_chore_notional": strat_limits["min_chore_notional"],
+        "limit_up_down_volume_participation_rate": strat_limits["limit_up_down_volume_participation_rate"],
+        "cancel_rate.max_cancel_rate": strat_limits["cancel_rate"]["max_cancel_rate"],
+        "cancel_rate.applicable_period_seconds": strat_limits["cancel_rate"]["applicable_period_seconds"],
+        "cancel_rate.waived_initial_chores": strat_limits["cancel_rate"]["waived_initial_chores"],
+        "cancel_rate.waived_min_rolling_notional": strat_limits["cancel_rate"]["waived_min_rolling_notional"],
+        "cancel_rate.waived_min_rolling_period_seconds": strat_limits["cancel_rate"][
+            "waived_min_rolling_period_seconds"],
+        "market_barter_volume_participation.max_participation_rate": strat_limits["market_barter_volume_participation"]
+        ["max_participation_rate"],
+        "market_barter_volume_participation.applicable_period_seconds":
+            strat_limits["market_barter_volume_participation"]["applicable_period_seconds"],
+        "market_barter_volume_participation.min_allowed_notional": strat_limits["market_barter_volume_participation"][
+            "min_allowed_notional"],
+        "market_depth.participation_rate": strat_limits["market_depth"]["participation_rate"],
+        "market_depth.depth_levels": strat_limits["market_depth"]["depth_levels"],
+        "residual_restriction.max_residual": strat_limits["residual_restriction"]["max_residual"],
+        "residual_restriction.residual_mark_seconds": strat_limits["residual_restriction"]["residual_mark_seconds"]
+    }
 
-    # max_single_leg_notional
-    xpath = "max_single_leg_notional"
-    value = strat_limits["max_single_leg_notional"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # max_open_single_leg_notional
-    xpath = "max_open_single_leg_notional"
-    value = strat_limits["max_open_single_leg_notional"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # max_net_filled_notional
-    xpath = "max_net_filled_notional"
-    value = strat_limits["max_net_filled_notional"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # max_concentration
-    xpath = "max_concentration"
-    value = strat_limits["max_concentration"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # limit_up_down_volume_participation_rate
-    xpath = "limit_up_down_volume_participation_rate"
-    value = strat_limits["limit_up_down_volume_participation_rate"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # max_cancel_rate
-    xpath = "cancel_rate.max_cancel_rate"
-    value = strat_limits["cancel_rate"]["max_cancel_rate"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # applicable_period_seconds
-    xpath = "cancel_rate.applicable_period_seconds"
-    value = strat_limits["cancel_rate"]["applicable_period_seconds"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # waived_min_chores
-    xpath = "cancel_rate.waived_min_chores"
-    value = strat_limits["cancel_rate"]["waived_min_chores"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # max_participation_rate
-    xpath = "market_barter_volume_participation.max_participation_rate"
-    value = strat_limits["market_barter_volume_participation"]["max_participation_rate"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # applicable_period_seconds
-    xpath = "market_barter_volume_participation.applicable_period_seconds"
-    value = strat_limits["market_barter_volume_participation"]["applicable_period_seconds"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # participation_rate
-    xpath = "market_depth.participation_rate"
-    value = strat_limits["market_depth"]["participation_rate"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # depth_levels
-    xpath = "market_depth.depth_levels"
-    value = strat_limits["market_depth"]["depth_levels"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # max_residual
-    xpath = "residual_restriction.max_residual"
-    value = strat_limits["residual_restriction"]["max_residual"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
-
-    # residual_mark_seconds
-    xpath = "residual_restriction.residual_mark_seconds"
-    value = strat_limits["residual_restriction"]["residual_mark_seconds"]
-    is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
-    if is_enabled:
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
+    for xpath, value in fields_to_update.items():
+        is_enabled = is_table_cell_enabled(widget=strat_limits_widget, xpath=xpath)
+        if is_enabled:
+            set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=str(value))
 
     click_button_with_name(widget=strat_limits_widget, button_name="Save")
     confirm_save(driver=driver)
 
+    click_id_fld_inside_strat_collection(strat_collection_widget)
     activate_strat(widget=strat_collection_widget, driver=driver)
     click_button_with_name(widget=strat_limits_widget, button_name="Edit")
-
-    # validating the values
     validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TABLE)
 
 
@@ -270,7 +163,7 @@ def test_hide_n_show_in_table_layout(clean_and_set_limits, driver_type, web_proj
     assert selected_fld in table_headers
 
 
-def test_nested_pair_strat_n_strats_limits(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict,
+def test_nested_pair_strat_n_strat_limits(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict,
                                            pair_strat_edit: Dict, strat_limits: Dict):
 
     strat_limits_widget = driver.find_element(By.ID, "strat_limits")

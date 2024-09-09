@@ -5,11 +5,8 @@ import os
 # 3rd party imports
 from pydantic import BaseModel
 
-os.environ["DBType"] = "beanie"
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import (
     PortfolioAlertBaseModel, StratAlertBaseModel, Severity)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_beanie_database import \
-    get_mongo_server_uri
 from FluxPythonUtils.scripts.utility_functions import get_version_from_mongodb_uri
 # Below unused import is used by generated beanie file
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *

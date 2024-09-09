@@ -3,7 +3,7 @@ import time
 from threading import Thread
 
 # project imports
-from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_routes_callback import (
+from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_routes_msgspec_callback import (
     PerformanceBenchmarkServiceRoutesCallback)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import *
 from FluxPythonUtils.scripts.utility_functions import except_n_log_alert, handle_refresh_configurable_data_members
@@ -15,7 +15,7 @@ class PerformanceBenchmarkServiceRoutesCallbackBaseNativeOverride(PerformanceBen
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_http_routes import underlying_read_raw_performance_data_http
+        from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_http_msgspec_routes import underlying_read_raw_performance_data_http
         cls.underlying_read_raw_performance_data_http = underlying_read_raw_performance_data_http
 
     def __init__(self):
@@ -53,7 +53,7 @@ class PerformanceBenchmarkServiceRoutesCallbackBaseNativeOverride(PerformanceBen
                     if not self.service_ready:
                         # todo start RawPerformanceDataProcessor script once performance_benchmark service is up
                         self.service_ready = True
-                        print(f"INFO: service is ready: {datetime.datetime.now().time()}")
+                    print(f"INFO: perf benchmark service is ready: {datetime.datetime.now().time()}")
 
                 if not self.service_up:
                     try:
@@ -127,5 +127,4 @@ class PerformanceBenchmarkServiceRoutesCallbackBaseNativeOverride(PerformanceBen
         raw_performance_data_of_callable = RawPerformanceDataOfCallable(raw_performance_data=raw_performance_data_list)
 
         return [raw_performance_data_of_callable]
-
 

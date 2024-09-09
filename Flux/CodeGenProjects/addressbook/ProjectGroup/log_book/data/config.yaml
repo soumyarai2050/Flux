@@ -17,6 +17,8 @@ mongo_server: "mongodb://localhost:27017"
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
+msgspec_override_type: "native"
+dataclass_override_type: "native"
 beanie_override_type: "native"
 cache_override_type: "bare"
 
@@ -40,7 +42,6 @@ raw_performance_data_processor_loop_wait: 2  # sec
 
 perf_bench_client_connection_fail_retry_secs: 300  # 5 minutes
 regex_list_refresh_time_wait: 30
-is_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
 
 # to run log analyzer in simulator mode

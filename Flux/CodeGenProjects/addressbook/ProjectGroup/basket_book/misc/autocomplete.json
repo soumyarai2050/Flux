@@ -5,6 +5,18 @@
       "VWAP",
       "TWAP",
       "WVOL"
+    ],
+    "BrokerCode_List": [
+      "ZERODHA",
+      "KOTAK"
+    ],
+    "CB_List": [
+      "CB_Sec_1",
+      "CB_Sec_2"
+    ],
+    "Mstrat_List": [
+      "Mstrat_1",
+      "Mstrat_2"
     ]
   }
 }

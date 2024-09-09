@@ -12,8 +12,8 @@ from fastapi.encoders import jsonable_encoder
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import (
     create_pre_chore_test_requirements, PAIR_STRAT_ENGINE_DIR, log_book_web_client, PortfolioAlertBaseModel,
     StratState, create_pre_chore_test_requirements_for_log_book, STRAT_EXECUTOR)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_beanie_model import (
-    Severity, AlertOptional, StratAlertBaseModel)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_msgspec_model import (
+    Severity, StratAlertBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_log_book import StratLogDetail
 from FluxPythonUtils.log_book.log_book import LogBook, LogDetail
 

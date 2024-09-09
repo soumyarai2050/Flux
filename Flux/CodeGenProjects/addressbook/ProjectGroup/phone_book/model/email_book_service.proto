@@ -16,14 +16,16 @@ option (FluxFileWebPageUIData) = {
 
 message StratLeg{
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
-  required Security sec = 2;
-  optional Side side = 3 [default = SIDE_UNSPECIFIED, (FluxFldColor) = "BUY=SUCCESS,SELL=ERROR", (FluxFldNoCommonKey) = true];
+  required Security sec = 2 [(FluxFldOrmNoUpdate) = true];
+  optional Side side = 3 [default = SIDE_UNSPECIFIED, (FluxFldOrmNoUpdate) = true, (FluxFldNoCommonKey) = true, (FluxFldColor) = "BUY=SUCCESS,SELL=ERROR"];
   optional string company = 4 [(FluxFldServerPopulate) = true];
+  optional BrokerCode fallback_broker = 5 [default = ZERODHA, (FluxFldHelp) = "if no short inventory found in SOD or SOD short inventory exhausted, this broker is used to execute any remaining long chores"];
+  optional BrokerRoute fallback_route = 6 [default = BR_QFII, (FluxFldHelp) = "if no short inventory found in SOD or SOD short inventory exhausted, this broker route is used to execute any remaining long chores"];
 }
 
 // Widget-2
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
-message PairStratParams{
+message PairStratParams {
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 13,
@@ -36,17 +38,17 @@ message PairStratParams{
   // server provided via security auto complete list (if available)
   optional StratMode strat_mode = 1 [default=StratMode_Normal];
   optional StratType strat_type = 2 [default=Premium, (FluxFldOrmNoUpdate) = true];
-  required StratLeg strat_leg1 = 3 [(FluxFldElaborateTitle) = true, (FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id~PairStrat.pair_strat_params.strat_type, sec_id_source=TICKER", (FluxFldHelp) = "CB Tickers"];
-  optional StratLeg strat_leg2 = 4 [(FluxFldElaborateTitle) = true, (FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id:EQT_List, sec_id_source=TICKER, side=server_populate", (FluxFldHelp) = "EQT Tickers"];
+  required StratLeg strat_leg1 = 3 [(FluxFldElaborateTitle) = true, (FluxFldAutoComplete) = "sec_id~PairStrat.pair_strat_params.strat_type, sec_id_source=TICKER, fallback_broker=KOTAK, fallback_route=BR_QFII", (FluxFldHelp) = "CB Tickers"];
+  optional StratLeg strat_leg2 = 4 [(FluxFldElaborateTitle) = true, (FluxFldAutoComplete) = "sec_id:EQT_List, sec_id_source=TICKER, fallback_broker=ZERODHA, fallback_route=BR_QFII, side=server_populate", (FluxFldHelp) = "EQT Tickers"];
   optional int32 exch_response_max_seconds = 5 [default = 30, (FluxFldHide) = "True", (FluxFldServerPopulate) = true];
   // these are specific to CB-EQT strat - move to derived later
-  required float common_premium = 6 [(FluxFldNumberFormat) = "%", (FluxFldDiffThreshold) = 2];
+  required float common_premium = 6 [(FluxFldNumberFormat) = "%", (FluxFldDiffThreshold) = 2, (FluxFldNoCommonKey) = true];
   optional float hedge_ratio = 7 [default = 1];
 }
 
 
 //Widget - 7
-message ChoreLimits{
+message ChoreLimits {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
@@ -76,15 +78,21 @@ message ChoreLimits{
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int32 max_basis_points = 2 [(FluxFldValMax) = "1000", (FluxFldHelp) = "basis-points a single chore can consume, if set to 1, it`s (1/100 of 1% of px @ BBO) or (0.01% of px @ BBO) + + px @ BBO"];
-  optional float max_px_deviation = 3 [default = 2, (FluxFldValMax) = "2", (FluxFldNameColor) = "ERROR", (FluxFldHelp) = "max % deviation allowed from Last Barterd px (if no last bartering px, use closing px)"];
+  optional int32 max_basis_points = 2 [(FluxFldNumberFormat) = "bps", (FluxFldValMax) = "1000", (FluxFldHelp) = "basis-points a single chore can consume, if set to 1, it`s (1/100 of 1% of px @ BBO) or (0.01% of px @ BBO) + + px @ BBO"];
+  optional float max_px_deviation = 3 [default = 2, (FluxFldValMax) = "2", (FluxFldNumberFormat) = "%", (FluxFldNameColor) = "ERROR", (FluxFldHelp) = "max % deviation or 1 tick (whichever is higher) allowed from Last Barterd px (if no last bartering px, use closing px)"];
   optional int32 max_px_levels = 4 [(FluxFldValMax) = "20", (FluxFldHelp) = "max chorebook levels allowed to be consumed by single chore"];
-  optional int32 max_chore_qty = 5[(FluxFldValMax) = "1000000", (FluxFldHelp) = "max qty for securities that barter in shares"];
+  optional int32 max_chore_qty = 5 [(FluxFldValMax) = "1000000", (FluxFldHelp) = "max qty for securities that barter in shares"];
   optional int32 max_contract_qty = 6 [(FluxFldValMax) = "10000", (FluxFldHelp) = "max qty for securities that barter in contracts"];
-  optional float max_chore_notional = 7 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "500000", (FluxFldHelp) = "chore qty times limit px must be less than this limit"];
+  optional float max_chore_notional = 7 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "500000", (FluxFldTitle) = "max chore $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "chore qty times limit px must be less than this limit"];
+  optional int32 max_basis_points_algo = 8 [(FluxFldNumberFormat) = "bps", (FluxFldValMax) = "1000", (FluxFldHelp) = "basis-points a single algo chore can consume, if set to 1, it`s (1/100 of 1% of px @ BBO) or (0.01% of px @ BBO) + + px @ BBO"];
+  optional float max_px_deviation_algo = 9 [default = 2, (FluxFldValMax) = "2", (FluxFldNumberFormat) = "%", (FluxFldNameColor) = "ERROR", (FluxFldHelp) = "algo chore max % deviation or 1 tick (whichever is higher) allowed from Last Barterd px (if no last bartering px, use closing px)"];
+  optional float max_chore_notional_algo = 10 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "500000", (FluxFldTitle) = "max chore algo $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "algo chore qty times limit px must be less than this limit"];
+  optional int32 max_contract_qty_algo = 11 [(FluxFldValMax) = "10000", (FluxFldHelp) = "algo chore max qty for securities that barter in contracts"];
+  optional int32 max_chore_qty_algo = 12 [(FluxFldValMax) = "1000000", (FluxFldHelp) = "algo chore max qty for securities that barter in shares"];
+
 }
 
-message SystemControl{
+message SystemControl {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -92,7 +100,8 @@ message SystemControl{
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
+    PassStoredObjToUpdatePrePostCallback: true
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
@@ -119,23 +128,25 @@ message SystemControl{
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
-    pressed_value_as_text: "true"
+    pressed_value_as_text: "true",
+    allow_force_update: true
   }];
   required bool pause_all_strats = 3 [default = false, (FluxFldButton) = {
     unpressed_caption: "Pause All Strats",
-    pressed_caption: "In Progress",
-    disabled_captions: "true=In Progress"
+    pressed_caption: "Pausing All Strats",
+    disabled_captions: "true=Pausing All Strats"
     value_color_map: "true=DEBUG,false=WARNING"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
-    pressed_value_as_text: "true"
-    button_icon_name: "Pause"
+    pressed_value_as_text: "true",
+    button_icon_name: "Pause",
+    allow_force_update: true
   }];
 }
 
 //Widget - 9
-message PortfolioStatus{
+message PortfolioStatus {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -169,17 +180,17 @@ message PortfolioStatus{
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional float overall_buy_notional = 3 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "Open + Executed [New Chore : overall_buy_notional + (Px X Qty)]; [Cxled : overall_buy_notional - (Px X Cxl-Qty)]; [Fill : overall_buy_notional - (chore-Px X fill-Qty) + (fill-px X fill-qty)]"];
-  optional float overall_sell_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "Open + Executed [refer overall_buy_notional formula]"];
+  optional float overall_buy_notional = 2 [(FluxFldTitle) = "overall buy $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "Open + Executed [New Chore : overall_buy_notional + (Px X Qty)]; [Cxled : overall_buy_notional - (Px X Cxl-Qty)]; [Fill : overall_buy_notional - (chore-Px X fill-Qty) + (fill-px X fill-qty)]"];
+  optional float overall_sell_notional = 3 [(FluxFldTitle) = "overall sell $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "Open + Executed [refer overall_buy_notional formula]"];
   // Executed
-  optional float overall_buy_fill_notional = 5 [(FluxFldDisplayType) = "int"];
+  optional float overall_buy_fill_notional = 4 [(FluxFldTitle) = "overall buy fill $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int"];
   // Executed
-  optional float overall_sell_fill_notional = 6 [(FluxFldDisplayType) = "int"];
-  optional int32 open_chores = 7;
+  optional float overall_sell_fill_notional = 5 [(FluxFldTitle) = "overall sell fill $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int"];
+  optional int32 open_chores = 6;
 }
 
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
-message PairStrat{
+message PairStrat {
     option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -188,6 +199,7 @@ message PairStrat{
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+    PassStoredObjToUpdatePrePostCallback: true
   };
     option (FluxMsgJsonQuery) = {
       QueryName: "get_pair_strat_sec_filter_json",
@@ -265,7 +277,7 @@ message PairStrat{
 }
 
 // Widget - 1
-message StratCollection{
+message StratCollection {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -278,6 +290,7 @@ message StratCollection{
     y: 0,
     w: 7,
     h: 13,
+    disable_ws_on_edit: true,
     widget_ui_data: {
       view_layout: UI_ABBREVIATED_FILTER
     },
@@ -293,7 +306,7 @@ message StratCollection{
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // leg1_sec_id-leg2_sec_id-leg1_side-uid
-  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Id:PairStrat.id^Tickers:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id^Side:PairStrat.pair_strat_params.strat_leg1.side^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:PairStrat.strat_state^Strat Notional:StratView.balance_notional^Premium Limit:PairStrat.pair_strat_params.common_premium^Avg Premium:StratView.average_premium^Mkt Premium:StratView.market_premium^Unload:StratView.unload_strat^Recycle:StratView.recycle_strat", (FluxFldAlertBubbleSource) = "StratView.strat_alert_count", (FluxFldAlertBubbleColor) = "StratView.strat_alert_aggregated_severity"];
+  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Id:PairStrat.id^Tickers:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id^Side:PairStrat.pair_strat_params.strat_leg1.side^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:PairStrat.strat_state^Strat Notional:StratView.balance_notional^P Limit:PairStrat.pair_strat_params.common_premium^P Avg:StratView.average_premium^P Mkt:StratView.market_premium^Fill Buy $:StratView.total_fill_buy_notional^Fill Sell $:StratView.total_fill_sell_notional^Unload:StratView.unload_strat^Recycle:StratView.recycle_strat", (FluxFldAlertBubbleSource) = "StratView.strat_alert_count", (FluxFldAlertBubbleColor) = "StratView.strat_alert_aggregated_severity"];
   //show 9 most recently used (weight:2) & 9 most frequently used (weight: 1)
   //Sort by type, merge by weight, FILTER OUT loaded
   repeated string buffered_strat_keys = 3 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id"];
@@ -381,6 +394,17 @@ message SampleTSModel1{
     optional int32 cum_sum_of_num = 5;
 }
 
+// Sample File Upload - used in test case to upload and save file verification
+message SampleFileUpload{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "sample_file_upload",
+      QueryParams: "save_file_destination",
+      QueryParamsDataType: "str",
+      QueryType: HTTP_FILE
+  };
+  required bool check_result = 1;
+}
+
 
 //Not used , maybe deleted in future
 message BarterBrief{
@@ -390,7 +414,7 @@ message BarterBrief{
   required float px = 4;
   required int64 qty = 5;
   optional int64 create_date_time = 7 [(FluxFldValIsDateTime) = true];
-  optional float computed_notional = 8 [(FluxFldDisplayType) = "int", (FluxFldHide) = "True"];
+  optional float computed_notional = 8 [(FluxFldTitle) = "computed $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHide) = "True"];
 }
 
 // not used
@@ -446,11 +470,9 @@ message LogSimulatorReloadConfig{
 }
 
 
-message IsOppositeSideTradable{
+message ReloadBarteringData{
   option (FluxMsgJsonQuery) = {
-    QueryName: "update_is_opposite_side_tradable_val",
-    QueryParams: "update_val",
-    QueryParamsDataType: "bool"
+    QueryName: "reload_bartering_data",
   };
   required bool resp = 1;
 }
@@ -463,6 +485,14 @@ message ImportWarningAvoidDummyMessage{
   optional DummyEnumDP temp3 = 3;
   optional Severity temp4 = 4;
   optional ReferencePxType temp5 = 5;
+}
+
+message TickerPair {
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_all_cb_eqt_ticker_pair"
+  };
+  required string cb_ticker = 1;
+  required string eqt_ticker = 2;
 }
 
 // Link impl Example models

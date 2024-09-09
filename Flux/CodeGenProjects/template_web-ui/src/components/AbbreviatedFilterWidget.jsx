@@ -458,7 +458,7 @@ function AbbreviatedFilterWidget(props) {
             })}
         </>
     )
-    const visibiltyColor = showMore ? 'info' : showHidden ? 'success' : 'inherit';
+    const visibiltyColor = showMore ? 'warning' : showHidden ? 'success' : 'inherit';
     const visibilityMenu = (
         <>
             <Icon

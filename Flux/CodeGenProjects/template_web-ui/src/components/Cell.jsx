@@ -434,6 +434,9 @@ const Cell = (props) => {
                     {collection.numberFormat && collection.numberFormat === 'bps' && (
                         <InputAdornment position='end'>bps</InputAdornment>
                     )}
+                    {collection.numberFormat && collection.numberFormat === '$' && (
+                        <InputAdornment position='end'>$</InputAdornment>
+                    )}
                     {validationError.current && (
                         <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
                     )}
@@ -490,6 +493,7 @@ const Cell = (props) => {
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
             } : {};
+            // default input format
             let inputFormat = 'YYYY-MM-DD HH:mm:ss'
             if (value) {
                 const localDateTime = dayjs.utc(value).tz(localTimezone);
@@ -497,8 +501,11 @@ const Cell = (props) => {
                     if (localDateTime.isSame(dayjs(), 'day')) {
                         inputFormat = 'HH:mm:ss';
                     }
+                    // else - use default input format
                 }
+                // else - use default input format
             }
+            // else - use default input format
             const classesStr = `${classes.cell_input_field} ${selectedClass}`;
             return (
                 <TableCell
@@ -549,17 +556,17 @@ const Cell = (props) => {
                                         if (value === null) {
                                             const newDate = new Date();
                                             newDate.setSeconds(0, 0);
-                                            props.onDateTimeChange(dataxpath, xpath, newDate.toISOString());
+                                            props.onDateTimeChange(dataxpath, xpath, newDate.toISOString(), dataSourceId, collection.source);
                                         }
-                                        setIsDateTimePickerOpen(true)
+                                        setIsDateTimePickerOpen(true);
                                     }}
                                     InputProps={{
                                         readOnly: true,
                                         endAdornment: (
-                                            <InputAdornment position="end">
+                                            <InputAdornment position='end'>
                                                 <IconButton 
                                                     onClick={(e) => {
-                                                        props.onDateTimeChange(dataxpath, xpath, null);
+                                                        props.onDateTimeChange(dataxpath, xpath, null, dataSourceId, collection.source);
                                                         e.stopPropagation();
                                                     }} 
                                                     disabled={!value}
@@ -567,7 +574,7 @@ const Cell = (props) => {
                                                     <Clear fontSize='small' />
                                                 </IconButton>
                                             </InputAdornment>
-                                        ),
+                                        )
                                     }}
                                 />
                             }

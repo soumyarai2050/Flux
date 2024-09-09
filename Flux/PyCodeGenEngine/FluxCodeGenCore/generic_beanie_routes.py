@@ -25,7 +25,7 @@ from beanie.operators import In
 from beanie.odm.operators.update.general import Set as BeanieSet
 
 # project specific imports
-from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
+from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultPydanticWebResponse
 from Flux.PyCodeGenEngine.FluxCodeGenCore.ws_connection_manager import WSData
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
 from FluxPythonUtils.scripts.utility_functions import compare_n_patch_dict, \
@@ -41,8 +41,8 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_route_utils import get_aggrega
 5. Delete : UpdateAggregate for massaging data post delete
 """
 
-id_not_found: Final[DefaultWebResponse] = DefaultWebResponse(msg="Id not Found")
-del_success: Final[DefaultWebResponse] = DefaultWebResponse(msg="Deletion Successful")
+id_not_found: Final[DefaultPydanticWebResponse] = DefaultPydanticWebResponse(msg="Id not Found")
+del_success: Final[DefaultPydanticWebResponse] = DefaultPydanticWebResponse(msg="Deletion Successful")
 code_gen_projects_path = PurePath(__file__).parent.parent.parent / "CodeGenProjects"
 PydanticModel = TypeVar('PydanticModel', bound=BaseModel)
 DocumentModel = TypeVar('DocumentModel', bound=Document)
@@ -139,7 +139,8 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], py
         # else not required: not going to broadcast if not a valid update for this ws
 
 
-async def publish_ws(pydantic_class_type: Type[DocumentModel], pydantic_obj_id: Any, filter_agg_pipeline: Dict | None = None,
+async def publish_ws(pydantic_class_type: Type[DocumentModel], pydantic_obj_id: Any,
+                     filter_agg_pipeline: Dict | None = None,
                      has_links: bool | None = None, update_ws_with_id: bool | None = None,
                      dummy_pydantic_model: Type[PydanticModel] | None = None):
     """
@@ -228,25 +229,28 @@ async def execute_update_agg_pipeline(pydantic_class_type: Type[DocumentModel],
         for aggregated_pydantic_obj in aggregated_pydantic_list:
             id_list.append(aggregated_pydantic_obj.id)
 
-        if pydantic_class_type.is_time_series:
-            # TimeSeries has limitations when it comes to update:
-            # https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/#updates
-            # We have implemented alternative way to avoid limitations
-            logging.info("Warning: Update using aggregate pipeline is expensive in time_series - "
-                         "time-series have limitations for which we have implemented alternative but expensive way")
+        if aggregated_pydantic_list:
+            if pydantic_class_type.is_time_series:
+                # TimeSeries has limitations when it comes to update:
+                # https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/#updates
+                # We have implemented alternative way to avoid limitations
+                logging.info("Warning: Update using aggregate pipeline is expensive in time_series - "
+                             "time-series have limitations for which we have implemented alternative but expensive way")
 
-            # first deleting all update objects
-            pydantic_list: List[DocumentModel] = \
-                await pydantic_class_type.find(In(pydantic_class_type.id, id_list)).to_list()
-            for pydantic_obj in pydantic_list:
-                await pydantic_obj.delete()
+                # first deleting all update objects
+                pydantic_list: List[DocumentModel] = \
+                    await pydantic_class_type.find(In(pydantic_class_type.id, id_list)).to_list()
+                for pydantic_obj in pydantic_list:
+                    await pydantic_obj.delete()
 
-            # creating new objects with updated values
-            await pydantic_class_type.insert_many(aggregated_pydantic_list)
-        else:
-            async with BulkWriter() as bulk_writer:
-                for aggregated_pydantic_obj in aggregated_pydantic_list:
-                    await aggregated_pydantic_obj.replace(bulk_writer)
+                # creating new objects with updated values
+                await pydantic_class_type.insert_many(aggregated_pydantic_list)
+            else:
+                async with BulkWriter() as bulk_writer:
+                    for aggregated_pydantic_obj in aggregated_pydantic_list:
+                        await aggregated_pydantic_obj.replace(bulk_writer)
+        # else not required: avoiding db calls if collection is empty
+
         await publish_ws_all(pydantic_class_type, id_list, update_ws_with_id=True)
 
 
@@ -264,6 +268,9 @@ async def generic_post_http(pydantic_class_type: Type[DocumentModel],
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
 
     await publish_ws(pydantic_class_type, new_pydantic_obj.id, filter_agg_pipeline, has_links)
+
+    # Todo: FIX BUG: if return_obj_copy is False bool will be returned which will be returned to post callback -
+    #  return type must be decided after post callback call
 
     if return_obj_copy:
         fetched_obj = await get_obj(pydantic_class_type, new_pydantic_obj.id, filter_agg_pipeline, has_links)
@@ -647,7 +654,7 @@ async def generic_patch_all_http(pydantic_class_type: Type[DocumentModel], proto
 async def generic_delete_http(pydantic_class_type: Type[DocumentModel], proto_package_name: str,
                               pydantic_dummy_model, pydantic_obj: DocumentModel,
                               update_agg_pipeline: Any = None, has_links: bool = False,
-                              return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:
+                              return_obj_copy: bool | None = True) -> DefaultPydanticWebResponse | bool:
     _id = pydantic_obj.id
     id_is_int_type = isinstance(_id, int)
 
@@ -680,7 +687,7 @@ async def generic_delete_http(pydantic_class_type: Type[DocumentModel], proto_pa
 @generic_perf_benchmark
 async def generic_delete_all_http(pydantic_class_type: Type[DocumentModel], proto_package_name: str,
                                   pydantic_dummy_model: Type[PydanticModel], return_obj_copy: bool | None = True
-                                  ) -> DefaultWebResponse | bool:
+                                  ) -> DefaultPydanticWebResponse | bool:
     id_is_int_type = (pydantic_class_type.model_fields.get("id").annotation == int)
 
     try:
@@ -805,7 +812,7 @@ async def generic_query_ws(ws: WebSocket, project_name: str, pydantic_class_type
                            ws_filter_callable: Callable[..., Any] | None = None,
                            ws_filter_callable_kwargs: Dict[Any, Any] | None = None,
                            filter_agg_pipeline: Any = None, has_links: bool = False,
-                           need_initial_snapshot: bool = True):
+                           need_initial_snapshot: bool | None = True):
     is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.connect(ws, ws_filter_callable,
                                                                                            ws_filter_callable_kwargs)
     logging.debug(f"websocket client requested to connect: {ws.client}")
@@ -982,9 +989,12 @@ async def get_obj_list(pydantic_class_type: Type[DocumentModel], find_ids: List[
             pydantic_list = await get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, find_ids,
                                                         has_links=has_links, projection_model=projection_model)
         return pydantic_list
-    except ValidationError as e:
-        logging.exception(f"Pydantic validation error: {e}")
-        raise Exception(e)
+    except ValidationError as ve:
+        logging.exception(f"Pydantic validation error: {ve}")
+        raise Exception(ve)
+    except Exception as e:
+        logging.exception(f"get_obj_list failed (no validation error) with exception: {e}")
+        raise e
 
 
 # {'aggregate': }
@@ -1065,3 +1075,6 @@ async def get_max_val(model_class_type: Type[DocumentModel]):
     max_val = int(max_val) if max_val is not None else 0
     return max_val
 
+
+def generic_encoder(obj_to_encode: Any, exclude_none: bool = False, by_alias: bool = False) -> Any:
+    return jsonable_encoder(obj_to_encode, exclude_none=exclude_none, by_alias=by_alias)

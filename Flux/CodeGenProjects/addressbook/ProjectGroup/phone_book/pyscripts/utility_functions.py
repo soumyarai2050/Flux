@@ -11,6 +11,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_hel
     photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 
 PAIR_STRAT_ENGINE_DATA_DIR: PurePath = PAIR_STRAT_ENGINE_DIR / "data"
 PAIR_STRAT_ENGINE_LOG_DIR: PurePath = PAIR_STRAT_ENGINE_DIR / "log"
@@ -39,6 +40,7 @@ def get_strat_collection() -> StratCollectionBaseModel:
 def unload_strat(strat_id: int, force: bool = False):
     pair_strat_obj: PairStratBaseModel = email_book_service_http_client.get_pair_strat_client(strat_id)
     strat_key: str = get_strat_key_from_pair_strat(pair_strat_obj)
+    active_strat: bool = pair_strat_obj.strat_state not in [StratState.StratState_SNOOZED, StratState.StratState_READY]
     # pause all active strat and force it to DONE
     if pair_strat_obj.strat_state == StratState.StratState_ACTIVE:
         if not force:
@@ -67,6 +69,10 @@ def unload_strat(strat_id: int, force: bool = False):
             updated_strat_collection_obj.loaded_strat_keys.remove(strat_key)
             updated_strat_collection_obj.buffered_strat_keys.append(strat_key)
             email_book_service_http_client.put_strat_collection_client(updated_strat_collection_obj)
+            market: Market = Market(MarketID.IN)
+            if not market.is_test_run and not market.is_sanity_test_run:
+                # remove strat lock files if no chores found
+                delete_strat_lock_files_if_no_barters(strat_id, active_strat)
             break
     else:
         err_str_ = f"No loaded strat found with {strat_id=} in strat_collection;;;{strat_collection_obj=}"
@@ -78,10 +84,14 @@ def recycle_strat(strat_id: int, force: bool = False):
     pair_strat_obj: PairStratBaseModel = email_book_service_http_client.get_pair_strat_client(strat_id)
     strat_key: str = get_strat_key_from_pair_strat(pair_strat_obj)
     unload_strat(strat_id, force)
-    time.sleep(5)
+    time.sleep(2)
 
     strat_collection_obj: StratCollectionBaseModel = get_strat_collection()
     updated_strat_collection_obj: StratCollectionBaseModel = deepcopy(strat_collection_obj)
     updated_strat_collection_obj.loaded_strat_keys.append(strat_key)
     updated_strat_collection_obj.buffered_strat_keys.remove(strat_key)
     email_book_service_http_client.put_strat_collection_client(updated_strat_collection_obj)
+
+
+def delete_strat_lock_files_if_no_barters(strat_id: int, active_strat: bool = True):
+    pass

@@ -66,7 +66,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         # Adding messages from core proto files having json_root option
         project_dir = os.getenv("PROJECT_DIR")
         if project_dir is None or not project_dir:
-            err_str = f"env var DBType received as {project_dir}"
+            err_str = f"env var PROJECT_DIR received as {project_dir}"
             logging.exception(err_str)
             raise Exception(err_str)
 
@@ -219,45 +219,45 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         for field in message.fields:
 
             indent_count = 2
-            if self.is_option_enabled(field, JsonSampleGenPlugin.flux_fld_auto_complete):
-                option_value = \
-                    self.get_simple_option_value_from_proto(field, JsonSampleGenPlugin.flux_fld_auto_complete)
-                if self.__response_field_case_style == "camel":
-                    field_name_case_styled = convert_to_camel_case(field.proto.name)
-                else:
-                    field_name_case_styled = field.proto.name
-                json_sample_output += " "*(indent_space_count+indent_count) + f'"{field_name_case_styled}":'
-
-                if field.kind.name.lower() == "message":
-                    if field.cardinality.name.lower() == "repeated":
-                        json_sample_output += " [\n"
-                        indent_count += 2
-                        json_sample_output += " "*(indent_space_count+indent_count) + "{\n"
-                    else:
-                        json_sample_output += " {\n"
-                else:
-                    json_sample_output += " "
-                json_sample_output += self.__handle_autocomplete_value_task(option_value, field.message,
-                                                                            indent_space_count+2)
-                if field.kind.name.lower() == "message":
-                    if field != message.fields[-1]:
-                        json_sample_output += " "*(indent_space_count+indent_count) + "},\n"
-                    else:
-                        if field.cardinality.name.lower() == "repeated":
-                            json_sample_output += " "*(indent_space_count+indent_count) + "}\n"
-                            indent_count -= 2
-                            json_sample_output += " "*(indent_space_count+indent_count) + "]\n"
-                        else:
-                            json_sample_output += " "*(indent_space_count+indent_count) + "}\n"
-                else:
-                    if field != message.fields[-1]:
-                        json_sample_output += ",\n"
-                    else:
-                        if field.cardinality.name.lower() == "repeated":
-                            json_sample_output += "]\n"
-                        else:
-                            json_sample_output += "\n"
-                continue
+            # if self.is_option_enabled(field, JsonSampleGenPlugin.flux_fld_auto_complete):
+            #     option_value = \
+            #         self.get_simple_option_value_from_proto(field, JsonSampleGenPlugin.flux_fld_auto_complete)
+            #     if self.__response_field_case_style == "camel":
+            #         field_name_case_styled = convert_to_camel_case(field.proto.name)
+            #     else:
+            #         field_name_case_styled = field.proto.name
+            #     json_sample_output += " "*(indent_space_count+indent_count) + f'"{field_name_case_styled}":'
+            #
+            #     if field.kind.name.lower() == "message":
+            #         if field.cardinality.name.lower() == "repeated":
+            #             json_sample_output += " [\n"
+            #             indent_count += 2
+            #             json_sample_output += " "*(indent_space_count+indent_count) + "{\n"
+            #         else:
+            #             json_sample_output += " {\n"
+            #     else:
+            #         json_sample_output += " "
+            #     json_sample_output += self.__handle_autocomplete_value_task(option_value, field.message,
+            #                                                                 indent_space_count+2)
+            #     if field.kind.name.lower() == "message":
+            #         if field != message.fields[-1]:
+            #             json_sample_output += " "*(indent_space_count+indent_count) + "},\n"
+            #         else:
+            #             if field.cardinality.name.lower() == "repeated":
+            #                 json_sample_output += " "*(indent_space_count+indent_count) + "}\n"
+            #                 indent_count -= 2
+            #                 json_sample_output += " "*(indent_space_count+indent_count) + "]\n"
+            #             else:
+            #                 json_sample_output += " "*(indent_space_count+indent_count) + "}\n"
+            #     else:
+            #         if field != message.fields[-1]:
+            #             json_sample_output += ",\n"
+            #         else:
+            #             if field.cardinality.name.lower() == "repeated":
+            #                 json_sample_output += "]\n"
+            #             else:
+            #                 json_sample_output += "\n"
+            #     continue
 
             match field.cardinality.name.lower():
                 case "optional" | "required":

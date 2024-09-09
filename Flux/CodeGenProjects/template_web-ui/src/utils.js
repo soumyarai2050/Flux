@@ -223,6 +223,8 @@ function addMessageAttributes(object, attributes, message) {
     })
 }
 
+const KEY_INDICATOR_SEPARATOR = '@@@';
+
 function getAutocompleteDict(autocompleteValue) {
     let autocompleteFieldSet = autocompleteValue.split(',').map((field) => field.trim());
     let autocompleteDict = {};
@@ -230,28 +232,35 @@ function getAutocompleteDict(autocompleteValue) {
     autocompleteFieldSet.forEach(fieldSet => {
         if (fieldSet.indexOf(':') > 0) {
             let [key, value] = fieldSet.split(':');
-            autocompleteDict[key] = [value, 'options'];
+            key = key.trim();
+            value = value.trim();
+            const indicator = 'options'
+            const pathNIndicator = key + KEY_INDICATOR_SEPARATOR + indicator;
+            autocompleteDict[pathNIndicator] = value;
         } else if (fieldSet.indexOf('=') > 0) {
             let [key, value] = fieldSet.split('=');
-            let indicator = 'assign';
-            if (value === 'server_populate') {
-                indicator = 'server_populate';
-            }
-            autocompleteDict[key] = [value, indicator];
+            key = key.trim();
+            value = value.trim();
+            const indicator = value === 'server_populate' ? 'server_populate' : 'assign';
+            const pathNIndicator = key + KEY_INDICATOR_SEPARATOR + indicator;
+            autocompleteDict[pathNIndicator] = value;
         } else {  // field separator is ~
             let [key, value] = fieldSet.split('~');
-            autocompleteDict[key] = [value, 'dynamic_options']
+            key = key.trim();
+            value = value.trim();
+            const indicator = 'dynamic_options';
+            const pathNIndicator = key + KEY_INDICATOR_SEPARATOR + indicator;
+            autocompleteDict[pathNIndicator] = value;
         }
     })
     return autocompleteDict;
 }
 
 function setAutocompleteValue(schema, object, autocompleteDict, propname, usageName) {
-    for (const path in autocompleteDict) {
+    for (const pathNIndicator in autocompleteDict) {
+        const [path, indicator] = pathNIndicator.split(KEY_INDICATOR_SEPARATOR); 
         if (path === propname || object.xpath.endsWith(path)) {
-            const [value, indicator] = autocompleteDict[path];
-            // object[usageName] = autocompleteDict[path];
-            // const autocompleteValue = autocompleteDict[path];
+            const value = autocompleteDict[pathNIndicator];
             object[usageName] = value;
             if (indicator === 'options') {
                 if (schema.autocomplete.hasOwnProperty(value)) {
@@ -264,7 +273,6 @@ function setAutocompleteValue(schema, object, autocompleteDict, propname, usageN
                 object.serverPopulate = true;
                 delete object[usageName];
             }
-
         }
     }
 }
@@ -504,7 +512,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             collection.properties = record.properties;
 
             let isRedundant = true;
-            if (collections.every(col => col.tableTitle === collection.tableTitle)) {
+            if (collections.every(col => col.tableTitle !== collection.tableTitle)) {
                 if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
                     isRedundant = false;
                 }
@@ -545,25 +553,21 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
 
         if (metadata.type === DataTypes.STRING) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : null;
+            // autocomplete overrides the default if set on string. Set default via autocomplete
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
                 let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
                 let autocompleteDict = getAutocompleteDict(autocomplete);
 
-                for (const path in autocompleteDict) {
+                for (const pathNIndicator in autocompleteDict) {
+                    const [path, indicator] = pathNIndicator.split(KEY_INDICATOR_SEPARATOR);
                     if (propname === path || xpath.endsWith(path)) {
-                        const [value, indicator] = autocompleteDict[path];
+                        const value = autocompleteDict[pathNIndicator];
                         if (indicator === 'server_populate') {
                             delete object[propname];
                         } else if (indicator === 'assign') {
+                            // TODO: check if value is present in available options
                             object[propname] = value;
                         }
-                        // if (!schema.autocomplete.hasOwnProperty(autocompleteDict[path])) {
-                        //     if (autocompleteDict[path] === 'server_populate') {
-                        //         delete object[propname];
-                        //     } else {
-                        //         object[propname] = autocompleteDict[path];
-                        //     }
-                        // }
                     }
                 }
             }
@@ -572,9 +576,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
         } else if (metadata.type === DataTypes.BOOLEAN) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : false;
         } else if (metadata.type === DataTypes.DATE_TIME) {
-            // const currentDate = new Date()
-            // currentDate.setSeconds(0, 0);
-            // object[propname] = currentDate.toISOString();
+            // default date-time is null (unassigned)
             object[propname] = null;
         } else if (metadata.type === DataTypes.ENUM) {
             let ref = metadata.items.$ref.split('/')
@@ -585,12 +587,14 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
                 let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
                 let autocompleteDict = getAutocompleteDict(autocomplete);
 
-                for (const path in autocompleteDict) {
+                for (const pathNIndicator in autocompleteDict) {
+                    const [path, indicator] = pathNIndicator.split(KEY_INDICATOR_SEPARATOR);
                     if (propname === path || xpath.endsWith(path)) {
-                        const [value, indicator] = autocompleteDict[path];
+                        const value = autocompleteDict[pathNIndicator];
                         if (indicator === 'server_populate') {
                             delete object[propname];
                         } else if (indicator === 'assign') {
+                            // TODO: check if value is present in available options
                             object[propname] = value;
                         }
                     }
@@ -3825,4 +3829,26 @@ function getTextWidthInPx(characters, fontSize = 14) {
 
 export function isEmptyObject(obj) {
     return Object.keys(obj).length === 0;
+}
+
+export function clearId(obj) {
+    if (isObject(obj)) {
+        if (obj.hasOwnProperty(DB_ID)) {
+            delete obj[DB_ID];
+        }
+        Object.entries(obj).forEach(([k, v]) => {
+            if (Array.isArray(v)) {
+                v.forEach(o => {
+                    if (isObject(o)) {
+                        clearId(o);
+                    } // else not required - simple data type array
+                })
+            } else if (isObject(v)) {
+                clearId(v);
+            } // else not required - simple data type field
+        })
+    } else {
+        const err_ = 'clearId failed, expected obj of type Object, received: ' + typeof obj;
+        console.error(err_);
+    }
 }

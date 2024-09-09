@@ -240,7 +240,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
 
         return output_str
 
-    def handle_CRUD_task(self) -> str:
+    def handle_pydantic_CRUD_task(self) -> str:
         output_str = ""
         for message in self.root_message_list:
             output_str += self.handle_CRUD_for_message(message)
@@ -302,7 +302,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
 
         output_str += self.handle_start_event()
 
-        output_str += self.handle_CRUD_task()
+        output_str += self.handle_pydantic_CRUD_task()
 
         output_str += self.handle_execution_code(self.proto_file_name)
         return output_str

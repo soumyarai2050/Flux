@@ -14,23 +14,26 @@ message StratView{
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
+    PassStoredObjToUpdatePrePostCallback: true
   };
   option (FluxMsgWidgetUIOption) = {
     depending_proto_file_name: "email_book_service.proto",
   };
-  required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID", (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int32 strat_alert_count = 2;
   optional Severity strat_alert_aggregated_severity = 3 [default=Severity_UNSPECIFIED, (FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
-  optional float average_premium = 4 [(FluxFldNumberFormat) = "%", (FluxFldNoCommonKey) = true];
-  optional float market_premium = 5 [(FluxFldNumberFormat) = "%", (FluxFldNoCommonKey) = true];
+  optional float average_premium = 4 [(FluxFldNumberFormat) = "%", (FluxFldOrmNoUpdate) = true, (FluxFldNoCommonKey) = true];
+  optional float market_premium = 5 [(FluxFldNumberFormat) = "%", (FluxFldOrmNoUpdate) = true, (FluxFldNoCommonKey) = true];
   optional float balance_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="StratView.max_single_leg_notional", (FluxFldProgressBar) = {
     value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // chore of condition matching -> left to right (select first match)
     hover_text_type: HoverTextType_VALUE,
     is_reverse: true
   }];
   optional float max_single_leg_notional = 7;
-  required bool unload_strat = 8 [default = false, (FluxFldButton) = {
+  optional float total_fill_buy_notional = 8 [(FluxFldDisplayType) = "int", (FluxFldNumberFormat) = "$", (FluxFldOrmNoUpdate) = true, (FluxFldNoCommonKey) = true];
+  optional float total_fill_sell_notional = 9 [(FluxFldDisplayType) = "int", (FluxFldNumberFormat) = "$", (FluxFldOrmNoUpdate) = true, (FluxFldNoCommonKey) = true];
+  required bool unload_strat = 10 [default = false, (FluxFldButton) = {
     unpressed_caption: "Unload Strat",
     pressed_caption: "In Progress",
     disabled_captions: "true=In Progress"
@@ -41,7 +44,7 @@ message StratView{
     pressed_value_as_text: "true",
     button_icon_name: "Delete"
   }];
-  required bool recycle_strat = 9 [default = false, (FluxFldButton) = {
+  required bool recycle_strat = 11 [default = false, (FluxFldButton) = {
     unpressed_caption: "Recycle Strat",
     pressed_caption: "In Progress",
     disabled_captions: "true=In Progress"

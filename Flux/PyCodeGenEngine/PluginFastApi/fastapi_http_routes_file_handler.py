@@ -14,7 +14,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 import protogen
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, \
     parse_string_to_original_types, convert_to_capitalized_camel_case
-from Flux.PyCodeGenEngine.PluginFastApi.fastapi_base_routes_file_handler import FastapiBaseRoutesFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_base_routes_file_handler import FastapiBaseRoutesFileHandler, ModelType
 
 
 class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
@@ -25,6 +25,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         self.shared_lock_name_message_list: List[protogen.Message] = []
         self.message_to_link_messages_dict: Dict[protogen.Message, List[protogen.Message]] = {}
         self._msg_already_generated_str_formatted_int_fields_handler_list: List[protogen.Message] = []
+        self._msg_already_generated_id_n_date_time_fields_handler_list: List[protogen.Message] = []
 
     def _get_list_of_shared_lock_for_message(self, message: protogen.Message) -> List[str]:
         shared_lock_name_list = []
@@ -43,546 +44,1898 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 indent_times += 1
         else:
             if message not in self.reentrant_lock_non_required_msg:
-                    output_str += " " * (indent_times * 4) + f"    async with {message.proto.name}.reentrant_lock:\n"
-                    indent_times += 1
+                output_str += " " * (indent_times * 4) + f"    async with {message.proto.name}.reentrant_lock:\n"
+                indent_times += 1
 
         indent_count = indent_times * 4
         return output_str, indent_count
 
-    def _unpack_kwargs_with_id_field_type(self, **kwargs) -> Tuple[protogen.Message, str, str, List[str]]:
-        message: protogen.Message | None = kwargs.get("message")
-        aggregation_type: str | None = kwargs.get("aggregation_type")
-        id_field_type: str | None = kwargs.get("id_field_type")
-        shared_lock_list: List[str] | None = kwargs.get("shared_lock_list")
-
-        if message is None or aggregation_type is None or id_field_type is None:
-            err_str = (f"Received kwargs having some None values out of message: "
-                       f"{message.proto.name if message is not None else message}, "
-                       f"aggregation_type: {aggregation_type}, id_field_type: {id_field_type}")
-            logging.exception(err_str)
-            raise Exception(err_str)
-        return message, aggregation_type, id_field_type, shared_lock_list
-
-    def _unpack_kwargs_without_id_field_type(self, **kwargs):
-        message: protogen.Message | None = kwargs.get("message")
-        aggregation_type: str | None = kwargs.get("aggregation_type")
-        shared_lock_list: List[str] | None = kwargs.get("shared_lock_list")
-        if message is None or aggregation_type is None:
-            err_str = (f"Received kwargs having some None values out of message: "
-                       f"{message.proto.name if message is not None else message}, "
-                       f"aggregation_type: {aggregation_type}")
-            logging.exception(err_str)
-            raise Exception(err_str)
-        return message, aggregation_type, shared_lock_list
-
-    def handle_underlying_POST_one_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
+    def _handle_msgspec_common_underlying_post_gen(self, message: protogen.Message, aggregation_type, msg_has_links,
+                                                   shared_lock_list) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
-        output_str += (f"async def underlying_create_{message_name_snake_cased}_http({message_name_snake_cased}: "
-                       f"{message.proto.name}, filter_agg_pipeline: Any = None, generic_callable: "
-                       f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                       f") -> {message.proto.name} | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Create route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_post_http\n'
-        # else not required: avoiding if method desc not provided
+        output_str = (f"async def _underlying_create_{message_name_snake_cased}_http("
+                      f"{message_name_snake_cased}_msgspec_obj: msgspec.Struct, "
+                      f"filter_agg_pipeline: Any = None, generic_callable: "
+                      f"Callable[Any, Any] | None = None, return_obj_copy: bool | None = True"
+                      f"):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
-        output_str += " " * indent_count + \
-                      f"    await callback_class.create_{message_name_snake_cased}_pre({message_name_snake_cased})\n"
-        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
+        output_str += (" " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_pre("
+                       f"{message_name_snake_cased}_msgspec_obj)\n")
+        output_str += (" " * indent_count + f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
+                       f"'avoid_{message_name_snake_cased}_db_update')\n")
+        output_str += " " * indent_count + f"    if not avoid_{message_name_snake_cased}_db_update:\n"
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
-                      f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
-                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                      f"{message_name_snake_cased}, filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
+                      f"        {message_name_snake_cased}_json_obj = await generic_callable(" \
+                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                      f"{message_name_snake_cased}_msgspec_obj, filter_agg_pipeline)\n"
+        output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj = "
+                                            f"msgspec.convert({message_name_snake_cased}_json_obj, "
+                                            f"type={message.proto.name}, dec_hook=dec_hook)\n")
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                filter_agg_pipeline_var_name = self._get_filter_configs_var_name(message, message_name_snake_cased)
                 output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
-                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, {message_name_snake_cased}, "
-                               f"{self._get_filter_configs_var_name(message, message_name_snake_cased)}, "
-                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                              (f"        {message_name_snake_cased}_json_obj = await generic_callable("
+                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message_name_snake_cased}_msgspec_obj, {filter_agg_pipeline_var_name}, "
+                               f"has_links={msg_has_links})\n")
+                output_str += " " * indent_count + (f"        # since {filter_agg_pipeline_var_name} is passed - "
+                                                    f"returned dict will be aggregated output so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj = "
+                                                    f"msgspec.convert({message_name_snake_cased}_json_obj, "
+                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
-                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, {message_name_snake_cased}, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
+                              (f"        {message_name_snake_cased}_json_obj = await "
+                               f"generic_callable({message.proto.name}, "
+                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message_name_snake_cased}_msgspec_obj, "
+                               f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
+                output_str += " " * indent_count + (f"        # since {update_agg_pipeline_var_name} is passed - "
+                                                    f"returned dict will be update "
+                                                    f"aggregated output so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj = "
+                                                    f"msgspec.convert({message_name_snake_cased}_json_obj, "
+                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                filter_agg_pipeline_var_name = self._get_filter_configs_var_name(message, message_name_snake_cased)
                 output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
-                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, {message_name_snake_cased}, "
-                               f"{self._get_filter_configs_var_name(message, message_name_snake_cased)}, "
-                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
+                              (f"        {message_name_snake_cased}_json_obj = "
+                               f"await generic_callable({message.proto.name}, "
+                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message_name_snake_cased}_msgspec_obj, {filter_agg_pipeline_var_name}, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
+                output_str += " " * indent_count + (f"        # since {filter_agg_pipeline_var_name} and "
+                                                    f"{update_agg_pipeline_var_name} are passed - "
+                                                    f"returned dict will be aggregated output so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj = "
+                                                    f"msgspec.convert({message_name_snake_cased}_json_obj, "
+                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
             case other:
                 output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
+                              (f"        {message_name_snake_cased}_json_obj = await "
+                               f"generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-        output_str += " " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_post({message_name_snake_cased}_obj)\n"
-        output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj\n"
+                               f"{message_name_snake_cased}_msgspec_obj, has_links={msg_has_links})\n")
+        output_str += " " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_post({message_name_snake_cased}_msgspec_obj)\n"
+        output_str += " " * indent_count + f"else:\n"
+        output_str += " " * indent_count + (f"    await callback_class.create_{message_name_snake_cased}_post("
+                                            f"{message_name_snake_cased}_msgspec_obj)\n")
         indent_count -= 4
+        output_str += " " * indent_count + f"    if return_obj_copy:\n"
+        output_str += " " * indent_count + f"        return {message_name_snake_cased}_msgspec_obj\n"
         output_str += " " * indent_count + f"    else:\n"
-        indent_count += 4
-        output_str += " " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_post({message_name_snake_cased})\n"
-        output_str += " " * indent_count + f"    return {message_name_snake_cased}\n"
+        output_str += " " * indent_count + f"        return True\n\n\n"
+        return output_str
+
+    def handle_underlying_POST_one_gen(self, **kwargs) -> str:
+        message, aggregation_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_without_id_field_type(**kwargs))
+        msg_has_links: bool = message in self.message_to_link_messages_dict
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+
+        if model_type == ModelType.Msgspec:
+            output_str = self._handle_msgspec_common_underlying_post_gen(message, aggregation_type, msg_has_links,
+                                                                         shared_lock_list)
+            # default version - takes json_str and returns json_dict
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_create_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_msgspec_obj: msgspec.Struct, "
+                           f"filter_agg_pipeline: Any = None, generic_callable: "
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                           f"):\n")
+            output_str += f'    """\n'
+            output_str += (f'    Create route for {message.proto.name} which takes msgspec_obj param and returns '
+                           f' msgspec_obj\n')
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_post_http\n'
+            output_str += (f"    return_obj = await _underlying_create_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_msgspec_obj, filter_agg_pipeline, generic_callable, "
+                           f"return_obj_copy)\n")
+            output_str += f"    return return_obj\n\n\n"
+
+            # version that takes json_dict and returns json_dict
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_create_{message_name_snake_cased}_http_json_dict("
+                           f"{message_name_snake_cased}_json_dict: Dict[str, Any], "
+                           f"filter_agg_pipeline: Any = None, generic_callable: "
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                           f"):\n")
+            output_str += f'    """\n'
+            output_str += (f'    Create route for {message.proto.name} which takes json_dict param and returns '
+                           f' json_dict\n')
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_post_http\n'
+            output_str += (f"    {message_name_snake_cased}_msgspec_obj = msgspec.convert("
+                           f"{message_name_snake_cased}_json_dict, type={message.proto.name}, "
+                           f"dec_hook=dec_hook)\n")
+            output_str += (f"    return_obj = await _underlying_create_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_msgspec_obj, filter_agg_pipeline, generic_callable, "
+                           f"return_obj_copy)\n")
+            output_str += f"    if return_obj_copy:\n"
+            output_str += f"        return_obj_dict = msgspec.to_builtins(return_obj, builtin_types=[DateTime])\n"
+            output_str += f"        return return_obj_dict\n"
+            output_str += f"    else:\n"
+            output_str += f"        return return_obj\n\n\n"
+
+            # default version - takes json_str and returns json_dict
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_create_{message_name_snake_cased}_http_bytes("
+                           f"{message_name_snake_cased}_bytes: "
+                           f"bytes, filter_agg_pipeline: Any = None, generic_callable: "
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                           f"):\n")
+            output_str += f'    """\n'
+            output_str += (f'    Create route for {message.proto.name} which takes json_str param and returns '
+                           f' json_dict\n')
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_post_http\n'
+            output_str += (f"    {message_name_snake_cased}_msgspec_obj = msgspec.json.decode("
+                           f"{message_name_snake_cased}_bytes, type={message.proto.name}, "
+                           f"dec_hook=dec_hook)\n")
+            output_str += (f"    return_obj = await _underlying_create_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_msgspec_obj, filter_agg_pipeline, generic_callable, "
+                           f"return_obj_copy)\n")
+            output_str += f"    if return_obj_copy:\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_obj, enc_hook=enc_hook)\n"
+            output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=201)\n"
+            output_str += f"    else:\n"
+            output_str += (f"        return CustomFastapiResponse(content=str(return_obj).encode('utf-8'), "
+                           f"status_code=201)\n")
+        else:
+            if model_type == ModelType.Dataclass:
+                output_str = self._handle_missing_id_n_datetime_field_callable_generation(message, model_type)
+                output_str += f"@perf_benchmark\n"
+                output_str += (f"async def underlying_create_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_json_dict: "
+                               f"Dict, filter_agg_pipeline: Any = None, generic_callable: "
+                               f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                               f"):\n")
+            else:
+                output_str = f"@perf_benchmark\n"
+                output_str += (
+                    f"async def underlying_create_{message_name_snake_cased}_http({message_name_snake_cased}: "
+                    f"{message.proto.name}, filter_agg_pipeline: Any = None, generic_callable: "
+                    f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                    f") -> {message.proto.name} | bool:\n")
+            output_str += f'    """\n'
+            output_str += f'    Create route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_post_http\n'
+
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + (
+                    f"    handle_missing_id_n_datetime_fields_in_{message_name_snake_cased}_"
+                    f"json({message.proto.name}, {message_name_snake_cased}_json_dict, "
+                    f"is_patch_call=False)\n")
+                output_str += (" " * indent_count + f"    {message_name_snake_cased}_json_n_dataclass_handler.clear()    "
+                                                    f"# Ideally ths should not be required since we clean handler "
+                                                    f"after post call - keeping it to avoid any bug\n")
+                output_str += (" " * indent_count +
+                               f"    {message_name_snake_cased}_json_n_dataclass_handler.set_json_dict("
+                               f"{message_name_snake_cased}_json_dict)\n")
+                output_str += " " * indent_count + \
+                              (f"    await callback_class.create_{message_name_snake_cased}_pre("
+                               f"{message_name_snake_cased}_json_n_dataclass_handler)\n")
+            else:
+                output_str += " " * indent_count + \
+                              f"    await callback_class.create_{message_name_snake_cased}_pre({message_name_snake_cased})\n"
+            output_str += " " * indent_count + (f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
+                                                f"'avoid_{message_name_snake_cased}_db_update')\n")
+            output_str += " " * indent_count + f"    if not avoid_{message_name_snake_cased}_db_update:\n"
+            indent_count += 4
+            output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + \
+                              f"        {message_name_snake_cased}_json_obj = await generic_callable(" \
+                              f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"{message_name_snake_cased}_json_n_dataclass_handler, filter_agg_pipeline, " \
+                              f"return_obj_copy=return_obj_copy)\n"
+            else:
+                output_str += " " * indent_count + \
+                              f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
+                              f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"{message_name_snake_cased}, filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
+            output_str += " " * indent_count + "    else:\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_json_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"{self._get_filter_configs_var_name(message, message_name_snake_cased)}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, {message_name_snake_cased}, "
+                                       f"{self._get_filter_configs_var_name(message, message_name_snake_cased)}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_json_obj = await "
+                                       f"generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, {message_name_snake_cased}, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                case FastapiHttpRoutesFileHandler.aggregation_type_both:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_json_obj = "
+                                       f"await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"{self._get_filter_configs_var_name(message, message_name_snake_cased)}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, {message_name_snake_cased}, "
+                                       f"{self._get_filter_configs_var_name(message, message_name_snake_cased)}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                case other:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_json_obj = await "
+                                       f"generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_json_obj\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_post({message_name_snake_cased}_obj)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_obj\n"
+            output_str += " " * indent_count + f"else:\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_json_n_dataclass_handler.get_json_dict()\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_post({message_name_snake_cased})\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"# Cleaning handler before returning and leaving r_lock\n"
+                output_str += " " * indent_count + f"{message_name_snake_cased}_json_n_dataclass_handler.clear()\n"
+            output_str += " " * indent_count + f"return return_obj\n"
         output_str += "\n"
         return output_str
 
     def handle_POST_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
+        message, _, _, model_type = self._unpack_kwargs_without_id_field_type(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_POST_one_gen(**kwargs)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}' + \
-                      f'", response_model={message.proto.name} | bool, status_code=201)\n'
-        output_str += (f"async def create_{message_name_snake_cased}_http({message_name_snake_cased}: "
-                       f"{message.proto.name}, return_obj_copy: bool | None = True) -> "
-                       f"{message.proto.name} | bool:\n")
-        output_str += (f"    return await underlying_create_{message_name_snake_cased}_http("
-                       f"{message_name_snake_cased}, return_obj_copy=return_obj_copy)\n")
+        if model_type == ModelType.Dataclass:
+            output_str += f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}' + \
+                          f'", status_code=201)\n'
+            output_str += (f"async def create_{message_name_snake_cased}_http({message_name_snake_cased}_json_req: "
+                           f"Request, return_obj_copy: bool | None = True):\n")
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_json_req.body()\n"
+            output_str += f"        json_body = orjson.loads(data_body)\n"
+            output_str += (f"        return await underlying_create_{message_name_snake_cased}_http("
+                           f"json_body, return_obj_copy=return_obj_copy)\n")
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'create_{message_name_snake_cased}_http failed in client call "
+                           "with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        elif model_type == ModelType.Msgspec:
+            output_str += f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}' + \
+                          f'", status_code=201)\n'
+            output_str += (f"async def create_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_json_req: Request, return_obj_copy: bool | None = True):\n")
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_json_req.body()\n"
+            output_str += (f"        return await underlying_create_{message_name_snake_cased}_http_bytes("
+                           f"data_body, return_obj_copy=return_obj_copy)\n")
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'create_{message_name_snake_cased}_http failed in client call "
+                           "with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        else:
+            output_str += f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}' + \
+                          f'", response_model={message.proto.name} | bool, status_code=201)\n'
+            output_str += (f"async def create_{message_name_snake_cased}_http({message_name_snake_cased}: "
+                           f"{message.proto.name}, return_obj_copy: bool | None = True) -> "
+                           f"{message.proto.name} | bool:\n")
+            output_str += f"    try:\n"
+            output_str += (f"        return await underlying_create_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}, return_obj_copy=return_obj_copy)\n")
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'create_{message_name_snake_cased}_http failed in client call "
+                           "with exception: {e}')\n")
+            output_str += f"        raise e\n"
         return output_str
 
-    def handle_underlying_POST_all_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
+    def _handle_msgspec_common_underlying_post_all_gen(self, message: protogen.Message, aggregation_type, msg_has_links,
+                                                       shared_lock_list) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
-        output_str += (f"async def underlying_create_all_{message_name_snake_cased}_http({message_name_snake_cased}_list: "
-                       f"List[{message.proto.name}], filter_agg_pipeline: Any = None, generic_callable: "
-                       f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True) -> "
-                       f"List[{message.proto.name}] | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Create All route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_post_all_http\n'
-        # else not required: avoiding if method desc not provided
+        output_str = (f"async def _underlying_create_all_{message_name_snake_cased}_http("
+                      f"{message_name_snake_cased}_msgspec_obj_list: List[msgspec.Struct], "
+                      f"filter_agg_pipeline: Any = None, generic_callable: "
+                      f"Callable[Any, Any] | None = None, return_obj_copy: bool | None = True"
+                      f"):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
         output_str += " " * indent_count + \
                       f"    await callback_class.create_all_{message_name_snake_cased}_pre(" \
-                      f"{message_name_snake_cased}_list)\n"
+                      f"{message_name_snake_cased}_msgspec_obj_list)\n"
         output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
                                             f"'avoid_{message_name_snake_cased}_db_update'):\n")
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
-                      f"        {message_name_snake_cased}_obj_list = await generic_callable({message.proto.name}, " \
-                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}," \
-                      f"{message_name_snake_cased}_list, filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
+                      (f"        {message_name_snake_cased}_json_list = "
+                       f"await generic_callable({message.proto.name}, "
+                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name},"
+                       f"{message_name_snake_cased}_msgspec_obj_list, filter_agg_pipeline)\n")
+        output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj_list = "
+                                            f"msgspec.convert({message_name_snake_cased}_json_list, "
+                                            f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                filter_agg_pipeline_var_name = self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_list')
                 output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj_list = "
+                              (f"        {message_name_snake_cased}_json_list = "
                                f"await generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}_list, "
-                               f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_list')}, "
-                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                               f"{message_name_snake_cased}_msgspec_obj_list, {filter_agg_pipeline_var_name}, "
+                               f"has_links={msg_has_links})\n")
+                output_str += " " * indent_count + (f"        # since {filter_agg_pipeline_var_name} is passed - "
+                                                    f"returned value will be aggregated output "
+                                                    f"so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj_list = "
+                                                    f"msgspec.convert({message_name_snake_cased}_json_list, "
+                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj_list = "
+                              (f"        {message_name_snake_cased}_json_list = "
                                f"await generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}_list, "
+                               f"{message_name_snake_cased}_msgspec_obj_list, "
                                f"update_agg_pipeline={update_agg_pipeline_var_name}, "
-                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                               f"has_links={msg_has_links})\n")
+                output_str += " " * indent_count + (f"        # since {update_agg_pipeline_var_name} is passed - "
+                                                    f"returned val will be update "
+                                                    f"aggregated output so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj_list = "
+                                                    f"msgspec.convert({message_name_snake_cased}_json_list, "
+                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                filter_agg_pipeline_var_name = self._get_filter_configs_var_name(message,
+                                                                                 f'{message_name_snake_cased}_list')
                 output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj_list = "
+                              (f"        {message_name_snake_cased}_json_list = "
                                f"await generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}_list, "
-                               f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_list')}, "
-                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
+                               f"{message_name_snake_cased}_msgspec_obj_list, {filter_agg_pipeline_var_name}, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
+                output_str += " " * indent_count + (f"        # since {filter_agg_pipeline_var_name} and "
+                                                    f"{update_agg_pipeline_var_name} are passed - "
+                                                    f"returned dict will be aggregated output so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj_list = "
+                                                    f"msgspec.convert({message_name_snake_cased}_json_list, "
+                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
             case other:
                 output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj_list = "
+                              (f"        {message_name_snake_cased}_json_list = "
                                f"await generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}_list, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-        output_str += " " * indent_count + f"    await callback_class.create_all_{message_name_snake_cased}_post({message_name_snake_cased}_obj_list)\n"
-        output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj_list\n"
+                               f"{message_name_snake_cased}_msgspec_obj_list, "
+                               f"has_links={msg_has_links})\n")
+                output_str += (" " * indent_count +
+                               f"        # avoiding returned json dict to obj convertion since no filter or update "
+                               f"aggregation was passed and hence whatever param passed was stored - will be using "
+                               f"same value which was passed as param\n")
+        output_str += " " * indent_count + (f"    await callback_class.create_all_{message_name_snake_cased}_post("
+                                            f"{message_name_snake_cased}_msgspec_obj_list)\n")
+        output_str += " " * indent_count + f"else:\n"
+        output_str += " " * indent_count + (f"    await callback_class.create_all_{message_name_snake_cased}_post("
+                                            f"{message_name_snake_cased}_msgspec_obj_list)\n")
         indent_count -= 4
+        output_str += " " * indent_count + f"    if return_obj_copy:\n"
+        output_str += " " * indent_count + f"        return {message_name_snake_cased}_msgspec_obj_list\n"
         output_str += " " * indent_count + f"    else:\n"
-        indent_count += 4
-        output_str += " " * indent_count + f"    await callback_class.create_all_{message_name_snake_cased}_post({message_name_snake_cased}_list)\n"
-        output_str += " " * indent_count + f"    return {message_name_snake_cased}_list\n"
+        output_str += " " * indent_count + f"        return True\n\n\n"
+        return output_str
+
+    def handle_underlying_POST_all_gen(self, **kwargs) -> str:
+        message, aggregation_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_without_id_field_type(**kwargs))
+        msg_has_links: bool = message in self.message_to_link_messages_dict
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        if model_type == ModelType.Msgspec:
+            output_str = self._handle_msgspec_common_underlying_post_all_gen(message, aggregation_type,
+                                                                             msg_has_links, shared_lock_list)
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_create_all_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_msgspec_obj_list: List[msgspec.Struct], "
+                           f"filter_agg_pipeline: Any = None, generic_callable: "
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Create All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_post_all_http\n'
+            output_str += (f"    return_val = await _underlying_create_all_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_msgspec_obj_list, "
+                           f"filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+            output_str += "    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_create_all_{message_name_snake_cased}_http_json_dict("
+                           f"{message_name_snake_cased}_json_dict_list: List[Dict[str, Any]], "
+                           f"filter_agg_pipeline: Any = None, generic_callable: "
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Create All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_post_all_http\n'
+            output_str += (f"    {message_name_snake_cased}_msgspec_obj_list = msgspec.convert("
+                           f"{message_name_snake_cased}_json_dict_list, type=List[{message.proto.name}], "
+                           f"dec_hook=dec_hook)\n")
+            output_str += (f"    return_val = await _underlying_create_all_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_msgspec_obj_list, "
+                           f"filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+            output_str += f"    if return_obj_copy:\n"
+            output_str += f"        return_obj_dict = msgspec.to_builtins(return_val, builtin_types=[DateTime])\n"
+            output_str += f"        return return_obj_dict\n"
+            output_str += f"    else:\n"
+            output_str += f"        return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_create_all_{message_name_snake_cased}_http_bytes("
+                           f"{message_name_snake_cased}_bytes: "
+                           f"bytes, filter_agg_pipeline: Any = None, generic_callable: "
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Create All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_post_all_http\n'
+            output_str += (f"    {message_name_snake_cased}_msgspec_obj_list = msgspec.json.decode("
+                           f"{message_name_snake_cased}_bytes, type=List[{message.proto.name}], "
+                           f"dec_hook=dec_hook)\n")
+            output_str += (f"    return_val = await _underlying_create_all_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_msgspec_obj_list, "
+                           f"filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+            output_str += f"    if return_obj_copy:\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=201)\n"
+            output_str += f"    else:\n"
+            output_str += (f"        return CustomFastapiResponse(content=str(return_val).encode('utf-8'), "
+                           f"status_code=201)\n")
+        else:
+            if model_type == ModelType.Dataclass:
+                output_str = self._handle_missing_id_n_datetime_field_callable_generation(message, model_type)
+                output_str += f"@perf_benchmark\n"
+                output_str += (f"async def underlying_create_all_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_json_dict_list: "
+                               f"List[Dict], filter_agg_pipeline: Any = None, generic_callable: "
+                               f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+            else:
+                output_str = f"@perf_benchmark\n"
+                output_str += (
+                    f"async def underlying_create_all_{message_name_snake_cased}_http({message_name_snake_cased}_list: "
+                    f"List[{message.proto.name}], filter_agg_pipeline: Any = None, generic_callable: "
+                    f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True) -> "
+                    f"List[{message.proto.name}] | bool:\n")
+            output_str += f'    """\n'
+            output_str += f'    Create All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_post_all_http\n'
+            # else not required: avoiding if method desc not provided
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    for {message_name_snake_cased}_json_dict in " \
+                                                   f"{message_name_snake_cased}_json_dict_list:\n"
+                output_str += " " * indent_count + (
+                    f"        handle_missing_id_n_datetime_fields_in_{message_name_snake_cased}_"
+                    f"json({message.proto.name}, {message_name_snake_cased}_json_dict, "
+                    f"is_patch_call=False)\n")
+                output_str += (" " * indent_count + f"    {message_name_snake_cased}_json_n_dataclass_handler.clear()    "
+                                                    f"# Ideally ths should not be required since we clean handler "
+                                                    f"after post call - keeping it to avoid any bug\n")
+                output_str += (" " * indent_count +
+                               f"    {message_name_snake_cased}_json_n_dataclass_handler.set_json_dict_list("
+                               f"{message_name_snake_cased}_json_dict_list)\n")
+                output_str += " " * indent_count + \
+                              f"    await callback_class.create_all_{message_name_snake_cased}_pre(" \
+                              f"{message_name_snake_cased}_json_n_dataclass_handler)\n"
+            else:
+                output_str += " " * indent_count + \
+                              f"    await callback_class.create_all_{message_name_snake_cased}_pre(" \
+                              f"{message_name_snake_cased}_list)\n"
+            output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
+                                                f"'avoid_{message_name_snake_cased}_db_update'):\n")
+            indent_count += 4
+            output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + \
+                              (f"        {message_name_snake_cased}_json_list = "
+                               f"await generic_callable({message.proto.name}, "
+                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name},"
+                               f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                               f"filter_agg_pipeline, return_obj_copy=return_obj_copy)\n")
+            else:
+                output_str += " " * indent_count + \
+                              f"        {message_name_snake_cased}_obj_list = await generic_callable({message.proto.name}, " \
+                              f"{FastapiHttpRoutesFileHandler.proto_package_var_name}," \
+                              f"{message_name_snake_cased}_list, filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
+            output_str += " " * indent_count + "    else:\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_json_list = "
+                                       f"await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_list')}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_obj_list = "
+                                       f"await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_list, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_list')}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_json_list = "
+                                       f"await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_obj_list = "
+                                       f"await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_list, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                case FastapiHttpRoutesFileHandler.aggregation_type_both:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_json_list = "
+                                       f"await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_list')}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_obj_list = "
+                                       f"await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_list, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_list')}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                case other:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_json_list = "
+                                       f"await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        {message_name_snake_cased}_obj_list = "
+                                       f"await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_list, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.create_all_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_json_list\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.create_all_{message_name_snake_cased}_post({message_name_snake_cased}_obj_list)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_obj_list\n"
+            output_str += " " * indent_count + f"else:\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.create_all_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_json_n_dataclass_handler.get_json_dict_list()\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.create_all_{message_name_snake_cased}_post({message_name_snake_cased}_list)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_list\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"# Cleaning handler before returning and leaving r_lock\n"
+                output_str += " " * indent_count + f"{message_name_snake_cased}_json_n_dataclass_handler.clear()\n"
+            output_str += " " * indent_count + f"return return_obj\n"
         output_str += "\n"
         return output_str
 
     def handle_POST_all_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
+        message, _, _, model_type = self._unpack_kwargs_without_id_field_type(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_POST_all_gen(**kwargs)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.post("/create_all-{message_name_snake_cased}' + \
-                      f'", response_model=List[{message.proto.name}] | bool, status_code=201)\n'
-        output_str += (f"async def create_all_{message_name_snake_cased}_http({message_name_snake_cased}_list: "
-                       f"List[{message.proto.name}], return_obj_copy: bool | None = True) -> "
-                       f"List[{message.proto.name}] | bool:\n")
-        output_str += f"    return await underlying_create_all_{message_name_snake_cased}_http(" \
-                      f"{message_name_snake_cased}_list, return_obj_copy=return_obj_copy)\n"
+        if model_type == ModelType.Dataclass:
+            output_str += f'@{self.api_router_app_name}.post("/create_all-{message_name_snake_cased}' + \
+                          f'", status_code=201)\n'
+            output_str += (f"async def create_all_{message_name_snake_cased}_http({message_name_snake_cased}_req: "
+                           f"Request, return_obj_copy: bool | None = True):\n")
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_req.body()\n"
+            output_str += f"        json_body = orjson.loads(data_body)\n"
+            output_str += f"        return await underlying_create_all_{message_name_snake_cased}_http(" \
+                          f"json_body, return_obj_copy=return_obj_copy)\n"
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'create_all_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        elif model_type == ModelType.Msgspec:
+            output_str += f'@{self.api_router_app_name}.post("/create_all-{message_name_snake_cased}' + \
+                          f'", status_code=201)\n'
+            output_str += (f"async def create_all_{message_name_snake_cased}_http({message_name_snake_cased}_req: "
+                           f"Request, return_obj_copy: bool | None = True):\n")
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_req.body()\n"
+            output_str += f"        return await underlying_create_all_{message_name_snake_cased}_http_bytes(" \
+                          f"data_body, return_obj_copy=return_obj_copy)\n"
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'create_all_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        else:
+            output_str += f'@{self.api_router_app_name}.post("/create_all-{message_name_snake_cased}' + \
+                          f'", response_model=List[{message.proto.name}] | bool, status_code=201)\n'
+            output_str += (f"async def create_all_{message_name_snake_cased}_http({message_name_snake_cased}_list: "
+                           f"List[{message.proto.name}], return_obj_copy: bool | None = True) -> "
+                           f"List[{message.proto.name}] | bool:\n")
+            output_str += f"    try:\n"
+            output_str += f"        return await underlying_create_all_{message_name_snake_cased}_http(" \
+                          f"{message_name_snake_cased}_list, return_obj_copy=return_obj_copy)\n"
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'create_all_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        return output_str
+
+    def _handle_msgspec_common_underlying_put_gen(self, message: protogen.Message, aggregation_type, msg_has_links,
+                                                  shared_lock_list, pass_stored_obj_to_pre_post_callback: bool) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = (
+            f"async def _underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
+            f"update_msgspec_obj: msgspec.Struct, filter_agg_pipeline: Any = None, generic_callable: "
+            f"Callable[Any, Any] | None = None, return_obj_copy: bool | None = True"
+            f"):\n")
+        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+        output_str += mutex_handling_str
+
+        if pass_stored_obj_to_pre_post_callback:
+            output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_json_dict = "
+                                                f"await generic_read_by_id_http({message.proto.name}, "
+                                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                                f"{message_name_snake_cased}_update_msgspec_obj.id, "
+                                                f"has_links={msg_has_links})\n")
+            output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_msgspec_obj = "
+                                                f"msgspec.convert(stored_{message_name_snake_cased}_json_dict, "
+                                                f"type={message.proto.name}, dec_hook=dec_hook)\n")
+            output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_msgspec_obj = "
+                                                f"await callback_class.update_{message_name_snake_cased}_pre("
+                                                f"stored_{message_name_snake_cased}_msgspec_obj, "
+                                                f"{message_name_snake_cased}_update_msgspec_obj)\n")
+        else:
+            output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_msgspec_obj = "
+                                                f"await callback_class.update_{message_name_snake_cased}_pre("
+                                                f"{message_name_snake_cased}_update_msgspec_obj)\n")
+        output_str += " " * indent_count + (
+            f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
+            f"'avoid_{message_name_snake_cased}_db_update')\n")
+        output_str += " " * indent_count + f"    if not avoid_{message_name_snake_cased}_db_update:\n"
+        indent_count += 4
+        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+        output_str += " " * indent_count + \
+                      f"        updated_{message_name_snake_cased}_json_obj = " \
+                      f"await generic_callable({message.proto.name}, " \
+                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                      f"{message_name_snake_cased}_update_msgspec_obj, " \
+                      f"filter_agg_pipeline)\n"
+        output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj = "
+                                            f"msgspec.convert(updated_{message_name_snake_cased}_json_obj, "
+                                            f"type={message.proto.name}, dec_hook=dec_hook)\n")
+        output_str += " " * indent_count + "    else:\n"
+        match aggregation_type:
+            case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                filter_agg_pipeline_var_name = self._get_filter_configs_var_name(message,
+                                                                                 f'{message_name_snake_cased}_updated')
+                output_str += " " * indent_count + \
+                              f"        updated_{message_name_snake_cased}_json_obj = await generic_callable(" \
+                              f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"{message_name_snake_cased}_update_msgspec_obj, {filter_agg_pipeline_var_name}, " \
+                              f"has_links={msg_has_links})\n"
+                output_str += " " * indent_count + (f"        # since {filter_agg_pipeline_var_name} is passed - "
+                                                    f"returned dict will be aggregated output so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj = "
+                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_obj, "
+                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
+            case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                update_agg_pipeline_var_name = \
+                    self.get_simple_option_value_from_proto(message,
+                                                            FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                output_str += " " * indent_count + \
+                              (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
+                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message_name_snake_cased}_update_msgspec_obj, "
+                               f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                               f"has_links={msg_has_links})\n")
+                output_str += " " * indent_count + (f"        # since {update_agg_pipeline_var_name} is passed - "
+                                                    f"returned dict will be update "
+                                                    f"aggregated output so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj = "
+                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_obj, "
+                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
+            case FastapiHttpRoutesFileHandler.aggregation_type_both:
+                update_agg_pipeline_var_name = \
+                    self.get_simple_option_value_from_proto(message,
+                                                            FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                filter_agg_pipeline_var_name = self._get_filter_configs_var_name(message,
+                                                                                 f'{message_name_snake_cased}_updated')
+                output_str += " " * indent_count + \
+                              (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
+                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message_name_snake_cased}_update_msgspec_obj, {filter_agg_pipeline_var_name}, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
+                output_str += " " * indent_count + (f"        # since {filter_agg_pipeline_var_name} and "
+                                                    f"{update_agg_pipeline_var_name} are passed - "
+                                                    f"returned dict will be aggregated output so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj = "
+                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_obj, "
+                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
+            case other:
+                output_str += " " * indent_count + \
+                              (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
+                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message_name_snake_cased}_update_msgspec_obj, has_links={msg_has_links})\n")
+        if pass_stored_obj_to_pre_post_callback:
+            output_str += " " * indent_count + (f"    await callback_class.update_{message_name_snake_cased}_post("
+                                                f"stored_{message_name_snake_cased}_msgspec_obj, "
+                                                f"{message_name_snake_cased}_update_msgspec_obj)\n")
+            output_str += " " * indent_count + f"else:\n"
+            output_str += " " * indent_count + (f"    await callback_class.update_{message_name_snake_cased}_post("
+                                                f"stored_{message_name_snake_cased}_msgspec_obj, "
+                                                f"{message_name_snake_cased}_update_msgspec_obj)\n")
+        else:
+            output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post({message_name_snake_cased}_update_msgspec_obj)\n"
+            output_str += " " * indent_count + f"else:\n"
+            output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post({message_name_snake_cased}_update_msgspec_obj)\n"
+        indent_count -= 4
+        output_str += " " * indent_count + f"    if return_obj_copy:\n"
+        output_str += " " * indent_count + f"        return {message_name_snake_cased}_update_msgspec_obj\n"
+        output_str += " " * indent_count + f"    else:\n"
+        output_str += " " * indent_count + f"        return True\n\n\n"
         return output_str
 
     def handle_underlying_PUT_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
+        message, aggregation_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_without_id_field_type(**kwargs))
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
-        output_str += (f"async def underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                       f"updated: {message.proto.name}, filter_agg_pipeline: Any = None, generic_callable: "
-                       f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                       f") -> {message.proto.name} | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Update route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_put_http\n'
-        # else not required: avoiding if method desc not provided
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
-                                           f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                                           f"{message_name_snake_cased}_updated.id, has_links={msg_has_links})\n"
-        output_str += " " * indent_count + f"    {message_name_snake_cased}_updated = " \
-                                           f"await callback_class.update_{message_name_snake_cased}_pre(" \
-                                           f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
-        output_str += " " * indent_count + f"    if {message_name_snake_cased}_updated is None:\n"
-        output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
-                                            f"'callback_class.partial_update_{message_name_snake_cased}_pre returned "
-                                            f"None instead of updated {message_name_snake_cased}_updated  ')\n")
-        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
-        indent_count += 4
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      f"        updated_{message_name_snake_cased}_obj = " \
-                      f"await generic_callable({message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj), {message_name_snake_cased}_updated, " \
-                      f"filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
-        output_str += " " * indent_count + "    else:\n"
-        match aggregation_type:
-            case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+        if model_type == ModelType.Msgspec:
+            pass_stored_obj_to_pre_post_callback = self._get_if_pass_stored_obj_to_pre_post_callback(
+                FastapiHttpRoutesFileHandler.flux_json_root_pass_stored_obj_to_update_pre_post_callback, **kwargs)
+            output_str = self._handle_msgspec_common_underlying_put_gen(message, aggregation_type,
+                                                                        msg_has_links, shared_lock_list,
+                                                                        pass_stored_obj_to_pre_post_callback)
+            output_str += f"@perf_benchmark\n"
+            output_str += (
+                f"async def underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                f"update_msgspec_obj: msgspec.Struct, filter_agg_pipeline: Any = None, generic_callable: "
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                f"):\n")
+            output_str += f'    """\n'
+            output_str += f'    Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_put_http\n'
+            output_str += (
+                f"    return_val = await _underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+            output_str += "    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (
+                f"async def underlying_update_{message_name_snake_cased}_http_json_dict({message_name_snake_cased}_"
+                f"update_json_dict: Dict[str, Any], filter_agg_pipeline: Any = None, generic_callable: "
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                f"):\n")
+            output_str += f'    """\n'
+            output_str += f'    Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_put_http\n'
+            output_str += (f"    {message_name_snake_cased}_update_msgspec_obj = msgspec.convert("
+                           f"{message_name_snake_cased}_update_json_dict, type={message.proto.name}, "
+                           f"dec_hook=dec_hook)\n")
+            output_str += (
+                f"    return_val = await _underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+            output_str += f"    if return_obj_copy:\n"
+            output_str += f"        return_obj_dict = msgspec.to_builtins(return_val, builtin_types=[DateTime])\n"
+            output_str += f"        return return_obj_dict\n"
+            output_str += f"    else:\n"
+            output_str += f"        return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (
+                f"async def underlying_update_{message_name_snake_cased}_http_bytes({message_name_snake_cased}_"
+                f"update_bytes: bytes, filter_agg_pipeline: Any = None, generic_callable: "
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                f"):\n")
+            output_str += f'    """\n'
+            output_str += f'    Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_put_http\n'
+            output_str += (f"    {message_name_snake_cased}_update_msgspec_obj = msgspec.json.decode("
+                           f"{message_name_snake_cased}_update_bytes, type={message.proto.name}, "
+                           f"dec_hook=dec_hook)\n")
+            output_str += (
+                f"    return_val = await _underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+            output_str += f"    if return_obj_copy:\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
+            output_str += f"    else:\n"
+            output_str += (f"        return CustomFastapiResponse(content=str(return_val).encode('utf-8'), "
+                           f"status_code=200)\n\n")
+        else:
+            output_str = f"@perf_benchmark\n"
+            if model_type == ModelType.Dataclass:
+                output_str += (f"async def underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                               f"update_json: Dict, filter_agg_pipeline: Any = None, generic_callable: "
+                               f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                               f"):\n")
+            else:
+                output_str += (f"async def underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                               f"updated: {message.proto.name}, filter_agg_pipeline: Any = None, generic_callable: "
+                               f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                               f") -> {message.proto.name} | bool:\n")
+            output_str += f'    """\n'
+            output_str += f'    Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_put_http\n'
+            # else not required: avoiding if method desc not provided
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            if model_type == ModelType.Dataclass:
+                output_str += (" " * indent_count + f"    {message_name_snake_cased}_json_n_dataclass_handler.clear()    "
+                                                    f"# Ideally ths should not be required since we clean handler "
+                                                    f"after post call - keeping it to avoid any bug\n")
+                output_str += (" " * indent_count +
+                               f"    {message_name_snake_cased}_json_n_dataclass_handler.set_json_dict("
+                               f"{message_name_snake_cased}_update_json)\n")
+                output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_pre(" \
+                                                   f"{message_name_snake_cased}_json_n_dataclass_handler)\n"
+            else:
+                output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
+                                                   f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                                   f"{message_name_snake_cased}_updated.id, has_links={msg_has_links})\n"
+                output_str += " " * indent_count + f"    {message_name_snake_cased}_updated = " \
+                                                   f"await callback_class.update_{message_name_snake_cased}_pre(" \
+                                                   f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
+                output_str += " " * indent_count + f"    if {message_name_snake_cased}_updated is None:\n"
+                output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
+                                                    f"'callback_class.partial_update_{message_name_snake_cased}_pre returned "
+                                                    f"None instead of updated {message_name_snake_cased}_updated  ')\n")
+            output_str += " " * indent_count + (f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
+                                                f"'avoid_{message_name_snake_cased}_db_update')\n")
+            output_str += " " * indent_count + (f"    if not avoid_{message_name_snake_cased}_db_update:\n")
+            indent_count += 4
+            output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+            if model_type == ModelType.Dataclass:
                 output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj = await generic_callable(" \
-                              f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
-                              f"{message_name_snake_cased}_updated, " \
-                              f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated')}, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
-            case FastapiHttpRoutesFileHandler.aggregation_type_update:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                              f"        updated_{message_name_snake_cased}_json_obj = " \
+                              f"await generic_callable({message.proto.name}, " \
+                              f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"{message_name_snake_cased}_json_n_dataclass_handler, " \
+                              f"filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
+            else:
                 output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_updated, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name}, "
-                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
-            case FastapiHttpRoutesFileHandler.aggregation_type_both:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_updated, "
-                               f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated')}, "
-                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case other:
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_updated, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-        output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post(" \
-                                           f"stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"
-        output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj\n"
-        indent_count -= 4
-        output_str += " " * indent_count + f"    else:\n"
-        indent_count += 4
-        output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post(" \
-                                           f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
-        output_str += " " * indent_count + f"    return True\n"
-        output_str += "\n"
+                              f"        updated_{message_name_snake_cased}_obj = " \
+                              f"await generic_callable({message.proto.name}, " \
+                              f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj), {message_name_snake_cased}_updated, " \
+                              f"filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
+            output_str += " " * indent_count + "    else:\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      f"        updated_{message_name_snake_cased}_json_obj = await generic_callable(" \
+                                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message_name_snake_cased}_json_n_dataclass_handler, " \
+                                      f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated')}, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                    else:
+                        output_str += " " * indent_count + \
+                                      f"        updated_{message_name_snake_cased}_obj = await generic_callable(" \
+                                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
+                                      f"{message_name_snake_cased}_updated, " \
+                                      f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated')}, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
+                                       f"{message_name_snake_cased}_updated, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                case FastapiHttpRoutesFileHandler.aggregation_type_both:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated')}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
+                                       f"{message_name_snake_cased}_updated, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated')}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                case other:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
+                                       f"{message_name_snake_cased}_updated, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_json_obj\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post(stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"
+                output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_obj\n"
+            output_str += " " * indent_count + f"else:\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_json_n_dataclass_handler.get_json_dict()\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post(stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_updated\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"# Cleaning handler before returning and leaving r_lock\n"
+                output_str += " " * indent_count + f"{message_name_snake_cased}_json_n_dataclass_handler.clear()\n"
+            output_str += " " * indent_count + f"return return_obj\n\n"
         return output_str
 
     def handle_PUT_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
+        message, _, _, model_type = self._unpack_kwargs_without_id_field_type(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_PUT_gen(**kwargs)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}' + \
-                      f'", response_model={message.proto.name} | bool, status_code=200)\n'
-        output_str += f"async def update_{message_name_snake_cased}_http({message_name_snake_cased}_updated: " \
-                      f"{message.proto.name}, return_obj_copy: bool | None = True) -> {message.proto.name} | bool:\n"
-        output_str += f"    return await underlying_update_{message_name_snake_cased}_http(" \
-                      f"{message_name_snake_cased}_updated, return_obj_copy=return_obj_copy)\n"
+        if model_type == ModelType.Dataclass:
+            output_str += f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}' + \
+                          f'", status_code=200)\n'
+            output_str += f"async def update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req: " \
+                          f"Request, return_obj_copy: bool | None = True):\n"
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_update_req.body()\n"
+            output_str += f"        json_body = orjson.loads(data_body)\n"
+            output_str += f"        return await underlying_update_{message_name_snake_cased}_http(" \
+                          f"json_body, return_obj_copy=return_obj_copy)\n"
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'update_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        elif model_type == ModelType.Msgspec:
+            output_str += f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}' + \
+                          f'", status_code=200)\n'
+            output_str += f"async def update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req: " \
+                          f"Request, return_obj_copy: bool | None = True):\n"
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_update_req.body()\n"
+            output_str += f"        return await underlying_update_{message_name_snake_cased}_http_bytes(" \
+                          f"data_body, return_obj_copy=return_obj_copy)\n"
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'update_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        else:
+            output_str += f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}' + \
+                          f'", response_model={message.proto.name} | bool, status_code=200)\n'
+            output_str += f"async def update_{message_name_snake_cased}_http({message_name_snake_cased}_updated: " \
+                          f"{message.proto.name}, return_obj_copy: bool | None = True) -> {message.proto.name} | bool:\n"
+            output_str += f"    try:\n"
+            output_str += f"        return await underlying_update_{message_name_snake_cased}_http(" \
+                          f"{message_name_snake_cased}_updated, return_obj_copy=return_obj_copy)\n"
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'update_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        return output_str
+
+    def _handle_msgspec_common_underlying_put_all_gen(
+            self, message: protogen.Message, aggregation_type, msg_has_links,
+            shared_lock_list, pass_stored_obj_to_pre_post_callback: bool) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = (f"async def _underlying_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                      f"update_msgspec_obj_list: List[msgspec.Struct], filter_agg_pipeline: Any = None, "
+                      f"generic_callable: Callable[Any, Any] | None = None, return_obj_copy: bool | None = True):\n")
+        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+        output_str += mutex_handling_str
+
+        if pass_stored_obj_to_pre_post_callback:
+            output_str += " " * indent_count + f"    obj_id_list = [pydantic_obj.id for pydantic_obj in " \
+                                               f"{message_name_snake_cased}_update_msgspec_obj_list]\n"
+            output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_json_dict_list = await "
+                                                f"generic_read_http({message.proto.name}, "
+                                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                                f"has_links={msg_has_links}, read_ids_list=obj_id_list)\n")
+            output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_msgspec_obj_list = "
+                                                f"msgspec.convert(stored_{message_name_snake_cased}_json_dict_list, "
+                                                f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+            output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_msgspec_obj_list = "
+                                                f"await callback_class.update_all_{message_name_snake_cased}_pre("
+                                                f"stored_{message_name_snake_cased}_msgspec_obj_list, "
+                                                f"{message_name_snake_cased}_update_msgspec_obj_list)\n")
+        else:
+            output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_msgspec_obj_list = "
+                                                f"await callback_class.update_all_{message_name_snake_cased}_pre("
+                                                f"{message_name_snake_cased}_update_msgspec_obj_list)\n")
+        output_str += " " * indent_count + (f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
+                                            f"'avoid_{message_name_snake_cased}_db_update')\n")
+        output_str += " " * indent_count + f"    if not avoid_{message_name_snake_cased}_db_update:\n"
+        indent_count += 4
+        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+        output_str += " " * indent_count + \
+                      f"        updated_{message_name_snake_cased}_json_list, missing_ids_list = " \
+                      f"await generic_callable({message.proto.name}, " \
+                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                      f"{message_name_snake_cased}_update_msgspec_obj_list, " \
+                      f"filter_agg_pipeline)\n"
+        output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj_list = "
+                                            f"msgspec.convert(updated_{message_name_snake_cased}_json_list, "
+                                            f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+        output_str += " " * indent_count + "    else:\n"
+        match aggregation_type:
+            case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                filter_agg_pipeline_var_name = self._get_filter_configs_var_name(message,
+                                                                                 f'{message_name_snake_cased}_updated_list')
+                output_str += " " * indent_count + \
+                              f"        updated_{message_name_snake_cased}_json_list , " \
+                              "missing_ids_list= await generic_callable(" \
+                              f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"{message_name_snake_cased}_update_msgspec_obj_list, {filter_agg_pipeline_var_name}, " \
+                              f"has_links={msg_has_links})\n"
+                output_str += " " * indent_count + (f"        # since {filter_agg_pipeline_var_name} is passed - "
+                                                    f"returned value will be aggregated output "
+                                                    f"so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj_list = "
+                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_list, "
+                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+            case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                update_agg_pipeline_var_name = \
+                    self.get_simple_option_value_from_proto(message,
+                                                            FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                output_str += " " * indent_count + \
+                              (f"        updated_{message_name_snake_cased}_json_list, missing_ids_list "
+                               "= await generic_callable("
+                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message_name_snake_cased}_update_msgspec_obj_list, "
+                               f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                               f"has_links={msg_has_links})\n")
+                output_str += " " * indent_count + (f"        # since {update_agg_pipeline_var_name} is passed - "
+                                                    f"returned val will be update "
+                                                    f"aggregated output so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj_list = "
+                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_list, "
+                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+            case FastapiHttpRoutesFileHandler.aggregation_type_both:
+                update_agg_pipeline_var_name = \
+                    self.get_simple_option_value_from_proto(message,
+                                                            FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                filter_agg_pipeline_var_name = self._get_filter_configs_var_name(message,
+                                                                                 f'{message_name_snake_cased}_updated_list')
+                output_str += " " * indent_count + \
+                              (f"        updated_{message_name_snake_cased}_json_list, missing_ids_list "
+                               f"= await generic_callable("
+                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message_name_snake_cased}_update_msgspec_obj_list, "
+                               f"{filter_agg_pipeline_var_name}, {update_agg_pipeline_var_name}, "
+                               f"has_links={msg_has_links})\n")
+                output_str += " " * indent_count + (f"        # since {filter_agg_pipeline_var_name} and "
+                                                    f"{update_agg_pipeline_var_name} are passed - "
+                                                    f"returned dict will be aggregated output so can't use passed obj\n")
+                output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj_list = "
+                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_list, "
+                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+            case other:
+                output_str += " " * indent_count + \
+                              (f"        updated_{message_name_snake_cased}_json_list, missing_ids_list "
+                               f"= await generic_callable({message.proto.name}, "
+                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message_name_snake_cased}_update_msgspec_obj_list, "
+                               f"has_links={msg_has_links})\n")
+                output_str += (" " * indent_count +
+                               f"        # if missing ids list is not empty then it returned list of updated objs will "
+                               f"be having only stored objects so can't use same list that was passed to generic "
+                               f"calable\n")
+                output_str += (" " * indent_count + f"        if missing_ids_list:\n")
+                output_str += " " * indent_count + (f"            {message_name_snake_cased}_update_msgspec_obj_list = "
+                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_list, "
+                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                output_str += (" " * indent_count +
+                               f"        # else not required: using same list of objects that was passed to "
+                               f"generic callable since all objects will be updated with same data\n")
+
+        if pass_stored_obj_to_pre_post_callback:
+            output_str += " " * indent_count + (f"    await callback_class.update_all_{message_name_snake_cased}_post("
+                                                f"stored_{message_name_snake_cased}_msgspec_obj_list, "
+                                                f"{message_name_snake_cased}_update_msgspec_obj_list)\n")
+            output_str += " " * indent_count + f"else:\n"
+            output_str += " " * indent_count + (f"    await callback_class.update_all_{message_name_snake_cased}_post("
+                                                f"stored_{message_name_snake_cased}_msgspec_obj_list, "
+                                                f"{message_name_snake_cased}_update_msgspec_obj_list)\n")
+        else:
+            output_str += " " * indent_count + (f"    await callback_class.update_all_{message_name_snake_cased}_post("
+                                                f"{message_name_snake_cased}_update_msgspec_obj_list)\n")
+            output_str += " " * indent_count + f"    if missing_ids_list:\n"
+            output_str += " " * indent_count + (f'        raise HTTPException(status_code=400, '
+                                                'detail=f"Can\'t find document objects with ids: {missing_ids_list} '
+                                                'to update - updated rest found objects;;; {'
+                                                f'{message_name_snake_cased}_update_msgspec_obj_list'+'=}")\n')
+            output_str += " " * indent_count + f"else:\n"
+            output_str += " " * indent_count + (f"    await callback_class.update_all_{message_name_snake_cased}_post("
+                                                f"{message_name_snake_cased}_update_msgspec_obj_list)\n")
+
+        indent_count -= 4
+        output_str += " " * indent_count + f"    if return_obj_copy:\n"
+        output_str += " " * indent_count + f"        return {message_name_snake_cased}_update_msgspec_obj_list\n"
+        output_str += " " * indent_count + f"    else:\n"
+        output_str += " " * indent_count + f"        return True\n\n\n"
         return output_str
 
     def handle_underlying_PUT_all_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
+        message, aggregation_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_without_id_field_type(**kwargs))
         msg_has_links: bool = message in self.message_to_link_messages_dict
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
-        output_str += (f"async def underlying_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                       f"updated_list: List[{message.proto.name}], filter_agg_pipeline: Any = None, generic_callable: "
-                       f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True) -> "
-                       f"List[{message.proto.name}] | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Update All route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_put_all_http\n'
-        # else not required: avoiding if method desc not provided
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+        if model_type == ModelType.Msgspec:
+            pass_stored_obj_to_pre_post_callback = self._get_if_pass_stored_obj_to_pre_post_callback(
+                FastapiHttpRoutesFileHandler.flux_json_root_pass_stored_obj_to_update_all_pre_post_callback, **kwargs)
+            output_str = self._handle_msgspec_common_underlying_put_all_gen(message, aggregation_type,
+                                                                            msg_has_links, shared_lock_list,
+                                                                            pass_stored_obj_to_pre_post_callback)
+            output_str += f"@perf_benchmark\n"
+            output_str += (
+                f"async def underlying_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                f"update_msgspec_obj_list: List[msgspec.Struct], filter_agg_pipeline: Any = None, generic_callable: "
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Update All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_put_all_http\n'
+            output_str += (
+                f"    return_val = await _underlying_update_all_{message_name_snake_cased}_http("
+                f"{message_name_snake_cased}_update_msgspec_obj_list, filter_agg_pipeline, "
+                f"generic_callable, return_obj_copy)\n")
+            output_str += "    return return_val\n\n\n"
 
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + f"    obj_id_list = [pydantic_obj.id for pydantic_obj in " \
-                                           f"{message_name_snake_cased}_updated_list]\n"
-        output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj_list = await " \
-                                           f"generic_read_http({message.proto.name}, " \
-                                           f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, has_links={msg_has_links}, " \
-                                           f"read_ids_list=obj_id_list)\n"
-        output_str += " " * indent_count + f"    {message_name_snake_cased}_updated_list = " \
-                                           f"await callback_class.update_all_{message_name_snake_cased}_pre(" \
-                                           f"stored_{message_name_snake_cased}_obj_list, {message_name_snake_cased}_updated_list)\n"
-        output_str += " " * indent_count + f"    if {message_name_snake_cased}_updated_list is None:\n"
-        output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
-                                            f"'callback_class.update_all_{message_name_snake_cased}_pre returned "
-                                            f"None instead of updated {message_name_snake_cased}_updated_list ')\n")
-        output_str += " " * indent_count + f"    elif not {message_name_snake_cased}_updated_list:\n"
-        output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
-                                            f"'callback_class.partial_update_{message_name_snake_cased}_pre returned "
-                                            f"empty list instead of updated "
-                                            f"{message_name_snake_cased}_updated_list ')\n")
-        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
-        indent_count += 4
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      f"        updated_{message_name_snake_cased}_obj_list = " \
-                      f"await generic_callable({message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), {message_name_snake_cased}_updated_list, " \
-                      f"obj_id_list, filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
-        output_str += " " * indent_count + "    else:\n"
-        match aggregation_type:
-            case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+            output_str += f"@perf_benchmark\n"
+            output_str += (
+                f"async def underlying_update_all_{message_name_snake_cased}_http_json_dict({message_name_snake_cased}_"
+                f"update_json_dict: Dict[str, Any], filter_agg_pipeline: Any = None, generic_callable: "
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Update All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_put_all_http\n'
+            output_str += (f"    {message_name_snake_cased}_update_msgspec_obj_list = msgspec.convert("
+                           f"{message_name_snake_cased}_update_json_dict, type=List[{message.proto.name}], "
+                           f"dec_hook=dec_hook)\n")
+            output_str += (
+                f"    return_val = await _underlying_update_all_{message_name_snake_cased}_http("
+                f"{message_name_snake_cased}_update_msgspec_obj_list, filter_agg_pipeline, generic_callable, "
+                f"return_obj_copy)\n")
+            output_str += f"    if return_obj_copy:\n"
+            output_str += f"        return_obj_dict = msgspec.to_builtins(return_val, builtin_types=[DateTime])\n"
+            output_str += f"        return return_obj_dict\n"
+            output_str += f"    else:\n"
+            output_str += f"        return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (
+                f"async def underlying_update_all_{message_name_snake_cased}_http_bytes({message_name_snake_cased}_"
+                f"update_bytes: bytes, filter_agg_pipeline: Any = None, generic_callable: "
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Update All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_put_all_http\n'
+            output_str += (f"    {message_name_snake_cased}_update_msgspec_obj_list = msgspec.json.decode("
+                           f"{message_name_snake_cased}_update_bytes, type=List[{message.proto.name}], "
+                           f"dec_hook=dec_hook)\n")
+            output_str += (
+                f"    return_val = await _underlying_update_all_{message_name_snake_cased}_http("
+                f"{message_name_snake_cased}_update_msgspec_obj_list, filter_agg_pipeline, generic_callable, "
+                f"return_obj_copy)\n")
+            output_str += f"    if return_obj_copy:\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
+            output_str += f"    else:\n"
+            output_str += (f"        return CustomFastapiResponse(content=str(return_val).encode('utf-8'), "
+                           f"status_code=200)\n\n")
+        else:
+            output_str = f"@perf_benchmark\n"
+            if model_type == ModelType.Dataclass:
+                output_str += (f"async def underlying_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                               f"update_json_list: List[Dict], filter_agg_pipeline: Any = None, generic_callable: "
+                               f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += (
+                    f"async def underlying_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                    f"updated_list: List[{message.proto.name}], filter_agg_pipeline: Any = None, generic_callable: "
+                    f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True) -> "
+                    f"List[{message.proto.name}] | bool:\n")
+            output_str += f'    """\n'
+            output_str += f'    Update All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_put_all_http\n'
+            # else not required: avoiding if method desc not provided
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            if model_type == ModelType.Dataclass:
+                output_str += (" " * indent_count + f"    {message_name_snake_cased}_json_n_dataclass_handler.clear()    "
+                                                    f"# Ideally ths should not be required since we clean handler "
+                                                    f"after post call - keeping it to avoid any bug\n")
+                output_str += (" " * indent_count +
+                               f"    {message_name_snake_cased}_json_n_dataclass_handler.set_json_dict_list("
+                               f"{message_name_snake_cased}_update_json_list)\n")
+                output_str += " " * indent_count + f"    obj_id_list = [json_obj.get('_id') for json_obj in " \
+                                                   f"{message_name_snake_cased}_update_json_list]\n"
+                output_str += " " * indent_count + f"    await callback_class.update_all_{message_name_snake_cased}_pre(" \
+                                                   f"{message_name_snake_cased}_json_n_dataclass_handler)\n"
+            else:
+                output_str += " " * indent_count + f"    obj_id_list = [pydantic_obj.id for pydantic_obj in " \
+                                                   f"{message_name_snake_cased}_updated_list]\n"
+                output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj_list = await " \
+                                                   f"generic_read_http({message.proto.name}, " \
+                                                   f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, has_links={msg_has_links}, " \
+                                                   f"read_ids_list=obj_id_list)\n"
+                output_str += " " * indent_count + f"    {message_name_snake_cased}_updated_list = " \
+                                                   f"await callback_class.update_all_{message_name_snake_cased}_pre(" \
+                                                   f"stored_{message_name_snake_cased}_obj_list, {message_name_snake_cased}_updated_list)\n"
+                output_str += " " * indent_count + f"    if {message_name_snake_cased}_updated_list is None:\n"
+                output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
+                                                    f"'callback_class.update_all_{message_name_snake_cased}_pre returned "
+                                                    f"None instead of updated {message_name_snake_cased}_updated_list ')\n")
+                output_str += " " * indent_count + f"    elif not {message_name_snake_cased}_updated_list:\n"
+                output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
+                                                    f"'callback_class.update_all_{message_name_snake_cased}_pre returned "
+                                                    f"empty list instead of updated "
+                                                    f"{message_name_snake_cased}_updated_list ')\n")
+            output_str += " " * indent_count + (f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
+                                                f"'avoid_{message_name_snake_cased}_db_update')\n")
+            output_str += " " * indent_count + f"    if not avoid_{message_name_snake_cased}_db_update:\n"
+            indent_count += 4
+            output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+            if model_type == ModelType.Dataclass:
                 output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj_list = await generic_callable(" \
-                              f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
-                              f"{message_name_snake_cased}_updated_list, obj_id_list, " \
-                              f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated_list')}, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
-            case FastapiHttpRoutesFileHandler.aggregation_type_update:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                              f"        updated_{message_name_snake_cased}_json_list = " \
+                              f"await generic_callable({message.proto.name}, " \
+                              f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"{message_name_snake_cased}_json_n_dataclass_handler, " \
+                              f"obj_id_list, filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
+            else:
                 output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
-                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                               f"{message_name_snake_cased}_updated_list, obj_id_list, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name}, "
-                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
-            case FastapiHttpRoutesFileHandler.aggregation_type_both:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
-                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                               f"{message_name_snake_cased}_updated_list, obj_id_list, "
-                               f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated_list')}, "
-                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case other:
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
-                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                               f"{message_name_snake_cased}_updated_list, obj_id_list, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-        output_str += " " * indent_count + f"    await callback_class.update_all_{message_name_snake_cased}_post(" \
-                                           f"stored_{message_name_snake_cased}_obj_list, " \
-                                           f"updated_{message_name_snake_cased}_obj_list)\n"
-        output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj_list\n"
-        indent_count -= 4
-        output_str += " " * indent_count + f"    else:\n"
-        indent_count += 4
-        output_str += " " * indent_count + (f"    await callback_class.update_all_{message_name_snake_cased}_post("
-                                            f"stored_{message_name_snake_cased}_obj_list, "
-                                            f"{message_name_snake_cased}_updated_list)\n")
-        output_str += " " * indent_count + f"    return True\n"
-        output_str += "\n"
+                              f"        updated_{message_name_snake_cased}_obj_list = " \
+                              f"await generic_callable({message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), {message_name_snake_cased}_updated_list, " \
+                              f"obj_id_list, filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
+            output_str += " " * indent_count + "    else:\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      f"        updated_{message_name_snake_cased}_json_list = await generic_callable(" \
+                                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message_name_snake_cased}_json_n_dataclass_handler, obj_id_list, " \
+                                      f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated_list')}, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                    else:
+                        output_str += " " * indent_count + \
+                                      f"        updated_{message_name_snake_cased}_obj_list = await generic_callable(" \
+                                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
+                                      f"{message_name_snake_cased}_updated_list, obj_id_list, " \
+                                      f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated_list')}, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_json_list = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, obj_id_list, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
+                                       f"{message_name_snake_cased}_updated_list, obj_id_list, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                case FastapiHttpRoutesFileHandler.aggregation_type_both:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_json_list = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, obj_id_list, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated_list')}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
+                                       f"{message_name_snake_cased}_updated_list, obj_id_list, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_updated_list')}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                case other:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_json_list = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, obj_id_list, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
+                                       f"{message_name_snake_cased}_updated_list, obj_id_list, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.update_all_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_json_list\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.update_all_{message_name_snake_cased}_post(stored_{message_name_snake_cased}_obj_list, updated_{message_name_snake_cased}_obj_list)\n"
+                output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_obj_list\n"
+            output_str += " " * indent_count + f"else:\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.update_all_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_json_n_dataclass_handler.get_json_dict_list()\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.update_all_{message_name_snake_cased}_post(stored_{message_name_snake_cased}_obj_list, {message_name_snake_cased}_updated_list)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_updated_list\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"# Cleaning handler before returning and leaving r_lock\n"
+                output_str += " " * indent_count + f"{message_name_snake_cased}_json_n_dataclass_handler.clear()\n"
+            output_str += " " * indent_count + f"return return_obj\n\n"
         return output_str
 
     def handle_PUT_all_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
+        message, aggregation_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_without_id_field_type(**kwargs))
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_PUT_all_gen(**kwargs)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.put("/put_all-{message_name_snake_cased}' + \
-                      f'", response_model=List[{message.proto.name}] | bool, status_code=200)\n'
-        output_str += (f"async def update_all_{message_name_snake_cased}_http({message_name_snake_cased}_updated_list: "
-                       f"List[{message.proto.name}], return_obj_copy: bool | None = True"
-                       f") -> List[{message.proto.name}] | bool:\n")
-        output_str += f"    return await underlying_update_all_{message_name_snake_cased}_http(" \
-                      f"{message_name_snake_cased}_updated_list, return_obj_copy=return_obj_copy)\n"
+        if model_type == ModelType.Dataclass:
+            output_str += f'@{self.api_router_app_name}.put("/put_all-{message_name_snake_cased}' + \
+                          f'", status_code=200)\n'
+            output_str += (f"async def update_all_{message_name_snake_cased}_http({message_name_snake_cased}_update_req: "
+                           f"Request, return_obj_copy: bool | None = True):\n")
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_update_req.body()\n"
+            output_str += f"        json_body = orjson.loads(data_body)\n"
+            output_str += f"        return await underlying_update_all_{message_name_snake_cased}_http(" \
+                          f"json_body, return_obj_copy=return_obj_copy)\n"
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'update_all_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        elif model_type == ModelType.Msgspec:
+            output_str += f'@{self.api_router_app_name}.put("/put_all-{message_name_snake_cased}' + \
+                          f'", status_code=200)\n'
+            output_str += (f"async def update_all_{message_name_snake_cased}_http({message_name_snake_cased}_update_req: "
+                           f"Request, return_obj_copy: bool | None = True):\n")
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_update_req.body()\n"
+            output_str += f"        return await underlying_update_all_{message_name_snake_cased}_http_bytes(" \
+                          f"data_body, return_obj_copy=return_obj_copy)\n"
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'update_all_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        else:
+            output_str += f'@{self.api_router_app_name}.put("/put_all-{message_name_snake_cased}' + \
+                          f'", response_model=List[{message.proto.name}] | bool, status_code=200)\n'
+            output_str += (
+                f"async def update_all_{message_name_snake_cased}_http({message_name_snake_cased}_updated_list: "
+                f"List[{message.proto.name}], return_obj_copy: bool | None = True"
+                f") -> List[{message.proto.name}] | bool:\n")
+            output_str += f"    try:\n"
+            output_str += f"        return await underlying_update_all_{message_name_snake_cased}_http(" \
+                          f"{message_name_snake_cased}_updated_list, return_obj_copy=return_obj_copy)\n"
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'update_all_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
         return output_str
 
-    def handle_underlying_PATCH_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
+    def _handle_msgspec_common_underlying_patch_gen(self, message: protogen.Message, aggregation_type, msg_has_links,
+                                                    shared_lock_list) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self._handle_str_int_val_callable_generation(message)
-        output_str += "\n"
-        output_str += f"@perf_benchmark('{self.proto_file_package}')\n"
-        output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http("
-                       f"{message_name_snake_cased}_update_req_json: Dict, filter_agg_pipeline: Any = None, "
-                       f"generic_callable: Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                       f") -> {message.proto.name} | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Partial Update route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_patch_http\n'
+        output_str = (f"async def _underlying_partial_update_{message_name_snake_cased}_http("
+                      f"{message_name_snake_cased}_update_json_dict: Dict[str, None], filter_agg_pipeline: Any = None, "
+                      f"generic_callable: Callable[Any, Any] | None = None, return_obj_copy: bool | None = True):\n")
         # else not required: avoiding if method desc not provided
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
-        output_str += " " * indent_count + (f"    handle_str_formatted_int_fields_in_{message_name_snake_cased}_"
-                                            f"json({message_name_snake_cased}_update_req_json)\n")
-        output_str += " " * indent_count + f"    obj_id = {message_name_snake_cased}_update_req_json.get('_id')\n"
-        output_str += " " * indent_count + f"    if obj_id is None:\n"
-        output_str += " " * indent_count + f'        err_str_ = f"Can not find _id key in received response body for ' \
-                                           f'patch operation of {message.proto.name}, response body: ' + \
-                                           '{'+f'{message_name_snake_cased}_update_req_json'+'}"\n'
-        output_str += " " * indent_count + f"        raise HTTPException(status_code=503, detail=err_str_)\n"
-        output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
+        output_str += " " * indent_count + (f"    handle_missing_id_n_datetime_fields_in_{message_name_snake_cased}_"
+                                            f"json({message.proto.name}, {message_name_snake_cased}_update_json_dict, "
+                                            f"is_patch_call=True)\n")
+        output_str += " " * indent_count + f"    obj_id = {message_name_snake_cased}_update_json_dict.get('_id')\n"
+        output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_json_dict = await generic_read_by_id_http(" \
                                            f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                                            f"obj_id, has_links={msg_has_links})\n"
-        output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_req_json = "
-                                            f"await callback_class.partial_update_{message_name_snake_cased}_pre("
-                                            f"stored_{message_name_snake_cased}_obj, "
-                                            f"{message_name_snake_cased}_update_req_json)\n")
-        output_str += " " * indent_count + f"    if {message_name_snake_cased}_update_req_json is None:\n"
-        output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
-                                            f"'callback_class.partial_update_{message_name_snake_cased}_pre returned "
-                                            f"None instead of updated {message_name_snake_cased}_update_req_json ')\n")
+        output_str += " " * indent_count + (
+            f"    {message_name_snake_cased}_update_json_dict = "
+            f"await callback_class.partial_update_{message_name_snake_cased}_pre("
+            f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict)\n")
         output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
                                             f"'avoid_{message_name_snake_cased}_db_update'):\n")
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
-                      (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                      (f"        updated_{message_name_snake_cased}_json_dict = await generic_callable("
                        f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                       f"{message_name_snake_cased}_update_req_json, filter_agg_pipeline, "
-                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                       f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict, "
+                       f"filter_agg_pipeline, has_links={msg_has_links})\n")
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
                 output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj =  await generic_callable(" \
+                              f"        updated_{message_name_snake_cased}_json_dict =  await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
-                              f"{message_name_snake_cased}_update_req_json, " \
+                              f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict, " \
                               f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json')}, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                              f"has_links={msg_has_links})\n"
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                              (f"        updated_{message_name_snake_cased}_json_dict = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_update_req_json, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
+                               f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict, "
+                               f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                              (f"        updated_{message_name_snake_cased}_json_dict = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_update_req_json, "
+                               f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict, "
                                f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json')}, "
-                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
             case other:
+                output_str += " " * indent_count + \
+                              (f"        updated_{message_name_snake_cased}_json_dict = await generic_callable("
+                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"stored_{message_name_snake_cased}_json_dict, "
+                               f"{message_name_snake_cased}_update_json_dict, has_links={msg_has_links})\n")
+        output_str += " " * indent_count + (f"    await callback_class.partial_update_{message_name_snake_cased}_post("
+                                            f"stored_{message_name_snake_cased}_json_dict, updated_{message_name_snake_cased}_json_dict)\n")
+        output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_json_dict\n"
+        output_str += " " * indent_count + f"else:\n"
+        output_str += " " * indent_count + (f"    await callback_class.partial_update_{message_name_snake_cased}_post("
+                                            f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict)\n")
+        output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_update_json_dict\n"
+        output_str += " " * indent_count + f"if return_obj_copy:\n"
+        output_str += " " * indent_count + f"    return return_obj\n"
+        output_str += " " * indent_count + f"else:\n"
+        output_str += " " * indent_count + f"    return True\n\n\n"
+        return output_str
+
+    def handle_underlying_PATCH_gen(self, **kwargs) -> str:
+        message, aggregation_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_without_id_field_type(**kwargs))
+        msg_has_links: bool = message in self.message_to_link_messages_dict
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        if model_type == ModelType.Msgspec:
+            output_str = self._handle_missing_id_n_datetime_field_callable_generation(message, model_type)
+            output_str += self._handle_msgspec_common_underlying_patch_gen(message, aggregation_type, msg_has_links,
+                                                                           shared_lock_list)
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_update_json_dict: Dict[str, Any], "
+                           f"filter_agg_pipeline: Any = None, generic_callable: Callable[[...], Any] | None = None, "
+                           f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Partial Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_patch_http\n'
+            output_str += (f"    return_val = await _underlying_partial_update_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_update_json_dict, filter_agg_pipeline, "
+                           f"generic_callable, return_obj_copy)\n")
+            output_str += f"    if return_val:\n"
+            output_str += (f"        return_val = msgspec.convert(return_val, type={message.proto.name}, "
+                           f"dec_hook=dec_hook)\n")
+            output_str += f"    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http_json_dict("
+                           f"{message_name_snake_cased}_update_json_dict: Dict[str, Any], "
+                           f"filter_agg_pipeline: Any = None, generic_callable: Callable[[...], Any] | None = None, "
+                           f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Partial Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_patch_http\n'
+            output_str += (f"    return_val = await _underlying_partial_update_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_update_json_dict, filter_agg_pipeline, "
+                           f"generic_callable, return_obj_copy)\n")
+            output_str += f"    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http_bytes("
+                           f"{message_name_snake_cased}_update_bytes: bytes, filter_agg_pipeline: Any = None, "
+                           f"generic_callable: Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Partial Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_patch_http\n'
+            output_str += (f"    {message_name_snake_cased}_update_json_dict = orjson.loads("
+                           f"{message_name_snake_cased}_update_bytes)\n")
+            output_str += (f"    return_val = await _underlying_partial_update_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_update_json_dict, filter_agg_pipeline, "
+                           f"generic_callable, return_obj_copy)\n")
+            output_str += f"    if return_obj_copy:\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
+            output_str += f"    else:\n"
+            output_str += (f"        return CustomFastapiResponse(content=str(return_val).encode('utf-8'), "
+                           f"status_code=200)\n\n")
+        else:
+            output_str = self._handle_missing_id_n_datetime_field_callable_generation(message, model_type)
+            output_str += self._handle_str_int_val_callable_generation(message)
+            output_str += "\n"
+            output_str += f"@perf_benchmark\n"
+            if model_type == ModelType.Dataclass:
+                output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_update_req_json: Dict, filter_agg_pipeline: Any = None, "
+                               f"generic_callable: Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_update_req_json: Dict, filter_agg_pipeline: Any = None, "
+                               f"generic_callable: Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                               f") -> {message.proto.name} | bool:\n")
+            output_str += f'    """\n'
+            output_str += f'    Partial Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_patch_http\n'
+            # else not required: avoiding if method desc not provided
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            output_str += " " * indent_count + (f"    handle_str_formatted_int_fields_in_{message_name_snake_cased}_"
+                                                f"json({message_name_snake_cased}_update_req_json)\n")
+            output_str += " " * indent_count + (f"    handle_missing_id_n_datetime_fields_in_{message_name_snake_cased}_"
+                                                f"json({message.proto.name}, {message_name_snake_cased}_update_req_json, "
+                                                f"is_patch_call=True)\n")
+            if model_type == ModelType.Dataclass:
+                output_str += (" " * indent_count + f"    {message_name_snake_cased}_json_n_dataclass_handler.clear()    "
+                                                    f"# Ideally ths should not be required since we clean handler "
+                                                    f"after post call - keeping it to avoid any bug\n")
+                output_str += (" " * indent_count +
+                               f"    {message_name_snake_cased}_json_n_dataclass_handler.set_json_dict("
+                               f"{message_name_snake_cased}_update_req_json)\n")
+                output_str += " " * indent_count + f"    obj_id = {message_name_snake_cased}_update_req_json.get('_id')\n"
+                output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_json_obj = await generic_read_by_id_http(" \
+                                                   f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                                   f"obj_id, has_links={msg_has_links})\n"
+                output_str += " " * indent_count + (f"    {message_name_snake_cased}_json_n_dataclass_handler."
+                                                    f"set_stored_json_dict(stored_{message_name_snake_cased}_json_obj)\n")
+                output_str += " " * indent_count + (f"    await callback_class.partial_update_{message_name_snake_cased}_pre("
+                                                    f"{message_name_snake_cased}_json_n_dataclass_handler)\n")
+            else:
+                output_str += " " * indent_count + f"    obj_id = {message_name_snake_cased}_update_req_json.get('_id')\n"
+                output_str += " " * indent_count + f"    if obj_id is None:\n"
+                output_str += " " * indent_count + f'        err_str_ = f"Can not find _id key in received response body for ' \
+                                                   f'patch operation of {message.proto.name}, response body: ' + \
+                                                   '{'+f'{message_name_snake_cased}_update_req_json'+'}"\n'
+                output_str += " " * indent_count + f"        raise HTTPException(status_code=503, detail=err_str_)\n"
+                output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
+                                                   f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                                   f"obj_id, has_links={msg_has_links})\n"
+                output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_req_json = "
+                                                    f"await callback_class.partial_update_{message_name_snake_cased}_pre("
+                                                    f"stored_{message_name_snake_cased}_obj, "
+                                                    f"{message_name_snake_cased}_update_req_json)\n")
+                output_str += " " * indent_count + f"    if {message_name_snake_cased}_update_req_json is None:\n"
+                output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
+                                                    f"'callback_class.partial_update_{message_name_snake_cased}_pre returned "
+                                                    f"None instead of updated {message_name_snake_cased}_update_req_json ')\n")
+            output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
+                                                f"'avoid_{message_name_snake_cased}_db_update'):\n")
+            indent_count += 4
+            output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + \
+                              (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
+                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message_name_snake_cased}_json_n_dataclass_handler, filter_agg_pipeline, "
+                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+            else:
                 output_str += " " * indent_count + \
                               (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_update_req_json, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-        indent_count -= 4
-        output_str += " " * indent_count + f"    else:\n"
-        output_str += " " * indent_count + (f"        updated_{message_name_snake_cased}_obj = await "
-                                            f"generic_patch_without_db_update_http({message.proto.name}, "
-                                            f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                                            f"{message_name_snake_cased}_update_req_json, "
-                                            f"return_obj_copy=return_obj_copy)\n")
-        indent_count -= 4
-        output_str += " " * indent_count + f"    await callback_class.partial_update_{message_name_snake_cased}_post(" \
-                                           f"stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"
-        output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj\n"
-        output_str += "\n"
+                               f"{message_name_snake_cased}_update_req_json, filter_agg_pipeline, "
+                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+            output_str += " " * indent_count + "    else:\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      f"        updated_{message_name_snake_cased}_json_obj =  await generic_callable(" \
+                                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message_name_snake_cased}_json_n_dataclass_handler, " \
+                                      f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json')}, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                    else:
+                        output_str += " " * indent_count + \
+                                      f"        updated_{message_name_snake_cased}_obj =  await generic_callable(" \
+                                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
+                                      f"{message_name_snake_cased}_update_req_json, " \
+                                      f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json')}, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
+                                       f"{message_name_snake_cased}_update_req_json, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                case FastapiHttpRoutesFileHandler.aggregation_type_both:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json')}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
+                                       f"{message_name_snake_cased}_update_req_json, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json')}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                case other:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
+                                       f"{message_name_snake_cased}_update_req_json, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.partial_update_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_json_obj\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.partial_update_{message_name_snake_cased}_post(stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"
+                output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_obj\n"
+            output_str += " " * indent_count + f"else:\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.partial_update_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_json_n_dataclass_handler.get_json_dict()\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.partial_update_{message_name_snake_cased}_post(stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_update_req_json)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_update_req_json\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"# Cleaning handler before returning and leaving r_lock\n"
+                output_str += " " * indent_count + f"{message_name_snake_cased}_json_n_dataclass_handler.clear()\n"
+            output_str += " " * indent_count + f"return return_obj\n\n"
         return output_str
 
     def handle_PATCH_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
+        message, _, _, model_type = self._unpack_kwargs_without_id_field_type(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_PATCH_gen(**kwargs)
         output_str += f"\n"
-        output_str += f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}' + \
-                      f'", response_model={message.proto.name} | bool, status_code=200)\n'
-        output_str += f"async def partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req_body: " \
-                      f"Request, return_obj_copy: bool | None = True) -> {message.proto.name} | bool:\n"
-        output_str += f"    json_body = await {message_name_snake_cased}_update_req_body.json()\n"
-        output_str += (f'    return await underlying_partial_update_{message_name_snake_cased}_http(json_body, '
-                       f'return_obj_copy=return_obj_copy)\n')
+        if model_type == ModelType.Msgspec:
+            output_str += f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}' + \
+                          f'", status_code=200)\n'
+            output_str += f"async def partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req_body: " \
+                          f"Request, return_obj_copy: bool | None = True):\n"
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_update_req_body.body()\n"
+            output_str += (f'        return await underlying_partial_update_{message_name_snake_cased}_http_bytes('
+                           f'data_body, return_obj_copy=return_obj_copy)\n')
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'partial_update_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        else:
+            if model_type == ModelType.Dataclass:
+                output_str += f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}' + \
+                              f'", status_code=200)\n'
+                output_str += f"async def partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req_body: " \
+                              f"Request, return_obj_copy: bool | None = True):\n"
+            else:
+                output_str += f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}' + \
+                              f'", response_model={message.proto.name} | bool, status_code=200)\n'
+                output_str += f"async def partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req_body: " \
+                              f"Request, return_obj_copy: bool | None = True) -> {message.proto.name} | bool:\n"
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_update_req_body.body()\n"
+            output_str += f"        json_body = orjson.loads(data_body)\n"
+            output_str += (f'        return await underlying_partial_update_{message_name_snake_cased}_http(json_body, '
+                           f'return_obj_copy=return_obj_copy)\n')
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'partial_update_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
         return output_str
 
     def _get_int_field_list(self, message: protogen.Message, parent_field_names: str | None = None) -> List[str]:
@@ -726,166 +2079,549 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         return output_str
 
-    def handle_underlying_PATCH_all_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self._handle_str_int_val_callable_generation(message)
-        output_str += "\n"
-        output_str += f"@perf_benchmark('{self.proto_file_package}')\n"
-        output_str += (f"async def underlying_partial_update_all_{message_name_snake_cased}_http("
-                       f"{message_name_snake_cased}_update_req_json_list: List[Dict], "
-                       f"filter_agg_pipeline: Any = None, "
-                       f"generic_callable: Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                       f") -> List[{message.proto.name}] | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Partial Update route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_patch_all_http\n'
-        # else not required: avoiding if method desc not provided
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+    def _get_fields_having_id_field_in_dict(self, message: protogen.Message,
+                                            fields_dict: Dict,
+                                            indent_count: int = 0):
+        output_str = ""
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        for field in message.fields:
+            if field.proto.name == "id":
+                fields_dict[field.proto.name] = "_id"
+                continue
+            if FastapiHttpRoutesFileHandler.is_option_enabled(field,
+                                                              FastapiHttpRoutesFileHandler.flux_fld_val_is_datetime):
+                fields_dict[field.proto.name] = "datetime"
+            if field.message is not None:
+                fields_dict[field.proto.name] = {"cardinality": field.cardinality.name.lower(),
+                                                 "message": field.message}
+                self._get_fields_having_id_field_in_dict(field.message, fields_dict[field.proto.name])
+                if len(fields_dict[field.proto.name]) == 2:      # only contains cardinality an message
+                    del fields_dict[field.proto.name]
 
+    def _get_fields_having_id_or_date_time_field_str(self, field_dict: Dict, prefix_fields: str | None = None,
+                                                     indent_count: int = 0):
+        output_str = ""
+
+        cardinality = field_dict.pop("cardinality")
+        message = field_dict.pop("message")
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        loop_count = 0
+        for field_name, value in field_dict.items():
+            loop_count += 1
+            output_str_ = ""
+            last_prefix_fields = prefix_fields
+            last_indent_count = indent_count
+            if cardinality != "repeated":
+                if field_name == "id":
+                    output_str_ += " " * (indent_count*4) + f'    if {prefix_fields} is not None:\n'
+                    output_str_ += " " * (indent_count*4) + f'        _id = {prefix_fields}.get("_id")\n'
+                    output_str_ += " " * (indent_count*4) + f'        if _id is None:\n'
+                    output_str_ += " " * (indent_count*4) + f'            {prefix_fields}["_id"] = {message_name}.next_id()\n'
+                    indent_count += 1
+                elif value == "datetime":
+                    if not prefix_fields:
+                        output_str_ += " " * (indent_count*4) + f'    date_time_field = {message_name_snake_cased}_json.get("{field_name}")\n'
+                        output_str_ += (" " * (indent_count*4) +
+                                        f'    if date_time_field is not None and isinstance(date_time_field, str):\n')
+                        output_str_ += (" " * (indent_count*4) +
+                                        f'        {message_name_snake_cased}_json["{field_name}"] = pendulum.parse(date_time_field)\n')
+                        indent_count += 1
+                    else:
+                        output_str_ += " " * (indent_count*4) + f'    if {prefix_fields} is not None:\n'
+                        output_str_ += (" " * (indent_count*4) +
+                                        f'        date_time_field = {prefix_fields}.get("{field_name}")\n')
+                        output_str_ += (" " * (indent_count*4) +
+                                        f'        if date_time_field is not None and isinstance(date_time_field, str):\n')
+                        output_str_ += (" " * (indent_count*4) +
+                                        f'            {prefix_fields}["{field_name}"] = pendulum.parse(date_time_field)\n')
+                        indent_count += 1
+                else:
+                    if not prefix_fields:
+                        output_str_ += " " * (indent_count*4) + (f'    {message_name_snake_cased}__{field_name} '
+                                      f'= {message_name_snake_cased}_json.get("{field_name}")\n')
+                        prefix_fields += f"{message_name_snake_cased}__{field_name}"
+                    else:
+                        output_str_ += " " * (indent_count*4) + f"    {prefix_fields}__{field_name} = None\n"
+                        output_str_ += " " * (indent_count*4) + f"    if {prefix_fields} is not None:\n"
+                        output_str_ += " " * (indent_count*4) + (f'        {prefix_fields}__{field_name} '
+                                       f'= {prefix_fields}.get("{field_name}")\n')
+                        prefix_fields += f"__{field_name}"
+
+                        indent_count += 1
+                    output_str_ += self._get_fields_having_id_or_date_time_field_str(value, prefix_fields, indent_count)
+            else:
+                if loop_count == 1:
+                    output_str_ += " " * (indent_count*4) + f"    if {prefix_fields} is not None:\n"
+                    output_str_ += " " * (indent_count*4) + f"        for {prefix_fields}_ in {prefix_fields}:\n"
+                    indent_count += 1
+                # else not required: for loop block is already open if loop count is more than 1
+                if field_name == "id":
+                    # if message_name_snake_cased:
+                    output_str_ += " " * (indent_count*4) + f'        _id = {prefix_fields}_.get("_id")\n'
+                    output_str_ += " " * (indent_count*4) + f'        if _id is None:\n'
+                    output_str_ += (" " * (indent_count*4) +
+                                   f'            {prefix_fields}_["_id"] = {message_name}.next_id()\n')
+                    indent_count += 1
+                elif value == "datetime":
+                    output_str_ += (" " * (indent_count*4) +
+                                    f'        date_time_field = {prefix_fields}_.get("{field_name}")\n')
+                    output_str_ += (" " * (indent_count*4) +
+                                    f'        if date_time_field is not None and isinstance(date_time_field, str):\n')
+                    output_str_ += (" " * (indent_count*4) +
+                                    f'            {prefix_fields}_["{field_name}"] = pendulum.parse(date_time_field)\n')
+                    indent_count += 1
+                else:
+                    output_str_ += " " * (indent_count*4) + (f'    {prefix_fields}__{field_name} '
+                                  f'= {prefix_fields}_.get("{field_name}")\n')
+
+                    prefix_fields += f"__{field_name}"
+                    # indent_count += 1
+                    output_str_ += self._get_fields_having_id_or_date_time_field_str(value, prefix_fields, indent_count=indent_count)
+            output_str += output_str_
+            prefix_fields = last_prefix_fields
+            # indent_count = last_indent_count
+        return output_str
+
+    def _handle_missing_id_n_datetime_field_callable_generation(self, message: protogen.Message,
+                                                                model_type: bool) -> str:
+        if message in self._msg_already_generated_id_n_date_time_fields_handler_list:
+            # if handler function is already generated for this model for either create, create_all,
+            # patch or patch_all then avoiding duplicate function creation
+            return ""
+        # else not required: generating if not generated for this model already
+
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+        # to avoid duplicate generation
+        self._msg_already_generated_id_n_date_time_fields_handler_list.append(message)
+
+        if model_type == ModelType.Dataclass:
+            output_str = (f"def handle_missing_id_n_datetime_fields_in_{message_name_snake_cased}_json("
+                          f"{message_name}: Type[dataclass], {message_name_snake_cased}_json: Dict, "
+                          f"is_patch_call: bool):\n")
+        else:
+            output_str = (f"def handle_missing_id_n_datetime_fields_in_{message_name_snake_cased}_json("
+                          f"{message_name}: Type[{message.proto.name}], {message_name_snake_cased}_json: Dict, "
+                          f"is_patch_call: bool):\n")
+
+        output_str += f"    _id = {message_name_snake_cased}_json.get(\"_id\")\n"
+        output_str += f"    if _id is None:\n"
+        output_str += f"        if is_patch_call:\n"
+        output_str += (f'            err_str_ = f"Can not find _id key in received response body '
+                       f'of {message_name} for patch, response body: '+'{'+f'{message_name_snake_cased}'+'_json}"\n')
+        output_str += f'            raise HTTPException(status_code=503, detail=err_str_)\n'
+        output_str += f'        else:\n'
+        output_str += f'            {message_name_snake_cased}_json["_id"] = {message_name}.next_id()\n\n'
+        temp_dict = {message_name: {}}
+        self._get_fields_having_id_field_in_dict(message, temp_dict[message_name])
+
+        temp_dict[message_name].pop("id")   # since id handling for root type is already done
+        temp_dict[message_name]["cardinality"] = "required"
+        temp_dict[message_name]["message"] = message
+        output_str += self._get_fields_having_id_or_date_time_field_str(temp_dict[message_name], "")
+        output_str += "\n\n"
+        return output_str
+
+    def _handle_msgspec_common_underlying_patch_all_gen(self, message: protogen.Message, aggregation_type,
+                                                        msg_has_links, shared_lock_list) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = (f"async def _underlying_partial_update_all_{message_name_snake_cased}_http("
+                      f"{message_name_snake_cased}_update_json_dict_list: List[Dict[str, Any]], "
+                      f"filter_agg_pipeline: Any = None, "
+                      f"generic_callable: Callable[Any, Any] | None = None, "
+                      f"return_obj_copy: bool | None = True):\n")
+        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
         output_str += mutex_handling_str
         output_str += " " * indent_count + f"    obj_id_list = []\n"
-        output_str += " " * indent_count + f"    for {message_name_snake_cased}_update_req_json in " \
-                                           f"{message_name_snake_cased}_update_req_json_list:\n"
-        output_str += " " * indent_count + (f"        handle_str_formatted_int_fields_in_{message_name_snake_cased}_"
-                                            f"json({message_name_snake_cased}_update_req_json)\n")
-        output_str += " " * indent_count + f"        obj_id = {message_name_snake_cased}_update_req_json.get('_id')\n"
-        output_str += " " * indent_count + f"        if obj_id is None:\n"
-        output_str += " " * indent_count + f'            err_str_ = f"Can not find _id key in received response ' \
-                                           f'body for patch all operation of {message.proto.name}, response body: ' + \
-                                           '{'+f'{message_name_snake_cased}_update_req_json_list'+'}"\n'
-        output_str += " " * indent_count + f"            raise HTTPException(status_code=503, detail=err_str_)\n"
-        output_str += " " * indent_count + f"        obj_id_list.append(obj_id)\n"
-        output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_obj_list = await "
+        output_str += " " * indent_count + (f"    for {message_name_snake_cased}_update_json_dict in "
+                                            f"{message_name_snake_cased}_update_json_dict_list:\n")
+        output_str += " " * indent_count + (
+            f"        handle_missing_id_n_datetime_fields_in_{message_name_snake_cased}_"
+            f"json({message.proto.name}, {message_name_snake_cased}_update_json_dict, "
+            f"is_patch_call=True)\n")
+        output_str += " " * indent_count + f"        obj_id_list.append({message_name_snake_cased}_update_json_dict.get('_id'))\n"
+        output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_json_dict_list = await "
                                             f"generic_read_http({message.proto.name}, "
                                             f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                             f"has_links={msg_has_links}, read_ids_list=obj_id_list)\n")
-        output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_req_json_list = "
-                                            f"await callback_class.partial_update_all_{message_name_snake_cased}_pre("
-                                            f"stored_{message_name_snake_cased}_obj_list, "
-                                            f"{message_name_snake_cased}_update_req_json_list)\n")
-        output_str += " " * indent_count + f"    if {message_name_snake_cased}_update_req_json_list is None:\n"
-        output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
-                                            f"'callback_class.partial_update_all_{message_name_snake_cased}_pre returned "
-                                            f"None instead of updated {message_name_snake_cased}_update_req_json_list ')\n")
-        output_str += " " * indent_count + f"    elif not {message_name_snake_cased}_update_req_json_list:\n"
-        output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
-                                            f"'callback_class.partial_update_all_{message_name_snake_cased}_pre returned "
-                                            f"empty list instead of updated "
-                                            f"{message_name_snake_cased}_update_req_json_list ')\n")
+        output_str += " " * indent_count + (
+            f"    {message_name_snake_cased}_update_json_dict_list = "
+            f"await callback_class.partial_update_all_{message_name_snake_cased}_pre("
+            f"stored_{message_name_snake_cased}_json_dict_list, {message_name_snake_cased}_update_json_dict_list)\n")
         output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
                                             f"'avoid_{message_name_snake_cased}_db_update'):\n")
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
-                      f"        updated_{message_name_snake_cased}_obj_list = await generic_callable(" \
+                      f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable(" \
                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
-                      f"{message_name_snake_cased}_update_req_json_list, obj_id_list, filter_agg_pipeline, " \
-                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                      f"stored_{message_name_snake_cased}_json_dict_list, {message_name_snake_cased}_update_json_dict_list, "\
+                      f"obj_id_list, filter_agg_pipeline, has_links={msg_has_links})\n"
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
                 output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj_list =  await generic_callable(" \
+                              f"        updated_{message_name_snake_cased}_update_req_json_list =  await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
-                              f"{message_name_snake_cased}_update_req_json_list, obj_id_list, " \
+                              f"stored_{message_name_snake_cased}_json_dict_list, "\
+                              f"{message_name_snake_cased}_update_json_dict_list, obj_id_list, " \
                               f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json_list')}, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                              f"has_links={msg_has_links})\n"
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
+                              (f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                               f"{message_name_snake_cased}_update_req_json_list, obj_id_list, "
+                               f"stored_{message_name_snake_cased}_json_dict_list, "
+                               f"{message_name_snake_cased}_update_json_dict_list, obj_id_list, "
                                f"update_agg_pipeline={update_agg_pipeline_var_name}, "
-                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                               f"has_links={msg_has_links})\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
+                              (f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                               f"{message_name_snake_cased}_update_req_json_list, obj_id_list, "
+                               f"stored_{message_name_snake_cased}_json_dict_list, "
+                               f"{message_name_snake_cased}_update_json_dict_list, obj_id_list, "
                                f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json_list')}, "
-                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
             case other:
+                output_str += " " * indent_count + \
+                              f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable(" \
+                              f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"stored_{message_name_snake_cased}_json_dict_list, "\
+                              f"{message_name_snake_cased}_update_json_dict_list, obj_id_list, " \
+                              f"has_links={msg_has_links})\n"
+        output_str += " " * indent_count + (f"    await callback_class.partial_update_all_{message_name_snake_cased}"
+                                            f"_post(stored_{message_name_snake_cased}_json_dict_list, "
+                                            f"{message_name_snake_cased}_update_json_dict_list)\n")
+        output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_update_req_json_list\n"
+        output_str += " " * indent_count + f"else:\n"
+        output_str += " " * indent_count + (f"    await callback_class.partial_update_all_{message_name_snake_cased}"
+                                            f"_post(stored_{message_name_snake_cased}_json_dict_list, "
+                                            f"{message_name_snake_cased}_update_json_dict_list)\n")
+        output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_update_json_dict_list\n"
+        output_str += " " * indent_count + f"if return_obj_copy:\n"
+        output_str += " " * indent_count + f"    return return_obj\n"
+        output_str += " " * indent_count + f"else:\n"
+        output_str += " " * indent_count + f"    return True\n\n\n"
+        return output_str
+
+    def handle_underlying_PATCH_all_gen(self, **kwargs) -> str:
+        message, aggregation_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_without_id_field_type(**kwargs))
+        msg_has_links: bool = message in self.message_to_link_messages_dict
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+
+        if model_type == ModelType.Msgspec:
+            output_str = self._handle_msgspec_common_underlying_patch_all_gen(message, aggregation_type,
+                                                                              msg_has_links, shared_lock_list)
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_partial_update_all_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_update_json_dict_list: List[Dict[str, Any]], "
+                           f"filter_agg_pipeline: Any = None, "
+                           f"generic_callable: Callable[[...], Any] | None = None, "
+                           f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Partial Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_patch_all_http\n'
+            output_str += (f"    return_val = await _underlying_partial_update_all_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_update_json_dict_list, filter_agg_pipeline, "
+                           f"generic_callable, return_obj_copy)\n")
+            output_str += "    if return_obj_copy:\n"
+            output_str += (f"        return_val = msgspec.convert(return_val, type=List[{message.proto.name}], "
+                           f"dec_hook=dec_hook)\n")
+            output_str += "    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_partial_update_all_{message_name_snake_cased}_http_json_dict("
+                           f"{message_name_snake_cased}_update_json_dict_list: List[Dict[str, Any]], "
+                           f"filter_agg_pipeline: Any = None, generic_callable: Callable[[...], Any] | None = None, "
+                           f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Partial Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_patch_all_http\n'
+            output_str += (f"    return_val = await _underlying_partial_update_all_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_update_json_dict_list, filter_agg_pipeline, "
+                           f"generic_callable, return_obj_copy)\n")
+            output_str += "    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_partial_update_all_{message_name_snake_cased}_http_bytes("
+                           f"{message_name_snake_cased}_update_req_bytes: bytes, "
+                           f"filter_agg_pipeline: Any = None, "
+                           f"generic_callable: Callable[[...], Any] | None = None, "
+                           f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Partial Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_patch_all_http\n'
+            output_str += (f"    {message_name_snake_cased}_update_json_dict_list = orjson.loads("
+                           f"{message_name_snake_cased}_update_req_bytes)\n")
+            output_str += (f"    return_val = await _underlying_partial_update_all_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_update_json_dict_list, filter_agg_pipeline, "
+                           f"generic_callable, return_obj_copy)\n")
+            output_str += f"    if return_obj_copy:\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
+            output_str += f"    else:\n"
+            output_str += (f"        return CustomFastapiResponse(content=str(return_val).encode('utf-8'), "
+                           f"status_code=200)\n\n")
+        else:
+            output_str = self._handle_missing_id_n_datetime_field_callable_generation(message, model_type)
+            output_str += self._handle_str_int_val_callable_generation(message)
+            output_str += "\n"
+            output_str += f"@perf_benchmark\n"
+            if model_type == ModelType.Dataclass:
+                output_str += (f"async def underlying_partial_update_all_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_update_req_json_list: List[Dict], "
+                               f"filter_agg_pipeline: Any = None, "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += (f"async def underlying_partial_update_all_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_update_req_json_list: List[Dict], "
+                               f"filter_agg_pipeline: Any = None, "
+                               f"generic_callable: Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
+                               f") -> List[{message.proto.name}] | bool:\n")
+            output_str += f'    """\n'
+            output_str += f'    Partial Update route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_patch_all_http\n'
+            # else not required: avoiding if method desc not provided
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            output_str += " " * indent_count + f"    obj_id_list = []\n"
+            output_str += " " * indent_count + f"    for {message_name_snake_cased}_update_req_json in " \
+                                               f"{message_name_snake_cased}_update_req_json_list:\n"
+            output_str += " " * indent_count + (f"        handle_str_formatted_int_fields_in_{message_name_snake_cased}_"
+                                                f"json({message_name_snake_cased}_update_req_json)\n")
+            output_str += " " * indent_count + (f"        handle_missing_id_n_datetime_fields_in_{message_name_snake_cased}_"
+                                                f"json({message.proto.name}, {message_name_snake_cased}_update_req_json, "
+                                                f"is_patch_call=True)\n")
+            output_str += " " * indent_count + f"        obj_id = {message_name_snake_cased}_update_req_json.get('_id')\n"
+            output_str += " " * indent_count + f"        if obj_id is None:\n"
+            output_str += " " * indent_count + f'            err_str_ = f"Can not find _id key in received response ' \
+                                               f'body for patch all operation of {message.proto.name}, response body: ' + \
+                          '{' + f'{message_name_snake_cased}_update_req_json_list' + '}"\n'
+            output_str += " " * indent_count + f"            raise HTTPException(status_code=503, detail=err_str_)\n"
+            output_str += " " * indent_count + f"        obj_id_list.append(obj_id)\n"
+            if model_type == ModelType.Dataclass:
+                output_str += (" " * indent_count + f"    {message_name_snake_cased}_json_n_dataclass_handler.clear()    "
+                                                    f"# Ideally ths should not be required since we clean handler "
+                                                    f"after post call - keeping it to avoid any bug\n")
+                output_str += (" " * indent_count +
+                               f"    {message_name_snake_cased}_json_n_dataclass_handler.set_json_dict_list("
+                               f"{message_name_snake_cased}_update_req_json_list)\n")
+                output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_json_list = await "
+                                                    f"generic_read_http({message.proto.name}, "
+                                                    f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                                    f"has_links={msg_has_links}, read_ids_list=obj_id_list)\n")
+                output_str += " " * indent_count + (f'    {message_name_snake_cased}_json_n_dataclass_handler.'
+                                                    f'set_stored_json_dict_list(stored_{message_name_snake_cased}_json_list)\n')
+                output_str += " " * indent_count + (f"    await callback_class.partial_update_all_{message_name_snake_cased}_pre("
+                                                    f"{message_name_snake_cased}_json_n_dataclass_handler)\n")
+            else:
+                output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_obj_list = await "
+                                                    f"generic_read_http({message.proto.name}, "
+                                                    f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                                    f"has_links={msg_has_links}, read_ids_list=obj_id_list)\n")
+                output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_req_json_list = "
+                                                    f"await callback_class.partial_update_all_{message_name_snake_cased}_pre("
+                                                    f"stored_{message_name_snake_cased}_obj_list, "
+                                                    f"{message_name_snake_cased}_update_req_json_list)\n")
+                output_str += " " * indent_count + f"    if {message_name_snake_cased}_update_req_json_list is None:\n"
+                output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
+                                                    f"'callback_class.partial_update_all_{message_name_snake_cased}_pre returned "
+                                                    f"None instead of updated {message_name_snake_cased}_update_req_json_list ')\n")
+                output_str += " " * indent_count + f"    elif not {message_name_snake_cased}_update_req_json_list:\n"
+                output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
+                                                    f"'callback_class.partial_update_all_{message_name_snake_cased}_pre returned "
+                                                    f"empty list instead of updated "
+                                                    f"{message_name_snake_cased}_update_req_json_list ')\n")
+            output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
+                                                f"'avoid_{message_name_snake_cased}_db_update'):\n")
+            indent_count += 4
+            output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + \
+                              f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable(" \
+                              f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"{message_name_snake_cased}_json_n_dataclass_handler, obj_id_list, filter_agg_pipeline, " \
+                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+            else:
                 output_str += " " * indent_count + \
                               f"        updated_{message_name_snake_cased}_obj_list = await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
-                              f"{message_name_snake_cased}_update_req_json_list, obj_id_list, " \
+                              f"{message_name_snake_cased}_update_req_json_list, obj_id_list, filter_agg_pipeline, " \
                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
-        indent_count -= 4
-        output_str += " " * indent_count + f"    else:\n"
-        output_str += " " * indent_count + (f"        updated_{message_name_snake_cased}_obj_list = await "
-                                            f"generic_patch_all_without_db_update_http({message.proto.name}, "
-                                            f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                                            f"{message_name_snake_cased}_update_req_json_list, "
-                                            f"return_obj_copy=return_obj_copy)\n")
-        indent_count -= 4
-        output_str += " " * indent_count + (f"    await callback_class.partial_update_all_"
-                                            f"{message_name_snake_cased}_post("
-                                            f"stored_{message_name_snake_cased}_obj_list, "
-                                            f"updated_{message_name_snake_cased}_obj_list)\n")
-        output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj_list\n"
-        output_str += "\n"
+            output_str += " " * indent_count + "    else:\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      f"        updated_{message_name_snake_cased}_update_req_json_list =  await generic_callable(" \
+                                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message_name_snake_cased}_json_n_dataclass_handler, obj_id_list, " \
+                                      f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json_list')}, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                    else:
+                        output_str += " " * indent_count + \
+                                      f"        updated_{message_name_snake_cased}_obj_list =  await generic_callable(" \
+                                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
+                                      f"{message_name_snake_cased}_update_req_json_list, obj_id_list, " \
+                                      f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json_list')}, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, obj_id_list, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
+                                       f"{message_name_snake_cased}_update_req_json_list, obj_id_list, "
+                                       f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
+                case FastapiHttpRoutesFileHandler.aggregation_type_both:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message_name_snake_cased}_json_n_dataclass_handler, obj_id_list, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json_list')}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
+                                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
+                                       f"{message_name_snake_cased}_update_req_json_list, obj_id_list, "
+                                       f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json_list')}, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                case other:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable(" \
+                                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message_name_snake_cased}_json_n_dataclass_handler, obj_id_list, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                    else:
+                        output_str += " " * indent_count + \
+                                      f"        updated_{message_name_snake_cased}_obj_list = await generic_callable(" \
+                                      f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
+                                      f"{message_name_snake_cased}_update_req_json_list, obj_id_list, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.partial_update_all_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_update_req_json_list\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.partial_update_all_{message_name_snake_cased}_post(stored_{message_name_snake_cased}_obj_list, updated_{message_name_snake_cased}_obj_list)\n"
+                output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_obj_list\n"
+            output_str += " " * indent_count + f"else:\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"    await callback_class.partial_update_all_{message_name_snake_cased}_post({message_name_snake_cased}_json_n_dataclass_handler)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_json_n_dataclass_handler.get_json_dict_list()\n"
+            else:
+                output_str += " " * indent_count + f"    await callback_class.partial_update_all_{message_name_snake_cased}_post(stored_{message_name_snake_cased}_obj_list, {message_name_snake_cased}_update_req_json_list)\n"
+                output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_update_req_json_list\n"
+            if model_type == ModelType.Dataclass:
+                output_str += " " * indent_count + f"# Cleaning handler before returning and leaving r_lock\n"
+                output_str += " " * indent_count + f"{message_name_snake_cased}_json_n_dataclass_handler.clear()\n"
+            output_str += " " * indent_count + f"return return_obj\n\n"
         return output_str
 
     def handle_PATCH_all_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
+        message, _, _, model_type = self._unpack_kwargs_without_id_field_type(**kwargs)
 
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_PATCH_all_gen(**kwargs)
         output_str += f"\n"
-        output_str += f'@{self.api_router_app_name}.patch("/patch_all-{message_name_snake_cased}' + \
-                      f'", response_model=List[{message.proto.name}] | bool, status_code=200)\n'
-        output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                       f"update_req_body: Request, return_obj_copy: bool | None = True"
-                       f") -> List[{message.proto.name}] | bool:\n")
-        output_str += f"    json_body = await {message_name_snake_cased}_update_req_body.json()\n"
-        output_str += (f'    return await underlying_partial_update_all_{message_name_snake_cased}_http(json_body, '
-                       f'return_obj_copy=return_obj_copy)\n')
+        if model_type == ModelType.Msgspec:
+            output_str += f'@{self.api_router_app_name}.patch("/patch_all-{message_name_snake_cased}' + \
+                          f'", status_code=200)\n'
+            output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                           f"update_req_body: Request, return_obj_copy: bool | None = True):\n")
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_update_req_body.body()\n"
+            output_str += (f'        return await underlying_partial_update_all_{message_name_snake_cased}_http_bytes('
+                           f'data_body, return_obj_copy=return_obj_copy)\n')
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'partial_update_all_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+        else:
+            if model_type == ModelType.Dataclass:
+                output_str += f'@{self.api_router_app_name}.patch("/patch_all-{message_name_snake_cased}' + \
+                              f'", status_code=200)\n'
+                output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                               f"update_req_body: Request, return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += f'@{self.api_router_app_name}.patch("/patch_all-{message_name_snake_cased}' + \
+                              f'", response_model=List[{message.proto.name}] | bool, status_code=200)\n'
+                output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
+                               f"update_req_body: Request, return_obj_copy: bool | None = True"
+                               f") -> List[{message.proto.name}] | bool:\n")
+            output_str += f"    try:\n"
+            output_str += f"        data_body = await {message_name_snake_cased}_update_req_body.body()\n"
+            output_str += f"        json_body = orjson.loads(data_body)\n"
+            output_str += (f'        return await underlying_partial_update_all_{message_name_snake_cased}_http(json_body, '
+                           f'return_obj_copy=return_obj_copy)\n')
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'partial_update_all_{message_name_snake_cased}_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
         return output_str
 
-    def handle_underlying_DELETE_gen(self, **kwargs) -> str:
-        message, aggregation_type, id_field_type, shared_lock_list = self._unpack_kwargs_with_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
+    def _handle_msgspec_common_underlying_delete_gen(self, message: protogen.Message, aggregation_type,
+                                                        msg_has_links, shared_lock_list, id_field_type) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
+        output_str = ""
         if id_field_type is not None:
-            output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
+            output_str += (f"async def _underlying_delete_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_id: {id_field_type}, "
                            f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
+                           f"return_obj_copy: bool | None = True):\n")
         else:
-            output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
+            output_str += (f"async def _underlying_delete_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
                            f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Delete route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_delete_http\n'
+                           f"return_obj_copy: bool | None = True):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
-        output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
-                                           f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                                           f"{message_name_snake_cased}_id, has_links={msg_has_links})\n"
         output_str += " " * indent_count + f"    await callback_class.delete_{message_name_snake_cased}_pre(" \
-                                           f"stored_{message_name_snake_cased}_obj)\n"
+                                           f"{message_name_snake_cased}_id)\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter | FastapiHttpRoutesFileHandler.aggregation_type_both:
                 err_str = "Filter Aggregation type is not supported in Delete operations, " \
@@ -899,60 +2635,196 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + \
                               (f"    delete_web_resp = await generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"{message.proto.name}BaseModel, stored_{message_name_snake_cased}_obj, "
-                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
+                               f"{message.proto.name}BaseModel, {message_name_snake_cased}_id, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
             case other:
                 output_str += " " * indent_count + \
                               f"    delete_web_resp = await generic_callable({message.proto.name}, " \
                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                              f"{message.proto.name}BaseModel, stored_{message_name_snake_cased}_obj, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                              f"{message.proto.name}BaseModel, {message_name_snake_cased}_id, " \
+                              f"has_links={msg_has_links})\n"
         output_str += " " * indent_count + f"    await callback_class.delete_{message_name_snake_cased}_post(" \
                                            f"delete_web_resp)\n"
-        output_str += " " * indent_count + f"    return delete_web_resp\n"
+        output_str += " " * indent_count + f"    if return_obj_copy:\n"
+        output_str += " " * indent_count + f"        return delete_web_resp\n"
+        output_str += " " * indent_count + f"    else:\n"
+        output_str += " " * indent_count + f"        return True\n\n\n"
+        return output_str
+
+    def handle_underlying_DELETE_gen(self, **kwargs) -> str:
+        message, aggregation_type, id_field_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_with_id_field_type(**kwargs))
+        msg_has_links: bool = message in self.message_to_link_messages_dict
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        if model_type == ModelType.Msgspec:
+            output_str = self._handle_msgspec_common_underlying_delete_gen(message, aggregation_type, msg_has_links,
+                                                                           shared_lock_list, id_field_type)
+            output_str += f"@perf_benchmark\n"
+            if id_field_type is not None:
+                output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id: {id_field_type}, "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id: "
+                               f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Delete route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_delete_http\n'
+            output_str += (f"    return_val = await _underlying_delete_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_id, generic_callable, return_obj_copy)\n")
+            output_str += "    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            if id_field_type is not None:
+                output_str += (f"async def underlying_delete_{message_name_snake_cased}_http_bytes("
+                               f"{message_name_snake_cased}_id: {id_field_type}, "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += (f"async def underlying_delete_{message_name_snake_cased}_http_bytes("
+                               f"{message_name_snake_cased}_id: "
+                               f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Delete route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_delete_http\n'
+            output_str += (f"    return_val = await _underlying_delete_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_id, generic_callable, return_obj_copy)\n")
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += "    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
+        else:
+            output_str = f"@perf_benchmark\n"
+            if id_field_type is not None:
+                output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id: {id_field_type}, "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True)")
+            else:
+                output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True)")
+            output_str += " -> DefaultPydanticWebResponse | bool:\n"
+            output_str += f'    """\n'
+            output_str += f'    Delete route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_delete_http\n'
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
+                                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                               f"{message_name_snake_cased}_id, has_links={msg_has_links})\n"
+            output_str += " " * indent_count + f"    await callback_class.delete_{message_name_snake_cased}_pre(" \
+                                               f"stored_{message_name_snake_cased}_obj)\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter | FastapiHttpRoutesFileHandler.aggregation_type_both:
+                    err_str = "Filter Aggregation type is not supported in Delete operations, " \
+                              f"but aggregation type {aggregation_type} received in message {message.proto.name}"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+                case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"    delete_web_resp = await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message.proto.name}BaseModel, {message_name_snake_cased}_id, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"    delete_web_resp = await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message.proto.name}BaseModel, stored_{message_name_snake_cased}_obj, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                case other:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      f"    delete_web_resp = await generic_callable({message.proto.name}, " \
+                                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message.proto.name}BaseModel, {message_name_snake_cased}_id, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                    else:
+                        output_str += " " * indent_count + \
+                                      f"    delete_web_resp = await generic_callable({message.proto.name}, " \
+                                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message.proto.name}BaseModel, stored_{message_name_snake_cased}_obj, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+            output_str += " " * indent_count + f"    await callback_class.delete_{message_name_snake_cased}_post(" \
+                                               f"delete_web_resp)\n"
+            output_str += " " * indent_count + f"    return delete_web_resp\n"
         output_str += "\n"
         return output_str
 
     def handle_DELETE_gen(self, **kwargs) -> str:
-        message, _, id_field_type, _ = self._unpack_kwargs_with_id_field_type(**kwargs)
+        message, _, id_field_type, _, model_type = self._unpack_kwargs_with_id_field_type(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_DELETE_gen(**kwargs)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}/' + \
-                      '{' + f'{message_name_snake_cased}_id' + '}' + \
-                      f'", response_model=DefaultWebResponse | bool, status_code=200)\n'
-        if id_field_type is not None:
-            output_str += (f"async def delete_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_id: {id_field_type}, "
-                           f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
+        if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+            output_str += f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}/' + \
+                          '{' + f'{message_name_snake_cased}_id' + '}' + \
+                          f'", status_code=200)\n'
+            if id_field_type is not None:
+                output_str += (f"async def delete_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id: {id_field_type}, "
+                               f"return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += (f"async def delete_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
+                               f"return_obj_copy: bool | None = True):\n")
         else:
-            output_str += (f"async def delete_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
-                           f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
-        output_str += f"    return await underlying_delete_{message_name_snake_cased}_http(" \
-                      f"{message_name_snake_cased}_id, return_obj_copy=return_obj_copy)\n"
+            output_str += f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}/' + \
+                          '{' + f'{message_name_snake_cased}_id' + '}' + \
+                          f'", response_model=DefaultPydanticWebResponse | bool, status_code=200)\n'
+            if id_field_type is not None:
+                output_str += (f"async def delete_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id: {id_field_type}, "
+                               f"return_obj_copy: bool | None = True) -> DefaultPydanticWebResponse | bool:\n")
+            else:
+                output_str += (f"async def delete_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
+                               f"return_obj_copy: bool | None = True) -> DefaultPydanticWebResponse | bool:\n")
+        output_str += f"    try:\n"
+        if model_type == ModelType.Msgspec:
+            output_str += f"        return await underlying_delete_{message_name_snake_cased}_http_bytes(" \
+                          f"{message_name_snake_cased}_id, return_obj_copy=return_obj_copy)\n"
+        else:
+            output_str += f"        return await underlying_delete_{message_name_snake_cased}_http(" \
+                          f"{message_name_snake_cased}_id, return_obj_copy=return_obj_copy)\n"
+        output_str += f"    except Exception as e:\n"
+        output_str += (f"        logging.exception(f'delete_{message_name_snake_cased}_http failed in "
+                       "client call with exception: {e}')\n")
+        output_str += f"        raise e\n"
         return output_str
 
-    def handle_underlying_DELETE_all_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
+    def _handle_msgspec_common_underlying_delete_all_gen(self, message: protogen.Message, aggregation_type,
+                                                         shared_lock_list) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
-        output_str += (f"async def underlying_delete_all_{message_name_snake_cased}_http("
-                       f"generic_callable: Callable[[...], Any] | None = None, "
-                       f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Delete All route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_delete_all_http\n'
+        output_str = (f"async def _underlying_delete_all_{message_name_snake_cased}_http("
+                      f"generic_callable: Callable[Any, Any] | None = None, "
+                      f"return_obj_copy: bool | None = True):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
         output_str += " " * indent_count + f"    await callback_class.delete_all_{message_name_snake_cased}_pre()\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter | (
-                    FastapiHttpRoutesFileHandler.aggregation_type_both) | FastapiHttpRoutesFileHandler.aggregation_type_update:
+            FastapiHttpRoutesFileHandler.aggregation_type_both) | FastapiHttpRoutesFileHandler.aggregation_type_update:
                 err_str = "Filter Aggregation type is not supported in Delete All operations, " \
                           f"but aggregation type {aggregation_type} received in message {message.proto.name}"
                 logging.exception(err_str)
@@ -961,24 +2833,121 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + \
                               f"    delete_web_resp = await generic_callable({message.proto.name}, " \
                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                              f"{message.proto.name}BaseModel, return_obj_copy=return_obj_copy)\n"
+                              f"{message.proto.name}BaseModel)\n"
         output_str += " " * indent_count + f"    await callback_class.delete_all_{message_name_snake_cased}_post(" \
                                            f"delete_web_resp)\n"
-        output_str += " " * indent_count + f"    return delete_web_resp\n"
+        output_str += " " * indent_count + f"    if return_obj_copy:\n"
+        output_str += " " * indent_count + f"        return delete_web_resp\n"
+        output_str += " " * indent_count + f"    else:\n"
+        output_str += " " * indent_count + f"        return True\n"
+        output_str += "\n\n"
+        return output_str
+
+
+    def handle_underlying_DELETE_all_gen(self, **kwargs) -> str:
+        message, aggregation_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_without_id_field_type(**kwargs))
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        if model_type == ModelType.Msgspec:
+            output_str = self._handle_msgspec_common_underlying_delete_all_gen(message, aggregation_type,
+                                                                               shared_lock_list)
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_delete_all_{message_name_snake_cased}_http("
+                           f"generic_callable: Callable[[...], Any] | None = None, "
+                           f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Delete All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_delete_all_http\n'
+            output_str += (f"    return_val = await _underlying_delete_all_{message_name_snake_cased}_http("
+                           f"generic_callable, return_obj_copy)\n")
+            output_str += f"    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_delete_all_{message_name_snake_cased}_http_bytes("
+                           f"generic_callable: Callable[[...], Any] | None = None, "
+                           f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Delete All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_delete_all_http\n'
+            output_str += (f"    return_val = await _underlying_delete_all_{message_name_snake_cased}_http("
+                           f"generic_callable, return_obj_copy)\n")
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
+
+        else:
+            output_str = f"@perf_benchmark\n"
+            if model_type == ModelType.Dataclass:
+                output_str += (f"async def underlying_delete_all_{message_name_snake_cased}_http("
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += (f"async def underlying_delete_all_{message_name_snake_cased}_http("
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True) -> DefaultPydanticWebResponse | bool:\n")
+            output_str += f'    """\n'
+            output_str += f'    Delete All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_delete_all_http\n'
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            output_str += " " * indent_count + f"    await callback_class.delete_all_{message_name_snake_cased}_pre()\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter | (
+                        FastapiHttpRoutesFileHandler.aggregation_type_both) | FastapiHttpRoutesFileHandler.aggregation_type_update:
+                    err_str = "Filter Aggregation type is not supported in Delete All operations, " \
+                              f"but aggregation type {aggregation_type} received in message {message.proto.name}"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+                case other:
+                    if model_type == ModelType.Msgspec:
+                        output_str += " " * indent_count + \
+                                      f"    delete_web_resp = await generic_callable({message.proto.name}, " \
+                                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message.proto.name}BaseModel)\n"
+                    else:
+                        output_str += " " * indent_count + \
+                                      f"    delete_web_resp = await generic_callable({message.proto.name}, " \
+                                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message.proto.name}BaseModel, return_obj_copy=return_obj_copy)\n"
+            output_str += " " * indent_count + f"    await callback_class.delete_all_{message_name_snake_cased}_post(" \
+                                               f"delete_web_resp)\n"
+            output_str += " " * indent_count + f"    return delete_web_resp\n"
         output_str += "\n"
         return output_str
 
     def handle_DELETE_all_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
+        message, _, _, model_type = self._unpack_kwargs_without_id_field_type(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_DELETE_all_gen(**kwargs)
         output_str += "\n"
-        output_str += (f'@{self.api_router_app_name}.delete("/delete_all-{message_name_snake_cased}/", '
-                       f'response_model=DefaultWebResponse | bool, status_code=200)\n')
-        output_str += (f"async def delete_{message_name_snake_cased}_all_http(return_obj_copy: bool | None = True"
-                       f") -> DefaultWebResponse | bool:\n")
-        output_str += (f"    return await underlying_delete_all_{message_name_snake_cased}_http("
-                       f"return_obj_copy=return_obj_copy)\n")
+        if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+            output_str += (f'@{self.api_router_app_name}.delete("/delete_all-{message_name_snake_cased}/", '
+                           f'status_code=200)\n')
+            output_str += (f"async def delete_{message_name_snake_cased}_all_http(return_obj_copy: bool | None = True"
+                           f"):\n")
+        else:
+            output_str += (f'@{self.api_router_app_name}.delete("/delete_all-{message_name_snake_cased}/", '
+                           f'response_model=DefaultPydanticWebResponse | bool, status_code=200)\n')
+            output_str += (f"async def delete_{message_name_snake_cased}_all_http(return_obj_copy: bool | None = True"
+                           f") -> DefaultPydanticWebResponse | bool:\n")
+
+        output_str += f"    try:\n"
+        if model_type == ModelType.Msgspec:
+            output_str += (f"        return await underlying_delete_all_{message_name_snake_cased}_http_bytes("
+                           f"return_obj_copy=return_obj_copy)\n")
+        else:
+            output_str += (f"        return await underlying_delete_all_{message_name_snake_cased}_http("
+                           f"return_obj_copy=return_obj_copy)\n")
+        output_str += f"    except Exception as e:\n"
+        output_str += (f"        logging.exception(f'delete_{message_name_snake_cased}_all_http failed in "
+                       "client call with exception: {e}')\n")
+        output_str += f"        raise e\n"
         return output_str
 
     def _get_filter_tuple_str(self, index_fields: List[protogen.Field]) -> str:
@@ -1050,41 +3019,34 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     #         f"    return await underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params})\n\n\n"
     #     return output_str
 
-    def handle_underlying_GET_gen(self, **kwargs) -> str:
-        message, aggregation_type, id_field_type, shared_lock_list = self._unpack_kwargs_with_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
+    def _handle_msgspec_common_underlying_get_gen(self, message: protogen.Message, aggregation_type, msg_has_links,
+                                                  shared_lock_list, id_field_type) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
         if id_field_type is not None:
-            output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
+            output_str = f"async def _underlying_read_{message_name_snake_cased}_by_id_http(" \
                           f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
-                          f"generic_callable: Callable[[...], Any] | None = None) -> {message.proto.name}:\n"
+                          f"generic_callable: Callable[Any, Any] | None = None):\n"
         else:
-            output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
+            output_str = f"async def _underlying_read_{message_name_snake_cased}_by_id_http(" \
                           f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, " \
                           f"filter_agg_pipeline: Any = None, generic_callable: " \
-                          f"Callable[[...], Any] | None = None) -> {message.proto.name}:\n"
-        output_str += f'    """\n'
-        output_str += f'    Read by id route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_read_by_id_http\n'
-        # else not required: avoiding if method desc not provided
+                          f"Callable[[...], Any] | None = None):\n"
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
         output_str += " " * indent_count + \
                       f"    await callback_class.read_by_id_{message_name_snake_cased}_pre({message_name_snake_cased}_id)\n"
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+        return_obj = f"{message_name_snake_cased}_json"
         output_str += " " * indent_count + \
-                      f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
+                      f"        {return_obj} = await generic_callable({message.proto.name}, " \
                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                       f"{message_name_snake_cased}_id, filter_agg_pipeline, has_links={msg_has_links})\n"
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
                 output_str += " " * indent_count + \
-                              f"        {message_name_snake_cased}_obj = await generic_callable(" \
+                              f"        {return_obj} = await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                               f"{message_name_snake_cased}_id, " \
                               f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_id')}, " \
@@ -1096,62 +3058,203 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 raise Exception(err_str)
             case other:
                 output_str += " " * indent_count + \
-                              f"        {message_name_snake_cased}_obj = await generic_callable(" \
+                              f"        {return_obj} = await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                               f"{message_name_snake_cased}_id, has_links={msg_has_links})\n"
+        output_str += " " * indent_count + (f"    {message_name_snake_cased}_msgspec_obj = "
+                                            f"msgspec.convert({message_name_snake_cased}_json, "
+                                            f"type={message.proto.name}, dec_hook=dec_hook)\n")
+        output_str += " " * indent_count + (f"    await callback_class.read_by_id_{message_name_snake_cased}_post("
+                                            f"{message_name_snake_cased}_msgspec_obj)\n")
+        output_str += " " * indent_count + f"    return {message_name_snake_cased}_msgspec_obj\n\n\n"
+        return output_str
 
-        output_str += " " * indent_count + f"    await callback_class.read_by_id_{message_name_snake_cased}_post({message_name_snake_cased}_obj)\n"
-        output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj\n"
-        output_str += "\n"
+    def handle_underlying_GET_gen(self, **kwargs) -> str:
+        message, aggregation_type, id_field_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_with_id_field_type(**kwargs))
+        msg_has_links: bool = message in self.message_to_link_messages_dict
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+
+        output_str = ""
+        if model_type == ModelType.Msgspec:
+            output_str += self._handle_msgspec_common_underlying_get_gen(message, aggregation_type, msg_has_links,
+                                                                         shared_lock_list, id_field_type)
+            output_str += f"@perf_benchmark\n"
+            if id_field_type is not None:
+                output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
+                              f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
+                              f"generic_callable: Callable[[...], Any] | None = None):\n"
+            else:
+                output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
+                              f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, " \
+                              f"filter_agg_pipeline: Any = None, generic_callable: " \
+                              f"Callable[[...], Any] | None = None):\n"
+            output_str += f'    """\n'
+            output_str += f'    Read by id route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_read_by_id_http\n'
+            output_str += f"    return_val = await _underlying_read_{message_name_snake_cased}_by_id_http(" \
+                          f"{message_name_snake_cased}_id, filter_agg_pipeline, generic_callable)\n"
+            output_str += f"    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            if id_field_type is not None:
+                output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http_json_dict(" \
+                              f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
+                              f"generic_callable: Callable[[...], Any] | None = None):\n"
+            else:
+                output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http_json_dict(" \
+                              f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, " \
+                              f"filter_agg_pipeline: Any = None, generic_callable: " \
+                              f"Callable[[...], Any] | None = None):\n"
+            output_str += f'    """\n'
+            output_str += f'    Read by id route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_read_by_id_http\n'
+            output_str += f"    return_val = await _underlying_read_{message_name_snake_cased}_by_id_http(" \
+                          f"{message_name_snake_cased}_id, filter_agg_pipeline, generic_callable)\n"
+            output_str += f"    return_val = msgspec.to_builtins(return_val, builtin_types=[DateTime])\n"
+            output_str += f"    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            if id_field_type is not None:
+                output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http_bytes(" \
+                              f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
+                              f"generic_callable: Callable[[...], Any] | None = None):\n"
+            else:
+                output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http_bytes(" \
+                              f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, " \
+                              f"filter_agg_pipeline: Any = None, generic_callable: " \
+                              f"Callable[[...], Any] | None = None):\n"
+            output_str += f'    """\n'
+            output_str += f'    Read by id route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_read_by_id_http\n'
+            output_str += f"    return_val = await _underlying_read_{message_name_snake_cased}_by_id_http(" \
+                          f"{message_name_snake_cased}_id, filter_agg_pipeline, generic_callable)\n"
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n\n"
+        else:
+            output_str += f"@perf_benchmark\n"
+            if id_field_type is not None:
+                output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
+                              f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
+                              f"generic_callable: Callable[[...], Any] | None = None)"
+            else:
+                output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
+                              f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, " \
+                              f"filter_agg_pipeline: Any = None, generic_callable: " \
+                              f"Callable[[...], Any] | None = None)"
+            if model_type == ModelType.Dataclass:
+                output_str += ":\n"
+            else:
+                output_str += f" -> {message.proto.name}:\n"
+            output_str += f'    """\n'
+            output_str += f'    Read by id route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_read_by_id_http\n'
+            # else not required: avoiding if method desc not provided
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            output_str += " " * indent_count + \
+                          f"    await callback_class.read_by_id_{message_name_snake_cased}_pre({message_name_snake_cased}_id)\n"
+            output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+            if model_type == ModelType.Dataclass:
+                return_obj = f"{message_name_snake_cased}_json"
+            else:
+                return_obj = f"{message_name_snake_cased}_obj"
+            output_str += " " * indent_count + \
+                          f"        {return_obj} = await generic_callable({message.proto.name}, " \
+                          f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                          f"{message_name_snake_cased}_id, filter_agg_pipeline, has_links={msg_has_links})\n"
+            output_str += " " * indent_count + "    else:\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                    output_str += " " * indent_count + \
+                                  f"        {return_obj} = await generic_callable(" \
+                                  f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                  f"{message_name_snake_cased}_id, " \
+                                  f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_id')}, " \
+                                  f"has_links={msg_has_links})\n"
+                case FastapiHttpRoutesFileHandler.aggregation_type_update | FastapiHttpRoutesFileHandler.aggregation_type_both:
+                    err_str = "Update Aggregation type is not supported in read by id operations, " \
+                              f"but aggregation type {aggregation_type} received in message {message.proto.name}"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+                case other:
+                    output_str += " " * indent_count + \
+                                  f"        {return_obj} = await generic_callable(" \
+                                  f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                  f"{message_name_snake_cased}_id, has_links={msg_has_links})\n"
+
+            output_str += " " * indent_count + f"    await callback_class.read_by_id_{message_name_snake_cased}_post({return_obj})\n"
+            output_str += " " * indent_count + f"    return {return_obj}\n"
+            output_str += "\n"
         return output_str
 
     def handle_GET_gen(self, **kwargs) -> str:
-        message, _, id_field_type, _ = self._unpack_kwargs_with_id_field_type(**kwargs)
+        message, _, id_field_type, _, model_type = self._unpack_kwargs_with_id_field_type(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_GET_gen(**kwargs)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}/' + '{' + \
-                      f'{message_name_snake_cased}_id' + '}' + \
-                      f'", response_model={message.proto.name}, status_code=200)\n'
+        if model_type == ModelType.Dataclass or model_type == ModelType.Msgspec:
+            output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}/' + '{' + \
+                          f'{message_name_snake_cased}_id' + '}' + f'", status_code=200)\n'
+        else:
+            output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}/' + '{' + \
+                          f'{message_name_snake_cased}_id' + '}' + \
+                          f'", response_model={message.proto.name}, status_code=200)\n'
         if id_field_type is not None:
             output_str += f"async def read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id: " \
-                          f"{id_field_type}) -> {message.proto.name}:\n"
+                          f"{id_field_type})"
         else:
             output_str += f"async def read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id: " \
-                          f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}) -> {message.proto.name}:\n"
-        output_str += \
-            f"    return await underlying_read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id)\n"
+                          f"{FastapiHttpRoutesFileHandler.default_id_type_var_name})"
+        if model_type == ModelType.Dataclass or model_type == ModelType.Msgspec:
+            output_str += ":\n"
+        else:
+            output_str += f" -> {message.proto.name}:\n"
+        output_str += f"    try:\n"
+        if model_type == ModelType.Msgspec:
+            output_str += \
+                f"        return await underlying_read_{message_name_snake_cased}_by_id_http_bytes({message_name_snake_cased}_id)\n"
+        else:
+            output_str += \
+                f"        return await underlying_read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id)\n"
+        output_str += f"    except Exception as e:\n"
+        output_str += (f"        logging.exception(f'read_{message_name_snake_cased}_by_id_http failed in "
+                       "client call with exception: {e}')\n")
+        output_str += f"        raise e\n"
+
         return output_str
 
-    def handle_underlying_GET_ALL_gen(self, message: protogen.Message, aggregation_type: str,
-                                      shared_lock_list: List[str] | None = None) -> str:
-        msg_has_links: bool = message in self.message_to_link_messages_dict
+    def _handle_msgspec_common_underlying_get_all_gen(self, message: protogen.Message, aggregation_type, msg_has_links,
+                                                      shared_lock_list) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
-        output_str += (f"async def underlying_read_{message_name_snake_cased}_http("
-                       f"filter_agg_pipeline: Any = None, generic_callable: "
-                       f"Callable[[...], Any] | None = None, projection_model=None, "
-                       f"projection_filter: Dict | None = None, limit_obj_count: int | None = None"
-                       f") -> List[{message.proto.name}]:\n")
-        output_str += f'    """\n'
-        output_str += f'    Get All route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_read_http\n'
+        output_str = (f"async def _underlying_read_{message_name_snake_cased}_http("
+                      f"filter_agg_pipeline: Any = None, generic_callable: "
+                      f"Callable[Any, Any] | None = None, projection_model=None, "
+                      f"projection_filter: Dict | None = None, limit_obj_count: int | None = None):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
+        return_obj_str = "json_list"
         output_str += mutex_handling_str
         output_str += " " * indent_count + f"    await callback_class.read_all_{message_name_snake_cased}_pre()\n"
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
-                      f"        obj_list = await generic_callable({message.proto.name}, " \
+                      f"        {return_obj_str} = await generic_callable({message.proto.name}, " \
                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, filter_agg_pipeline, " \
                       f"has_links={msg_has_links}, projection_model=projection_model)\n"
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
                 output_str += " " * indent_count + \
-                              f"        obj_list = await generic_callable({message.proto.name}, " \
+                              f"        {return_obj_str} = await generic_callable({message.proto.name}, " \
                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                               f"{self._get_filter_configs_var_name(message, None, put_limit=True)}, " \
                               f"has_links={msg_has_links})\n"
@@ -1170,35 +3273,178 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + \
                               "            limit_filter_agg = {'agg': get_limited_objs(limit_obj_count)}\n"
                 output_str += " " * indent_count + \
-                              f"        obj_list = await generic_callable({message.proto.name}, " \
+                              f"        {return_obj_str} = await generic_callable({message.proto.name}, " \
                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                               f"limit_filter_agg, has_links={msg_has_links})\n"
-        output_str += " " * indent_count + f"    await callback_class.read_all_{message_name_snake_cased}_post(obj_list)\n"
-        output_str += " " * indent_count + f"    return obj_list\n\n"
+        output_str += " " * indent_count + f"    if json_list:\n"
+        output_str += " " * indent_count + (f"        convert_type = projection_model if projection_model is not "
+                                            f"None else List[{message.proto.name}]\n")
+        output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj_list = "
+                                            f"msgspec.convert({return_obj_str}, "
+                                            f"type=convert_type, dec_hook=dec_hook)\n")
+        output_str += " " * indent_count + f"    else:\n"
+        output_str += " " * indent_count + f"        {message_name_snake_cased}_msgspec_obj_list = []\n"
+        output_str += " " * indent_count + (f"    await callback_class.read_all_{message_name_snake_cased}_post("
+                                            f"{message_name_snake_cased}_msgspec_obj_list)\n")
+        output_str += " " * indent_count + f"    return {message_name_snake_cased}_msgspec_obj_list\n\n\n"
+        return output_str
+
+    def handle_underlying_GET_ALL_gen(self, message: protogen.Message, aggregation_type: str,
+                                      shared_lock_list: List[str] | None = None,
+                                      model_type: ModelType = ModelType.Beanie) -> str:
+        msg_has_links: bool = message in self.message_to_link_messages_dict
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+
+        if model_type == ModelType.Msgspec:
+            output_str = self._handle_msgspec_common_underlying_get_all_gen(message, aggregation_type, msg_has_links,
+                                                                            shared_lock_list)
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_read_{message_name_snake_cased}_http("
+                           f"filter_agg_pipeline: Any = None, generic_callable: "
+                           f"Callable[[...], Any] | None = None, projection_model=None, "
+                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None"
+                           f"):\n")
+            output_str += f'    """\n'
+            output_str += f'    Get All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_read_http\n'
+            output_str += (f"    return_val = await _underlying_read_{message_name_snake_cased}_http("
+                          f"filter_agg_pipeline, generic_callable, projection_model, projection_filter, "
+                          f"limit_obj_count)\n")
+            output_str += f"    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_read_{message_name_snake_cased}_http_json_dict("
+                           f"filter_agg_pipeline: Any = None, generic_callable: "
+                           f"Callable[[...], Any] | None = None, projection_model=None, "
+                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None"
+                           f"):\n")
+            output_str += f'    """\n'
+            output_str += f'    Get All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_read_http\n'
+            output_str += (f"    return_val = await _underlying_read_{message_name_snake_cased}_http("
+                          f"filter_agg_pipeline, generic_callable, projection_model, projection_filter, "
+                          f"limit_obj_count)\n")
+            output_str += f"    return_obj_dict = msgspec.to_builtins(return_val, builtin_types=[DateTime])\n"
+            output_str += f"    return return_obj_dict\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            output_str += (f"async def underlying_read_{message_name_snake_cased}_http_bytes("
+                           f"filter_agg_pipeline: Any = None, generic_callable: "
+                           f"Callable[[...], Any] | None = None, projection_model=None, "
+                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None"
+                           f"):\n")
+            output_str += f'    """\n'
+            output_str += f'    Get All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_read_http\n'
+            output_str += (f"    return_val = await _underlying_read_{message_name_snake_cased}_http("
+                           f"filter_agg_pipeline, generic_callable, projection_model, projection_filter, "
+                           f"limit_obj_count)\n")
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n\n"
+        else:
+            output_str = f"@perf_benchmark\n"
+            output_str += (f"async def underlying_read_{message_name_snake_cased}_http("
+                           f"filter_agg_pipeline: Any = None, generic_callable: "
+                           f"Callable[[...], Any] | None = None, projection_model=None, "
+                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None"
+                           f")")
+            if model_type == ModelType.Dataclass:
+                output_str += ":\n"
+                return_obj_str = "json_list"
+            else:
+                output_str += f" -> List[{message.proto.name}]:\n"
+                return_obj_str = "obj_list"
+            output_str += f'    """\n'
+            output_str += f'    Get All route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_read_http\n'
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            output_str += " " * indent_count + f"    await callback_class.read_all_{message_name_snake_cased}_pre()\n"
+            output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+            output_str += " " * indent_count + \
+                          f"        {return_obj_str} = await generic_callable({message.proto.name}, " \
+                          f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, filter_agg_pipeline, " \
+                          f"has_links={msg_has_links}, projection_model=projection_model)\n"
+            output_str += " " * indent_count + "    else:\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter:
+                    output_str += " " * indent_count + \
+                                  f"        {return_obj_str} = await generic_callable({message.proto.name}, " \
+                                  f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                  f"{self._get_filter_configs_var_name(message, None, put_limit=True)}, " \
+                                  f"has_links={msg_has_links})\n"
+                case FastapiHttpRoutesFileHandler.aggregation_type_update | FastapiHttpRoutesFileHandler.aggregation_type_both:
+                    err_str = "Update Aggregation type is not supported in real all operations, " \
+                              f"but aggregation type {aggregation_type} received in message {message.proto.name}"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+                case other:
+                    output_str += " " * indent_count + \
+                                  f"        limit_filter_agg: Dict[str, Any] | None = None\n"
+                    output_str += " " * indent_count + \
+                                  f"        if limit_obj_count is not None:\n"
+                    output_str += " " * indent_count + \
+                                  f"            # if underlying is called with limit_obj_count directly\n"
+                    output_str += " " * indent_count + \
+                                  "            limit_filter_agg = {'agg': get_limited_objs(limit_obj_count)}\n"
+                    output_str += " " * indent_count + \
+                                  f"        {return_obj_str} = await generic_callable({message.proto.name}, " \
+                                  f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                  f"limit_filter_agg, has_links={msg_has_links})\n"
+            output_str += " " * indent_count + f"    await callback_class.read_all_{message_name_snake_cased}_post({return_obj_str})\n"
+            output_str += " " * indent_count + f"    return {return_obj_str}\n\n"
         return output_str
 
     def handle_GET_ALL_gen(self, message: protogen.Message, aggregation_type: str,
-                           shared_lock_list: List[str] | None = None) -> str:
+                           shared_lock_list: List[str] | None = None, model_type: ModelType = ModelType.Beanie) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_GET_ALL_gen(message, aggregation_type, shared_lock_list)
+        output_str = self.handle_underlying_GET_ALL_gen(message, aggregation_type, shared_lock_list, model_type)
         output_str += "\n"
-        output_str += (f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}'
-                       f'", response_model=List[{message.proto.name}], status_code=200)\n')
-        output_str += (f"async def read_{message_name_snake_cased}_http(limit_obj_count: int | None = None"
-                       f") -> List[{message.proto.name}]:\n")
+        if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+            output_str += (f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}'
+                           f'", status_code=200)\n')
+            output_str += (f"async def read_{message_name_snake_cased}_http(limit_obj_count: int | None = None"
+                           f"):\n")
+        else:
+            output_str += (f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}'
+                           f'", response_model=List[{message.proto.name}], status_code=200)\n')
+            output_str += (f"async def read_{message_name_snake_cased}_http(limit_obj_count: int | None = None"
+                           f") -> List[{message.proto.name}]:\n")
         additional_agg_option_val_dict = \
             self.get_complex_option_value_from_proto(message,
                                                      FastapiHttpRoutesFileHandler.flux_msg_main_crud_operations_agg)
 
+        output_str += f"    try:\n"
         override_default_get_all_limit = additional_agg_option_val_dict.get("override_get_all_limit_handling")
         if not override_default_get_all_limit:
-            output_str += f"    limit_filter_agg: Dict[str, Any] | None = None\n"
-            output_str += f"    if limit_obj_count is not None:\n"
-            output_str += "        limit_filter_agg = {'agg': get_limited_objs(limit_obj_count)}\n"
-            output_str += f"    return await underlying_read_{message_name_snake_cased}_http(limit_filter_agg)\n\n\n"
+            output_str += f"        limit_filter_agg: Dict[str, Any] | None = None\n"
+            output_str += f"        if limit_obj_count is not None:\n"
+            output_str += "            limit_filter_agg = {'agg': get_limited_objs(limit_obj_count)}\n"
+            if model_type == ModelType.Msgspec:
+                output_str += (f"        return await underlying_read_{message_name_snake_cased}_http_bytes("
+                               f"limit_filter_agg)\n")
+            else:
+                output_str += f"        return await underlying_read_{message_name_snake_cased}_http(limit_filter_agg)\n"
         else:
-            output_str += (f"    return await underlying_read_{message_name_snake_cased}_http("
-                           f"limit_obj_count=limit_obj_count)\n\n\n")
+            if model_type == ModelType.Msgspec:
+                output_str += (f"        return await underlying_read_{message_name_snake_cased}_http_bytes("
+                               f"limit_obj_count=limit_obj_count)\n")
+            else:
+                output_str += (f"        return await underlying_read_{message_name_snake_cased}_http("
+                               f"limit_obj_count=limit_obj_count)\n")
+        output_str += f"    except Exception as e:\n"
+        output_str += (f"        logging.exception(f'read_{message_name_snake_cased}_http failed in "
+                       "client call with exception: {e}')\n")
+        output_str += f"        raise e\n\n\n"
         return output_str
 
     def _check_agg_info_availability(self, aggregation_type: str, crud_option_field_name: str,
@@ -1245,8 +3491,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 raise Exception(err_str)
         return aggregation_type
 
-    def _handle_routes_methods(self, message: protogen.Message) -> str:
-        output_str = ""
+    def _handle_routes_methods(self, message: protogen.Message, model_type: ModelType = ModelType.Beanie) -> str:
+
+        if model_type == ModelType.Dataclass:
+            msg_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+            output_str = (f"{msg_name_snake_cased}_json_n_dataclass_handler = "
+                          f"JsonNDataClassHandler({message.proto.name})\n\n")
+        else:
+            output_str = ""
         crud_field_name_to_method_call_dict = {
             FastapiHttpRoutesFileHandler.flux_json_root_create_field: self.handle_POST_gen,
             FastapiHttpRoutesFileHandler.flux_json_root_create_all_field: self.handle_POST_all_gen,
@@ -1268,7 +3520,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         shared_mutex_list = self._get_list_of_shared_lock_for_message(message)
 
         if (aggregation_type := option_val_dict.get(FastapiHttpRoutesFileHandler.flux_json_root_read_field)) is not None:
-            output_str += self.handle_GET_ALL_gen(message, aggregation_type.strip(), shared_mutex_list)
+            output_str += self.handle_GET_ALL_gen(message, aggregation_type.strip(),
+                                                  shared_mutex_list, model_type)
         # else not required: avoiding find_all route for this message if read_field of json_root option is not set
 
         id_field_type: str = self._get_msg_id_field_type(message)
@@ -1279,7 +3532,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                                           crud_option_field_name,
                                                                           message)
                 output_str += crud_operation_method(message=message, aggregation_type=aggregation_type,
-                                                    id_field_type=id_field_type, shared_mutex_list=shared_mutex_list)
+                                                    id_field_type=id_field_type, shared_mutex_list=shared_mutex_list,
+                                                    model_type=model_type, json_root_option_val=option_val_dict)
                 output_str += "\n\n"
             # else not required: Avoiding method creation if desc not provided in option
 
@@ -1290,20 +3544,23 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             # else not required: Avoiding field if index option is not enabled
 
         if id_field_type == "int":
-            output_str += self._handle_get_max_id_query_generation(message)
+            output_str += self._handle_get_max_id_query_generation(message, model_type)
 
         return output_str
 
     def _handle_http_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
                                query_params_with_type_str: str, route_type: str | None = None,
-                               return_type_str: str | None = None) -> str:
+                               return_type_str: str | None = None, model_type: ModelType = ModelType.Beanie) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if return_type_str is None:
             return_type_str = message.proto.name
         if route_type is None or route_type == FastapiHttpRoutesFileHandler.flux_json_query_route_get_type_field_val:
-            output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
-            output_str += f"async def underlying_{query_name}_query_http({query_params_with_type_str}) -> " \
-                          f"List[{return_type_str}]:\n"
+            output_str = f"@perf_benchmark\n"
+            if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+                output_str += f"async def underlying_{query_name}_query_http({query_params_with_type_str}):\n"
+            else:
+                output_str += f"async def underlying_{query_name}_query_http({query_params_with_type_str}) -> " \
+                              f"List[{return_type_str}]:\n"
             if query_params_str:
                 output_str += f"    {message_name_snake_cased}_obj = await " \
                               f"callback_class.{query_name}_query_pre({message.proto.name}, {query_params_str})\n"
@@ -1315,19 +3572,45 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += f"    await callback_class.{query_name}_query_post(" \
                               f"{message_name_snake_cased}_obj)\n"
             output_str += f"    return {message_name_snake_cased}_obj\n\n\n"
-            output_str += f'@{self.api_router_app_name}.get("/query-{query_name}' + \
-                          f'", response_model=List[{return_type_str}], status_code=200)\n'
-            output_str += f"async def {query_name}_query_http({query_params_with_type_str}) -> " \
-                          f"List[{return_type_str}]:\n"
+
+            if model_type == ModelType.Msgspec:
+                output_str += f"async def underlying_{query_name}_query_http_bytes({query_params_with_type_str}):\n"
+                output_str += f"    return_val = await underlying_{query_name}_query_http({query_params_str})\n"
+                output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+                output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n\n"
+            # else not required: if model_type is not Msgspec then no bytes type underlying variant is created
+
+            if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+                output_str += f'@{self.api_router_app_name}.get("/query-{query_name}' + \
+                              f'", status_code=200)\n'
+                output_str += f"async def {query_name}_query_http({query_params_with_type_str}):\n"
+            else:
+                output_str += f'@{self.api_router_app_name}.get("/query-{query_name}' + \
+                              f'", response_model=List[{return_type_str}], status_code=200)\n'
+                output_str += f"async def {query_name}_query_http({query_params_with_type_str}) -> " \
+                              f"List[{return_type_str}]:\n"
             output_str += f'    """\n'
             output_str += f'    Get Query of {message.proto.name} with aggregate - {query_name}\n'
             output_str += f'    """\n'
-            output_str += f"    return await underlying_{query_name}_query_http({query_params_str})"
+            if model_type == ModelType.Msgspec:
+                output_str += f"    return await underlying_{query_name}_query_http_bytes({query_params_str})"
+            else:
+                output_str += f"    return await underlying_{query_name}_query_http({query_params_str})"
             output_str += "\n\n\n"
-        elif route_type == FastapiHttpRoutesFileHandler.flux_json_query_route_patch_type_field_val:
-            output_str = f"@perf_benchmark('{self.proto_file_package}')\n"
-            output_str += f"async def underlying_{query_name}_query_http(payload_dict: Dict[str, Any]) -> " \
-                          f"List[{return_type_str}]:\n"
+        elif route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_type_field_val,
+                            FastapiHttpRoutesFileHandler.flux_json_query_route_post_type_field_val]:
+            route_type_str = route_type.lower()
+            if route_type == FastapiHttpRoutesFileHandler.flux_json_query_route_patch_type_field_val:
+                status_code = 200
+            else:
+                status_code = 201
+
+            output_str = f"@perf_benchmark\n"
+            if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+                output_str += f"async def underlying_{query_name}_query_http(payload_dict: Dict[str, Any]):\n"
+            else:
+                output_str += f"async def underlying_{query_name}_query_http(payload_dict: Dict[str, Any]) -> " \
+                              f"List[{return_type_str}]:\n"
             if query_params_str:
                 output_str += f"    {message_name_snake_cased}_obj = await " \
                               f"callback_class.{query_name}_query_pre({message.proto.name}, payload_dict)\n"
@@ -1339,22 +3622,98 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 logging.exception(err_str)
                 raise Exception(err_str)
             output_str += f"    return {message_name_snake_cased}_obj\n\n\n"
-            output_str += f'@{self.api_router_app_name}.patch("/query-{query_name}' + \
-                          f'", response_model=List[{return_type_str}], status_code=201)\n'
-            output_str += f"async def {query_name}_query_http(payload_dict: Dict[str, Any]) -> " \
-                          f"List[{return_type_str}]:\n"
+
+            if model_type == ModelType.Msgspec:
+                output_str += f"async def underlying_{query_name}_query_http_bytes(payload_dict: Dict[str, Any]):\n"
+                output_str += f"    return_val = await underlying_{query_name}_query_http(payload_dict)\n"
+                output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+                output_str += (f"    return CustomFastapiResponse(content=return_obj_bytes, "
+                               f"status_code={status_code})\n\n\n")
+            # else not required: if model_type is not Msgspec then no bytes type underlying variant is created
+
+            if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+                output_str += f'@{self.api_router_app_name}.{route_type_str}("/query-{query_name}' + \
+                              f'", status_code={status_code})\n'
+                output_str += f"async def {query_name}_query_http(payload_dict: Dict[str, Any]):\n"
+            else:
+                output_str += f'@{self.api_router_app_name}.{route_type_str}("/query-{query_name}' + \
+                              f'", response_model=List[{return_type_str}], status_code={status_code})\n'
+                output_str += f"async def {query_name}_query_http(payload_dict: Dict[str, Any]) -> " \
+                              f"List[{return_type_str}]:\n"
             output_str += f'    """\n'
             output_str += f'    Patch Query of {message.proto.name} with aggregate - {query_name}\n'
             output_str += f'    """\n'
-            output_str += f"    return await underlying_{query_name}_query_http(payload_dict)"
-            output_str += "\n\n\n"
+
+            output_str += f"    try:\n"
+            if model_type == ModelType.Msgspec:
+                output_str += f"        return await underlying_{query_name}_query_http_bytes(payload_dict)\n"
+            else:
+                output_str += f"        return await underlying_{query_name}_query_http(payload_dict)\n"
+            output_str += f"    except Exception as e:\n"
+            output_str += (f"        logging.exception(f'{query_name}_query_http failed in "
+                           "client call with exception: {e}')\n")
+            output_str += f"        raise e\n"
+            output_str += "\n\n"
         else:
             err_str = f"Unexpected routes_type: {route_type}, str: {route_type}, type {type(route_type)}"
             logging.exception(err_str)
             raise Exception(err_str)
         return output_str
 
-    def _handle_query_methods(self, message: protogen.Message) -> str:
+    def _handle_http_file_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
+                                    query_params_with_type_str: str, return_type_str: str | None = None,
+                                    model_type: ModelType = ModelType.Beanie) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        if return_type_str is None:
+            return_type_str = message.proto.name
+        output_str = f"@perf_benchmark\n"
+        if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+            output_str += (f"async def underlying_{query_name}_query_http(upload_file: UploadFile, "
+                           f"{query_params_with_type_str}):\n")
+        else:
+            output_str += f"async def underlying_{query_name}_query_http(upload_file: UploadFile, " \
+                          f"{query_params_with_type_str}) -> " \
+                          f"List[{return_type_str}]:\n"
+        if query_params_str:
+            output_str += f"    return_val = await " \
+                          f"callback_class.{query_name}_query_pre(upload_file, {query_params_str})\n"
+            output_str += f"    return_val = await " \
+                          f"callback_class.{query_name}_query_post(return_val)\n"
+        else:
+            output_str += f"    return_val = await callback_class.{query_name}_" \
+                          f"query_pre(upload_file)\n"
+            output_str += f"    await callback_class.{query_name}_query_post(return_val)\n"
+        output_str += f"    return return_val\n\n\n"
+
+        if model_type == ModelType.Msgspec:
+            output_str += (f"async def underlying_{query_name}_query_http_bytes(upload_file: UploadFile, "
+                           f"{query_params_with_type_str}):\n")
+            output_str += (f"    return_val = await underlying_{query_name}_query_http("
+                           f"upload_file, {query_params_str})\n")
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=201)\n\n\n"
+        # else not required: if model_type is not Msgspec then no bytes type underlying variant is created
+
+        if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+            output_str += f'@{self.api_router_app_name}.post("/query-{query_name}' + \
+                          f'", status_code=201)\n'
+            output_str += f"async def {query_name}_query_http(upload_file: UploadFile, {query_params_with_type_str}):\n"
+        else:
+            output_str += f'@{self.api_router_app_name}.post("/query-{query_name}' + \
+                          f'", response_model=List[{return_type_str}], status_code=201)\n'
+            output_str += (f"async def {query_name}_query_http(upload_file: UploadFile, "
+                           f"{query_params_with_type_str}) -> List[{return_type_str}]:\n")
+        output_str += f'    """\n'
+        output_str += f'    File Upload Query of {message.proto.name} - {query_name}\n'
+        output_str += f'    """\n'
+        if model_type == ModelType.Msgspec:
+            output_str += f"    return await underlying_{query_name}_query_http_bytes(upload_file, {query_params_str})"
+        else:
+            output_str += f"    return await underlying_{query_name}_query_http(upload_file, {query_params_str})"
+        output_str += "\n\n\n"
+        return output_str
+
+    def _handle_query_methods(self, message: protogen.Message, model_type: ModelType = ModelType.Beanie) -> str:
         output_str = ""
         aggregate_value_list = self.message_to_query_option_list_dict[message]
 
@@ -1387,20 +3746,35 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
             if query_type is None or query_type == "http" or query_type == "both":
                 output_str += self._handle_http_query_str(message, query_name, query_params_str,
-                                                         query_params_with_type_str, query_route_type)
-
+                                                          query_params_with_type_str, query_route_type,
+                                                          model_type=model_type)
+            elif query_type == "http_file":
+                output_str += self._handle_http_file_query_str(message, query_name, query_params_str,
+                                                               query_params_with_type_str,
+                                                               model_type=model_type)
         return output_str
 
-    def _handle_get_max_id_query_generation(self, message: protogen.Message):
+    def _handle_get_max_id_query_generation(self, message: protogen.Message, model_type: ModelType):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f'@{self.api_router_app_name}.get("/query-get_{message_name_snake_cased}_max_id' + \
-                     f'", response_model=MaxId, status_code=200)\n'
-        output_str += f"async def get_{message_name_snake_cased}_max_id_http() -> MaxId:\n"
+        if model_type in [model_type.Dataclass, model_type.Msgspec]:
+            output_str = f'@{self.api_router_app_name}.get("/query-get_{message_name_snake_cased}_max_id' + \
+                         f'", status_code=200)\n'
+            output_str += f"async def get_{message_name_snake_cased}_max_id_http():\n"
+        else:
+            output_str = f'@{self.api_router_app_name}.get("/query-get_{message_name_snake_cased}_max_id' + \
+                         f'", response_model=MaxId, status_code=200)\n'
+            output_str += f"async def get_{message_name_snake_cased}_max_id_http() -> MaxId:\n"
         output_str += f'    """\n'
         output_str += f'    Get Query of {message.proto.name} to get max int id\n'
         output_str += f'    """\n'
         output_str += f'    max_val = await get_max_val({message.proto.name})\n'
-        output_str += f"    return MaxId(max_id_val=max_val)\n"
+        if model_type == model_type.Dataclass:
+            output_str += f"    return orjson.dumps(MaxId(max_id_val=max_val))\n"
+        elif model_type == model_type.Msgspec:
+            output_str += (f"    return CustomFastapiResponse(content=MaxId(max_id_val=max_val).to_json_str(), "
+                           f"status_code=200)\n")
+        else:
+            output_str += f"    return MaxId(max_id_val=max_val)\n"
         output_str += "\n\n"
         return output_str
 
@@ -1462,7 +3836,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         return output_str
 
-    def handle_CRUD_task(self) -> str:
+    def handle_pydantic_CRUD_task(self) -> str:
         output_str = ""
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root):
@@ -1471,13 +3845,43 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += self._handle_routes_methods(message)
 
         for message in self.message_to_query_option_list_dict:
-            # if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_query):
             output_str += self._handle_query_methods(message)
 
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
                 output_str += self._handle_projection_query_methods(message)
+        return output_str
 
+    def handle_dataclass_CRUD_task(self) -> str:
+        output_str = ""
+        for message in self.root_message_list:
+            if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root):
+                output_str += self._handle_routes_methods(message, model_type=ModelType.Dataclass)
+            elif self.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
+                output_str += self._handle_routes_methods(message, model_type=ModelType.Dataclass)
+
+        for message in self.message_to_query_option_list_dict:
+            output_str += self._handle_query_methods(message, model_type=ModelType.Dataclass)
+
+        for message in self.root_message_list:
+            if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
+                output_str += self._handle_projection_query_methods(message)
+        return output_str
+
+    def handle_msgspec_CRUD_task(self) -> str:
+        output_str = ""
+        for message in self.root_message_list:
+            if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root):
+                output_str += self._handle_routes_methods(message, model_type=ModelType.Msgspec)
+            elif self.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
+                output_str += self._handle_routes_methods(message, model_type=ModelType.Msgspec)
+
+        for message in self.message_to_query_option_list_dict:
+            output_str += self._handle_query_methods(message, model_type=ModelType.Msgspec)
+
+        for message in self.root_message_list:
+            if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
+                output_str += self._handle_projection_query_methods(message)
         return output_str
 
     def _get_aggregate_query_var_list(self) -> List[str]:
@@ -1491,15 +3895,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         # else not required: if no message is found with agg_query option then returning empty list
         return agg_query_var_list
 
-    def handle_http_routes_file_gen(self) -> str:
-        # running pre-requisite method to set shared lock option info
-        self._get_messages_having_links()
-        self._set_shared_lock_name_to_pydentic_class_dict()
-
-        base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
-        output_str = f"from {base_routes_file_path} import *\n\n"
-        output_str += self.handle_CRUD_task()
-        output_str += 'host = os.environ.get("HOST")\n'
+    def _handle_ui_specific_code(self):
+        output_str = 'host = os.environ.get("HOST")\n'
         output_str += 'if host is None or len(host) == 0:\n'
         output_str += '    err_str = "Couldn\'t find \'HOST\' key in data/config.yaml of current project"\n'
         output_str += '    logging.error(err_str)\n'
@@ -1508,4 +3905,40 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f"@{self.api_router_app_name}.get('/')\n"
         output_str += "async def serve_spa(request: Request):\n"
         output_str += "    return templates.TemplateResponse('index.html', {'request': request})\n"
+        return output_str
+
+    def handle_http_pydantic_routes_file_gen(self) -> str:
+        # running pre-requisite method to set shared lock option info
+        self._get_messages_having_links()
+        self._set_shared_lock_name_to_pydentic_class_dict()
+
+        base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
+        output_str = f"from {base_routes_file_path} import *\n\n"
+        output_str += self.handle_pydantic_CRUD_task()
+        output_str += self._handle_ui_specific_code()
+        return output_str
+
+    def handle_http_dataclass_routes_file_gen(self) -> str:
+        # running pre-requisite method to set shared lock option info
+        self._get_messages_having_links()
+        self._set_shared_lock_name_to_pydentic_class_dict()
+
+        base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
+        output_str = f"from dataclasses import dataclass\n\n"
+        output_str += f"from {base_routes_file_path} import *\n\n"
+        output_str += self.handle_dataclass_CRUD_task()
+        output_str += self._handle_ui_specific_code()
+
+        return output_str
+
+    def handle_http_msgspec_routes_file_gen(self) -> str:
+        # running pre-requisite method to set shared lock option info
+        self._get_messages_having_links()
+        self._set_shared_lock_name_to_pydentic_class_dict()
+
+        base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
+        output_str = f"from {base_routes_file_path} import *\n\n"
+        output_str += self.handle_msgspec_CRUD_task()
+        output_str += self._handle_ui_specific_code()
+
         return output_str

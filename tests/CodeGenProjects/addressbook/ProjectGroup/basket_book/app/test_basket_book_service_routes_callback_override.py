@@ -29,15 +29,15 @@ def test_sanity_new_chores(static_data_, clean_and_set_limits,
         new_chore_list.append(new_chore_obj)
 
     basket_chore = BasketChoreBaseModel(new_chores=new_chore_list)
-    created_bucket_chore = basket_book_web_client.create_basket_chore_client(basket_chore)
+    created_basket_chore = basket_book_web_client.create_basket_chore_client(basket_chore)
 
-    for new_chore in created_bucket_chore.new_chores:
+    for new_chore in created_basket_chore.new_chores:
         assert new_chore.chore_submit_state == ChoreSubmitType.ORDER_SUBMIT_PENDING, \
             (f"Mismatched: Expected chore_submit_state {ChoreSubmitType.ORDER_SUBMIT_PENDING}, "
              f"found: {new_chore.chore_submit_state}")
 
     # updating market data for this symbol
-    symbol_list = set([new_chore.security.sec_id for new_chore in created_bucket_chore.new_chores])
+    symbol_list = set([new_chore.security.sec_id for new_chore in created_basket_chore.new_chores])
     for symbol in symbol_list:
         tob = TopOfBookBaseModel(symbol=symbol)
         basket_book_web_client.create_top_of_book_client(tob)   # creating tob
@@ -50,7 +50,7 @@ def test_sanity_new_chores(static_data_, clean_and_set_limits,
     for _ in range(try_attempts):
         time.sleep(try_wait)
 
-        basket_chore = basket_book_web_client.get_basket_chore_client(created_bucket_chore.id)
+        basket_chore = basket_book_web_client.get_basket_chore_client(created_basket_chore.id)
         for new_chore in basket_chore.new_chores:
             if new_chore.chore_submit_state != ChoreSubmitType.ORDER_SUBMIT_DONE:
                 break

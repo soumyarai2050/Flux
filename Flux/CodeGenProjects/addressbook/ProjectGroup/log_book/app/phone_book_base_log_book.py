@@ -8,7 +8,6 @@ import inspect
 
 import pendulum
 
-os.environ["DBType"] = "beanie"
 # Project imports
 from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
 from FluxPythonUtils.scripts.utility_functions import get_last_log_line_date_time, parse_to_float
@@ -38,11 +37,11 @@ portfolio_alert_bulk_update_counts_per_call, portfolio_alert_bulk_update_timeout
 
 
 # Updating LogDetail to have strat_id_finder_callable
-class StratLogDetail(LogDetail):
+class StratLogDetail(LogDetail, kw_only=True):
     strat_id_find_callable: Callable[[str], int] | None = None
 
 
-class PairStratDbUpdateDataContainer(BaseModel):
+class PairStratDbUpdateDataContainer(msgspec.Struct):
     method_name: str
     pydantic_basemodel_type: str
     kwargs: Dict[str, Any]
@@ -56,7 +55,7 @@ class PhoneBookBaseLogBook(AppLogBook):
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_msgspec_routes import (
             underlying_partial_update_all_portfolio_alert_http, underlying_read_portfolio_alert_http,
             underlying_read_strat_alert_http)
         cls.underlying_partial_update_all_portfolio_alert_http = underlying_partial_update_all_portfolio_alert_http
@@ -191,16 +190,16 @@ class PhoneBookBaseLogBook(AppLogBook):
                     try:
                         if pydantic_basemodel_type != "None":
                             # API operations other than update
-                            pydantic_basemodel_class_type: Type = eval(pydantic_basemodel_type)
+                            pydantic_basemodel_class_type: Type[MsgspecModel] = eval(pydantic_basemodel_type)
 
                             if isinstance(kwargs, list):  # put_all or post_all
                                 pydantic_obj_list = []
                                 for kwarg in kwargs:
-                                    pydantic_object = pydantic_basemodel_class_type(**kwarg)
+                                    pydantic_object = pydantic_basemodel_class_type.from_dict(kwarg)
                                     pydantic_obj_list.append(pydantic_object)
                                 callback_method(pydantic_obj_list)
                             else:
-                                pydantic_object = pydantic_basemodel_class_type(**kwargs)
+                                pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs)
                                 callback_method(pydantic_object)
                         else:
                             # query handling
@@ -253,7 +252,7 @@ class PhoneBookBaseLogBook(AppLogBook):
         self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
                                    alert_meta=alert_meta)
 
-    def get_update_obj_list_for_journal_type_update(
+    def _get_update_obj_list_for_journal_type_update(
             self, pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str,
             patch_queue: Queue, max_fetch_from_queue: int, parse_to_pydantic: bool | None = None):
         # blocking function
@@ -305,7 +304,7 @@ class PhoneBookBaseLogBook(AppLogBook):
 
             handle_patch_db_queue_updater(update_type, self.pydantic_type_name_to_patch_queue_cache_dict,
                                           pydantic_basemodel_type_name, method_name, kwargs,
-                                          self.get_update_obj_list_for_journal_type_update,
+                                          self._get_update_obj_list_for_journal_type_update,
                                           self.get_update_obj_for_snapshot_type_update,
                                           photo_book_service_http_client.process_strat_view_updates_query_client,
                                           self.dynamic_queue_handler_err_handler, self.max_fetch_from_queue,
@@ -339,9 +338,10 @@ class PhoneBookBaseLogBook(AppLogBook):
                                    StratAlertBaseModel, PortfolioAlertBaseModel,
                                    severity, alert_brief, alert_meta=alert_meta)
         except Exception as e:
-            log_book_service_http_client.portfolio_alert_fail_logger_query_client(
-                f"send_portfolio_alerts failed{PhoneBookBaseLogBook.log_seperator} exception: {e};;; "
-                f"received: {severity=}, {alert_brief=}, {alert_meta=}")
+            err_str_ = (f"send_portfolio_alerts failed, exception: {e};;; "
+                        f"received: {severity=}, {alert_brief=}, {alert_meta=}")
+            logging.exception(err_str_)
+            log_book_service_http_client.portfolio_alert_fail_logger_query_client(err_str_)
             self.service_up = False
 
     def _get_error_dict(self, log_prefix: str, log_message: str) -> \
@@ -372,6 +372,9 @@ class PhoneBookBaseLogBook(AppLogBook):
                                             alert_details)
             self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
                                        alert_meta=alert_meta)
+
+    def notify_unexpected_activity(self, log_detail: LogDetail):
+        pass
 
     def notify_tail_event_in_log_service(self, severity: str, brief_msg_str: str, detail_msg_str: str,
                                          source_file_name: str, line_num: int,
@@ -459,15 +462,14 @@ class PhoneBookBaseLogBook(AppLogBook):
             found_pattern = search_obj.group()
             found_pattern = found_pattern[8:-8]  # removing beginning and ending _timeit_
             found_pattern_list = found_pattern.split(self.timeit_field_separator)  # splitting pattern values
-            if len(found_pattern_list) == 4:
-                callable_name, start_time, delta, project_name = found_pattern_list
+            if len(found_pattern_list) == 3:
+                callable_name, start_time, delta = found_pattern_list
                 if callable_name != "underlying_create_raw_performance_data_http":
                     raw_performance_data_obj = RawPerformanceDataBaseModel()
                     raw_performance_data_obj.callable_name = callable_name
                     raw_performance_data_obj.start_time = pendulum.parse(start_time)
                     raw_performance_data_obj.delta = parse_to_float(delta)
-                    if project_name != "None":
-                        raw_performance_data_obj.project_name = project_name
+                    raw_performance_data_obj.project_name = log_detail.service
 
                     self.raw_performance_data_queue.put(raw_performance_data_obj)
                     logging.debug(f"Created raw_performance_data entry in queue for callable {callable_name} "
@@ -475,7 +477,7 @@ class PhoneBookBaseLogBook(AppLogBook):
                 # else not required: avoiding callable underlying_create_raw_performance_data to avoid infinite loop
             else:
                 err_str_: str = f"Found timeit pattern but internally only contains {found_pattern_list}, " \
-                                f"ideally must contain callable_name, start_time, delta & project_name" \
+                                f"ideally must contain callable_name, start_time & delta " \
                                 f"seperated by '~'"
                 logging.exception(err_str_)
         # else not required: if no pattern is matched ignoring this log_message

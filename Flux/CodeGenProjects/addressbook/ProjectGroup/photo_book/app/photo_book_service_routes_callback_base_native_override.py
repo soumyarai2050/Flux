@@ -11,7 +11,7 @@ import subprocess
 from FluxPythonUtils.scripts.utility_functions import (
     except_n_log_alert, submitted_task_result, submit_task_with_first_completed_wait,
     handle_refresh_configurable_data_members)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_routes_callback import PhotoBookServiceRoutesCallback
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_routes_msgspec_callback import PhotoBookServiceRoutesCallback
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     handle_patch_db_queue_updater, get_update_obj_list_for_journal_type_update,
@@ -43,7 +43,7 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_msgspec_routes import (
             underlying_partial_update_all_strat_view_http, underlying_read_strat_view_http,
             underlying_update_strat_view_http)
         cls.underlying_partial_update_all_strat_view_http = underlying_partial_update_all_strat_view_http
@@ -70,7 +70,7 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
                 if self.service_up:
                     if not self.service_ready:
                         self.service_ready = True
-                    print(f"INFO: service is ready: {datetime.datetime.now().time()}")
+                    print(f"INFO: strat view engine service is ready: {datetime.datetime.now().time()}")
 
                 if not self.service_up:
                     try:
@@ -202,35 +202,52 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
             await submit_task_with_first_completed_wait(tasks, 10)
         return []
 
-    async def _update_strat_view_post(self, stored_strat_view_obj: StratView, updated_strat_view_obj: StratView):
-        if not stored_strat_view_obj.unload_strat and updated_strat_view_obj.unload_strat:
+    async def _update_strat_view_post(self, stored_strat_view_obj: StratView | Dict,
+                                      updated_strat_view_obj: StratView | Dict):
+        if isinstance(stored_strat_view_obj, dict):
+            obj_id = stored_strat_view_obj.get("_id")
+            stored_unload_strat = stored_strat_view_obj.get("unload_strat")
+            stored_recycle_strat = stored_strat_view_obj.get("recycle_strat")
+        else:
+            obj_id = stored_strat_view_obj.id
+            stored_unload_strat = stored_strat_view_obj.unload_strat
+            stored_recycle_strat = stored_strat_view_obj.recycle_strat
+
+        if isinstance(updated_strat_view_obj, dict):
+            updated_unload_strat = updated_strat_view_obj.get("unload_strat")
+            updated_recycle_strat = updated_strat_view_obj.get("recycle_strat")
+        else:
+            updated_unload_strat = updated_strat_view_obj.unload_strat
+            updated_recycle_strat = updated_strat_view_obj.recycle_strat
+
+        if not stored_unload_strat and updated_unload_strat:
             script_path: str = str(PAIR_STRAT_ENGINE_DIR / "pyscripts" / "unload_strat.py")
-            cmd: List[str] = ["python", script_path, f"{stored_strat_view_obj.id}", "--force", "&"]
+            cmd: List[str] = ["python", script_path, f"{obj_id}", "--force", "&"]
             launcher: subprocess.Popen = subprocess.Popen(cmd)
-            logging.warning(f"Triggered unload event for strat_id={stored_strat_view_obj.id} at {DateTime.utcnow()};;;"
+            logging.warning(f"Triggered unload event for strat_id={obj_id} at {DateTime.utcnow()};;;"
                             f"{cmd=}, {launcher=}")
-        if not stored_strat_view_obj.recycle_strat and updated_strat_view_obj.recycle_strat:
+        if not stored_recycle_strat and updated_recycle_strat:
             script_path: str = str(PAIR_STRAT_ENGINE_DIR / "pyscripts" / "recycle_strat.py")
-            cmd: List[str] = ["python", script_path, f"{stored_strat_view_obj.id}", "--force", "&"]
+            cmd: List[str] = ["python", script_path, f"{obj_id}", "--force", "&"]
             launcher: subprocess.Popen = subprocess.Popen(cmd)
-            logging.warning(f"Triggered recycle event for strat_id={stored_strat_view_obj.id} at {DateTime.utcnow()};;;"
+            logging.warning(f"Triggered recycle event for strat_id={obj_id} at {DateTime.utcnow()};;;"
                             f"{cmd=}, {launcher=}")
 
     async def update_strat_view_post(self, stored_strat_view_obj: StratView, updated_strat_view_obj: StratView):
         await self._update_strat_view_post(stored_strat_view_obj, updated_strat_view_obj)
 
-    async def partial_update_strat_view_post(self, stored_strat_view_obj: StratView,
-                                             updated_strat_view_obj: StratViewOptional):
+    async def partial_update_strat_view_post(self, stored_strat_view_obj: Dict,
+                                             updated_strat_view_obj: Dict):
         await self._update_strat_view_post(stored_strat_view_obj, updated_strat_view_obj)
 
-    async def partial_update_all_strat_view_post(self, stored_strat_view_obj_list: List[StratView],
-                                                 updated_strat_view_obj_list: List[StratViewOptional]):
+    async def partial_update_all_strat_view_post(self, stored_strat_view_dict_list: List[Dict[str, Any]],
+                                                 updated_strat_view_dict_list: List[Dict[str, Any]]):
         tasks: List = []
-        for idx, updated_strat_view_obj in enumerate(updated_strat_view_obj_list):
+        for idx, updated_strat_view_obj in enumerate(updated_strat_view_dict_list):
 
             task = asyncio.create_task(
-                self._update_strat_view_post(stored_strat_view_obj_list[idx], updated_strat_view_obj),
-                name=str(f"{updated_strat_view_obj.id}"))
+                self._update_strat_view_post(stored_strat_view_dict_list[idx], updated_strat_view_obj),
+                name=str(f"{updated_strat_view_obj.get("_id")}"))
             tasks.append(task)
 
         if tasks:

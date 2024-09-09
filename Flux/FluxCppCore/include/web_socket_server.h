@@ -11,6 +11,8 @@
 #include "quill/Quill.h"
 
 #include "json_codec.h"
+#include "utility_functions.h"
+// #include "cpp_app_shared_resource.h"
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/cpp_app/replay/cpp_app_shared_resource.h"
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_constants.h"
 
@@ -45,17 +47,6 @@ namespace FluxCppCore {
             } catch (const boost::system::system_error& error) {
                 LOG_ERROR_IMPL(mp_logger, "Failed to start server: {} in function: {}", error.what(), __func__);
                 LOG_INFO_IMPL(mp_logger, "Retrying server initialization in function: {}", __func__);
-                int32_t port = FluxCppCore::find_free_port();
-                if (RootModelType::GetDescriptor()->name() == "MarketDepth") {
-                    km_port_ = port;
-                    market_data_handler::md_ws_port = port;
-                } else if (RootModelType::GetDescriptor()->name() == "TopOfBook") {
-                    km_port_ = port;
-                    market_data_handler::tob_ws_port = port;
-                } else {
-                    km_port_ = port;
-                    market_data_handler::lt_ws_port = port;
-                }
                 start_connection();
             }
         }

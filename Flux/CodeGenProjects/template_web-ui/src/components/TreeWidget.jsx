@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import WidgetContainer from './WidgetContainer';
 import InfinityMenu from 'react-infinity-menu-plus';
 import _, { cloneDeep } from 'lodash';
-import { generateTreeStructure, generateObjectFromSchema, addxpath, getDataxpath, setTreeState, getXpathKeyValuePairFromObject } from '../utils';
+import { generateTreeStructure, generateObjectFromSchema, addxpath, getDataxpath, setTreeState, getXpathKeyValuePairFromObject, clearxpath, clearId } from '../utils';
 import { Icon } from './Icon';
 import { UnfoldMore, UnfoldLess, VisibilityOff, Visibility } from '@mui/icons-material';
 import { MenuItem, Checkbox, FormControlLabel, Select } from '@mui/material';
@@ -154,7 +154,8 @@ const TreeWidget = (props) => {
                             parentindex = parseInt(propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'))) + 1;
                         }
                         let max = originalindex > parentindex ? originalindex : parentindex;
-                        emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema));
+                        let additionalProps = JSON.parse(e.currentTarget.attributes['data-prop'].value);
+                        emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema), additionalProps);
                         emptyObject = addxpath(emptyObject, parentxpath + '[' + max + ']');
                         parentObject.push(emptyObject);
                     }
@@ -170,7 +171,66 @@ const TreeWidget = (props) => {
             // let changesDict = getXpathKeyValuePairFromObject(emptyObject);
             // props.onUserChange(undefined, undefined, false, changesDict);
             props.onUpdate(updatedData, 'add');
-        } else {
+        }
+        else if (e.currentTarget.attributes['data-addcopy']) {
+            let updatedData = cloneDeep(props.data);
+            let xpath = e.currentTarget.attributes['data-addcopy'].value;
+            xpath = getDataxpath(updatedData, xpath);
+            let ref = e.currentTarget.attributes['data-ref'].value;
+            const isArray = xpath.endsWith(']');
+            // let emptyObject = {};
+            let duplicateObj = cloneDeep(_.get(updatedData, xpath));
+            if (!duplicateObj) return;
+            duplicateObj = clearxpath(duplicateObj);
+            if (isArray) {
+                clearId(duplicateObj);
+                if ([DataTypes.NUMBER, DataTypes.STRING].includes(ref)) {
+                    let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
+                    let parentObject = _.get(updatedData, parentxpath);
+                    parentObject.push(null)
+                } else {
+                    ref = ref.split('/');
+                    let currentSchema = ref.length === 2 ? props.schema[ref[1]] : props.schema[ref[1]][ref[2]];
+                    if (currentSchema.hasOwnProperty('enum') && _.keys(currentSchema).length === 1) {
+                        let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
+                        let parentObject = _.get(updatedData, parentxpath);
+                        parentObject.push(currentSchema.enum[0]);
+                    } else {
+                        let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
+                        let originalindex = _.get(props.originalData, parentxpath) ? _.get(props.originalData, parentxpath).length : 0;
+                        let parentObject = _.get(updatedData, parentxpath);
+                        if (!parentObject) {
+                            _.set(updatedData, parentxpath, []);
+                            parentObject = _.get(updatedData, parentxpath);
+                        }
+                        let parentindex = 0;
+                        if (parentObject.length > 0) {
+                            let propname = _.keys(parentObject[parentObject.length - 1]).find(key => key.startsWith('xpath_'));
+                            let propxpath = parentObject[parentObject.length - 1][propname];
+                            parentindex = parseInt(propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'))) + 1;
+                        }
+                        let max = originalindex > parentindex ? originalindex : parentindex;
+
+                        duplicateObj = addxpath(duplicateObj, parentxpath + '[' + max + ']');
+                        // emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema));
+                        // emptyObject = addxpath(emptyObject, parentxpath + '[' + max + ']');
+                        parentObject.push(duplicateObj);
+                    }
+                }
+            } else {
+                ref = ref.split('/');
+                // let currentSchema = ref.length === 2 ? props.schema[ref[1]] : props.schema[ref[1]][ref[2]];
+                // let additionalProps = JSON.parse(e.currentTarget.attributes['data-prop'].value);
+                // emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema), additionalProps);
+                // emptyObject = addxpath(emptyObject, xpath);
+                duplicateObj = addxpath(duplicateObj, xpath);
+                _.set(updatedData, xpath, duplicateObj);
+            }
+            // let changesDict = getXpathKeyValuePairFromObject(emptyObject);
+            // props.onUserChange(undefined, undefined, false, changesDict);
+            props.onUpdate(updatedData, 'add');
+        }
+        else {
             let xpath = e.currentTarget.attributes;
             if (xpath.hasOwnProperty('data-open')) {
                 xpath = xpath['data-open'].value;

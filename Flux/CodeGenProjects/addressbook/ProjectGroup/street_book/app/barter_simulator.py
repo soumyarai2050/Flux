@@ -2,16 +2,22 @@ import logging
 import random
 from typing import ClassVar, List, Dict, Tuple
 import re
+import os
+from pathlib import PurePath
 
 from pendulum import DateTime
-from fastapi.encoders import jsonable_encoder
+from filelock import FileLock
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import \
-    Side, SecurityIdSource
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import \
-    ChoreBrief, ChoreEventType, ChoreJournal, FillsJournal, \
-    Security
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link_base import BarteringLinkBase, add_to_texts
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
+    Side, SecurityIdSource)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
+    ChoreBrief, ChoreEventType, ChoreJournal, FillsJournal, Security)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link_base import (
+    BarteringLinkBase, add_to_texts)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
+    executor_config_yaml_dict, EXECUTOR_PROJECT_DATA_DIR)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_symbol_side_key
+from FluxPythonUtils.scripts.utility_functions import dict_or_list_records_csv_writer
 
 
 def init_symbol_configs():
@@ -23,10 +29,15 @@ def init_symbol_configs():
 
 
 class BarterSimulator(BarteringLinkBase):
+    int_id: ClassVar[int] = 1
     continuous_symbol_based_chores_counter: ClassVar[Dict | None] = {}
     cxl_rej_symbol_to_bool_dict: ClassVar[Dict | None] = {}
     symbol_configs: ClassVar[Dict | None] = init_symbol_configs()
     special_chore_counter = 0
+    intraday_bartering_chores_csv_file_name: str = f"intraday_bartering_chores_{DateTime.now().strftime('%Y%m%d')}"
+    intraday_bartering_chores_lock_file_name: str = f"intraday_bartering_chores.lock"
+    intraday_bartering_chores_csv_file: PurePath = EXECUTOR_PROJECT_DATA_DIR / intraday_bartering_chores_csv_file_name
+    intraday_bartering_chores_lock_file: PurePath = EXECUTOR_PROJECT_DATA_DIR / intraday_bartering_chores_lock_file_name
 
     @classmethod
     def reload_symbol_configs(cls):
@@ -55,7 +66,7 @@ class BarterSimulator(BarteringLinkBase):
         return None
 
     def __init__(self):
-        pass
+        super(BarterSimulator, self).__init__(executor_config_yaml_dict.get("inst_id"))
 
     @classmethod
     def is_special_chore(cls, symbol: str) -> bool:
@@ -108,20 +119,25 @@ class BarterSimulator(BarteringLinkBase):
 
     @classmethod
     async def place_new_chore(cls, px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str,
-                              account: str, exchange: str | None = None, text: List[str] | None = None):
+                              symbol_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
+                              internal_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
         """
         when invoked form log analyzer - all params are passed as strings
         pydantic default conversion handles conversion - any util functions called should be called with
         explicit type convertors or pydantic object converted values
+        return bool indicating success/fail and unique-id-str/err-description in second param
         """
         if BarterSimulator.chore_create_async_callable:
             create_date_time = DateTime.utcnow()
             chore_id: str = f"{bartering_sec_id}-{create_date_time}"
             # use system_sec_id to create system's internal chore brief / journal
             security = Security(sec_id=system_sec_id, sec_id_source=SecurityIdSource.TICKER)
+            bartering_security = Security(sec_id=system_sec_id, sec_id_source=SecurityIdSource.TICKER)
 
-            chore_brief = ChoreBrief(chore_id=chore_id, security=security, side=side, px=px, qty=qty,
-                                     underlying_account=account, exchange=exchange)
+            chore_brief = ChoreBrief(chore_id=chore_id, security=security, bartering_security=bartering_security, side=side,
+                                     px=px, qty=qty,
+                                     underlying_account=account, exchange=exchange,
+                                     user_data=internal_ord_id)
             msg = f"SIM: Choreing {bartering_sec_id}/{system_sec_id}, qty {qty} and px {px}"
             add_to_texts(chore_brief, msg)
 
@@ -129,6 +145,8 @@ class BarterSimulator(BarteringLinkBase):
                                          chore_event_date_time=create_date_time,
                                          chore_event=ChoreEventType.OE_NEW)
             await BarterSimulator.chore_create_async_callable(chore_journal)
+            logging.info(f"placed new chore with Simulator, qty: {qty} for symbol_side_key: "
+                         f"{get_symbol_side_key([(system_sec_id, side)])}")
 
             symbol_configs = cls.get_symbol_configs(system_sec_id)
 
@@ -145,7 +163,8 @@ class BarterSimulator(BarteringLinkBase):
                 else:
                     await cls.process_chore_ack(chore_id, chore_brief.px, chore_brief.qty, chore_brief.side, system_sec_id,
                                                 account)
-        return True  # indicates chore send success (send false otherwise)
+        cls.int_id += 1
+        return True, str(cls.int_id)  # indicates chore send success (send false otherwise)
 
     @classmethod
     def get_partial_allowed_ack_qty(cls, symbol: str, qty: int):
@@ -233,6 +252,22 @@ class BarterSimulator(BarteringLinkBase):
         return qty, total_fill_count
 
     @classmethod
+    def store_intraday_chore_fills(cls, intraday_chore_fills: List[FillsJournal]):
+        if not intraday_chore_fills:
+            logging.warning("No intraday chore fills to store")
+            return
+
+        include_header: bool = False
+        with FileLock(str(cls.intraday_bartering_chores_lock_file)):
+            if not os.path.exists(f"{str(cls.intraday_bartering_chores_csv_file)}.csv"):
+                include_header = True
+            # file already exists, don't include headers
+            fieldnames = list(FillsJournal.__annotations__.keys())
+            dict_or_list_records_csv_writer(cls.intraday_bartering_chores_csv_file_name, intraday_chore_fills,
+                                            fieldnames, FillsJournal, EXECUTOR_PROJECT_DATA_DIR, append_mode=True,
+                                            include_header=include_header, by_alias=True)
+
+    @classmethod
     async def process_fill(cls, chore_id, px: float, qty: int, side: Side, sec_id: str,
                            underlying_account: str, use_exact_passed_qty: bool | None = None) -> bool:
         """Simulates Chore's fills - returns True if fully fills chore else returns False"""
@@ -244,14 +279,17 @@ class BarterSimulator(BarteringLinkBase):
                 fill_qty, total_fill_count = cls._process_fill(sec_id, qty)
 
             total_fill_qty = 0
+            intraday_chore_fills: List[FillsJournal] = []
             for fill_count in range(total_fill_count):
                 fill_journal = FillsJournal(chore_id=chore_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,
                                             fill_side=side, underlying_account=underlying_account,
                                             fill_date_time=DateTime.utcnow(),
                                             fill_id=f"F{chore_id[1:]}")
                 total_fill_count += fill_count
-                await BarterSimulator.fill_create_async_callable(fill_journal)
+                fill_journal = await BarterSimulator.fill_create_async_callable(fill_journal)
+                intraday_chore_fills.append(fill_journal)
 
+            cls.store_intraday_chore_fills(intraday_chore_fills)
             if total_fill_qty == qty:
                 return True
             else:
@@ -308,8 +346,8 @@ class BarterSimulator(BarteringLinkBase):
             await BarterSimulator.chore_create_async_callable(chore_journal)
 
     @classmethod
-    async def place_cxl_chore(cls, chore_id: str, side: Side, bartering_sec_id: str,
-                              system_sec_id: str, underlying_account: str | None = "bartering-account",
+    async def place_cxl_chore(cls, chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
+                              system_sec_id: str | None = None, underlying_account: str | None = "bartering-account",
                               px: int | None = None, qty: int | None = None):
         """
         cls.simulate_reverse_path or not - always simulate cancel chore's Ack/Rejects (unless configured for unack)
@@ -322,7 +360,8 @@ class BarterSimulator(BarteringLinkBase):
             security = Security(sec_id=system_sec_id, sec_id_source=SecurityIdSource.TICKER)
             # query chore
             chore_brief = ChoreBrief(chore_id=chore_id, security=security, side=side,
-                                     underlying_account=underlying_account)
+                                     underlying_account=underlying_account,
+                                     user_data=executor_config_yaml_dict.get("inst_id"))
             msg = f"SIM:Cancel Request for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}"
             add_to_texts(chore_brief, msg)
             # simulate cancel ack

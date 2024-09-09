@@ -500,10 +500,10 @@ const TableWidget = (props) => {
         const res = await axios.get(`${url}/get-all-${props.name}`);
         const storedData = widgetType === 'root' && res.data.length > 0 ? res.data[0] : res.data;
         let originalRows = getTableRowsFromData(props.collections, storedData, props.xpath);
-        originalRows.forEach(row => {;
+        originalRows.forEach(row => {
             Object.entries(row).forEach(([k, v]) => {
                 if (v !== null && typeof v === DataTypes.OBJECT) {
-                    row[k] = JSON.stringify(v)
+                    row[k] = JSON.stringify(v);
                 }
             })
             delete row['data-id'];
@@ -599,7 +599,7 @@ const TableWidget = (props) => {
 
     const maxSequence = Math.max(...headCells.map(cell => cell.sequenceNumber));
 
-    const visibiltyColor = showMore ? 'info' : !hide ? 'success' : 'inherit';
+    const visibiltyColor = showMore ? 'warning' : !hide ? 'success' : 'inherit';
     const visibilityMenu = (
         <>
             <Icon

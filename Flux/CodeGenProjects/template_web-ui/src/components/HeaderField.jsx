@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Typography, Box, ClickAwayListener, Tooltip } from "@mui/material";
-import { IndeterminateCheckBox, AddBox, AddCircle, RemoveCircle, Menu, LiveHelp, ArrowDropDownSharp, ArrowDropUpSharp, HelpSharp, HelpOutline } from "@mui/icons-material";
+import { Typography, Box, ClickAwayListener, Tooltip, IconButton } from "@mui/material";
+import { IndeterminateCheckBox, AddBox, AddCircle, RemoveCircle, Menu, LiveHelp, ArrowDropDownSharp, ArrowDropUpSharp, HelpSharp, HelpOutline, Copyright, ContentCopy, AddOutlined, RemoveOutlined, CopyAllOutlined } from "@mui/icons-material";
 import { DataTypes, Modes } from '../constants';
 import { Icon } from './Icon';
 import PropTypes from 'prop-types';
@@ -51,7 +51,7 @@ const HeaderField = (props) => {
                         <ArrowDropDownSharp data-open={props.data.xpath} onClick={props.onClick} />
                     )}
                 </span>
-                <Typography variant="subtitle1" sx={{display: 'flex', flex: '1'}} >
+                <Typography variant="subtitle1" sx={{ display: 'flex', flex: '1' }} >
                     {title}
                 </Typography>
                 {
@@ -59,9 +59,6 @@ const HeaderField = (props) => {
                         <Tooltip title={props.data.help} disableInteractive>
                             <HelpOutline fontSize='small' />
                         </Tooltip>
-                        // <Box className={classes.option}>
-
-                        // </Box>
                     )
                 }
             </Box>
@@ -89,28 +86,45 @@ const HeaderOptions = ({ add, remove, show, metadata, onClick, onToggle }) => {
         if (show) {
             return (
                 <ClickAwayListener onClickAway={() => onToggle(false)}>
-                    <Box className={classes.menu}>
+                    <Box className={classes.menu} bgcolor='background.secondary'>
                         {add && (
-                            <AddCircle
-                                data-add={xpath}
-                                data-ref={ref}
-                                data-prop={JSON.stringify(metadata)}
-                                onClick={onClick}
-                            />
+                            <>
+                                <IconButton
+                                    size='small'
+                                    title='Add'
+                                    data-add={xpath}
+                                    data-ref={ref}
+                                    data-prop={JSON.stringify(metadata)}
+                                    onClick={onClick}>
+                                    <AddOutlined fontSize='small' />
+                                </IconButton>
+                                <IconButton
+                                    size='small'
+                                    title='Copy'
+                                    data-addcopy={xpath}
+                                    data-ref={ref}
+                                    data-prop={JSON.stringify(metadata)}
+                                    onClick={onClick}>
+                                    <ContentCopy fontSize='small' />
+                                </IconButton>
+                            </>
                         )}
                         {remove && (
-                            <RemoveCircle
+                            <IconButton
+                                size='small'
+                                title='Remove'
                                 data-remove={xpath}
-                                onClick={onClick}
-                            />
+                                onClick={onClick}>
+                                <RemoveOutlined fontSize='small' />
+                            </IconButton>
                         )}
                     </Box>
                 </ClickAwayListener>
             )
         } else {
             return (
-                <Box className={classes.option}>
-                    <Icon title="options" onClick={onToggle}>
+                <Box className={classes.option} bgcolor='background.secondary'>
+                    <Icon title="More Options" onClick={onToggle}>
                         <Menu />
                     </Icon>
                 </Box>

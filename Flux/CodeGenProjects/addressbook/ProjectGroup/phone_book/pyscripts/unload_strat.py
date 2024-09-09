@@ -8,8 +8,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.pyscripts.utility_
 
 
 def main():
-    date_str: str = datetime.datetime.now().strftime("%Y%m%d")
-    configure_logger(logging.DEBUG, str(PAIR_STRAT_ENGINE_LOG_DIR), f"unload_strat_{date_str}.log")
+    datetime_str: str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    configure_logger(logging.DEBUG, str(PAIR_STRAT_ENGINE_LOG_DIR), f"unload_strat_{datetime_str}.log")
 
     # read strat_id from args
     args: List[str] = sys.argv[1:]

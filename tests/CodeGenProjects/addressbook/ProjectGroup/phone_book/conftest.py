@@ -5,7 +5,7 @@ import pytest
 import os
 import copy
 
-os.environ["DBType"] = "beanie"
+os.environ["ModelType"] = "msgspec"
 
 # Project Imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
@@ -13,6 +13,9 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 from tests.CodeGenProjects.AddressBook.ProjectGroup.conftest import *
+
+TRADING_ACCOUNT: Final[str] = "TRADING_ACCOUNT_ZERODHA_BKR"
+TRADING_EXCHANGE: Final[str] = "ZERODHA"
 
 
 @pytest.fixture()
@@ -111,8 +114,8 @@ def last_barter_fixture_list():
                 "px": px,
                 "qty": 150,
                 "market_barter_volume": {
-                    "participation_period_last_barter_qty_sum": 0,
-                    "applicable_period_seconds": 0
+                    "participation_period_last_barter_qty_sum": 1000,
+                    "applicable_period_seconds": 180
                 }
             }
         ])
@@ -120,7 +123,7 @@ def last_barter_fixture_list():
 
 
 def empty_pair_side_bartering_brief_obj(symbol: str, side: str, sec_id_source: str | None = SecurityIdSource.TICKER):
-    return PairSideBarteringBriefOptional(**{
+    return PairSideBarteringBriefBaseModel.from_dict({
         "security": {
           "sec_id": symbol,
           "sec_id_source": sec_id_source
@@ -148,15 +151,15 @@ def expected_strat_brief_(pair_securities_with_sides_):
                                                                     pair_securities_with_sides_["side1"])
     pair_sell_side_bartering_brief = empty_pair_side_bartering_brief_obj(pair_securities_with_sides_["security2"]["sec_id"],
                                                                      pair_securities_with_sides_["side2"])
-    yield StratBriefBaseModel(pair_buy_side_bartering_brief=pair_buy_side_bartering_brief,
-                              pair_sell_side_bartering_brief=pair_sell_side_bartering_brief,
-                              consumable_nett_filled_notional=160_000)
+    yield StratBriefBaseModel.from_kwargs(pair_buy_side_bartering_brief=pair_buy_side_bartering_brief,
+                                          pair_sell_side_bartering_brief=pair_sell_side_bartering_brief,
+                                          consumable_nett_filled_notional=160_000)
 
 
 @pytest.fixture()
 def expected_symbol_side_snapshot_():
     yield [
-        SymbolSideSnapshotBaseModel(**{
+        SymbolSideSnapshotBaseModel.from_dict({
             "security": {
               "sec_id": "CB_Sec_1",
               "sec_id_source": SecurityIdSource.TICKER
@@ -175,7 +178,7 @@ def expected_symbol_side_snapshot_():
             "last_update_date_time": "2023-02-13T20:30:35.165Z",
             "chore_count": 0
         }),
-        SymbolSideSnapshotBaseModel(**{
+        SymbolSideSnapshotBaseModel.from_dict({
             "security": {
                 "sec_id": "EQT_Sec_1",
                 "sec_id_source": SecurityIdSource.TICKER
@@ -199,7 +202,7 @@ def expected_symbol_side_snapshot_():
 
 @pytest.fixture()
 def buy_chore_(pair_securities_with_sides_):
-    yield ChoreJournalBaseModel(**{
+    yield ChoreJournalBaseModel.from_dict({
         "chore": {
             "chore_id": "O1",
             "security": pair_securities_with_sides_["security1"],
@@ -207,7 +210,7 @@ def buy_chore_(pair_securities_with_sides_):
             "px": 100,
             "qty": 90,
             "chore_notional": 0,
-            "underlying_account": "bartering_account",
+            "underlying_account": TRADING_ACCOUNT,
             "text": [
               "test_string"
             ]
@@ -219,17 +222,18 @@ def buy_chore_(pair_securities_with_sides_):
 
 @pytest.fixture()
 def expected_buy_chore_snapshot_(pair_securities_with_sides_):
-    yield ChoreSnapshotBaseModel(**{
+    yield ChoreSnapshotBaseModel.from_dict({
         "chore_brief": {
             "chore_id": "O1",
             "security": pair_securities_with_sides_["security1"],
+            "bartering_security": pair_securities_with_sides_["security1"],
             "side": pair_securities_with_sides_["side1"],
             "px": 0,
             "qty": 0,
             "chore_notional": 0,
-            "underlying_account": "bartering_account",
+            "underlying_account": TRADING_ACCOUNT,
             "text": [],
-            "exchange": "bartering_exchange"
+            "exchange": TRADING_EXCHANGE
         },
         "filled_qty": 0,
         "avg_fill_px": 0,
@@ -243,6 +247,7 @@ def expected_buy_chore_snapshot_(pair_securities_with_sides_):
         "cxled_notional": 0,
         "last_lapsed_qty": 0,
         "total_lapsed_qty": 0,
+        "total_amd_rej_qty": None,
         "pending_amend_dn_qty": 0,
         "pending_amend_dn_px": 0,
         "pending_amend_up_qty": 0,
@@ -255,14 +260,14 @@ def expected_buy_chore_snapshot_(pair_securities_with_sides_):
 
 @pytest.fixture()
 def buy_fill_journal_(pair_securities_with_sides_):
-    yield FillsJournalBaseModel(**{
+    yield FillsJournalBaseModel.from_dict({
         "chore_id": "O1",
         "fill_px": 90,
         "fill_qty": 50,
         "fill_notional": 0,
         "fill_symbol": pair_securities_with_sides_["security1"]["sec_id"],
         "fill_side": pair_securities_with_sides_["side1"],
-        "underlying_account": "bartering_account",
+        "underlying_account": TRADING_ACCOUNT,
         "fill_date_time": DateTime.utcnow(),
         "fill_id": "F1"
     })
@@ -281,7 +286,7 @@ def chore_cxl_request(email_book_service_web_client_, buy_chore_):
 
 @pytest.fixture()
 def sell_chore_(pair_securities_with_sides_):
-    yield ChoreJournalBaseModel(**{
+    yield ChoreJournalBaseModel.from_dict({
         "chore": {
             "chore_id": "O2",
             "security": pair_securities_with_sides_["security2"],
@@ -289,7 +294,7 @@ def sell_chore_(pair_securities_with_sides_):
             "px": 110,
             "qty": 70,
             "chore_notional": 0,
-            "underlying_account": "bartering_account",
+            "underlying_account": TRADING_ACCOUNT,
             "text": [
               "test_string"
             ]
@@ -301,17 +306,18 @@ def sell_chore_(pair_securities_with_sides_):
 
 @pytest.fixture()
 def expected_sell_chore_snapshot_(pair_securities_with_sides_):
-    yield ChoreSnapshotBaseModel(**{
+    yield ChoreSnapshotBaseModel.from_dict({
         "chore_brief": {
             "chore_id": "O2",
             "security": pair_securities_with_sides_["security2"],
+            "bartering_security": pair_securities_with_sides_["security2"],
             "side": pair_securities_with_sides_["side2"],
             "px": 0,
             "qty": 0,
             "chore_notional": 0,
-            "underlying_account": "bartering_account",
+            "underlying_account": TRADING_ACCOUNT,
             "text": [],
-            "exchange": "bartering_exchange"
+            "exchange": TRADING_EXCHANGE
         },
         "filled_qty": 0,
         "avg_fill_px": 0,
@@ -344,7 +350,7 @@ def sell_fill_journal_(pair_securities_with_sides_):
         "fill_notional": 0,
         "fill_symbol": pair_securities_with_sides_["security2"]["sec_id"],
         "fill_side": pair_securities_with_sides_["side2"],
-        "underlying_account": "bartering_account",
+        "underlying_account": TRADING_ACCOUNT,
         "fill_date_time": DateTime.utcnow(),
         "fill_id": "F2"
     })
@@ -352,7 +358,7 @@ def sell_fill_journal_(pair_securities_with_sides_):
 
 @pytest.fixture()
 def sample_alert():
-    yield AlertOptional(**{
+    yield AlertBaseModel.from_dict({
           "dismiss": False,
           "severity": "Severity_ERROR",
           "alert_count": 0,
@@ -369,7 +375,7 @@ def sample_alert():
               "px": 10,
               "qty": 10,
               "chore_notional": 100,
-              "underlying_account": "bartering_account",
+              "underlying_account": TRADING_ACCOUNT,
               "text": [
                 "sample alert"
               ]
@@ -435,9 +441,9 @@ def bar_data_():
     yield bar_data_json
 
 
-class SampleBaseModel1(BaseModel):
+class SampleBaseModel1(MsgspecBaseModel, kw_only=True):
     _id_count: ClassVar[int] = 0
-    id: int = Field(default_factory=(lambda: SampleBaseModel1.inc_id()), alias="_id")
+    _id: int = field(default_factory=(lambda: SampleBaseModel1.inc_id()))
     field1: bool | None = None
 
     @classmethod
@@ -446,9 +452,9 @@ class SampleBaseModel1(BaseModel):
         return cls._id_count
 
 
-class SampleBaseModel2(BaseModel):
+class SampleBaseModel2(MsgspecBaseModel, kw_only=True):
     _id_count: ClassVar[int] = 0
-    id: int = Field(default_factory=(lambda: SampleBaseModel2.inc_id()), alias="_id")
+    _id: int = field(default_factory=(lambda: SampleBaseModel2.inc_id()))
     field1: int | None = None
 
     @classmethod
@@ -457,17 +463,16 @@ class SampleBaseModel2(BaseModel):
         return cls._id_count
 
 
-class SampleBaseModel(BaseModel):
+class SampleBaseModel(MsgspecBaseModel, kw_only=True):
     _id_count: ClassVar[int] = 0
-    id: int = Field(default_factory=(lambda: SampleBaseModel.inc_id()), alias="_id")
+    _id: int = field(default_factory=(lambda: SampleBaseModel.inc_id()))
     field1: SampleBaseModel1
     field2: List[SampleBaseModel2]
     field3: SampleBaseModel2 | None = None
     field4: List[SampleBaseModel1] | None = None
     field5: bool = False
     field6: SampleBaseModel2 | None
-    field7: pendulum.DateTime | SkipJsonSchema[None]
-    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
+    field7: pendulum.DateTime | None
 
     @classmethod
     def inc_id(cls):
@@ -485,5 +490,5 @@ def get_missing_id_json():
         field6=SampleBaseModel2(field1=6), field7=DateTime.utcnow()
     )
 
-    sample_json = sample.model_dump(by_alias=True)
+    sample_json = sample.to_dict()
     yield sample_json, SampleBaseModel

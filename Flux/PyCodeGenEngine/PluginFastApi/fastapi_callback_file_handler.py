@@ -13,7 +13,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 
 import protogen
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
-from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin
+from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin, ModelType
 
 
 class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
@@ -21,27 +21,59 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
 
-    def handle_POST_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
+    def unpack_kwargs_for_callback_methods(self, **kwargs):
+        message: protogen.Message | None = kwargs.get("message")
+        id_field_type: str | None = kwargs.get("id_field_type")
+        model_type: ModelType | None = kwargs.get("model_type")
+        if message is None:
+            err_str = (f"Can't find message in kwargs: "
+                       f"{message.proto.name if message is not None else message}")
+            logging.exception(err_str)
+            raise Exception(err_str)
+        return message, id_field_type, model_type
+
+    def handle_POST_callback_methods_gen(self, **kwargs) -> str:
+        message, _, model_type = self.unpack_kwargs_for_callback_methods(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def create_{message_name_snake_cased}_pre(self, " \
-                     f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
-        output_str += "        pass\n\n"
-        output_str += f"    async def create_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
-        output_str += "        pass\n\n"
+        if model_type == ModelType.Dataclass:
+            output_str = f"    async def create_{message_name_snake_cased}_pre(self, " \
+                         f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += "        pass\n\n"
+            output_str += f"    async def create_{message_name_snake_cased}_post(self, " \
+                          f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += "        pass\n\n"
+        else:
+            output_str = f"    async def create_{message_name_snake_cased}_pre(self, " \
+                         f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
+            output_str += "        pass\n\n"
+            output_str += f"    async def create_{message_name_snake_cased}_post(self, " \
+                          f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
+            output_str += "        pass\n\n"
         return output_str
 
-    def handle_POST_all_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
+    def handle_POST_all_callback_methods_gen(self, **kwargs) -> str:
+        message, _, model_type = self.unpack_kwargs_for_callback_methods(**kwargs)
+
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def create_all_{message_name_snake_cased}_pre(self, " \
-                      f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
-        output_str += "        pass\n\n"
-        output_str += f"    async def create_all_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
-        output_str += "        pass\n\n"
+        if model_type == ModelType.Dataclass:
+            output_str = f"    async def create_all_{message_name_snake_cased}_pre(self, " \
+                         f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += "        pass\n\n"
+            output_str += f"    async def create_all_{message_name_snake_cased}_post(self, " \
+                          f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += "        pass\n\n"
+        else:
+            output_str = f"    async def create_all_{message_name_snake_cased}_pre(self, " \
+                          f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
+            output_str += "        pass\n\n"
+            output_str += f"    async def create_all_{message_name_snake_cased}_post(self, " \
+                          f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
+            output_str += "        pass\n\n"
         return output_str
 
-    def handle_GET_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
+    def handle_GET_callback_methods_gen(self, **kwargs) -> str:
+        message, id_field_type, _ = self.unpack_kwargs_for_callback_methods(**kwargs)
+
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if id_field_type is None:
             output_str = f"    async def read_by_id_{message_name_snake_cased}_pre(self, obj_id: int):\n"
@@ -53,65 +85,167 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += "        pass\n\n"
         return output_str
 
-    def handle_PUT_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
+    def handle_PUT_callback_methods_gen(self, **kwargs) -> str:
+        message, _, model_type = self.unpack_kwargs_for_callback_methods(**kwargs)
+
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def update_{message_name_snake_cased}_pre(self, " \
-                     f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
-                     f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
-        output_str += f"        return updated_{message_name_snake_cased}_obj\n\n"
-        output_str += f"    async def update_{message_name_snake_cased}_post(self, " \
-                      f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
-                      f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
-        output_str += "        pass\n\n"
+        if model_type == ModelType.Dataclass:
+            output_str = f"    async def update_{message_name_snake_cased}_pre(self, " \
+                         f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += "        return {}\n\n"
+            output_str += f"    async def update_{message_name_snake_cased}_post(self, " \
+                          f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += "        pass\n\n"
+        elif model_type == ModelType.Msgspec:
+            pass_stored_obj_to_pre_post_callback = self._get_if_pass_stored_obj_to_pre_post_callback(
+                FastapiCallbackFileHandler.flux_json_root_pass_stored_obj_to_update_pre_post_callback, **kwargs)
+            if pass_stored_obj_to_pre_post_callback:
+                output_str = (f"    async def update_{message_name_snake_cased}_pre(self, "
+                              f"stored_{message_name_snake_cased}_obj: {message.proto.name}, "
+                              f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n")
+                output_str += f"        return updated_{message_name_snake_cased}_obj\n\n"
+                output_str += (f"    async def update_{message_name_snake_cased}_post(self, "
+                               f"stored_{message_name_snake_cased}_obj: {message.proto.name}, "
+                               f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n")
+                output_str += "        pass\n\n"
+            else:
+                output_str = f"    async def update_{message_name_snake_cased}_pre(self, " \
+                             f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
+                output_str += f"        return updated_{message_name_snake_cased}_obj\n\n"
+                output_str += f"    async def update_{message_name_snake_cased}_post(self, " \
+                              f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
+                output_str += "        pass\n\n"
+        else:
+            output_str = f"    async def update_{message_name_snake_cased}_pre(self, " \
+                         f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
+                         f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
+            output_str += f"        return updated_{message_name_snake_cased}_obj\n\n"
+            output_str += f"    async def update_{message_name_snake_cased}_post(self, " \
+                          f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
+                          f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
+            output_str += "        pass\n\n"
         return output_str
 
-    def handle_PUT_all_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
+    def handle_PUT_all_callback_methods_gen(self, **kwargs) -> str:
+        message, _, model_type = self.unpack_kwargs_for_callback_methods(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def update_all_{message_name_snake_cased}_pre(self, " \
-                     f"stored_{message_name_snake_cased}_obj_list: List[{message.proto.name}], " \
-                     f"updated_{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
-        output_str += f"        return updated_{message_name_snake_cased}_obj_list\n\n"
-        output_str += f"    async def update_all_{message_name_snake_cased}_post(self, " \
-                      f"stored_{message_name_snake_cased}_obj_list: List[{message.proto.name}], " \
-                      f"updated_{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
-        output_str += "        pass\n\n"
+        if model_type == ModelType.Dataclass:
+            output_str = f"    async def update_all_{message_name_snake_cased}_pre(self, " \
+                         f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += f"        return []\n\n"
+            output_str += f"    async def update_all_{message_name_snake_cased}_post(self, " \
+                          f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += "        pass\n\n"
+        elif model_type == ModelType.Msgspec:
+            pass_stored_obj_to_pre_post_callback = self._get_if_pass_stored_obj_to_pre_post_callback(
+                FastapiCallbackFileHandler.flux_json_root_pass_stored_obj_to_update_all_pre_post_callback, **kwargs)
+            if pass_stored_obj_to_pre_post_callback:
+                output_str = (f"    async def update_all_{message_name_snake_cased}_pre(self, "
+                              f"stored_{message_name_snake_cased}_obj_list: List[{message.proto.name}], "
+                              f"updated_{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n")
+                output_str += f"        return updated_{message_name_snake_cased}_obj_list\n\n"
+                output_str += (f"    async def update_all_{message_name_snake_cased}_post(self, "
+                               f"stored_{message_name_snake_cased}_obj_list: List[{message.proto.name}], "
+                               f"updated_{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n")
+                output_str += "        pass\n\n"
+            else:
+                output_str = f"    async def update_all_{message_name_snake_cased}_pre(self, " \
+                             f"updated_{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
+                output_str += f"        return updated_{message_name_snake_cased}_obj_list\n\n"
+                output_str += f"    async def update_all_{message_name_snake_cased}_post(self, " \
+                              f"updated_{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
+                output_str += "        pass\n\n"
+        else:
+            output_str = f"    async def update_all_{message_name_snake_cased}_pre(self, " \
+                         f"stored_{message_name_snake_cased}_obj_list: List[{message.proto.name}], " \
+                         f"updated_{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
+            output_str += f"        return updated_{message_name_snake_cased}_obj_list\n\n"
+            output_str += f"    async def update_all_{message_name_snake_cased}_post(self, " \
+                          f"stored_{message_name_snake_cased}_obj_list: List[{message.proto.name}], " \
+                          f"updated_{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
+            output_str += "        pass\n\n"
         return output_str
 
-    def handle_PATCH_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
+    def handle_PATCH_callback_methods_gen(self, **kwargs) -> str:
+        message, _, model_type = self.unpack_kwargs_for_callback_methods(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def partial_update_{message_name_snake_cased}_pre(self, " \
-                     f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
-                     f"updated_{message_name_snake_cased}_obj_json: Dict):\n"
-        output_str += f"        return updated_{message_name_snake_cased}_obj_json\n\n"
-        output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
-                      f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
-                      f"updated_{message_name_snake_cased}_obj: {message.proto.name}Optional):\n"
-        output_str += "        pass\n\n"
+        if model_type == ModelType.Dataclass:
+            output_str = f"    async def partial_update_{message_name_snake_cased}_pre(self, " \
+                         f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += "        return {}\n\n"
+            output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
+                          f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += "        pass\n\n"
+        elif model_type == ModelType.Msgspec:
+            output_str = f"    async def partial_update_{message_name_snake_cased}_pre(self, " \
+                         f"stored_{message_name_snake_cased}_obj_json: Dict[str, Any], " \
+                         f"updated_{message_name_snake_cased}_obj_json: Dict[str, Any]):\n"
+            output_str += f"        return updated_{message_name_snake_cased}_obj_json\n\n"
+            output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
+                          f"stored_{message_name_snake_cased}_obj_json: Dict[str, Any], " \
+                          f"updated_{message_name_snake_cased}_obj_json: Dict[str, Any]):\n"
+            output_str += "        pass\n\n"
+        else:
+            output_str = f"    async def partial_update_{message_name_snake_cased}_pre(self, " \
+                         f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
+                         f"updated_{message_name_snake_cased}_obj_json: Dict):\n"
+            output_str += f"        return updated_{message_name_snake_cased}_obj_json\n\n"
+            output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
+                          f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
+                          f"updated_{message_name_snake_cased}_obj: {message.proto.name}Optional):\n"
+            output_str += "        pass\n\n"
         return output_str
 
-    def handle_PATCH_all_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
+    def handle_PATCH_all_callback_methods_gen(self, **kwargs) -> str:
+        message, _, model_type = self.unpack_kwargs_for_callback_methods(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def partial_update_all_{message_name_snake_cased}_pre(self, " \
-                     f"stored_{message_name_snake_cased}_obj_list: List[{message.proto.name}], " \
-                     f"updated_{message_name_snake_cased}_obj_json_list: List[Dict]):\n"
-        output_str += f"        return updated_{message_name_snake_cased}_obj_json_list\n\n"
-        output_str += f"    async def partial_update_all_{message_name_snake_cased}_post(self, " \
-                      f"stored_{message_name_snake_cased}_obj_list: List[{message.proto.name}], " \
-                      f"updated_{message_name_snake_cased}_obj_list: List[{message.proto.name}Optional]):\n"
-        output_str += "        pass\n\n"
+        if model_type == ModelType.Dataclass:
+            output_str = f"    async def partial_update_all_{message_name_snake_cased}_pre(self, " \
+                         f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += f"        return []\n\n"
+            output_str += f"    async def partial_update_all_{message_name_snake_cased}_post(self, " \
+                          f"json_n_dataclass_handler: JsonNDataClassHandler):\n"
+            output_str += "        pass\n\n"
+        elif model_type == ModelType.Msgspec:
+            output_str = f"    async def partial_update_all_{message_name_snake_cased}_pre(self, " \
+                         f"stored_{message_name_snake_cased}_dict_list: List[Dict[str, Any]], " \
+                         f"updated_{message_name_snake_cased}_dict_list: List[Dict[str, Any]]):\n"
+            output_str += f"        return updated_{message_name_snake_cased}_dict_list\n\n"
+            output_str += f"    async def partial_update_all_{message_name_snake_cased}_post(self, " \
+                          f"stored_{message_name_snake_cased}_dict_list: List[Dict[str, Any]], " \
+                          f"updated_{message_name_snake_cased}_dict_list: List[Dict[str, Any]]):\n"
+            output_str += "        pass\n\n"
+        else:
+            output_str = f"    async def partial_update_all_{message_name_snake_cased}_pre(self, " \
+                         f"stored_{message_name_snake_cased}_obj_list: List[{message.proto.name}], " \
+                         f"updated_{message_name_snake_cased}_obj_json_list: List[Dict]):\n"
+            output_str += f"        return updated_{message_name_snake_cased}_obj_json_list\n\n"
+            output_str += f"    async def partial_update_all_{message_name_snake_cased}_post(self, " \
+                          f"stored_{message_name_snake_cased}_obj_list: List[{message.proto.name}], " \
+                          f"updated_{message_name_snake_cased}_obj_list: List[{message.proto.name}Optional]):\n"
+            output_str += "        pass\n\n"
         return output_str
 
-    def handle_DELETE_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
+    def handle_DELETE_callback_methods_gen(self, **kwargs) -> str:
+        message, id_field_type, model_type = self.unpack_kwargs_for_callback_methods(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def delete_{message_name_snake_cased}_pre(self, pydantic_obj_to_be_deleted: " \
-                     f"{message.proto.name}):\n"
-        output_str += "        pass\n\n"
+        if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+            if id_field_type is None:
+                output_str = f"    async def delete_{message_name_snake_cased}_pre(self, db_obj_id: int):\n"
+            else:
+                output_str = (f"    async def delete_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n")
+            output_str += "        pass\n\n"
+        else:
+            output_str = f"    async def delete_{message_name_snake_cased}_pre(self, pydantic_obj_to_be_deleted: " \
+                         f"{message.proto.name}):\n"
+            output_str += "        pass\n\n"
         output_str += f"    async def delete_{message_name_snake_cased}_post(self, " \
                       f"delete_web_response):\n"
         output_str += "        pass\n\n"
         return output_str
 
-    def handle_DELETE_all_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
+    def handle_DELETE_all_callback_methods_gen(self, **kwargs) -> str:
+        message, _, model_type = self.unpack_kwargs_for_callback_methods(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = f"    async def delete_all_{message_name_snake_cased}_pre(self):\n"
         output_str += "        pass\n\n"
@@ -120,8 +254,8 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += "        pass\n\n"
         return output_str
 
-    def handle_read_by_id_WEBSOCKET_callback_methods_gen(self, message: protogen.Message,
-                                                         id_field_type: str | None = None) -> str:
+    def handle_read_by_id_WEBSOCKET_callback_methods_gen(self, **kwargs) -> str:
+        message, id_field_type, _ = self.unpack_kwargs_for_callback_methods(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if id_field_type is None:
             output_str = f"    async def read_by_id_ws_{message_name_snake_cased}_pre(self, obj_id: int):\n"
@@ -174,55 +308,55 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         return output_str
 
     def handle_get_set_instance(self) -> str:
-        output_str = f"{self.routes_callback_class_name_capital_camel_cased}DerivedType = " \
-                      f"TypeVar('{self.routes_callback_class_name_capital_camel_cased}DerivedType', " \
-                      f"bound='{self.routes_callback_class_name_capital_camel_cased}')\n\n\n"
-        output_str += f"class {self.routes_callback_class_name_capital_camel_cased}:\n"
+        output_str = f"{self.routes_callback_class_name}DerivedType = " \
+                      f"TypeVar('{self.routes_callback_class_name}DerivedType', " \
+                      f"bound='{self.routes_callback_class_name}')\n\n\n"
+        output_str += f"class {self.routes_callback_class_name}:\n"
         output_str += f"    get_instance_mutex: threading.Lock = threading.Lock()\n"
-        output_str += f"    {self.routes_callback_class_name}_instance: " \
-                      f"Optional['{self.routes_callback_class_name_capital_camel_cased}'] = None\n\n"
+        output_str += f"    {self.routes_callback_file_name}_instance: " \
+                      f"Optional['{self.routes_callback_class_name}'] = None\n\n"
         output_str += f"    def __init__(self):\n"
         output_str += f"        self.port: int | None = None    # must be set by overridden app_launch_pre\n\n"
 
         output_str += f"    @classmethod\n"
-        output_str += f"    def get_instance(cls) -> '{self.routes_callback_class_name_capital_camel_cased}':\n"
+        output_str += f"    def get_instance(cls) -> '{self.routes_callback_class_name}':\n"
         output_str += f"        with cls.get_instance_mutex:\n"
-        output_str += f"            if cls.{self.routes_callback_class_name}_instance is None:\n"
+        output_str += f"            if cls.{self.routes_callback_file_name}_instance is None:\n"
         output_str += f'                logging.exception("Error: get_instance invoked before any server creating ' \
                       f'instance via set_instance - "\n'
         output_str += f'                                  "instantiating default!")\n'
-        output_str += f'                cls.{self.routes_callback_class_name}_instance = ' \
-                      f'{self.routes_callback_class_name_capital_camel_cased}()\n'
-        output_str += f"            return cls.{self.routes_callback_class_name}_instance\n\n"
+        output_str += f'                cls.{self.routes_callback_file_name}_instance = ' \
+                      f'{self.routes_callback_class_name}()\n'
+        output_str += f"            return cls.{self.routes_callback_file_name}_instance\n\n"
 
         output_str += f"    @classmethod\n"
-        output_str += f"    def set_instance(cls, instance: {self.routes_callback_class_name_capital_camel_cased}" \
+        output_str += f"    def set_instance(cls, instance: {self.routes_callback_class_name}" \
                       f"DerivedType, delayed_override: bool = False) -> None:\n"
-        output_str += f"        if not isinstance(instance, {self.routes_callback_class_name_capital_camel_cased}):\n"
-        output_str += f'            raise Exception("{self.routes_callback_class_name_capital_camel_cased}.' \
+        output_str += f"        if not isinstance(instance, {self.routes_callback_class_name}):\n"
+        output_str += f'            raise Exception("{self.routes_callback_class_name}.' \
                       f'set_instance must be invoked ' \
                       f'with a type that is "\n'
         output_str += f'                            "subclass of ' \
-                      f'{self.routes_callback_class_name_capital_camel_cased} ' \
+                      f'{self.routes_callback_class_name} ' \
                       f'- is-subclass test failed!")\n'
-        output_str += f'        if instance == cls.{self.routes_callback_class_name}_instance:\n'
+        output_str += f'        if instance == cls.{self.routes_callback_file_name}_instance:\n'
         output_str += f'            return  # multiple calls with same instance is not an error (though - should be ' \
                       f'avoided where possible)\n'
         output_str += f'        with cls.get_instance_mutex:\n'
-        output_str += f'            if cls.{self.routes_callback_class_name}_instance is not None:\n'
+        output_str += f'            if cls.{self.routes_callback_file_name}_instance is not None:\n'
         output_str += f'                if delayed_override:\n'
-        output_str += f'                    cls.{self.routes_callback_class_name}_instance = instance\n'
+        output_str += f'                    cls.{self.routes_callback_file_name}_instance = instance\n'
         output_str += f'                else:\n'
         output_str += f'                    raise Exception("Multiple ' \
-                      f'{self.routes_callback_class_name_capital_camel_cased}.set_instance ' \
+                      f'{self.routes_callback_class_name}.set_instance ' \
                       f'invocation detected with "\n'
         output_str += f'                                    "different instance objects. multiple calls allowed with ' \
                       f'the exact same object only"\n'
         output_str += f'                                    ", unless delayed_override is passed explicitly as True")\n'
-        output_str += f'            cls.{self.routes_callback_class_name}_instance = instance\n\n'
+        output_str += f'            cls.{self.routes_callback_file_name}_instance = instance\n\n'
         return output_str
 
-    def handle_callback_methods_output(self) -> str:
+    def handle_callback_methods_output(self, model_type: ModelType = ModelType.Beanie) -> str:
         output_str = ""
         for message in self.root_message_list:
             if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root):
@@ -254,7 +388,9 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
             for crud_option_field_name, crud_operation_method in crud_field_name_to_method_call_dict.items():
                 if crud_option_field_name in option_value_dict:
-                    output_str += crud_operation_method(message, id_field_type)
+                    output_str += crud_operation_method(message=message, id_field_type=id_field_type,
+                                                        model_type=model_type,
+                                                        json_root_option_val=option_value_dict)
                 # else not required: Avoiding method creation if desc not provided in option
 
             for field in message.fields:
@@ -290,6 +426,22 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"    async def {query_name}_query_post(self, " \
                       f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
         output_str += f"        return {message_name_snake_cased}_obj_list\n\n"
+        return output_str
+
+    def _handle_callback_http_file_query_method_output(
+            self, message: protogen.Message, query_name: str,
+            agg_params_with_type_str: str, route_type: str | None = None) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        if agg_params_with_type_str is not None:
+            output_str = f"    async def {query_name}_query_pre(self, " \
+                          f"upload_file: UploadFile, " \
+                          f"{agg_params_with_type_str}):\n"
+        else:
+            output_str = f"    async def {query_name}_query_pre(self, upload_file: UploadFile):\n"
+        output_str += "        return []\n\n"
+        output_str += f"    async def {query_name}_query_post(self, " \
+                      f"*args, **kwargs):\n"
+        output_str += f"        return []\n\n"
         return output_str
 
     def _handle_callback_ws_query_method_output(self, query_name: str, is_projection_query: bool | None = None) -> str:
@@ -347,6 +499,10 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                                                                                  query_route_type)
                     output_str += self._handle_callback_ws_query_method_output(query_name)
                     msg_name_n_ws_query_name_tuple_list.append((message.proto.name, query_name))
+                elif query_type == "http_file":
+                    output_str += self._handle_callback_http_file_query_method_output(message, query_name,
+                                                                                      agg_params_with_type_str,
+                                                                                      query_route_type)
                 else:
                     err_str = f"Unsupported Query type for query base callback code generation {query_type}"
                     logging.exception(err_str)
@@ -411,6 +567,53 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += "\n"
 
         output_str += self.handle_callback_methods_output()
+
+        msg_name_n_ws_query_name_tuple_list: List = []      # to be populated in below calls
+        output_str += self.handle_callback_query_methods_output(msg_name_n_ws_query_name_tuple_list)
+        output_str += self.handle_callback_projection_query_methods_output(msg_name_n_ws_query_name_tuple_list)
+        output_str += self.handle_query_filter_func_output(msg_name_n_ws_query_name_tuple_list)
+
+        return output_str
+
+    def handle_dataclass_callback_class_file_gen(self) -> str:
+        output_str = "import threading\n"
+        output_str += "import logging\n"
+        output_str += "from abc import abstractmethod\n"
+        output_str += "from typing import Optional, TypeVar, List, Type\n"
+        output_str += f"from FluxPythonUtils.scripts.model_base_utils import JsonNDataClassHandler\n\n\n"
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
+        output_str += f"from {model_file_path} import *\n"
+        output_str += self.handle_get_set_instance()
+
+        # Adding app pre- and post-launch methods
+        output_str += self.handle_launch_pre_and_post_callback()
+        output_str += "\n"
+
+        output_str += self.handle_callback_methods_output(model_type=ModelType.Dataclass)
+
+        msg_name_n_ws_query_name_tuple_list: List = []      # to be populated in below calls
+        output_str += self.handle_callback_query_methods_output(msg_name_n_ws_query_name_tuple_list)
+        output_str += self.handle_callback_projection_query_methods_output(msg_name_n_ws_query_name_tuple_list)
+        output_str += self.handle_query_filter_func_output(msg_name_n_ws_query_name_tuple_list)
+
+        return output_str
+
+    def handle_msgspec_callback_class_file_gen(self) -> str:
+        output_str = "import threading\n"
+        output_str += "import logging\n"
+        output_str += "from abc import abstractmethod\n"
+        output_str += "from fastapi import UploadFile\n"
+        output_str += "from typing import Optional, TypeVar, List, Type\n"
+        output_str += f'\n\n'
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
+        output_str += f"from {model_file_path} import *\n"
+        output_str += self.handle_get_set_instance()
+
+        # Adding app pre- and post-launch methods
+        output_str += self.handle_launch_pre_and_post_callback()
+        output_str += "\n"
+
+        output_str += self.handle_callback_methods_output(model_type=ModelType.Msgspec)
 
         msg_name_n_ws_query_name_tuple_list: List = []      # to be populated in below calls
         output_str += self.handle_callback_query_methods_output(msg_name_n_ws_query_name_tuple_list)

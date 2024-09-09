@@ -1,5 +1,5 @@
 driver:
-  chrome: "C:/Users/abhis/Downloads/chromedriver_win32/chromedriver.exe"
+  chrome: "/home/sourav/Downloads/chromedriver-linux64 (2)/chromedriver"
 mongo_server_uri: "mongodb://localhost:27017"
 ps_db_name: "phone_book_8020"
 md_db_name: "mobile_book"
