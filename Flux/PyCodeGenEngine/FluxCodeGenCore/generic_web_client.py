@@ -1,6 +1,7 @@
 # standard imports
 import os
 
+import msgspec
 import requests
 from typing import Any, Callable, List, Dict
 from pathlib import PurePath
@@ -12,11 +13,10 @@ from asyncio.exceptions import TimeoutError
 import json
 import urllib.parse
 
-# 3rd party imports
-from pydantic import BaseModel
-
 # project imports
 from FluxPythonUtils.scripts.utility_functions import log_n_except, http_response_as_class_type, HTTPRequestType
+from FluxPythonUtils.scripts.model_base_utils import dec_hook
+
 if (model_type := os.getenv("ModelType")) is None or len(model_type) == 0:
 	err_str = f"env var ModelType must not be {model_type}"
 	logging.exception(err_str)
@@ -157,8 +157,6 @@ def generic_http_delete_all_client(url: str, return_copy_obj: bool | None = True
 
 
 async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Callable, query_args: Dict | None = None):
-    class PydanticClassTypeList(BaseModel):
-        root: List[pydantic_type]
 
     if query_args:
         url = url + "?" + urllib.parse.urlencode(query_args)
@@ -187,11 +185,11 @@ async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Call
                 break
             if data is not None:
                 data = json.loads(data)
-                pydantic_obj_list: PydanticClassTypeList = PydanticClassTypeList(root=data)
+                pydantic_obj_list: List[pydantic_type] = pydantic_type.from_dict_list(data)
                 user_callback(pydantic_obj_list)
                 data = None
                 try:
-                    for pydantic_obj in pydantic_obj_list.root:
+                    for pydantic_obj in pydantic_obj_list:
                         # print(pydantic_obj)
                         logging.debug(pydantic_obj)
                 except KeyError:

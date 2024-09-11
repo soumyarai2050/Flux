@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from typing import List, Dict
+from typing import List, Dict, Tuple, Type
 import time
 import logging
 from pathlib import PurePath
@@ -48,6 +48,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         super().__init__(base_dir_path)
         self.app_is_router: bool = True
         self.custom_id_primary_key_messages: List[protogen.Message] = []
+        self.msg_type_to_nested_root_type_field_name_n_type_dict: Dict[protogen.Message, List[Tuple[str, str]]] = {}
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message],
                                                  avoid_non_roots: bool | None = None):
@@ -93,6 +94,40 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
             # else not required: avoiding list append if msg is not having option for query
 
             self.load_dependency_messages_and_enums_in_dicts(message)
+
+            # checking if any field or nested field in message is of root type
+            res_list = self._get_root_type_nested_fields_path_n_type_list(message)
+            if res_list:
+                self.msg_type_to_nested_root_type_field_name_n_type_dict[message] = res_list
+
+    def _get_root_type_nested_fields_path_n_type_list(self, message: protogen.Message,
+                                                      result_list: List[Tuple[str, str]] | None = None,
+                                                      field_prefix: str | None = None) -> List[Tuple[str, str]]:
+        if result_list is None:
+            result_list = []
+        if field_prefix is None:
+            field_prefix = ""
+        for field in message.fields:
+            if field.message is not None:
+                if MsgspecFastApiPlugin.is_option_enabled(field.message, MsgspecFastApiPlugin.flux_msg_json_root):
+                    if field_prefix:
+                        if field.cardinality.name.lower() == "repeated":
+                            result_list.append((f"{field_prefix}.{field.proto.name}", field.message.proto.name))
+                        # else not required: if field is not repeated then id will not affect to be same with root model
+                        self._get_root_type_nested_fields_path_n_type_list(field.message, result_list,
+                                                                           f"{field_prefix}.{field.proto.name}")
+                    else:
+                        if field.cardinality.name.lower() == "repeated":
+                            result_list.append((f"{field.proto.name}", field.message.proto.name))
+                        # else not required: if field is not repeated then id will not affect to be same with root model
+                        self._get_root_type_nested_fields_path_n_type_list(field.message, result_list,
+                                                                           f"{field.proto.name}")
+                else:
+                    self._get_root_type_nested_fields_path_n_type_list(field.message, result_list,
+                                                                       f"{field.proto.name}")
+            # else not required: ignore if not msg type
+        return result_list
+
 
     def _get_msg_id_field_type(self, message: protogen.Message) -> str:
         id_field_type: str = MsgspecFastApiPlugin.default_id_type_var_name
@@ -233,29 +268,15 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         output_str += f"from {model_file_path} import *\n"
         # else not required: if no message with custom id is found then avoiding import statement
         database_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.database_file_name)
-        output_str += f"from {database_file_path} import init_db\n\n"
+        output_str += f"from {database_file_path} import init_db\n"
+        generic_utils_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_utils")
+        output_str += f"from {generic_utils_path} import init_max_id_handler, init_nested_max_id_handler\n\n"
         output_str += "# Below imports are to initialize routes before launching server\n"
         routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
         output_str += f"from {routes_file_path} import *\n"
         routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.ws_routes_file_name)
         output_str += f"from {routes_file_path} import *\n\n"
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n\n"
-        output_str += f"async def init_max_id_handler(model_class_type: Struct):\n"
-        output_str += f'    latest_obj = await model_class_type.collection_obj.find_one(sort=[("_id", -1)])\n'
-        output_str += f'    if latest_obj is not None:\n'
-        output_str += f'        max_val = latest_obj.get("_id")\n'
-        output_str += f'        if max_val is None:\n'
-        output_str += f'            max_val = 0\n'
-        output_str += f'    else:\n'
-        output_str += f'        max_val = 0\n'
-        output_str += f'    latest_obj = await model_class_type.collection_obj.find_one(sort=[("update_id", -1)])\n'
-        output_str += f'    if latest_obj is not None:\n'
-        output_str += f'        max_update_val = latest_obj.get("update_id")\n'
-        output_str += f'        if max_update_val is None:\n'
-        output_str += f'            max_update_val = 0\n'
-        output_str += f'    else:\n'
-        output_str += f'        max_update_val = 0\n'
-        output_str += f'    model_class_type.init_max_id(int(max_val), int(max_update_val))\n\n\n'
         output_str += f'@{self.fastapi_app_name}.on_event("startup")\n'
         output_str += f'async def connect():\n'
         output_str += f'    await init_db()\n'
@@ -263,6 +284,15 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
             if "int" == self._get_msg_id_field_type(message):
                 message_name = message.proto.name
                 output_str += f"    await init_max_id_handler({message_name})\n"
+        for message, nested_root_type_field_n_type_list in self.msg_type_to_nested_root_type_field_name_n_type_dict.items():
+            message_name = message.proto.name
+            if MsgspecFastApiPlugin.is_option_enabled(message, MsgspecFastApiPlugin.flux_msg_json_root):
+                for nested_field_path, nested_field_type in nested_root_type_field_n_type_list:
+                    output_str += (f"    await init_nested_max_id_handler({message_name}, '{nested_field_path}', "
+                                   f"{nested_field_type})\n")
+            # else not required: if top lvl msg is not root type then it will not be persisted and hence
+            # nested root types will not be conflicted to any persisted obj
+
         output_str += '    port = os.getenv("PORT")\n'
         output_str += '    if port is None or len(port) == 0:\n'
         output_str += '        err_str = "Can not find PORT env var for fastapi db init"\n'

@@ -55,3 +55,41 @@ def get_non_stored_ids(ids_to_check: List[int]):
         }}
     ]
     return pipeline
+
+
+def get_nested_field_max_id(nested_field_name):
+    pipeline = [
+        {"$unwind": f"${nested_field_name}"},  # Unwind the "nested_field_name" array
+        {"$group": {"_id": None, "max_id": {"$max": f"${nested_field_name}._id"}}}  # Get the max id
+    ]
+    return pipeline
+
+
+def get_raw_perf_data_callable_names_pipeline():
+    agg_pipeline = {"aggregate": [
+        {
+            '$group': {
+                '_id': '$callable_name',
+                'count': {
+                    '$count': {}
+                }
+            }
+        }, {
+            '$project': {
+                '_id': 0,
+                'callable_name': '$_id',
+                'total_calls': '$count'
+            }
+        }
+    ]}
+    return agg_pipeline
+
+
+def get_raw_performance_data_from_callable_name_agg_pipeline(callable_name: str):
+    return {"aggregate": [
+        {
+            "$match": {
+                "callable_name": callable_name
+            }
+        }
+    ]}

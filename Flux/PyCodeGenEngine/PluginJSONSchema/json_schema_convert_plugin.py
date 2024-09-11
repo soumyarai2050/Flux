@@ -18,6 +18,7 @@ import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
 from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_specific_case, convert_to_camel_case,
                                                        YAMLConfigurationManager)
+from Flux.PyCodeGenEngine.FluxCodeGenCore.plugin_utils import selective_message_per_project_env_var_val_to_dict
 
 
 root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
@@ -181,9 +182,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             # else not required: If AutoComplete option is not set then __add_autocomplete_dict's default
             # value will be used while generation check
 
-    def __load_json_layout_and_non_layout_messages_in_dicts(self, file: protogen.File):
-        message_list: List[protogen.Message] = file.messages
-
+    def __load_json_layout_and_non_layout_messages_in_dicts(self, message_list: List[protogen.Message],
+                                                            dependencies: List[protogen.File],
+                                                            excepted_msg_name_list: List[str] | None = None):
         # Adding messages from core proto files having json_root option
         project_dir = os.getenv("PROJECT_DIR")
         if project_dir is None or not project_dir:
@@ -202,9 +203,14 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 core_or_util_files.extend(project_grp_core_or_util_files)
 
         if core_or_util_files is not None:
-            for dependency_file in file.dependencies:
+            for dependency_file in dependencies:
                 if dependency_file.proto.name in core_or_util_files:
-                    message_list.extend(dependency_file.messages)
+                    if excepted_msg_name_list:
+                        for msg in dependency_file.messages:
+                            if msg.proto.name in excepted_msg_name_list:
+                                message_list.append(msg)
+                    else:
+                        message_list.extend(dependency_file.messages)
                 # else not required: if dependency file name not in core_or_util_files
                 # config list, avoid messages from it
         # else not required: core_or_util_files key is not in yaml dict config
@@ -1136,17 +1142,41 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         json_msg_str += f'  "autocomplete": ' + f"{json.dumps(auto_complete_json_dict, indent=4)}\n"
         return json_msg_str
 
-    def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
-        if isinstance(file, list):
-            for f in file:
-                self._proto_project_name_to_msg_list_dict[f.proto.package] = f.messages
-                self.__load_json_layout_and_non_layout_messages_in_dicts(f)
-            file = file[0]  # since first file will be this project's proto file
+    def output_file_generate_handler(self, file_or_file_list: protogen.File | List[protogen.File]):
+        if isinstance(file_or_file_list, list):
+            file_list: List[protogen.File] = file_or_file_list
+            selective_msg_per_project = os.getenv("SELECTIVE_MSG_PER_PROJECT")
+            if selective_msg_per_project is not None:
+                project_name_to_msg_list_dict: Dict[str, List[str]] = (
+                    selective_message_per_project_env_var_val_to_dict(
+                        selective_msg_per_project))
+            else:
+                project_name_to_msg_list_dict = {}
+
+            for f in file_list:
+                project_name = f.proto.package
+                msg_list = project_name_to_msg_list_dict.get(project_name)
+                if msg_list:
+                    message_list: List[protogen.Message] = f.messages
+                    included_msgs: List[protogen.Message] = []
+                    for message_ in message_list:
+                        if message_.proto.name in msg_list:
+                            included_msgs.append(message_)
+
+                    self._proto_project_name_to_msg_list_dict[f.proto.package] = included_msgs
+                    self.__load_json_layout_and_non_layout_messages_in_dicts(included_msgs, f.dependencies,
+                                                                             msg_list)
+                else:       # else all msg in file are included
+                    message_list: List[protogen.Message] = f.messages
+                    self._proto_project_name_to_msg_list_dict[f.proto.package] = message_list
+                    self.__load_json_layout_and_non_layout_messages_in_dicts(message_list, f.dependencies)
+            file = file_list[0]  # since first file will be this project's proto file
             self.__main_file_message_name_list = [p.proto.name for p in file.messages]
             self._current_project_name = file.proto.package
             self._current_project_model_file = file
         else:
-            self.__load_json_layout_and_non_layout_messages_in_dicts(file)
+            file: protogen.File = file_or_file_list
+            self.__load_json_layout_and_non_layout_messages_in_dicts(file.messages, file.dependencies)
         # Performing Recursion to messages (including nested type) to get json layout, non-layout and enums and
         # adding to their respective data-member
         if self.__response_field_case_style.lower() == "snake":

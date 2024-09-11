@@ -3,7 +3,7 @@ syntax = "proto2";
 import "flux_options.proto";
 import "projects_core.proto";
 import "street_book_n_basket_book_core.proto";
-import "mobile_book_n_street_book_core.proto";
+import "mobile_book_n_street_book_n_basket_book_core.proto";
 import "dept_book_n_mobile_book_n_street_book_n_basket_book_core.proto";
 
 package basket_book;
@@ -45,6 +45,6 @@ message BasketChore{
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage{
    optional DummyEnumP temp1 = 1;
-   optional DummyEnumMS temp2 = 2;
+   optional DummyEnumMSB temp2 = 2;
    optional DummyEnumDMSB temp3 = 3;
 }

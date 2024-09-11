@@ -2,12 +2,11 @@
 from typing import Dict, Tuple, Type, List, Any
 import os
 
-# 3rd party imports
-from pydantic import BaseModel
-
+# project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import (
     PortfolioAlertBaseModel, StratAlertBaseModel, Severity)
 from FluxPythonUtils.scripts.utility_functions import get_version_from_mongodb_uri
+from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 # Below unused import is used by generated beanie file
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
@@ -381,8 +380,8 @@ def get_total_strat_alert_count_n_highest_severity(strat_id: int):
     return agg_pipeline
 
 
-def sort_alerts_based_on_severity_n_last_update_analyzer_time(strat_id_or_pydantic_obj: int | BaseModel | None = None,
-                                                              limit: int | None = None):
+def sort_alerts_based_on_severity_n_last_update_analyzer_time(
+        strat_id_or_pydantic_obj: int | MsgspecBaseModel | None = None, limit: int | None = None):
     """
     - $addFields: Adds a new field severityPriority based on the priority mapping defined using $switch.
     - $switch: Evaluates each case expression and returns the value associated with the first case expression that

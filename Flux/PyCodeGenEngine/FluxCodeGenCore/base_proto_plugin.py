@@ -769,9 +769,9 @@ class BaseProtoPlugin(ABC):
             raise Exception(err_str)
 
         output_file_name_to_insertion_points_n_content_dict: Dict[str, Dict[str, str]] = {}
-        received_output_file_name_to_content = self.output_file_generate_handler(plugin_arg)
+        received_output_file_name_to_content_dict = self.output_file_generate_handler(plugin_arg)
 
-        for output_file_name, output_file_content in received_output_file_name_to_content.items():
+        for output_file_name, output_file_content in received_output_file_name_to_content_dict.items():
             if isinstance(output_file_content, dict):
                 file_content_path = self.output_file_name_to_template_file_path_dict.get(output_file_name)
                 if file_content_path is not None:

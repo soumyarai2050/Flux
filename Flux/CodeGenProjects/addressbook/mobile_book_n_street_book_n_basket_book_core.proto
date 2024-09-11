@@ -4,7 +4,7 @@ import "flux_options.proto";
 import "barter_core.proto";
 
 
-enum DummyEnumMS{
+enum DummyEnumMSB{
   DUMMY_MS = 0;
 }
 

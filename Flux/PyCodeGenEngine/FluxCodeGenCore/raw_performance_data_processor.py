@@ -5,16 +5,16 @@ import pandas
 import asyncio
 
 # 3rd part imports
-from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
 # project imports
-from Flux.PyCodeGenEngine.FluxCodeGenCore.aggregate_core import (
-    get_raw_perf_data_callable_names_pipeline, get_raw_performance_data_from_callable_name_agg_pipeline)
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import get_raw_perf_data_callable_names_pipeline, \
+    get_raw_performance_data_from_callable_name_agg_pipeline
 from FluxPythonUtils.scripts.utility_functions import (read_mongo_collection_as_dataframe,
                                                        execute_tasks_list_with_all_completed)
+from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 
 
-class MongoConnectionReqs(BaseModel):
+class MongoConnectionReqs(MsgspecBaseModel):
     db: str
     collection: str
     host: str | None = 'localhost'
@@ -26,11 +26,11 @@ class MongoConnectionReqs(BaseModel):
 class RawPerformanceDataProcessor:
 
     def __init__(self, web_client_object,
-                 processed_performance_analysis_model_type: Type[BaseModel],
+                 processed_performance_analysis_model_type: Type[MsgspecBaseModel],
                  mongo_connection_reqs: MongoConnectionReqs,
                  config_yaml_dict: Dict):
         self.web_client_object = web_client_object
-        self.processed_performance_analysis_model_type: Type[BaseModel] = processed_performance_analysis_model_type
+        self.processed_performance_analysis_model_type: Type[MsgspecBaseModel] = processed_performance_analysis_model_type
         self.mongo_connection_reqs: MongoConnectionReqs = mongo_connection_reqs
         self.loaded_processed_performance_analysis_obj_from_db: List[processed_performance_analysis_model_type] = (
             self.web_client_object.get_all_processed_performance_analysis_client())

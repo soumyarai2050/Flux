@@ -29,12 +29,14 @@ log_simulate_logger = logging.getLogger("log_simulator")
 
 class FillsJournalCont(FillsJournalBaseModel):
 
-    @field_validator("fill_symbol", mode="before")
     @classmethod
-    def transform_to_str(cls, v) -> str | None:
-        if v is not None:
-            v = str(v)
-        return v
+    def from_kwargs(cls, **kwargs):
+        fill_symbol = kwargs.pop("fill_symbol", None)
+        if fill_symbol is not None:
+            kwargs["fill_symbol"] = str(fill_symbol)
+
+        sec_pos_extended = super().from_kwargs(**kwargs)
+        return sec_pos_extended
 
 
 class LogBarterSimulator(BarteringLinkBase):

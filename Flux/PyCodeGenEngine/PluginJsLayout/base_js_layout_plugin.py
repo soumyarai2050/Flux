@@ -7,6 +7,8 @@ from pathlib import PurePath
 from abc import ABC
 from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_specific_case, convert_to_camel_case,
                                                        YAMLConfigurationManager)
+from Flux.PyCodeGenEngine.FluxCodeGenCore.plugin_utils import selective_message_per_project_env_var_val_to_dict
+
 # below main is imported to be accessible to derived classes
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main  # required import
 
@@ -50,7 +52,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
         self.case_style_convert_method: Callable[[str], str] | None = None
 
     def handle_dependency_files(self, file: protogen.File, message_list: List[protogen.Message],
-                                is_multi_project: bool | None = None):
+                                is_multi_project: bool | None = None, selective_msg_name_list: List[str] = None):
         # Adding messages from core proto files having json_root option
         project_dir = os.getenv("PROJECT_DIR")
         if project_dir is None or not project_dir:
@@ -77,26 +79,57 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                             dependency_file.messages)
                     for msg in dependency_file.messages:
                         if msg not in message_list:
-                            message_list.append(msg)
+                            if selective_msg_name_list:
+                                # selective_msg_name_list is passed when selective msg are going to be added for
+                                # this project
+                                if msg.proto.name in selective_msg_name_list:
+                                    message_list.append(msg)
+                                # else not required: ignoring if not present in selective_msg_name_list
+                            else:
+                                # normal case: putting all msg in list
+                                message_list.append(msg)
+
                 # else not required: if dependency file name not in core_or_util_files
                 # config list, avoid messages from it
         # else not required: core_or_util_files key is not in yaml dict config
 
-    def load_root_message_to_data_member(self, file: protogen.File):
+    def load_root_message_to_data_member(self, file_or_file_list: protogen.File | List[protogen.File]):
         message_list: List[protogen.Message]
-        if isinstance(file, list):
+        if isinstance(file_or_file_list, list):
+            file_list: List[protogen.File] = file_or_file_list
+            selective_msg_per_project = os.getenv("SELECTIVE_MSG_PER_PROJECT")
+            if selective_msg_per_project is not None:
+                project_name_to_msg_list_dict: Dict[str, List[str]] = (
+                    selective_message_per_project_env_var_val_to_dict(
+                        selective_msg_per_project))
+            else:
+                project_name_to_msg_list_dict = {}
+
             message_list = []
-            current_full_file_name: str = file[0].proto.name   # since first file in list is current proto file
-            self.project_name = file[0].proto.package
+            current_full_file_name: str = file_list[0].proto.name   # since first file in list is current proto file
+            self.project_name = file_list[0].proto.package
             self.current_proto_file_name = current_full_file_name.split(os.sep)[-1]
-            for f in file:
-                message_list.extend(f.messages)
-                file_name = f.proto.name
-                self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]] = f.messages
-                self.handle_dependency_files(f, message_list, True)
+            for f in file_list:
+                project_name = f.proto.package
+                msg_list = project_name_to_msg_list_dict.get(project_name)
+                if msg_list:
+                    file_name = f.proto.name
+                    self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]] = []
+                    for msg in f.messages:
+                        if msg.proto.name in msg_list:
+                            message_list.append(msg)
+
+                            self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]].append(msg)
+                            self.handle_dependency_files(f, message_list, True, msg_list)
+                else:
+                    message_list.extend(f.messages)
+                    file_name = f.proto.name
+                    self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]] = f.messages
+                    self.handle_dependency_files(f, message_list, True)
                 self.file_name_to_dependency_file_names_dict[f.proto.name] = \
                     [file.proto.name for file in f.dependencies]
         else:
+            file: protogen.File = file_or_file_list
             message_list = file.messages
             self.handle_dependency_files(file, message_list)
             self.project_name = file.proto.package
@@ -228,7 +261,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                             else:
                                 return dependent_model_name
                         elif BaseJSLayoutPlugin.is_option_enabled(message,
-                                                                BaseJSLayoutPlugin.flux_msg_widget_ui_option):
+                                                                  BaseJSLayoutPlugin.flux_msg_widget_ui_option):
                             return ""
         return None
 

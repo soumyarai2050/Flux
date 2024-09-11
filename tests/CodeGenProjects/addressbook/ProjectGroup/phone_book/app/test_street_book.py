@@ -1144,23 +1144,55 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
                     f"Mismatched market_depth: expected: {market_depth_basemodel}, updated: {updated_market_depth}"
                 time.sleep(1)
 
+        # below are computes expected for HIGH breach px:
+        # ask_quote_px = 85
+        # bid_quote_px = 99
+        # last_barter_reference_px = 116
+        # aggressive_quote_px = 85
+        # with this:
         # max_px_by_basis_point = 97.75
         # max_px_by_deviation = 139.2
         # px_by_max_level = 105
-        # >>> min comes max_px_by_basis_point which is being tested in this test
+        # >>> breach_threshold_px i.e. min of above is max_px_by_basis_point = 97.75
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
 
-        # Negative Check for buy chore - chore block since px > max_px_by_basis_point
+        # Negative Check for buy chore - chore block since px > max_breach_threshold_px
         # placing new non-systematic new_chore
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
         px = 98
         qty = 90
-        check_str = "blocked generated Side.BUY chore, chore-px=.* > high_breach_px=.*; low_breach_px=.*"
+        check_str = "blocked generated Side.BUY chore, chore-px=98.0 > high_breach_px=97.750; low_breach_px=95.000"
         assert_fail_message = f"cant find any alert with msg: {check_str!r}"
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat, executor_http_client)
 
-        # Positive check for buy chore - chore places since px < max_px_by_basis_point
+        # below are computes expected for LOW breach px:
+        # ask_quote_px = 85
+        # bid_quote_px = 99
+        # last_barter_reference_px = 116
+        # aggressive_quote_px = 99
+        # with this:
+        # min_px_by_basis_point = 84.15
+        # min_px_by_deviation = 92.8
+        # px_by_max_level = 95
+        # >>> breach_threshold_px i.e. max of above is px_by_max_level = 95
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
+
+        # Negative Check for buy chore - chore block since px < min_breach_threshold_px
+        # placing new non-systematic new_chore
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        px = 94
+        qty = 90
+        check_str = "blocked generated Side.BUY chore, chore-px=94.0 < low_breach_px=95.000; high_breach_px=97.750"
+        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+        handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
+                                                                      check_str, assert_fail_message,
+                                                                      active_pair_strat, executor_http_client)
+
+        # Positive check for buy chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
         px = 97
@@ -1199,22 +1231,55 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
                         time.sleep(1)
                         break
 
+        # below are computes expected for LOW breach px:
+        # ask_quote_px = 121
+        # bid_quote_px = 100
+        # last_barter_reference_px = 100
+        # aggressive_quote_px = 100
+        # with this:
         # min_px_by_basis_point = 85
         # min_px_by_deviation = 80
         # px_by_max_level = 80
-        # >>> max comes max_px_by_basis_point which is being tested in this test
+        # >>> breach_threshold_px i.e. max of above is min_px_by_basis_point = 85
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
 
-        # Negative Check for sell chore - chore block since px < max_px_by_basis_point
+        # Negative Check for sell chore - chore block since px < min_breach_threshold_px
         # placing new non-systematic new_chore
         # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
         px = 84
         qty = 90
-        check_str = "blocked generated Side.SELL chore, chore-px=.* < low_breach_px=.*; high_breach_px=.*"
+        check_str = "blocked generated Side.SELL chore, chore-px=84.0 < low_breach_px=85.000; high_breach_px=120.000"
+        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
         handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat, executor_http_client)
 
-        # Positive check for sell chore - chore places since px > max_px_by_basis_point
+        # below are computes expected for HIGH breach px:
+        # ask_quote_px = 121
+        # bid_quote_px = 100
+        # last_barter_reference_px = 100
+        # aggressive_quote_px = 121
+        # with this:
+        # max_px_by_basis_point = 139.15
+        # max_px_by_deviation = 120
+        # px_by_max_level = 125
+        # >>> breach_threshold_px i.e. min of above is max_px_by_deviation = 120
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
+
+        # Negative Check for sell chore - chore block since px > max_breach_threshold_px
+        # placing new non-systematic new_chore
+        # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        px = 121
+        qty = 90
+        check_str = "blocked generated Side.SELL chore, chore-px=121.0 > high_breach_px=120.000; low_breach_px=85.000"
+        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+        handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
+                                                                      check_str, assert_fail_message,
+                                                                      active_pair_strat, executor_http_client)
+
+        # Positive check for sell chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
         # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
@@ -1308,7 +1373,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
             buy_sample_last_barter.market_barter_volume.participation_period_last_barter_qty_sum = 2000
             executor_http_client.create_last_barter_client(buy_sample_last_barter)
 
-            # below are computes expected in this test:
+            # below are computes expected for HIGH breach px:
             # ask_quote_px = 121
             # bid_quote_px = 100
             # last_barter_reference_px = 80
@@ -1324,7 +1389,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
             # >>> final breach_threshold_px i.e. max of min_px_by_tick_size and breach_threshold_px is
             #     min_px_by_tick_size=121.001
 
-            # Negative Check for buy chore - chore block since px > max_px_by_deviation
+            # Negative Check for buy chore - chore block since px > max_breach_threshold_px
             # placing new non-systematic new_chore
             px = 122
             qty = 90
@@ -1335,7 +1400,34 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
                                                                           check_str, assert_fail_message,
                                                                           active_pair_strat, executor_http_client)
 
-            # Positive check for buy chore - chore places since px =< max_px_by_deviation
+            # below are computes expected for LOW breach px:
+            # ask_quote_px = 121
+            # bid_quote_px = 100
+            # last_barter_reference_px = 80
+            # aggressive_quote_px = 100
+            # with this:
+            # min_px_by_basis_point = 85
+            # min_px_by_deviation = 64
+            # px_by_max_level = 96
+            # >>> breach_threshold_px i.e. max of above is px_by_max_level = 96
+            # max_px_by_bbo_n_tick_size = 99.999
+            # max_px_by_last_barter_n_tick_size = 79.999
+            # >>> max_px_by_tick_size i.e. min of above is max_px_by_last_barter_n_tick_size = 79.999
+            # >>> final breach_threshold_px i.e. min of min_px_by_tick_size and breach_threshold_px is
+            #     min_px_by_tick_size=79.999
+
+            # Negative Check for buy chore - chore block since px < min_breach_threshold_px
+            # placing new non-systematic new_chore
+            px = 79
+            qty = 90
+            check_str = ("blocked generated Side.BUY chore, chore-px=79.0 < "
+                         "low_breach_px=79.999; high_breach_px=121.001")
+            assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+            handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
+                                                                          check_str, assert_fail_message,
+                                                                          active_pair_strat, executor_http_client)
+
+            # Positive check for buy chore - chore places since min_breach_threshold_px < px =< max_breach_threshold_px
             px = 121
             qty = 90
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -1352,7 +1444,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
             sell_sample_last_barter.arrival_time = get_utc_date_time()
             executor_http_client.create_last_barter_client(sell_sample_last_barter)
 
-            # below are computes expected in this test:
+            # below are computes expected for LOW breach px:
             # ask_quote_px = 80
             # bid_quote_px = 85
             # last_barter_reference_px = 110
@@ -1368,7 +1460,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
             # >>> final breach_threshold_px i.e. min of max_px_by_tick_size and breach_threshold_px is
             #     min_px_by_tick_size=84.99
 
-            # Negative Check for sell chore - chore block since px < min_px_by_deviation
+            # Negative Check for sell chore - chore block since px < min_breach_threshold_px
             # placing new non-systematic new_chore
             px = 84
             qty = 90
@@ -1379,7 +1471,34 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
                                                                           check_str, assert_fail_message,
                                                                           active_pair_strat, executor_http_client)
 
-            # Positive check for sell chore - chore places since px > min_px_by_deviation
+            # below are computes expected for HIGH breach px :
+            # ask_quote_px = 80
+            # bid_quote_px = 85
+            # last_barter_reference_px = 110
+            # aggressive_quote_px = 80
+            # with this:
+            # max_px_by_basis_point = 92
+            # max_px_by_deviation = 132
+            # px_by_max_level = 100
+            # >>> breach_threshold_px i.e. min of above is max_px_by_basis_point = 92
+            # min_px_by_bbo_n_tick_size = 80.001
+            # min_px_by_last_barter_n_tick_size = 110.001
+            # >>> min_px_by_tick_size i.e. max of above is min_px_by_last_barter_n_tick_size = 110.001
+            # >>> final breach_threshold_px i.e. max of min_px_by_tick_size and breach_threshold_px is
+            #     min_px_by_last_barter_n_tick_size = 110.001
+
+            # Negative Check for sell chore - chore block since px > max_breach_threshold_px
+            # placing new non-systematic new_chore
+            px = 111
+            qty = 90
+            check_str = ("blocked generated Side.SELL chore, chore-px=111.0 > high_breach_px=110.001; "
+                         "low_breach_px=84.999")
+            assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+            handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
+                                                                          check_str, assert_fail_message,
+                                                                          active_pair_strat, executor_http_client)
+
+            # Positive check for sell chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
             px = 85
             qty = 90
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
@@ -1463,12 +1582,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
                         f"Mismatched market_depth: expected: {market_depth_basemodel}, updated: {updated_market_depth}"
                     time.sleep(1)
 
-            # max_px_by_basis_point = 97.75
-            # max_px_by_deviation = 139.2
-            # px_by_max_level = 105
-            # >>> min comes max_px_by_basis_point which is being tested in this test
-
-            # below are computes expected in this test:
+            # below are computes expected for HIGH breach px:
             # ask_quote_px = 99
             # bid_quote_px = 85
             # last_barter_reference_px = 116
@@ -1484,18 +1598,46 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
             # >>> final breach_threshold_px i.e. max of min_px_by_tick_size and breach_threshold_px is
             #     min_px_by_last_barter_n_tick_size = 116.001
 
-            # Negative Check for buy chore - chore block since px > max_px_by_basis_point
+            # Negative Check for buy chore - chore block since px > max_breach_threshold_px
             # placing new non-systematic new_chore
             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
             px = 117
             qty = 90
-            check_str = "blocked generated Side.BUY chore, chore-px=117.0 > high_breach_px=116.001; low_breach_px=.*"
+            check_str = ("blocked generated Side.BUY chore, chore-px=117.0 > high_breach_px=116.001; "
+                         "low_breach_px=95.000")
             assert_fail_message = f"cant find any alert with msg: {check_str!r}"
             handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                           check_str, assert_fail_message,
                                                                           active_pair_strat, executor_http_client)
 
-            # Positive check for buy chore - chore places since px < max_px_by_basis_point
+            # below are computes expected for LOW breach px:
+            # ask_quote_px = 121
+            # bid_quote_px = 130
+            # last_barter_reference_px = 116
+            # aggressive_quote_px = 121
+            # with this:
+            # min_px_by_basis_point = 102.85
+            # min_px_by_deviation = 92.8
+            # px_by_max_level = 95
+            # >>> breach_threshold_px i.e. max of above is px_by_max_level = 95
+            # max_px_by_bbo_n_tick_size = 120.999
+            # max_px_by_last_barter_n_tick_size = 115.999
+            # >>> max_px_by_tick_size i.e. min of above is max_px_by_last_barter_n_tick_size = 115.999
+            # >>> final breach_threshold_px i.e. min of max_px_by_tick_size and breach_threshold_px is
+            #     px_by_max_level = 95
+
+            # Negative Check for buy chore - chore block since px < min_breach_threshold_px>
+            # placing new non-systematic new_chore
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            px = 94
+            qty = 90
+            check_str = "blocked generated Side.BUY chore, chore-px=94.0 < low_breach_px=95.000; high_breach_px=116.001"
+            assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+            handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
+                                                                          check_str, assert_fail_message,
+                                                                          active_pair_strat, executor_http_client)
+
+            # Positive check for buy chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
             px = 116
@@ -1534,12 +1676,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
                             time.sleep(1)
                             break
 
-            # min_px_by_basis_point = 85
-            # min_px_by_deviation = 80
-            # px_by_max_level = 80
-            # >>> max comes max_px_by_basis_point which is being tested in this test
-
-            # below are computes expected in this test:
+            # below are computes expected for LOW breach px:
             # ask_quote_px = 121
             # bid_quote_px = 130
             # last_barter_reference_px = 100
@@ -1555,17 +1692,47 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
             # >>> final breach_threshold_px i.e. min of max_px_by_tick_size and breach_threshold_px is
             #     max_px_by_last_barter_n_tick_size = 99.999
 
-            # Negative Check for sell chore - chore block since px < max_px_by_basis_point
+            # Negative Check for sell chore - chore block since px < min_breach_threshold_px
             # placing new non-systematic new_chore
             # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
             px = 98
             qty = 90
-            check_str = "blocked generated Side.SELL chore, chore-px=98.0 < low_breach_px=99.999; high_breach_px=.*"
+            check_str = ("blocked generated Side.SELL chore, chore-px=98.0 < low_breach_px=99.999; "
+                         "high_breach_px=121.001")
+            assert_fail_message = f"cant find any alert with msg: {check_str!r}"
             handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                           check_str, assert_fail_message,
                                                                           active_pair_strat, executor_http_client)
 
-            # Positive check for sell chore - chore places since px > max_px_by_basis_point
+            # below are computes expected for HIGH breach px:
+            # ask_quote_px = 121
+            # bid_quote_px = 130
+            # last_barter_reference_px = 100
+            # aggressive_quote_px = 121
+            # with this:
+            # max_px_by_basis_point = 139.15
+            # max_px_by_deviation = 120
+            # px_by_max_level = 125
+            # >>> breach_threshold_px i.e. min of above is max_px_by_deviation = 120
+            # min_px_by_bbo_n_tick_size = 121.001
+            # min_px_by_last_barter_n_tick_size = 100.001
+            # >>> min_px_by_tick_size i.e. max of above is min_px_by_bbo_n_tick_size = 121.001
+            # >>> final breach_threshold_px i.e. max of max_px_by_tick_size and breach_threshold_px is
+            #     min_px_by_bbo_n_tick_size = 121.001
+
+            # Negative Check for sell chore - chore block since px > max_breach_threshold_px
+            # placing new non-systematic new_chore
+            # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            px = 122
+            qty = 90
+            check_str = ("blocked generated Side.SELL chore, chore-px=122.0 > high_breach_px=121.001; "
+                         "low_breach_px=99.999")
+            assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+            handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
+                                                                          check_str, assert_fail_message,
+                                                                          active_pair_strat, executor_http_client)
+
+            # Positive check for sell chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
             # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
 
             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
@@ -1599,6 +1766,394 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
         raise Exception(e)
     finally:
         YAMLConfigurationManager.update_yaml_configurations(executor_config_dict_str, str(executor_config_file_path))
+
+
+@pytest.mark.nightly
+def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_,
+        max_loop_count_per_side, refresh_sec_update_fixture):
+    buy_symbol, sell_symbol = leg1_leg2_symbol_list[0][0], leg1_leg2_symbol_list[0][1]
+
+    # updating bid market depth to make its lowest depth px value greater than calculated max_px_by_basis_point
+    buy_bid_px = 100
+    sell_bid_px = 85
+    sell_ask_px = 80
+    for market_depth_basemodel in market_depth_basemodel_list:
+        if market_depth_basemodel.symbol == buy_symbol and market_depth_basemodel.side == "BID":
+            market_depth_basemodel.px = buy_bid_px
+            buy_bid_px -= 1
+        elif market_depth_basemodel.symbol == sell_symbol:
+            if market_depth_basemodel.side == "ASK":
+                market_depth_basemodel.px = sell_ask_px
+                sell_ask_px += 5
+            else:
+                market_depth_basemodel.px = sell_bid_px
+                sell_bid_px -= 1
+
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+    buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
+        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+                                                 expected_strat_status_, symbol_overview_obj_list,
+                                                 last_barter_fixture_list, market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    buy_inst_type: InstrumentType = InstrumentType.CB if (
+            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
+    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        buy_sample_last_barter = LastBarterBaseModel.from_dict(last_barter_fixture_list[0])
+        buy_sample_last_barter.px = 80
+        buy_sample_last_barter.exch_time = get_utc_date_time()
+        buy_sample_last_barter.arrival_time = get_utc_date_time()
+        buy_sample_last_barter.market_barter_volume.participation_period_last_barter_qty_sum = 2000
+        executor_http_client.create_last_barter_client(buy_sample_last_barter)
+
+        # below are computes expected for HIGH breach px:
+        # ask_quote_px = 121
+        # bid_quote_px = 100
+        # last_barter_reference_px = 80
+        # aggressive_quote_px = 121
+        # with this:
+        # max_px_by_basis_point = 139.15
+        # max_px_by_deviation = 96
+        # px_by_max_level = 125
+        # >>> breach_threshold_px i.e. min of above is max_px_by_deviation = 96
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
+
+        # Negative Check for buy chore - chore block since px > max_breach_threshold_px
+        # placing new non-systematic new_chore
+        px = 97
+        qty = 90
+        check_str = "blocked generated Side.BUY chore, chore-px=97.0 > high_breach_px=96.000; low_breach_px=96.000"
+        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+        handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
+                                                                      check_str, assert_fail_message,
+                                                                      active_pair_strat, executor_http_client)
+
+        # below are computes expected for LOW breach px:
+        # ask_quote_px = 121
+        # bid_quote_px = 100
+        # last_barter_reference_px = 80
+        # aggressive_quote_px = 100
+        # with this:
+        # min_px_by_basis_point = 85
+        # min_px_by_deviation = 64
+        # px_by_max_level = 96
+        # >>> breach_threshold_px i.e. max of above is min_px_by_basis_point = 96
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
+
+        # Negative Check for buy chore - chore block since px < min_breach_threshold_px
+        # placing new non-systematic new_chore
+        px = 95
+        qty = 90
+        check_str = "blocked generated Side.BUY chore, chore-px=95.0 < low_breach_px=96.000; high_breach_px=96.000"
+        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+        handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
+                                                                      check_str, assert_fail_message,
+                                                                      active_pair_strat, executor_http_client)
+
+        # Positive check for buy chore - chore places since min_breach_threshold_px < px =< max_breach_threshold_px
+        px = 96
+        qty = 90
+        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
+        # Internally checks if chore_journal is found with OE_NEW state
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+            time.sleep(residual_wait_sec)
+
+        sell_sample_last_barter = LastBarterBaseModel.from_dict(last_barter_fixture_list[1])
+        sell_sample_last_barter.px = 110
+        sell_sample_last_barter.exch_time = get_utc_date_time()
+        sell_sample_last_barter.arrival_time = get_utc_date_time()
+        executor_http_client.create_last_barter_client(sell_sample_last_barter)
+
+        # below are computes expected for LOW breach px:
+        # ask_quote_px = 80
+        # bid_quote_px = 85
+        # last_barter_reference_px = 110
+        # aggressive_quote_px = 85
+        # with this:
+        # min_px_by_basis_point = 72.25
+        # min_px_by_deviation = 88
+        # px_by_max_level = 81
+        # >>> breach_threshold_px i.e. max of above is min_px_by_deviation = 88
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
+
+        # Negative Check for sell chore - chore block since px < min_px_by_deviation = 88
+        # placing new non-systematic new_chore
+        px = 87
+        qty = 90
+        check_str = "blocked generated Side.SELL chore, chore-px=87.0 < low_breach_px=88.000; high_breach_px=92.000"
+        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+        handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
+                                                                      check_str, assert_fail_message,
+                                                                      active_pair_strat, executor_http_client)
+
+        # below are computes expected for HIGH breach px:
+        # ask_quote_px = 80
+        # bid_quote_px = 85
+        # last_barter_reference_px = 110
+        # aggressive_quote_px = 80
+        # with this:
+        # max_px_by_basis_point = 92
+        # max_px_by_deviation = 132
+        # px_by_max_level = 100
+        # >>> breach_threshold_px i.e. min of above is max_px_by_basis_point = 92
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
+
+        # Negative Check for sell chore - chore block since px > max_breach_threshold_px
+        # placing new non-systematic new_chore
+        px = 93
+        qty = 90
+        check_str = "blocked generated Side.SELL chore, chore-px=93.0 > high_breach_px=92.000; low_breach_px=88.000"
+        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+        handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
+                                                                      check_str, assert_fail_message,
+                                                                      active_pair_strat, executor_http_client)
+
+        # Positive check for sell chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
+        px = 89
+        qty = 90
+        place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
+
+        # Internally checks if chore_journal is found with OE_NEW state
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              sell_symbol, executor_http_client)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+                                                 pair_strat_, expected_strat_limits_,
+                                                 expected_strat_status_, symbol_overview_obj_list,
+                                                 last_barter_fixture_list, market_depth_basemodel_list,
+                                                 buy_chore_, sell_chore_,
+                                                 max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+    buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
+        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+                                                 expected_strat_status_, symbol_overview_obj_list,
+                                                 last_barter_fixture_list, market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    buy_inst_type: InstrumentType = InstrumentType.CB if (
+            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
+    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # updating sell market depth to make its max depth px value lowest of all values
+        sell_px = 91
+        stored_market_depths = executor_http_client.get_all_market_depth_client()
+        for market_depth_basemodel in stored_market_depths:
+            if market_depth_basemodel.symbol == buy_symbol:
+                if market_depth_basemodel.side == "ASK":
+                    market_depth_basemodel.px = sell_px + market_depth_basemodel.position
+                market_depth_basemodel.exch_time = get_utc_date_time()
+                market_depth_basemodel.arrival_time = get_utc_date_time()
+
+                executor_http_client.put_market_depth_client(market_depth_basemodel)
+                time.sleep(1)
+
+        # max_px_by_basis_point = 109.2
+        # max_px_by_deviation = 139.2
+        # px_by_max_level = 95
+        # >>> min comes px_by_max_level which is being tested in this test
+
+        # below are computes expected for HIGH breach px:
+        # ask_quote_px = 91
+        # bid_quote_px = 99
+        # last_barter_reference_px = 116
+        # aggressive_quote_px = 91
+        # with this:
+        # max_px_by_basis_point = 104.65
+        # max_px_by_deviation = 139.2
+        # px_by_max_level = 95
+        # >>> breach_threshold_px i.e. min of above is px_by_max_level = 95
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
+
+        # Negative Check for buy chore - chore block since px > max_breach_threshold_px
+        # placing new non-systematic new_chore
+        px = 96
+        qty = 90
+        check_str = "blocked generated Side.BUY chore, chore-px=96.0 > high_breach_px=95.000; low_breach_px=95.000"
+        assert_fail_message = "Could not find any alert containing message to block chores tob last barter px as 0"
+        handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
+                                                                      check_str, assert_fail_message,
+                                                                      active_pair_strat, executor_http_client)
+
+        # below are computes expected for LOW breach px:
+        # ask_quote_px = 91
+        # bid_quote_px = 99
+        # last_barter_reference_px = 116
+        # aggressive_quote_px = 99
+        # with this:
+        # min_px_by_basis_point = 84.15
+        # min_px_by_deviation = 92.8
+        # px_by_max_level = 95
+        # >>> breach_threshold_px i.e. max of above is px_by_max_level = 95
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
+
+        # Negative Check for buy chore - chore block since px < min_breach_threshold_px
+        # placing new non-systematic new_chore
+        px = 94
+        qty = 90
+        check_str = "blocked generated Side.BUY chore, chore-px=94.0 < low_breach_px=95.000; high_breach_px=95.000"
+        assert_fail_message = "Could not find any alert containing message to block chores tob last barter px as 0"
+        handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
+                                                                      check_str, assert_fail_message,
+                                                                      active_pair_strat, executor_http_client)
+
+        # Positive check for buy chore - chore places since min_breach_threshold_px <= px =< max_breach_threshold_px
+
+        px = 95
+        qty = 90
+        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
+
+        # Internally checks if chore_journal is found with OE_NEW state
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+            time.sleep(residual_wait_sec)
+
+        # checking min_px_by_basis_point
+        sell_sample_last_barter = LastBarterBaseModel.from_dict(last_barter_fixture_list[1])
+        sell_sample_last_barter.px = 110
+        sell_sample_last_barter.exch_time = get_utc_date_time()
+        sell_sample_last_barter.arrival_time = get_utc_date_time()
+        executor_http_client.create_last_barter_client(sell_sample_last_barter)
+
+        # updating buy market depth to make its max depth px value less than calculated max_px_by_basis_point
+        buy_px = 100
+        stored_market_depths = executor_http_client.get_all_market_depth_client()
+        for pos in range(4, -1, -1):
+            for market_depth_basemodel in stored_market_depths:
+                if market_depth_basemodel.symbol == sell_symbol:
+                    if market_depth_basemodel.side == "BID" and market_depth_basemodel.position == pos:
+                        market_depth_basemodel.px = buy_px - pos
+                        market_depth_basemodel.exch_time = get_utc_date_time()
+                        market_depth_basemodel.arrival_time = get_utc_date_time()
+
+                        executor_http_client.put_market_depth_client(market_depth_basemodel)
+                        time.sleep(1)
+                        break
+
+        # min_px_by_basis_point = 85
+        # min_px_by_deviation = 88
+        # px_by_max_level = 95
+        # >>> max comes px_by_max_level which is being tested in this test
+
+        # below are computes expected for LOW breach px:
+        # ask_quote_px = 121
+        # bid_quote_px = 100
+        # last_barter_reference_px = 110
+        # aggressive_quote_px = 100
+        # with this:
+        # min_px_by_basis_point = 85
+        # min_px_by_deviation = 88
+        # px_by_max_level = 96
+        # >>> breach_threshold_px i.e. max of above is px_by_max_level = 96
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
+
+        # Negative Check for sell chore - chore block since px < min_breach_threshold_px
+        # placing new non-systematic new_chore
+        px = 95
+        qty = 90
+        check_str = "blocked generated Side.SELL chore, chore-px=95.0 < low_breach_px=96.000; high_breach_px=125.000"
+        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+        handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
+                                                                      check_str, assert_fail_message,
+                                                                      active_pair_strat, executor_http_client)
+
+        # below are computes expected for HIGH breach px:
+        # ask_quote_px = 121
+        # bid_quote_px = 100
+        # last_barter_reference_px = 110
+        # aggressive_quote_px = 121
+        # with this:
+        # max_px_by_basis_point = 139.15
+        # max_px_by_deviation = 132
+        # px_by_max_level = 125
+        # >>> breach_threshold_px i.e. min of above is px_by_max_level = 125
+        # since spread_in_bips > max_spread_in_bips in this test, breach_threshold_px_by_tick_size
+        # will not be considered
+
+        # Negative Check for sell chore - chore block since px < max_breach_threshold_px
+        # placing new non-systematic new_chore
+        px = 126
+        qty = 90
+        check_str = "blocked generated Side.SELL chore, chore-px=126.0 > high_breach_px=125.000; low_breach_px=96.000"
+        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
+        handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
+                                                                      check_str, assert_fail_message,
+                                                                      active_pair_strat, executor_http_client)
+
+        # Positive check for sell chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
+
+        px = 97
+        qty = 90
+        place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
+
+        # Internally checks if chore_journal is found with OE_NEW state
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              sell_symbol, executor_http_client)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
 # chore limits
@@ -1684,260 +2239,6 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
                     f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
         print(err_str_)
         raise Exception(err_str_)
-
-
-@pytest.mark.nightly
-def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-        pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list,
-        last_barter_fixture_list, market_depth_basemodel_list,
-        buy_chore_, sell_chore_,
-        max_loop_count_per_side, refresh_sec_update_fixture):
-    buy_symbol, sell_symbol = leg1_leg2_symbol_list[0][0], leg1_leg2_symbol_list[0][1]
-
-    # updating bid market depth to make its lowest depth px value greater than calculated max_px_by_basis_point
-    buy_bid_px = 100
-    sell_bid_px = 85
-    sell_ask_px = 80
-    for market_depth_basemodel in market_depth_basemodel_list:
-        if market_depth_basemodel.symbol == buy_symbol and market_depth_basemodel.side == "BID":
-            market_depth_basemodel.px = buy_bid_px
-            buy_bid_px -= 1
-        elif market_depth_basemodel.symbol == sell_symbol:
-            if market_depth_basemodel.side == "ASK":
-                market_depth_basemodel.px = sell_ask_px
-                sell_ask_px += 5
-            else:
-                market_depth_basemodel.px = sell_bid_px
-                sell_bid_px -= 1
-
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    residual_wait_sec = 4 * refresh_sec_update_fixture
-    buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
-        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-                                                 expected_strat_status_, symbol_overview_obj_list,
-                                                 last_barter_fixture_list, market_depth_basemodel_list))
-
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
-
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
-
-    try:
-        # updating yaml_configs according to this test
-        for symbol in config_dict["symbol_configs"]:
-            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
-
-        # updating simulator's configs
-        executor_http_client.barter_simulator_reload_config_query_client()
-
-        buy_sample_last_barter = LastBarterBaseModel.from_dict(last_barter_fixture_list[0])
-        buy_sample_last_barter.px = 80
-        buy_sample_last_barter.exch_time = get_utc_date_time()
-        buy_sample_last_barter.arrival_time = get_utc_date_time()
-        buy_sample_last_barter.market_barter_volume.participation_period_last_barter_qty_sum = 2000
-        executor_http_client.create_last_barter_client(buy_sample_last_barter)
-
-        # max_px_by_basis_point = 139.15
-        # max_px_by_deviation = 96
-        # px_by_max_level = 125
-        # >>> min comes max_px_by_deviation which is being tested in this test
-
-        # Negative Check for buy chore - chore block since px > max_px_by_deviation
-        # placing new non-systematic new_chore
-        px = 97
-        qty = 90
-        check_str = "blocked generated Side.BUY chore, chore-px=.* > high_breach_px=.*; low_breach_px=.*"
-        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
-        handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
-                                                                      check_str, assert_fail_message,
-                                                                      active_pair_strat, executor_http_client)
-
-        # Positive check for buy chore - chore places since px =< max_px_by_deviation
-        px = 96
-        qty = 90
-        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
-                                                                              buy_symbol, executor_http_client)
-
-        if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
-            time.sleep(residual_wait_sec)
-
-        sell_sample_last_barter = LastBarterBaseModel.from_dict(last_barter_fixture_list[1])
-        sell_sample_last_barter.px = 110
-        sell_sample_last_barter.exch_time = get_utc_date_time()
-        sell_sample_last_barter.arrival_time = get_utc_date_time()
-        executor_http_client.create_last_barter_client(sell_sample_last_barter)
-
-        # min_px_by_basis_point = 85
-        # min_px_by_deviation = 88
-        # px_by_max_level = 81
-        # >>> max comes max_px_by_basis_point which is being tested in this test
-
-        # Negative Check for sell chore - chore block since px < min_px_by_deviation
-        # placing new non-systematic new_chore
-        px = 87
-        qty = 90
-        check_str = "blocked generated Side.SELL chore, chore-px=.* < low_breach_px=.*; high_breach_px=.*"
-        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
-        handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
-                                                                      check_str, assert_fail_message,
-                                                                      active_pair_strat, executor_http_client)
-
-        # Positive check for sell chore - chore places since px > min_px_by_deviation
-        px = 89
-        qty = 90
-        place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
-
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
-                                                                              sell_symbol, executor_http_client)
-
-    except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        print(f"Some Error Occurred: exception: {e}, "
-              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        raise Exception(e)
-    finally:
-        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
-
-
-@pytest.mark.nightly
-def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                                 pair_strat_, expected_strat_limits_,
-                                                 expected_strat_status_, symbol_overview_obj_list,
-                                                 last_barter_fixture_list, market_depth_basemodel_list,
-                                                 buy_chore_, sell_chore_,
-                                                 max_loop_count_per_side, refresh_sec_update_fixture):
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    residual_wait_sec = 4 * refresh_sec_update_fixture
-    buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
-        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-                                                 expected_strat_status_, symbol_overview_obj_list,
-                                                 last_barter_fixture_list, market_depth_basemodel_list))
-
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
-
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
-
-    try:
-        # updating yaml_configs according to this test
-        for symbol in config_dict["symbol_configs"]:
-            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
-
-        # updating simulator's configs
-        executor_http_client.barter_simulator_reload_config_query_client()
-
-        # updating sell market depth to make its max depth px value lowest of all values
-        sell_px = 91
-        stored_market_depths = executor_http_client.get_all_market_depth_client()
-        for market_depth_basemodel in stored_market_depths:
-            if market_depth_basemodel.symbol == buy_symbol:
-                if market_depth_basemodel.side == "ASK":
-                    market_depth_basemodel.px = sell_px + market_depth_basemodel.position
-                market_depth_basemodel.exch_time = get_utc_date_time()
-                market_depth_basemodel.arrival_time = get_utc_date_time()
-
-                executor_http_client.put_market_depth_client(market_depth_basemodel)
-                time.sleep(1)
-
-        # max_px_by_basis_point = 109.2
-        # max_px_by_deviation = 139.2
-        # px_by_max_level = 95
-        # >>> min comes px_by_max_level which is being tested in this test
-
-        # Negative Check for buy chore - chore block since px > px_by_max_level
-        # placing new non-systematic new_chore
-        px = 96
-        qty = 90
-        check_str = "blocked generated Side.BUY chore, chore-px=.* > high_breach_px=.*; low_breach_px=.*"
-        assert_fail_message = "Could not find any alert containing message to block chores tob last barter px as 0"
-        handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
-                                                                      check_str, assert_fail_message,
-                                                                      active_pair_strat, executor_http_client)
-
-        # Positive check for buy chore - chore places since px =< px_by_max_level
-
-        px = 95
-        qty = 90
-        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
-
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
-                                                                              buy_symbol, executor_http_client)
-
-        if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
-            time.sleep(residual_wait_sec)
-
-        # checking min_px_by_basis_point
-        sell_sample_last_barter = LastBarterBaseModel.from_dict(last_barter_fixture_list[1])
-        sell_sample_last_barter.px = 110
-        sell_sample_last_barter.exch_time = get_utc_date_time()
-        sell_sample_last_barter.arrival_time = get_utc_date_time()
-        executor_http_client.create_last_barter_client(sell_sample_last_barter)
-
-        # updating buy market depth to make its max depth px value less than calculated max_px_by_basis_point
-        buy_px = 100
-        stored_market_depths = executor_http_client.get_all_market_depth_client()
-        for pos in range(4, -1, -1):
-            for market_depth_basemodel in stored_market_depths:
-                if market_depth_basemodel.symbol == sell_symbol:
-                    if market_depth_basemodel.side == "BID" and market_depth_basemodel.position == pos:
-                        market_depth_basemodel.px = buy_px - pos
-                        market_depth_basemodel.exch_time = get_utc_date_time()
-                        market_depth_basemodel.arrival_time = get_utc_date_time()
-
-                        executor_http_client.put_market_depth_client(market_depth_basemodel)
-                        time.sleep(1)
-                        break
-
-        # min_px_by_basis_point = 85
-        # min_px_by_deviation = 88
-        # px_by_max_level = 95
-        # >>> max comes px_by_max_level which is being tested in this test
-
-        # Negative Check for sell chore - chore block since px < px_by_max_level
-        # placing new non-systematic new_chore
-        px = 94
-        qty = 90
-        check_str = "blocked generated Side.SELL chore, chore-px=.* < low_breach_px=.*; high_breach_px=.*"
-        assert_fail_message = f"cant find any alert with msg: {check_str!r}"
-        handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
-                                                                      check_str, assert_fail_message,
-                                                                      active_pair_strat, executor_http_client)
-
-        # Positive check for sell chore - chore places since px > px_by_max_level
-
-        px = 96
-        qty = 90
-        place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
-
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
-                                                                              sell_symbol, executor_http_client)
-
-    except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        print(f"Some Error Occurred: exception: {e}, "
-              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        raise Exception(e)
-    finally:
-        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
 # @@@ deprecated: no street_book can be set to ready without symbol_overview

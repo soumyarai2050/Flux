@@ -40,7 +40,7 @@ raw_performance_data_processor_loop_wait: 2  # sec
 
 log_level: "debug"  # log lvl in int or basic log lvl name
 
-# to be used by plugins to take proto files form these projects to generated combined output
+# to be used by plugins to take proto files from these projects to generate combined output
 multi_project_plugin:
   - "street_book"
   - "log_book"
