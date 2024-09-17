@@ -5679,9 +5679,9 @@ def debug_callable_handler(debug_max_wait_sec: int | None, test_callable: Callab
 
 
 def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
-                         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
-                         last_barter_fixture_list, market_depth_basemodel_list,
-                         max_loop_count_per_side, refresh_sec_update_fixture):
+                        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+                        last_barter_fixture_list, market_depth_basemodel_list,
+                        max_loop_count_per_side, refresh_sec_update_fixture):
     expected_strat_limits_.max_open_chores_per_side = 10
     expected_strat_limits_.residual_restriction.max_residual = 111360
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
@@ -5693,8 +5693,8 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
                                            market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path), load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
@@ -5751,7 +5751,7 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
             if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
                 # Sleeping to let the chore get cxlled
                 time.sleep(residual_wait_sec)
-        return executor_web_client
+        return buy_symbol, sell_symbol, created_pair_strat, executor_web_client
 
     except AssertionError as e:
         raise AssertionError(e)

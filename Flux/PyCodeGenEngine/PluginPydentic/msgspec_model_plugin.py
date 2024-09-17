@@ -11,7 +11,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 
 import protogen
 from Flux.PyCodeGenEngine.PluginPydentic.dataclass_model_plugin import DataclassModelPlugin, main, IdType
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
+from FluxPythonUtils.scripts.utility_functions import convert_to_capitalized_camel_case
 
 
 class MsgspecModelPlugin(DataclassModelPlugin):
@@ -276,6 +276,66 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         # Adding other versions for root pydantic class
         output_str += self.handle_dummy_message_gen(message, auto_gen_id_type, alias_name_dict=alias_name_dict)
 
+        # handling projections
+        output_str += self.handle_projection_models_output(message)
+
+        return output_str
+
+    def _handle_projection_model_output(self, message: protogen.Message, projection_val_to_fields_dict,
+                                         time_field_name: str, meta_field_name: str, meta_field_type: str) -> str:
+        output_str = ""
+        for projection_option_val, field_names in projection_val_to_fields_dict.items():
+            field_name_list: List[str] = []
+            for field_name in field_names:
+                if "." in field_name:
+                    field_name_list.append("_".join(field_name.split(".")))
+                else:
+                    field_name_list.append(field_name)
+            field_names_str = "_n_".join(field_name_list)
+            field_names_str_camel_cased = convert_to_capitalized_camel_case(field_names_str)
+            output_str += (f"class {message.proto.name}ProjectionFor{field_names_str_camel_cased}(MsgspecBaseModel, "
+                           f"kw_only=True):\n")
+            output_str += " " * 4 + f"{time_field_name}: pendulum.DateTime\n"
+
+            field_name_to_type_dict: Dict = {}
+            for field_name in field_names:
+                if "." in field_name:
+                    for field in message.fields:
+                        if field.proto.name == field_name:
+                            field_type = self.get_nested_field_proto_to_py_datatype(field, field_name)
+                            field_name_to_type_dict[field_name] = field_type
+                else:
+                    for field in message.fields:
+                        if field.proto.name == field_name:
+                            field_type = self.proto_to_py_datatype(field)
+                            field_name_to_type_dict[field_name] = field_type
+
+            for field_name in field_names:
+                field_type = field_name_to_type_dict.get(field_name)
+                if field_type is None:
+                    err_str = ("Could not find type for field_name from field_name_to_type_dict, "
+                               "probably bug in field_name_to_type_dict generation/population")
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+
+                if "." in field_name:
+                    output_str += " " * 4 + f"{field_name.split('.')[0]}: {field_type}\n"
+                else:
+                    output_str += " " * 4 + f"{field_name}: {field_type}\n"
+            output_str += "\n\n"
+
+            # container class for projection model
+            output_str += (f"class {message.proto.name}ProjectionContainerFor"
+                           f"{field_names_str_camel_cased}(MsgspecBaseModel, kw_only=True):\n")
+            output_str += f"    {meta_field_name}: {meta_field_type}\n"
+            output_str += (f"    projection_models: List[{message.proto.name}ProjectionFor"
+                           f"{field_names_str_camel_cased}]\n\n\n")
+
+            # List class of container class
+            output_str += (f'class {message.proto.name}ProjectionContainerFor'
+                           f'{field_names_str_camel_cased}List(ListModelMsgspec):\n')
+            output_str += (f'    root: List[{message.proto.name}ProjectionContainerFor'
+                           f'{field_names_str_camel_cased}]\n\n\n')
         return output_str
 
     def handle_message_output(self, message: protogen.Message) -> str:

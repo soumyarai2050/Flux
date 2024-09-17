@@ -1,11 +1,14 @@
+# standard imports
 import logging
 import datetime
 import sys
 import time
 
+# project imports
 from FluxPythonUtils.scripts.utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.pyscripts.utility_functions import *
-
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
+    photo_book_service_http_client)
 
 def main():
     datetime_str: str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -30,9 +33,7 @@ def main():
         logging.error(err_str_)
     finally:
         # update strat_view obj
-        updated_strat_view_obj: StratViewBaseModel = StratViewBaseModel(id=strat_id, unload_strat=False)
-        photo_book_service_http_client.patch_strat_view_client(
-            jsonable_encoder(updated_strat_view_obj, by_alias=True, exclude_none=True))
+        photo_book_service_http_client.patch_strat_view_client({'_id': strat_id, 'unload_strat': False})
 
 
 if __name__ == "__main__":

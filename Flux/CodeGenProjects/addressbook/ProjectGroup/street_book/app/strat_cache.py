@@ -48,7 +48,7 @@ class MarketDepthsCont:
         elif side == Side.SELL:
             return self.ask_market_depths
         else:
-            logging.error(f"get_market_depths: Unsupported {side = }, returning empty list")
+            logging.error(f"get_market_depths: Unsupported {side=}, returning empty list")
             return []
 
     def set_market_depths(self, side: str, market_depths: List[MarketDepthBaseModel] | List[MarketDepth]):
@@ -85,7 +85,7 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
     # fx_symbol_overview_dict must be preloaded with supported fx pairs for system to work
     fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | FxSymbolOverview | None] = {"USD|SGD": None}
 
-    error_prefix = "StratCache"
+    error_prefix = "StratCache: "
     load_static_data_mutex: Lock = Lock()
     static_data_service_state: ClassVar[ServiceState] = ServiceState(
         error_prefix=error_prefix + "static_data_service failed, exception: ")
@@ -146,7 +146,7 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
 
     def _check_log_over_fill(self, chore_snapshot: ChoreSnapshotBaseModel | ChoreSnapshot):
         if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
-            # move strat to pause via log analyzer if we sees overfill: (logic handles corner cases)
+            # move strat to pause state via log analyzer if we sees overfill: (logic handles corner cases)
             ord_brief = chore_snapshot.chore_brief
             logging.critical(f"Chore found overfilled for symbol_side_key: "
                              f"{get_symbol_side_key([(ord_brief.security.sec_id, ord_brief.side)])}; strat "
@@ -183,7 +183,7 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
                 self.open_chore_id_has_fill_set.discard(chore_snapshot.chore_brief.chore_id)
                 # Providing the second argument None prevents the KeyError exception
                 self._chore_id_to_open_chore_snapshot_cont_dict.pop(chore_snapshot.chore_brief.chore_id, None)
-        return _chore_snapshots_update_date_time
+        return _chore_snapshots_update_date_time  # ignore - helps with debug
 
     def get_open_chore_snapshots(self) -> List[ChoreSnapshot]:
         """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
@@ -248,8 +248,8 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         symbol: str
         symbol_side_tuple = StratCache.chore_id_to_symbol_side_tuple_dict.get(fills_journal.chore_id)
         if not symbol_side_tuple:
-            logging.error(f"Unknown {fills_journal.chore_id = } found for fill "
-                          f"{get_fills_journal_log_key(fills_journal)};;; {fills_journal = }")
+            logging.error(f"Unknown {fills_journal.chore_id=} found for fill "
+                          f"{get_fills_journal_log_key(fills_journal)};;; {fills_journal=}")
             return None, None
         symbol, side = symbol_side_tuple
         key: str | None = StreetBookServiceKeyHandler.get_key_from_fills_journal(fills_journal)
@@ -330,7 +330,7 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
                         self._strat_limits.strat_limits_update_seq_num is None or
                         strat_limits.strat_limits_update_seq_num > self._strat_limits.strat_limits_update_seq_num):
                     self.pos_cache.update_sec_limits(strat_limits.eligible_brokers)
-                    logging.debug(f"pos_cache updated from set_strat_limits for: "
+                    logging.debug(f"pos_cache updated with update from set_strat_limits for: "
                                   f"{self.get_key() if self._pair_strat is not None else strat_limits.id}")
                 # else not needed - old pos update is still valid
             else:
@@ -416,9 +416,9 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
                 return self._tob_leg1_update_date_time
             else:
                 delta = self._tob_leg1_update_date_time - top_of_book.last_update_date_time
-                logging.debug(f"leg1 set_top_of_book called for: {top_of_book.symbol = } with update_date_time older "
+                logging.debug(f"leg1 set_top_of_book called for: {top_of_book.symbol=} with update_date_time older "
                               f"by: {delta} period, ignoring this TOB;;;stored tob: {self._top_of_books[0]}"
-                              f" update received [discarded] {top_of_book = }")
+                              f" update received [discarded] {top_of_book=}")
                 return None
             # else not needed - common log outside handles this
         elif top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
@@ -436,9 +436,9 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
                 return self._tob_leg2_update_date_time
             else:
                 delta = self._tob_leg2_update_date_time - top_of_book.last_update_date_time
-                logging.debug(f"leg2 set_top_of_book called for: {top_of_book.symbol = } with update_date_time older "
+                logging.debug(f"leg2 set_top_of_book called for: {top_of_book.symbol=} with update_date_time older "
                               f"by: {delta} period, ignoring this TOB;;;stored tob: {self._top_of_books[1]}"
-                              f" update received [discarded] {top_of_book = }")
+                              f" update received [discarded] {top_of_book=}")
                 return None
         else:
             logging.error(f"set_top_of_book called with non matching symbol: {top_of_book.symbol}, "

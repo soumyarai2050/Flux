@@ -61,34 +61,40 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
                                                 tasks_list: List[asyncio.Task],
                                                 has_links: bool | None = None):
     for ws_data in active_ws_data_set:
-        projection_model = ws_data.projection_model
         projection_agg_params = ws_data.filter_callable_kwargs
         projection_agg_pipeline_callable = ws_data.projection_agg_pipeline_callable
 
-        if projection_agg_pipeline_callable is not None:    # todo: broken projection logic - infact not correct way so need to remove anyway
+        if projection_agg_pipeline_callable is not None:
             projection_agg_params["id_list"] = db_obj_id_list
             filter_agg_pipeline = projection_agg_pipeline_callable(**projection_agg_params)
+
+            db_obj_dict_list = await get_obj_list(msgspec_class_type, db_obj_id_list,
+                                                  filter_agg_pipeline=filter_agg_pipeline,
+                                                  has_links=has_links, is_projection_type=True)
+        # else not required: passing provided list of dict if ws_data is not of projection type
 
         json_str = orjson.dumps(db_obj_dict_list, default=str).decode('utf-8')
         await broadcast_callable(json_str, ws_data, tasks_list)
 
 
-async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type: Type[MsgspecModel],
+async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], msgspec_class_type: Type[MsgspecModel],
                                             db_obj_id: Any, db_obj_dict: Dict[str, Any],
                                             broadcast_callable: Callable,
                                             tasks_list: List[asyncio.Task],
                                             broadcast_with_id: bool | None = None,
                                             has_links: bool | None = None):
     for ws_data in active_ws_data_set:
-        projection_model = ws_data.projection_model
         projection_agg_params = ws_data.filter_callable_kwargs
         projection_agg_pipeline_callable = ws_data.projection_agg_pipeline_callable
 
-        if projection_agg_pipeline_callable is not None:    # todo: broken projection logic - infact not correct way so need to remove anyway
+        if projection_agg_pipeline_callable is not None:
             projection_agg_params["id_list"] = [db_obj_id]
             filter_agg_pipeline = projection_agg_pipeline_callable(**projection_agg_params)
 
-        # else not required: db_obj_dict
+            db_obj_dict = await get_obj(msgspec_class_type, db_obj_id,
+                                        filter_agg_pipeline=filter_agg_pipeline,
+                                        has_links=has_links, is_projection_type=True)
+        # else not required: passing provided db_obj_dict if ws_data is not of projection type
 
         json_str = orjson.dumps(db_obj_dict, default=str).decode("utf-8")
         if broadcast_with_id:
@@ -610,7 +616,7 @@ async def generic_delete_http(msgspec_class_type: Type[MsgspecModel], proto_pack
         if pydantic_objs_count == 0:
             max_id_val = 0
             max_update_id_vale = 0
-            msgspec_class_type.init_max_id(max_id_val, max_update_id_vale)
+            msgspec_class_type.init_max_id(max_id_val, max_update_id_vale, force_set=True)
         # else not required: all good
     # else not required: if id is not int then it must be of PydanticObjectId so no handling required
     del_success.id = db_obj_id
@@ -661,8 +667,7 @@ async def generic_read_http(msgspec_class_type: Type[MsgspecModel], proto_packag
     json_obj_list: List[msgspec_class_type]
     json_obj_list = \
         await get_obj_list(msgspec_class_type, read_ids_list,
-                           filter_agg_pipeline=filter_agg_pipeline, has_links=has_links,
-                           projection_model=projection_model)
+                           filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
     if read_ids_list and len(json_obj_list) != len(set(read_ids_list)):
         existing_ids = set()
         for json_obj in json_obj_list:
@@ -755,16 +760,14 @@ async def generic_projection_query_ws(ws: WebSocket, project_name: str, msgspec_
                                       filter_callable: Callable[..., Any] | None = None,
                                       filter_callable_kwargs: Dict[Any, Any] | None = None,
                                       projection_agg_pipeline_callable: Callable[..., Any] | None = None,
-                                      projection_model: Type[MsgspecModel] | None = None,
                                       need_initial_snapshot: bool = True):
     if filter_callable_kwargs is None:
         filter_callable_kwargs = {}
 
     is_new_ws: bool = \
         await msgspec_class_type.read_ws_path_ws_connection_manager.connect(ws, filter_callable,
-                                                                              filter_callable_kwargs,
-                                                                              projection_agg_pipeline_callable,
-                                                                              projection_model)
+                                                                            filter_callable_kwargs,
+                                                                            projection_agg_pipeline_callable)
     logging.debug(f"websocket client requested to connect: {ws.client}")
     need_disconnect = False
     try:
@@ -774,8 +777,7 @@ async def generic_projection_query_ws(ws: WebSocket, project_name: str, msgspec_
                 projection_agg_pipeline = projection_agg_pipeline_callable(**filter_callable_kwargs)
 
             json_obj_list = await get_obj_list(msgspec_class_type,
-                                               filter_agg_pipeline=projection_agg_pipeline,
-                                               projection_model=projection_model)
+                                               filter_agg_pipeline=projection_agg_pipeline)
             json_str = json.dumps(json_obj_list, default=str)
             await msgspec_class_type.read_ws_path_ws_connection_manager. \
                 send_json_to_websocket(json_str, ws)
@@ -892,19 +894,19 @@ async def generic_read_by_id_ws(ws: WebSocket, project_name: str, msgspec_class_
 
 async def get_obj(msgspec_class_type: Type[MsgspecModel], db_obj_id: Any,
                   filter_agg_pipeline: Any = None, has_links: bool = False,
-                  projection_model: Type[MsgspecModel] | None = None):
+                  is_projection_type: bool | None = False):
     if filter_agg_pipeline is None:
         collection_cursor: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
         fetched_json_obj = await collection_cursor.find_one({"_id": db_obj_id})
     else:
         fetched_json_obj = await get_filtered_obj(filter_agg_pipeline, msgspec_class_type,
-                                                  db_obj_id, has_links, projection_model)
+                                                  db_obj_id, has_links, is_projection_type=is_projection_type)
     return fetched_json_obj
 
 
 async def get_obj_list(msgspec_class_type: Type[MsgspecModel], find_ids: List[Any] | None = None,
                        filter_agg_pipeline: Any = None, has_links: bool = False,
-                       projection_model: Type[MsgspecModel] | None = None) -> List[Dict[str, Any]]:
+                       is_projection_type: bool | None = False) -> List[Dict[str, Any]]:
     if filter_agg_pipeline is None:
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
         if find_ids is None:
@@ -916,7 +918,7 @@ async def get_obj_list(msgspec_class_type: Type[MsgspecModel], find_ids: List[An
     else:
         # find_ids if none: will be handled inside get_filtered_obj_list implicitly
         json_list = await get_filtered_obj_list(filter_agg_pipeline, msgspec_class_type, find_ids,
-                                                has_links=has_links, projection_model=projection_model)
+                                                has_links=has_links, is_projection_type=is_projection_type)
         return json_list
 
 
@@ -954,7 +956,7 @@ async def projection_read_http(msgspec_class_type: Type[MsgspecModel], proto_pac
 
 async def get_filtered_obj_list(filter_agg_pipeline: Dict, msgspec_class_type: Type[MsgspecModel],
                                 db_obj_id_list: List | None = None,
-                                has_links: bool = False, projection_model: Type[MsgspecModel] | None = None):
+                                has_links: bool = False, is_projection_type: bool | None = False):
     # prevent polluting caller provided filter_agg_pipeline
     filter_agg_pipeline_copy = deepcopy(filter_agg_pipeline)
     if db_obj_id_list is not None:
@@ -963,9 +965,8 @@ async def get_filtered_obj_list(filter_agg_pipeline: Dict, msgspec_class_type: T
             match.append((pydantic_obj_id_field, db_obj_id_list))
         else:
             filter_agg_pipeline_copy["match"] = [(pydantic_obj_id_field, db_obj_id_list)]
-    agg_pipeline = get_aggregate_pipeline(filter_agg_pipeline_copy)
-    if projection_model is None:
-        projection_model = msgspec_class_type
+    if not is_projection_type:
+        agg_pipeline = get_aggregate_pipeline(filter_agg_pipeline_copy)
     else:
         agg_pipeline = filter_agg_pipeline["aggregate"]
 
@@ -978,9 +979,9 @@ async def get_filtered_obj_list(filter_agg_pipeline: Dict, msgspec_class_type: T
 
 async def get_filtered_obj(filter_agg_pipeline: Dict, msgspec_class_type: Type[MsgspecModel],
                            pydantic_obj_id: Any, has_links: bool = False,
-                           projection_model: Type[MsgspecModel] | None = None) -> Dict[str, Any] | None:
+                           is_projection_type: bool | None = False) -> Dict[str, Any] | None:
     json_obj_list = await get_filtered_obj_list(filter_agg_pipeline, msgspec_class_type,
-                                                [pydantic_obj_id], has_links, projection_model)
+                                                [pydantic_obj_id], has_links, is_projection_type)
     if json_obj_list:
         return json_obj_list[0]
     else:

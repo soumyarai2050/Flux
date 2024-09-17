@@ -1017,7 +1017,7 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
                     metadataProp.orm_no_update = metadata.orm_no_update;
                 }
                 if (metadata.hasOwnProperty('auto_complete')) {
-                    metadataProp.auto_complete = metadata.auto_complete;
+                    metadataProp.auto_complete = metadataProp.auto_complete ?? metadata.auto_complete;
                 }
                 if (metadataProp.hasOwnProperty('type') && (metadataProp.type === DataTypes.OBJECT)) {
                     let childxpath = dataxpath;

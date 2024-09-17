@@ -36,6 +36,8 @@ class SecurityRecord(MsgspecBaseModel):
     executed_tradable: bool | None = None
     limit_up_px: float | None = None
     limit_dn_px: float | None = None
+    tick_size: float | None = None
+    figi: str | None = None
 
 
 class SecurityRecordManager:
@@ -138,8 +140,8 @@ class SecurityRecordManager:
         else:
             return None
 
-    @staticmethod
-    def refresh() -> bool:
+    def refresh(self) -> bool:
+        self.load_from_cache()
         return False
 
     def get_sedol_from_ticker(self, ticker: str):

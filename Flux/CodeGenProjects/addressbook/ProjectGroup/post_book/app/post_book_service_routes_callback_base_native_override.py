@@ -9,7 +9,6 @@ from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from queue import Queue
 import asyncio
-from pydantic import BaseModel
 import datetime
 
 # project imports
@@ -604,7 +603,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             portfolio_limits.rolling_max_reject_count.rolling_tx_count_period_seconds,
             portfolio_limits.rolling_max_reject_count.max_rolling_tx_count)
         if rolling_max_rej_count_breached:
-            pause_all_strats = True  # any failure logged in check_rolling_max_chore_count
+            pause_all_strats = True  # any failure logged in check_rolling_max_rej_count
         return pause_all_strats
 
     def _portfolio_limit_check_queue_handler(self, strat_id_list: List[int],

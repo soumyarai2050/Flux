@@ -64,6 +64,8 @@ message MessageJsonRoot{
   optional bool SetReentrantLock = 11 [default=true];
   optional bool PassStoredObjToUpdatePrePostCallback = 12 [default=false];
   optional bool PassStoredObjToUpdateAllPrePostCallback = 13 [default=false];
+  optional bool PassStoredObjToPartialUpdatePostCallback = 14 [default=false];
+  optional bool PassStoredObjToPartialUpdateAllPostCallback = 15 [default=false];
 }
 
 enum TimeSeriesGranularityType{

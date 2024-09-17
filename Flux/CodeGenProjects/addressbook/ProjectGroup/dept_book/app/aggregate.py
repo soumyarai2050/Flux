@@ -1,6 +1,9 @@
 from pendulum import DateTime
 from typing import List
 
+# below import is required in routes
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
+
 
 def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, start_date_time: DateTime | None = None, end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # Code generated function
@@ -67,7 +70,7 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, st
         agg_pipeline[2]['$match'] = {
             '$expr': {
                 '$lt': [
-                    '$start_time', end_date_time
+                    '$end_time', end_date_time
                 ]
             }
         }
@@ -84,7 +87,7 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, st
                 {
                     '$expr': {
                         '$lt': [
-                            '$start_time', end_date_time
+                            '$end_time', end_date_time
                         ]
                     }
                 }

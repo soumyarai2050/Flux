@@ -11,7 +11,7 @@ from filelock import FileLock
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
     Side, SecurityIdSource)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
-    ChoreBrief, ChoreEventType, ChoreJournal, FillsJournal, Security)
+    ChoreBrief, ChoreEventType, ChoreStatusType, ChoreJournal, FillsJournal, Security)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link_base import (
     BarteringLinkBase, add_to_texts)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
@@ -433,7 +433,7 @@ class BarterSimulator(BarteringLinkBase):
             await BarterSimulator.chore_create_async_callable(chore_journal)
 
     @classmethod
-    async def place_lapse_chore(self, chore_id: str, side: Side, bartering_sec_id: str, system_sec_id: str,
+    async def place_lapse_chore(cls, chore_id: str, side: Side, bartering_sec_id: str, system_sec_id: str,
                                 underlying_account: str | None = "bartering-account", qty: int | None = None):
         if BarterSimulator.chore_create_async_callable:
             security = Security(sec_id=system_sec_id, sec_id_source=SecurityIdSource.TICKER)
@@ -460,3 +460,18 @@ class BarterSimulator(BarteringLinkBase):
     async def revoke_kill_switch_n_resume_bartering(cls) -> bool:
         logging.critical("Called BarteringLink.revoke_kill_switch_n_resume_bartering from BarterSimulator")
         return True
+
+    @classmethod
+    async def place_amend_chore(cls, chore_id: str, px: float | None = None, qty: int | None = None) -> bool:
+        raise NotImplementedError
+
+    @classmethod
+    async def is_chore_open(cls, chore_id: str) -> bool:
+        raise NotImplementedError
+
+    @classmethod
+    async def get_chore_status(cls, chore_id: str) -> Tuple[ChoreStatusType | None, str | None, int | None]:
+        """
+        returns chore_status (ChoreStatusType), any_chore_text, filled-Qty
+        """
+        raise NotImplementedError

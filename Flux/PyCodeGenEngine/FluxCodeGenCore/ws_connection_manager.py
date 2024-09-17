@@ -2,19 +2,17 @@ from typing import Dict, Set, List, Any, ClassVar, Tuple, Callable
 from fastapi import WebSocket, WebSocketDisconnect
 import logging
 import asyncio
-from pydantic import ConfigDict, BaseModel
 
 # Project imports
 from FluxPythonUtils.scripts.async_rlock import AsyncRLock
+from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 
 
-class WSData(BaseModel):
+class WSData(MsgspecBaseModel, kw_only=True):
     ws_object: WebSocket
     filter_callable: Callable[..., Any] | None = None
     filter_callable_kwargs: Dict[Any, Any] | None = None,
     projection_agg_pipeline_callable: Callable[..., Any] | None = None
-    projection_model: BaseModel | None = None
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class WSConnectionManager:
@@ -98,22 +96,20 @@ class PathWSConnectionManager(WSConnectionManager):
 
     async def connect(self, ws: WebSocket, filter_callable: Callable[..., Any] | None = None,
                       callable_kwargs: Dict[Any, Any] | None = None,
-                      projection_agg_pipeline_callable: Callable[..., Any] | None = None,
-                      projection_model=None) -> bool:
+                      projection_agg_pipeline_callable: Callable[..., Any] | None = None) -> bool:
 
         async with self.rlock:
             is_new_ws: bool = await WSConnectionManager.add_to_master_ws_set(ws)
             # if ws not in self.active_ws_n_callable_tuple_set:
-            if not any(ws in active_ws_callable_tuple
-                       for active_ws_callable_tuple in self.active_ws_data_list):
+            if not any(ws == active_ws_data.ws_object
+                       for active_ws_data in self.active_ws_data_list):
                 # old or new ws does not matter - may have been added to master via a different path
                 if callable_kwargs is None:
                     callable_kwargs = {}
                 self.active_ws_data_list.append(WSData(ws_object=ws, filter_callable=filter_callable,
                                                        filter_callable_kwargs=callable_kwargs,
                                                        projection_agg_pipeline_callable=
-                                                       projection_agg_pipeline_callable,
-                                                       projection_model=projection_model))
+                                                       projection_agg_pipeline_callable))
                 return True
             elif is_new_ws:
                 raise Exception(f"Unexpected! ws: {ws} is in active_ws_n_callable_tuple_set "
@@ -185,8 +181,7 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
 
     async def connect(self, ws: WebSocket, obj_id: Any, filter_callable: Callable[..., Any] | None = None,
                       callable_kwargs: Dict[Any, Any] | None = None,
-                      projection_agg_pipeline_callable: Callable[..., Any] | None = None,
-                      projection_model=None) -> bool:
+                      projection_agg_pipeline_callable: Callable[..., Any] | None = None) -> bool:
 
         async with self.rlock:
             is_new_ws: bool = await WSConnectionManager.add_to_master_ws_set(ws)
@@ -197,16 +192,14 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
                 self.id_to_active_ws_data_list_dict[obj_id] = []
                 self.id_to_active_ws_data_list_dict[obj_id].append(
                     WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
-                           projection_agg_pipeline_callable=projection_agg_pipeline_callable,
-                           projection_model=projection_model))
+                           projection_agg_pipeline_callable=projection_agg_pipeline_callable))
             elif is_new_ws:  # we have the obj_id in our dict but master did not have this websocket
                 active_ws_n_filter_callable_tuple_list: List[WSData] = \
                     self.id_to_active_ws_data_list_dict[obj_id]
                 if not (ws in [ws_data.ws_object for ws_data in active_ws_n_filter_callable_tuple_list]):
                     self.id_to_active_ws_data_list_dict[obj_id].append(
                         WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
-                               projection_agg_pipeline_callable=projection_agg_pipeline_callable,
-                               projection_model=projection_model))
+                               projection_agg_pipeline_callable=projection_agg_pipeline_callable))
                     logging.debug("new client web-socket connect called on a pre-added obj_id-web-path")
                 else:
                     raise Exception(

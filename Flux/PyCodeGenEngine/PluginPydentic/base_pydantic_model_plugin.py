@@ -377,6 +377,78 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         # else not required: Avoid cache override if message is not root
         return output_str
 
+    def _handle_projection_model_output(self, message: protogen.Message, projection_val_to_fields_dict,
+                                         time_field_name: str, meta_field_name: str, meta_field_type: str) -> str:
+        output_str = ""
+        for projection_option_val, field_names in projection_val_to_fields_dict.items():
+            field_name_list: List[str] = []
+            for field_name in field_names:
+                if "." in field_name:
+                    field_name_list.append("_".join(field_name.split(".")))
+                else:
+                    field_name_list.append(field_name)
+            field_names_str = "_n_".join(field_name_list)
+            field_names_str_camel_cased = convert_to_capitalized_camel_case(field_names_str)
+            output_str += f"class {message.proto.name}ProjectionFor{field_names_str_camel_cased}(BaseModel):\n"
+            output_str += " " * 4 + f"{time_field_name}: pendulum.DateTime\n"
+
+            field_name_to_type_dict: Dict = {}
+            for field_name in field_names:
+                if "." in field_name:
+                    for field in message.fields:
+                        if field.proto.name == field_name:
+                            field_type = self.get_nested_field_proto_to_py_datatype(field, field_name)
+                            field_name_to_type_dict[field_name] = field_type
+                else:
+                    for field in message.fields:
+                        if field.proto.name == field_name:
+                            field_type = self.proto_to_py_datatype(field)
+                            field_name_to_type_dict[field_name] = field_type
+
+            has_nested_field = False
+            for field_name in field_names:
+                field_type = field_name_to_type_dict.get(field_name)
+                if field_type is None:
+                    err_str = ("Could not find type for field_name from field_name_to_type_dict, "
+                               "probably bug in field_name_to_type_dict generation/population")
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+
+                if "." in field_name:
+                    has_nested_field = True
+                    output_str += " " * 4 + f"{field_name.split('.')[0]}: {field_type}\n"
+                else:
+                    output_str += " " * 4 + f"{field_name}: {field_type}\n"
+
+            output_str += self._add_config_attribute()
+            output_str += "\n"
+
+            if has_nested_field:
+                output_str += "\n"
+                output_str += " " * 4 + f"class Settings:\n"
+                projection_dict = {}
+                for index, field_name in enumerate(field_names):
+                    if "." in field_name:
+                        projection_dict[field_name.split('.')[0]] = f"${field_name}"
+                    else:
+                        projection_dict[field_name] = index + 1
+                output_str += " " * 8 + f"projection = {projection_dict}\n"
+            output_str += "\n\n"
+
+            # container class for projection model
+            output_str += (f"class {message.proto.name}ProjectionContainerFor"
+                           f"{field_names_str_camel_cased}(BaseModel):\n")
+            output_str += f"    {meta_field_name}: {meta_field_type}\n"
+            output_str += (f"    projection_models: List[{message.proto.name}ProjectionFor"
+                           f"{field_names_str_camel_cased}]\n\n\n")
+
+            # List class of container class
+            output_str += (f'class {message.proto.name}ProjectionContainerFor'
+                           f'{field_names_str_camel_cased}List(RootModel):\n')
+            output_str += (f'    root: List[{message.proto.name}ProjectionContainerFor'
+                           f'{field_names_str_camel_cased}]\n\n\n')
+        return output_str
+
     def handle_projection_models_output(self, message: protogen.Message):
         output_str = ""
         if BasePydanticModelPlugin.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series):
@@ -411,71 +483,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
             projection_val_to_fields_dict = BaseProtoPlugin.get_projection_option_value_to_fields(message)
 
-            for projection_option_val, field_names in projection_val_to_fields_dict.items():
-                field_name_list: List[str] = []
-                for field_name in field_names:
-                    if "." in field_name:
-                        field_name_list.append("_".join(field_name.split(".")))
-                    else:
-                        field_name_list.append(field_name)
-                field_names_str = "_n_".join(field_name_list)
-                field_names_str_camel_cased = convert_to_capitalized_camel_case(field_names_str)
-                output_str += f"class {message.proto.name}ProjectionFor{field_names_str_camel_cased}(BaseModel):\n"
-                output_str += " " * 4 + f"{time_field_name}: pendulum.DateTime\n"
-
-                field_name_to_type_dict: Dict = {}
-                for field_name in field_names:
-                    if "." in field_name:
-                        field_type = self.get_nested_field_proto_to_py_datatype(field, field_name)
-                        field_name_to_type_dict[field_name] = field_type
-                    else:
-                        for field in message.fields:
-                            if field.proto.name == field_name:
-                                field_type = self.proto_to_py_datatype(field)
-                                field_name_to_type_dict[field_name] = field_type
-
-                has_nested_field = False
-                for field_name in field_names:
-                    field_type = field_name_to_type_dict.get(field_name)
-                    if field_type is None:
-                        err_str = ("Could not find type for field_name from field_name_to_type_dict, "
-                                   "probably bug in field_name_to_type_dict generation/population")
-                        logging.exception(err_str)
-                        raise Exception(err_str)
-
-                    if "." in field_name:
-                        has_nested_field = True
-                        output_str += " "*4 + f"{field_name.split('.')[0]}: {field_type}\n"
-                    else:
-                        output_str += " "*4 + f"{field_name}: {field_type}\n"
-
-                output_str += self._add_config_attribute()
-                output_str += "\n"
-
-                if has_nested_field:
-                    output_str += "\n"
-                    output_str += " " * 4 + f"class Settings:\n"
-                    projection_dict = {}
-                    for index, field_name in enumerate(field_names):
-                        if "." in field_name:
-                            projection_dict[field_name.split('.')[0]] = f"${field_name}"
-                        else:
-                            projection_dict[field_name] = index + 1
-                    output_str += " "*8 + f"projection = {projection_dict}\n"
-                output_str += "\n\n"
-
-                # container class for projection model
-                output_str += (f"class {message.proto.name}ProjectionContainerFor"
-                               f"{field_names_str_camel_cased}(BaseModel):\n")
-                output_str += f"    {meta_field_name}: {meta_field_type}\n"
-                output_str += (f"    projection_models: List[{message.proto.name}ProjectionFor"
-                               f"{field_names_str_camel_cased}]\n\n\n")
-
-                # List class of container class
-                output_str += (f'class {message.proto.name}ProjectionContainerFor'
-                               f'{field_names_str_camel_cased}List(RootModel):\n')
-                output_str += (f'    root: List[{message.proto.name}ProjectionContainerFor'
-                               f'{field_names_str_camel_cased}]\n\n\n')
+            output_str += self._handle_projection_model_output(message, projection_val_to_fields_dict, time_field_name,
+                                                               meta_field_name, meta_field_type)
 
         return output_str
 

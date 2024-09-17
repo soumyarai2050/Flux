@@ -52,7 +52,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi
 from FluxPythonUtils.scripts.service import Service
 from FluxPythonUtils.scripts.utility_functions import (
     get_pid_from_port, except_n_log_alert, is_process_running, submit_task_with_first_completed_wait,
-    handle_refresh_configurable_data_members, parse_to_int)
+    handle_refresh_configurable_data_members, parse_to_int, set_package_logger_level)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import get_bartering_link
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
@@ -583,6 +583,8 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
     def app_launch_pre(self):
         EmailBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_routes()
+        # to be called only after logger is initialized - to prevent getting overridden
+        set_package_logger_level("filelock", logging.WARNING)
 
         self.port = ps_port
         app_launch_pre_thread = threading.Thread(target=self._app_launch_pre_thread_func, daemon=True)
@@ -675,7 +677,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         else:
             unsupported_sec_id_source = True
         if unsupported_sec_id_source:
-            raise Exception(f"error: _set_derived_exchange called with unsupported sec_is_source param, supported: "
+            raise Exception(f"error: _set_derived_exchange called with unsupported sec_id_source param, supported: "
                             f"SecurityIdSource.TICKER, {strat_leg1.sec.sec_id_source=}, {strat_leg2.sec.sec_id_source=}"
                             f";;;{pair_strat_obj=}")
 
@@ -723,6 +725,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                        f"pair_strat_key: {get_pair_strat_log_key(pair_strat_obj)};;; {pair_strat_obj=}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
+        if (pair_strat_obj.pair_strat_params.mstrat is None and
+                pair_strat_obj.pair_strat_params.strat_type == StratType.Premium):
+            pair_strat_obj.pair_strat_params.mstrat = "Mstrat_1"
         strat_leg1_sec_id: str = pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id
         strat_leg2_sec_id: str | None = None
         # expectation: if strat leg2 is not provided, set it from static data
@@ -877,7 +882,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                 ongoing_pair_strat1, ongoing_pair_strat2 = ongoing_pair_strats
                 if not (self.are_similar_strats(ongoing_pair_strat1, pair_strat) or
                         self.are_similar_strats(ongoing_pair_strat2, pair_strat)):
-                    err_str_ = (f"Can't activate this strat, none of {len(ongoing_pair_strats)} more ongoing strats "
+                    err_str_ = (f"can't activate this strat, none of {len(ongoing_pair_strats)} more ongoing strats "
                                 f"are similar;;;{ongoing_pair_strats=}")
                     logging.error(err_str_)
                     raise HTTPException(status_code=400, detail=err_str_)
@@ -893,7 +898,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         # for instance if s1-sd1 and s2-sd2 are symbol-side pairs in param pair_strat's legs then checking there must
         # not be any strat activated today with s1-sd2 and s2-sd1 symbol-side pair legs, if it is found then this
         # strat can't be activated unless strat symbols are all opposite side tradable
-
         first_matched_strat_lock_file_path_list: List[str] = []
         if not self.static_data.is_opposite_side_tradable(leg1_symbol):
             first_matched_strat_lock_file_path_list = (
@@ -1645,7 +1649,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
     async def reload_bartering_data_query_pre(self, reload_bartering_data_class_type: Type[ReloadBarteringData]):
         if self.static_data is not None:
-            self.static_data.load_from_cache()
+            self.static_data_periodic_refresh()
         else:
             logging.error("reload_bartering_data_query called when static_data is not initialized or "
                           "is None due to some other reason")
@@ -1662,6 +1666,24 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         with open(save_file_destination, "wb") as file:
             file.write(content)
         return []
+
+    async def partial_update_sample_model_post(self, stored_sample_model_obj_json: Dict[str, Any],
+                                               updated_sample_model_obj_json: Dict[str, Any]):
+        # @@@ Used in test to verify patch's post call doesn't get stored == updated obj after generic call
+        if stored_sample_model_obj_json == updated_sample_model_obj_json:
+            raise HTTPException(status_code=400,
+                                detail="Unexpected: Found stored_sample_model_obj_json == "
+                                       "updated_sample_model_obj_json, must be different;;; "
+                                       f"{stored_sample_model_obj_json=}, {updated_sample_model_obj_json=}")
+
+    async def partial_update_all_sample_model_post(self, stored_sample_model_dict_list: List[Dict[str, Any]],
+                                                   updated_sample_model_dict_list: List[Dict[str, Any]]):
+        # @@@ Used in test to verify patch_all's post call doesn't get stored == updated obj list after generic call
+        if stored_sample_model_dict_list == updated_sample_model_dict_list:
+            raise HTTPException(status_code=400,
+                                detail="Unexpected: Found stored_sample_model_dict_list == "
+                                       "updated_sample_model_dict_list, must be different;;; "
+                                       f"{stored_sample_model_dict_list=}, {updated_sample_model_dict_list=}")
 
 
 def filter_ws_pair_strat(pair_strat_obj_json: Dict, **kwargs):

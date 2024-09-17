@@ -18,7 +18,8 @@ message BasketChore{
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
+    PassStoredObjToPartialUpdatePostCallback: True
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,

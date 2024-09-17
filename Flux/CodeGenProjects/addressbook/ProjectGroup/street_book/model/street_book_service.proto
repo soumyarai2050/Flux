@@ -224,7 +224,8 @@ message StratLimits{
     PatchOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
-    PassStoredObjToUpdatePrePostCallback: True
+    PassStoredObjToUpdatePrePostCallback: True,
+    PassStoredObjToPartialUpdatePostCallback: True
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 7,
@@ -269,7 +270,7 @@ message StratLimits{
   required bool eqt_sod_disable = 16 [default = false, (FluxFldButton) = {
     unpressed_caption: "EQT SOD DISABLE",
     pressed_caption: "DISABLING EQT SOD",
-    disabled_captions: "true=DISABLING EQT SOD."
+    disabled_captions: "true=DISABLING EQT SOD"
     value_color_map: "true=DEBUG,false=INFO"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
@@ -362,7 +363,7 @@ message BarterSimulatorProcessNewChore{
     QueryParams: "underlying_account",
     QueryParamsDataType: "str",
     QueryParams: "exchange",
-    QueryParamsDataType: "str | None = None"
+    QueryParamsDataType: "str | None = None",
     QueryParams: "internal_ord_id",
     QueryParamsDataType: "str | None = None"
   };

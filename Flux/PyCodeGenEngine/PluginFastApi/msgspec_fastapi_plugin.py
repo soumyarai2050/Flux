@@ -24,7 +24,7 @@ from Flux.PyCodeGenEngine.PluginFastApi.fastapi_http_client_file_handler import 
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_client_file_handler import FastapiWSClientFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ui_proxy_config_handler import FastapiUIProxyConfigHandler
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, convert_camel_case_to_specific_case
 
 
 root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
@@ -283,13 +283,24 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         for message in self.custom_id_primary_key_messages:
             if "int" == self._get_msg_id_field_type(message):
                 message_name = message.proto.name
-                output_str += f"    await init_max_id_handler({message_name})\n"
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+                if message in self.msg_type_to_nested_root_type_field_name_n_type_dict:
+                    # max_id to be used to check before nested call - if no obj is there for parent model ,i.e.,
+                    # max_id=0 then since no obj is parent model is present, no nested obj id needs to be checked
+                    # and initialized
+                    output_str += f"    {message_name_snake_cased}_max_id = await init_max_id_handler({message_name})\n"
+                else:
+                    output_str += f"    await init_max_id_handler({message_name})\n"
         for message, nested_root_type_field_n_type_list in self.msg_type_to_nested_root_type_field_name_n_type_dict.items():
             message_name = message.proto.name
+            message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
             if MsgspecFastApiPlugin.is_option_enabled(message, MsgspecFastApiPlugin.flux_msg_json_root):
                 for nested_field_path, nested_field_type in nested_root_type_field_n_type_list:
-                    output_str += (f"    await init_nested_max_id_handler({message_name}, '{nested_field_path}', "
+                    output_str += f"    if {message_name_snake_cased}_max_id != 0:\n"
+                    output_str += (f"        await init_nested_max_id_handler({message_name}, '{nested_field_path}', "
                                    f"{nested_field_type})\n")
+                    output_str += (f"    # else not required: {message_name} itself has no data so nested fields type "
+                                   f"don't need initialization\n")
             # else not required: if top lvl msg is not root type then it will not be persisted and hence
             # nested root types will not be conflicted to any persisted obj
 
@@ -411,7 +422,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
             self.http_routes_import_file_name + ".py": self.handle_http_routes_import_file_gen(),
 
             # # Adding project's ws routes.py
-            self.ws_routes_file_name + ".py": self.handle_ws_routes_file_gen(),
+            self.ws_routes_file_name + ".py": self.handle_ws_msgspec_routes_file_gen(),
 
             # # Adding project's launch file
             self.launch_file_name + ".py": self.handle_launch_file_gen(file),

@@ -3,9 +3,6 @@ import re
 from typing import List, Dict, Type
 import logging
 
-# 3rd party imports
-from pydantic import BaseModel
-
 # Project imports
 from FluxPythonUtils.log_analyzer.log_analyzer import LogAnalyzer, LogDetail, ABC
 

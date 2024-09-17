@@ -20,7 +20,7 @@ def main():
         logging.info("Updating system control state")
         updated_system_control_obj: SystemControlBaseModel = SystemControlBaseModel(id=1, pause_all_strats=False)
         email_book_service_http_client.patch_system_control_client(
-            jsonable_encoder(updated_system_control_obj, by_alias=True, exclude_none=True))
+            updated_system_control_obj.to_dict(exclude_none=True))
 
 
 if __name__ == "__main__":

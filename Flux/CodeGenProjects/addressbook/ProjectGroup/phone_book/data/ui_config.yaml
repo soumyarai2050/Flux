@@ -79,7 +79,7 @@ ui_coordinates:
     y: 185
     w: 18
     h: 20
-  ProcessedPerformanceAnalysis:
+  ExecutorEventJournal:
     x: 0
     y: 205
     w: 18

@@ -73,8 +73,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                       f"{message_name_snake_cased}_msgspec_obj, filter_agg_pipeline)\n"
         output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj = "
-                                            f"msgspec.convert({message_name_snake_cased}_json_obj, "
-                                            f"type={message.proto.name}, dec_hook=dec_hook)\n")
+                                            f"{message.proto.name}.from_dict({message_name_snake_cased}_json_obj)\n")
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
@@ -87,8 +86,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + (f"        # since {filter_agg_pipeline_var_name} is passed - "
                                                     f"returned dict will be aggregated output so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj = "
-                                                    f"msgspec.convert({message_name_snake_cased}_json_obj, "
-                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict("
+                                                    f"{message_name_snake_cased}_json_obj)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
@@ -103,8 +102,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"returned dict will be update "
                                                     f"aggregated output so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj = "
-                                                    f"msgspec.convert({message_name_snake_cased}_json_obj, "
-                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict("
+                                                    f"{message_name_snake_cased}_json_obj)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
@@ -120,8 +119,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"{update_agg_pipeline_var_name} are passed - "
                                                     f"returned dict will be aggregated output so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj = "
-                                                    f"msgspec.convert({message_name_snake_cased}_json_obj, "
-                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict("
+                                                    f"{message_name_snake_cased}_json_obj)\n")
             case other:
                 output_str += " " * indent_count + \
                               (f"        {message_name_snake_cased}_json_obj = await "
@@ -179,9 +178,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    """\n'
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_post_http\n'
-            output_str += (f"    {message_name_snake_cased}_msgspec_obj = msgspec.convert("
-                           f"{message_name_snake_cased}_json_dict, type={message.proto.name}, "
-                           f"dec_hook=dec_hook)\n")
+            output_str += (f"    {message_name_snake_cased}_msgspec_obj = {message.proto.name}.from_dict("
+                           f"{message_name_snake_cased}_json_dict)\n")
             output_str += (f"    return_obj = await _underlying_create_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj, filter_agg_pipeline, generic_callable, "
                            f"return_obj_copy)\n")
@@ -433,8 +431,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                        f"{FastapiHttpRoutesFileHandler.proto_package_var_name},"
                        f"{message_name_snake_cased}_msgspec_obj_list, filter_agg_pipeline)\n")
         output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj_list = "
-                                            f"msgspec.convert({message_name_snake_cased}_json_list, "
-                                            f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                                            f"{message.proto.name}.from_dict_list("
+                                            f"{message_name_snake_cased}_json_list)\n")
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
@@ -449,8 +447,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"returned value will be aggregated output "
                                                     f"so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj_list = "
-                                                    f"msgspec.convert({message_name_snake_cased}_json_list, "
-                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict_list("
+                                                    f"{message_name_snake_cased}_json_list)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
@@ -466,8 +464,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"returned val will be update "
                                                     f"aggregated output so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj_list = "
-                                                    f"msgspec.convert({message_name_snake_cased}_json_list, "
-                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict_list("
+                                                    f"{message_name_snake_cased}_json_list)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
@@ -484,8 +482,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"{update_agg_pipeline_var_name} are passed - "
                                                     f"returned dict will be aggregated output so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj_list = "
-                                                    f"msgspec.convert({message_name_snake_cased}_json_list, "
-                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict_list("
+                                                    f"{message_name_snake_cased}_json_list)\n")
             case other:
                 output_str += " " * indent_count + \
                               (f"        {message_name_snake_cased}_json_list = "
@@ -542,9 +540,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    """\n'
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_post_all_http\n'
-            output_str += (f"    {message_name_snake_cased}_msgspec_obj_list = msgspec.convert("
-                           f"{message_name_snake_cased}_json_dict_list, type=List[{message.proto.name}], "
-                           f"dec_hook=dec_hook)\n")
+            output_str += (f"    {message_name_snake_cased}_msgspec_obj_list = {message.proto.name}."
+                           f"from_dict_list({message_name_snake_cased}_json_dict_list)\n")
             output_str += (f"    return_val = await _underlying_create_all_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj_list, "
                            f"filter_agg_pipeline, generic_callable, return_obj_copy)\n")
@@ -793,19 +790,32 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += mutex_handling_str
 
         if pass_stored_obj_to_pre_post_callback:
+            output_str += " " * indent_count + (f"    # Below stored obj code is added based on field "
+                                                f"'PassStoredObjToUpdatePrePostCallback' set on plugin option\n\t\t"
+                                                f"# 'MessageJsonRoot' on this model in proto file, this includes "
+                                                f"extra dependency of fetching stored obj and\n\t\t#passing it to pre "
+                                                f"and post callback calls, if not required in this model then update "
+                                                f"proto file and regenerate\n")
             output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_json_dict = "
                                                 f"await generic_read_by_id_http({message.proto.name}, "
                                                 f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                                 f"{message_name_snake_cased}_update_msgspec_obj.id, "
                                                 f"has_links={msg_has_links})\n")
             output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_msgspec_obj = "
-                                                f"msgspec.convert(stored_{message_name_snake_cased}_json_dict, "
-                                                f"type={message.proto.name}, dec_hook=dec_hook)\n")
+                                                f"{message.proto.name}.from_dict("
+                                                f"stored_{message_name_snake_cased}_json_dict)\n")
             output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_msgspec_obj = "
                                                 f"await callback_class.update_{message_name_snake_cased}_pre("
                                                 f"stored_{message_name_snake_cased}_msgspec_obj, "
                                                 f"{message_name_snake_cased}_update_msgspec_obj)\n")
         else:
+            output_str += " " * indent_count + (f"    # Since field 'PassStoredObjToUpdatePrePostCallback' of plugin "
+                                                f"option 'MessageJsonRoot' on this model\n\t\t# is not set in proto "
+                                                f"file, stored obj will not be passed to pre and post callback calls - "
+                                                f"if required then\n\t\t# 'PassStoredObjToUpdatePrePostCallback' field "
+                                                f"must be set to True in option 'MessageJsonRoot',\n\t\t# but this "
+                                                f"will add extra load since it requires fetching stored obj from db so "
+                                                f"must\n\t\t# be noted before updating and regenerating\n")
             output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_msgspec_obj = "
                                                 f"await callback_class.update_{message_name_snake_cased}_pre("
                                                 f"{message_name_snake_cased}_update_msgspec_obj)\n")
@@ -822,8 +832,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                       f"{message_name_snake_cased}_update_msgspec_obj, " \
                       f"filter_agg_pipeline)\n"
         output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj = "
-                                            f"msgspec.convert(updated_{message_name_snake_cased}_json_obj, "
-                                            f"type={message.proto.name}, dec_hook=dec_hook)\n")
+                                            f"{message.proto.name}.from_dict("
+                                            f"updated_{message_name_snake_cased}_json_obj)\n")
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
@@ -837,8 +847,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + (f"        # since {filter_agg_pipeline_var_name} is passed - "
                                                     f"returned dict will be aggregated output so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj = "
-                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_obj, "
-                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict("
+                                                    f"updated_{message_name_snake_cased}_json_obj)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
@@ -853,8 +863,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"returned dict will be update "
                                                     f"aggregated output so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj = "
-                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_obj, "
-                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict("
+                                                    f"updated_{message_name_snake_cased}_json_obj)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
@@ -870,8 +880,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"{update_agg_pipeline_var_name} are passed - "
                                                     f"returned dict will be aggregated output so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj = "
-                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_obj, "
-                                                    f"type={message.proto.name}, dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict("
+                                                    f"updated_{message_name_snake_cased}_json_obj)\n")
             case other:
                 output_str += " " * indent_count + \
                               (f"        updated_{message_name_snake_cased}_json_obj = await generic_callable("
@@ -935,9 +945,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    """\n'
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_put_http\n'
-            output_str += (f"    {message_name_snake_cased}_update_msgspec_obj = msgspec.convert("
-                           f"{message_name_snake_cased}_update_json_dict, type={message.proto.name}, "
-                           f"dec_hook=dec_hook)\n")
+            output_str += (f"    {message_name_snake_cased}_update_msgspec_obj = {message.proto.name}.from_dict("
+                           f"{message_name_snake_cased}_update_json_dict)\n")
             output_str += (
                 f"    return_val = await _underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
                 f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy)\n")
@@ -1178,6 +1187,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += mutex_handling_str
 
         if pass_stored_obj_to_pre_post_callback:
+            output_str += " " * indent_count + (f"    # Below stored obj code is added based on field "
+                                                f"'PassStoredObjToUpdateAllPrePostCallback' set on plugin option\n\t\t"
+                                                f"# 'MessageJsonRoot' on this model in proto file, this includes "
+                                                f"extra dependency of fetching stored obj and\n\t\t#passing it to pre "
+                                                f"and post callback calls, if not required in this model then update "
+                                                f"proto file and regenerate\n")
             output_str += " " * indent_count + f"    obj_id_list = [pydantic_obj.id for pydantic_obj in " \
                                                f"{message_name_snake_cased}_update_msgspec_obj_list]\n"
             output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_json_dict_list = await "
@@ -1185,13 +1200,20 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                 f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                                 f"has_links={msg_has_links}, read_ids_list=obj_id_list)\n")
             output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_msgspec_obj_list = "
-                                                f"msgspec.convert(stored_{message_name_snake_cased}_json_dict_list, "
-                                                f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                                                f"{message.proto.name}.from_dict_list("
+                                                f"stored_{message_name_snake_cased}_json_dict_list)\n")
             output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_msgspec_obj_list = "
                                                 f"await callback_class.update_all_{message_name_snake_cased}_pre("
                                                 f"stored_{message_name_snake_cased}_msgspec_obj_list, "
                                                 f"{message_name_snake_cased}_update_msgspec_obj_list)\n")
         else:
+            output_str += " " * indent_count + (f"    # Since field 'PassStoredObjToUpdateAllPrePostCallback' of plugin "
+                                                f"option 'MessageJsonRoot' on this model\n\t\t# is not set in proto "
+                                                f"file, stored obj will not be passed to pre and post callback calls - "
+                                                f"if required then\n\t\t# 'PassStoredObjToUpdateAllPrePostCallback' "
+                                                f"field must be set to True in option 'MessageJsonRoot',\n\t\t# but "
+                                                f"this will add extra load since it requires fetching stored obj from "
+                                                f"db so must\n\t\t# be noted before updating and regenerating\n")
             output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_msgspec_obj_list = "
                                                 f"await callback_class.update_all_{message_name_snake_cased}_pre("
                                                 f"{message_name_snake_cased}_update_msgspec_obj_list)\n")
@@ -1207,8 +1229,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                       f"{message_name_snake_cased}_update_msgspec_obj_list, " \
                       f"filter_agg_pipeline)\n"
         output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj_list = "
-                                            f"msgspec.convert(updated_{message_name_snake_cased}_json_list, "
-                                            f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                                            f"{message.proto.name}.from_dict_list("
+                                            f"updated_{message_name_snake_cased}_json_list)\n")
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
@@ -1224,8 +1246,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"returned value will be aggregated output "
                                                     f"so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj_list = "
-                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_list, "
-                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict_list("
+                                                    f"updated_{message_name_snake_cased}_json_list)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
@@ -1241,8 +1263,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"returned val will be update "
                                                     f"aggregated output so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj_list = "
-                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_list, "
-                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict_list("
+                                                    f"updated_{message_name_snake_cased}_json_list)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
                     self.get_simple_option_value_from_proto(message,
@@ -1260,8 +1282,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"{update_agg_pipeline_var_name} are passed - "
                                                     f"returned dict will be aggregated output so can't use passed obj\n")
                 output_str += " " * indent_count + (f"        {message_name_snake_cased}_update_msgspec_obj_list = "
-                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_list, "
-                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict_list("
+                                                    f"updated_{message_name_snake_cased}_json_list)\n")
             case other:
                 output_str += " " * indent_count + \
                               (f"        updated_{message_name_snake_cased}_json_list, missing_ids_list "
@@ -1275,8 +1297,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"calable\n")
                 output_str += (" " * indent_count + f"        if missing_ids_list:\n")
                 output_str += " " * indent_count + (f"            {message_name_snake_cased}_update_msgspec_obj_list = "
-                                                    f"msgspec.convert(updated_{message_name_snake_cased}_json_list, "
-                                                    f"type=List[{message.proto.name}], dec_hook=dec_hook)\n")
+                                                    f"{message.proto.name}.from_dict_list("
+                                                    f"updated_{message_name_snake_cased}_json_list)\n")
                 output_str += (" " * indent_count +
                                f"        # else not required: using same list of objects that was passed to "
                                f"generic callable since all objects will be updated with same data\n")
@@ -1345,9 +1367,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    """\n'
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_put_all_http\n'
-            output_str += (f"    {message_name_snake_cased}_update_msgspec_obj_list = msgspec.convert("
-                           f"{message_name_snake_cased}_update_json_dict, type=List[{message.proto.name}], "
-                           f"dec_hook=dec_hook)\n")
+            output_str += (f"    {message_name_snake_cased}_update_msgspec_obj_list = {message.proto.name}"
+                           f".from_dict_list({message_name_snake_cased}_update_json_dict)\n")
             output_str += (
                 f"    return_val = await _underlying_update_all_{message_name_snake_cased}_http("
                 f"{message_name_snake_cased}_update_msgspec_obj_list, filter_agg_pipeline, generic_callable, "
@@ -1591,7 +1612,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         return output_str
 
     def _handle_msgspec_common_underlying_patch_gen(self, message: protogen.Message, aggregation_type, msg_has_links,
-                                                    shared_lock_list) -> str:
+                                                    shared_lock_list, pass_stored_obj_to_post_callback: bool) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = (f"async def _underlying_partial_update_{message_name_snake_cased}_http("
                       f"{message_name_snake_cased}_update_json_dict: Dict[str, None], filter_agg_pipeline: Any = None, "
@@ -1604,13 +1625,42 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                             f"json({message.proto.name}, {message_name_snake_cased}_update_json_dict, "
                                             f"is_patch_call=True)\n")
         output_str += " " * indent_count + f"    obj_id = {message_name_snake_cased}_update_json_dict.get('_id')\n"
+        if pass_stored_obj_to_post_callback:
+            output_str += " " * indent_count + (f"    # Since 'PassStoredObjToPartialUpdatePostCallback' field is "
+                                                f"set on plugin option 'MessageJsonRoot'\n\t{' ' * indent_count}# on "
+                                                f"this model in proto file, one more fetch is done from db for "
+                                                f"stored obj that will be used in\n\t{' ' * indent_count}# "
+                                                f"partial_update_{message_name_snake_cased}_post call - reason is, "
+                                                f"in generic patch stored obj gets updated in\n\t{' ' * indent_count}# "
+                                                f"compare_n_patch. Since this includes extra load of fetching "
+                                                f"stored obj again, so if not required\n\t{' ' * indent_count}# in "
+                                                f"this model then update proto file and regenerate\n")
+            output_str += " " * indent_count + f"    fetched_{message_name_snake_cased}_json_dict = await generic_read_by_id_http(" \
+                                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                               f"obj_id, has_links={msg_has_links})\n"
+            fetch_json_dict_variable_name = f"fetched_{message_name_snake_cased}_json_dict"
+        else:
+            output_str += " " * indent_count + (f"    # Since field 'PassStoredObjToPartialUpdatePostCallback' "
+                                                f"of plugin option 'MessageJsonRoot' on this model\n\t"
+                                                f"{' ' * indent_count}# is not set in proto file, stored obj will "
+                                                f"not be passed to post callback call. The reason is since\n\t"
+                                                f"{' ' * indent_count}# stored obj is passed to generic "
+                                                f"patch, it gets updated and becomes same as updated obj, to solve "
+                                                f"this another\n\t{' ' * indent_count}# fetch is done from db and "
+                                                f"that instance is passed to post callback call - if stored obj is "
+                                                f"required in\n\t{' ' * indent_count}# post callback call then "
+                                                f"'PassStoredObjToPartialUpdatePostCallback' field must be set to "
+                                                f"True in\n\t{' ' * indent_count}# option 'MessageJsonRoot', but this "
+                                                f"will add extra load since it requires fetching stored obj from db so "
+                                                f"must\n\t{' ' * indent_count}# be noted before updating and regenerating\n")
+            fetch_json_dict_variable_name = f"stored_{message_name_snake_cased}_json_dict"
         output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_json_dict = await generic_read_by_id_http(" \
                                            f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                                            f"obj_id, has_links={msg_has_links})\n"
         output_str += " " * indent_count + (
             f"    {message_name_snake_cased}_update_json_dict = "
             f"await callback_class.partial_update_{message_name_snake_cased}_pre("
-            f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict)\n")
+            f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict)\n")
         output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
                                             f"'avoid_{message_name_snake_cased}_db_update'):\n")
         indent_count += 4
@@ -1618,7 +1668,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += " " * indent_count + \
                       (f"        updated_{message_name_snake_cased}_json_dict = await generic_callable("
                        f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                       f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict, "
+                       f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict, "
                        f"filter_agg_pipeline, has_links={msg_has_links})\n")
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
@@ -1626,7 +1676,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + \
                               f"        updated_{message_name_snake_cased}_json_dict =  await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                              f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict, " \
+                              f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict, " \
                               f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json')}, " \
                               f"has_links={msg_has_links})\n"
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
@@ -1636,7 +1686,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + \
                               (f"        updated_{message_name_snake_cased}_json_dict = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict, "
+                               f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict, "
                                f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
@@ -1645,21 +1695,32 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + \
                               (f"        updated_{message_name_snake_cased}_json_dict = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict, "
+                               f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict, "
                                f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json')}, "
                                f"{update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
             case other:
                 output_str += " " * indent_count + \
                               (f"        updated_{message_name_snake_cased}_json_dict = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"stored_{message_name_snake_cased}_json_dict, "
-                               f"{message_name_snake_cased}_update_json_dict, has_links={msg_has_links})\n")
-        output_str += " " * indent_count + (f"    await callback_class.partial_update_{message_name_snake_cased}_post("
-                                            f"stored_{message_name_snake_cased}_json_dict, updated_{message_name_snake_cased}_json_dict)\n")
+                               f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict, "
+                               f"has_links={msg_has_links})\n")
+        if pass_stored_obj_to_post_callback:
+            output_str += " " * indent_count + (f"    await callback_class.partial_update_{message_name_snake_cased}_post("
+                                                f"stored_{message_name_snake_cased}_json_dict, "
+                                                f"updated_{message_name_snake_cased}_json_dict)\n")
+        else:
+            output_str += " " * indent_count + (f"    await callback_class.partial_update_{message_name_snake_cased}_"
+                                                f"post(updated_{message_name_snake_cased}_json_dict)\n")
         output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_json_dict\n"
         output_str += " " * indent_count + f"else:\n"
-        output_str += " " * indent_count + (f"    await callback_class.partial_update_{message_name_snake_cased}_post("
-                                            f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict)\n")
+        if pass_stored_obj_to_post_callback:
+            output_str += " " * indent_count + (
+                f"    await callback_class.partial_update_{message_name_snake_cased}_post("
+                f"stored_{message_name_snake_cased}_json_dict, {message_name_snake_cased}_update_json_dict)\n")
+        else:
+            output_str += " " * indent_count + (
+                f"    await callback_class.partial_update_{message_name_snake_cased}_post("
+                f"{message_name_snake_cased}_update_json_dict)\n")
         output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_update_json_dict\n"
         output_str += " " * indent_count + f"if return_obj_copy:\n"
         output_str += " " * indent_count + f"    return return_obj\n"
@@ -1674,8 +1735,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if model_type == ModelType.Msgspec:
             output_str = self._handle_missing_id_n_datetime_field_callable_generation(message, model_type)
+            pass_stored_obj_to_post_callback = self._get_if_pass_stored_obj_to_pre_post_callback(
+                FastapiHttpRoutesFileHandler.flux_json_root_pass_stored_obj_to_partial_update_pre_post_callback,
+                **kwargs)
             output_str += self._handle_msgspec_common_underlying_patch_gen(message, aggregation_type, msg_has_links,
-                                                                           shared_lock_list)
+                                                                           shared_lock_list,
+                                                                           pass_stored_obj_to_post_callback)
             output_str += f"@perf_benchmark\n"
             output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_update_json_dict: Dict[str, Any], "
@@ -1690,8 +1755,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"{message_name_snake_cased}_update_json_dict, filter_agg_pipeline, "
                            f"generic_callable, return_obj_copy)\n")
             output_str += f"    if return_val:\n"
-            output_str += (f"        return_val = msgspec.convert(return_val, type={message.proto.name}, "
-                           f"dec_hook=dec_hook)\n")
+            output_str += f"        return_val = {message.proto.name}.from_dict(return_val)\n"
             output_str += f"    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
@@ -2226,7 +2290,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         return output_str
 
     def _handle_msgspec_common_underlying_patch_all_gen(self, message: protogen.Message, aggregation_type,
-                                                        msg_has_links, shared_lock_list) -> str:
+                                                        msg_has_links, shared_lock_list,
+                                                        pass_stored_obj_to_post_callback) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = (f"async def _underlying_partial_update_all_{message_name_snake_cased}_http("
                       f"{message_name_snake_cased}_update_json_dict_list: List[Dict[str, Any]], "
@@ -2243,6 +2308,38 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             f"json({message.proto.name}, {message_name_snake_cased}_update_json_dict, "
             f"is_patch_call=True)\n")
         output_str += " " * indent_count + f"        obj_id_list.append({message_name_snake_cased}_update_json_dict.get('_id'))\n"
+        if pass_stored_obj_to_post_callback:
+            output_str += " " * indent_count + (f"    # Since 'PassStoredObjToPartialUpdateAllPostCallback' field is "
+                                                f"set on plugin option 'MessageJsonRoot'\n\t{' ' * indent_count}# on "
+                                                f"this model in proto file, one more fetch is done from db for "
+                                                f"stored obj list that will be used in\n\t{' ' * indent_count}# "
+                                                f"partial_update_all_{message_name_snake_cased}_post "
+                                                f"call - reason is, in generic patch_all stored obj list gets updated "
+                                                f"in\n\t{' ' * indent_count}# compare_n_patch. Since this includes "
+                                                f"extra load of fetching stored obj list again, so if not "
+                                                f"required\n\t{' ' * indent_count}# in this model then update "
+                                                f"proto file and regenerate\n")
+            output_str += " " * indent_count + (f"    fetched_{message_name_snake_cased}_json_dict_list = await "
+                                                f"generic_read_http({message.proto.name}, "
+                                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                                f"has_links={msg_has_links}, read_ids_list=obj_id_list)\n")
+            fetch_json_dict_variable_name = f"fetched_{message_name_snake_cased}_json_dict_list"
+        else:
+            output_str += " " * indent_count + (f"    # Since field 'PassStoredObjToPartialUpdateAllPostCallback' "
+                                                f"of plugin option 'MessageJsonRoot' on this model\n\t"
+                                                f"{' ' * indent_count}# is not set in proto file, stored obj list will "
+                                                f"not be passed to post callback call. The reason is since\n\t"
+                                                f"{' ' * indent_count}# stored obj list is passed to generic patch, "
+                                                f"it gets updated and becomes same as updated obj list, to solve "
+                                                f"this another\n\t{' ' * indent_count}# fetch is done from db and "
+                                                f"that instance is passed to post callback call - if stored obj is "
+                                                f"required in\n\t{' ' * indent_count}# post callback call then "
+                                                f"'PassStoredObjToPartialUpdateAllPostCallback' field must be set to "
+                                                f"True in\n\t{' ' * indent_count}# option 'MessageJsonRoot', but this "
+                                                f"will add extra load since it requires fetching stored obj list "
+                                                f"from db so must\n\t{' ' * indent_count}# be noted before "
+                                                f"updating and regenerating\n")
+            fetch_json_dict_variable_name = f"stored_{message_name_snake_cased}_json_dict_list"
         output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_json_dict_list = await "
                                             f"generic_read_http({message.proto.name}, "
                                             f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
@@ -2250,7 +2347,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += " " * indent_count + (
             f"    {message_name_snake_cased}_update_json_dict_list = "
             f"await callback_class.partial_update_all_{message_name_snake_cased}_pre("
-            f"stored_{message_name_snake_cased}_json_dict_list, {message_name_snake_cased}_update_json_dict_list)\n")
+            f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict_list)\n")
         output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
                                             f"'avoid_{message_name_snake_cased}_db_update'):\n")
         indent_count += 4
@@ -2258,7 +2355,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += " " * indent_count + \
                       f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable(" \
                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                      f"stored_{message_name_snake_cased}_json_dict_list, {message_name_snake_cased}_update_json_dict_list, "\
+                      f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict_list, " \
                       f"obj_id_list, filter_agg_pipeline, has_links={msg_has_links})\n"
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
@@ -2266,8 +2363,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + \
                               f"        updated_{message_name_snake_cased}_update_req_json_list =  await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                              f"stored_{message_name_snake_cased}_json_dict_list, "\
-                              f"{message_name_snake_cased}_update_json_dict_list, obj_id_list, " \
+                              f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict_list, obj_id_list, " \
                               f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json_list')}, " \
                               f"has_links={msg_has_links})\n"
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
@@ -2277,9 +2373,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + \
                               (f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"stored_{message_name_snake_cased}_json_dict_list, "
-                               f"{message_name_snake_cased}_update_json_dict_list, obj_id_list, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name}, "
+                               f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict_list, "
+                               f"obj_id_list, update_agg_pipeline={update_agg_pipeline_var_name}, "
                                f"has_links={msg_has_links})\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
@@ -2288,25 +2383,32 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + \
                               (f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
-                               f"stored_{message_name_snake_cased}_json_dict_list, "
-                               f"{message_name_snake_cased}_update_json_dict_list, obj_id_list, "
-                               f"{self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json_list')}, "
+                               f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict_list, "
+                               f"obj_id_list, {self._get_filter_configs_var_name(message, f'{message_name_snake_cased}_update_req_json_list')}, "
                                f"{update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
             case other:
                 output_str += " " * indent_count + \
                               f"        updated_{message_name_snake_cased}_update_req_json_list = await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-                              f"stored_{message_name_snake_cased}_json_dict_list, "\
+                              f"{fetch_json_dict_variable_name}, " \
                               f"{message_name_snake_cased}_update_json_dict_list, obj_id_list, " \
                               f"has_links={msg_has_links})\n"
-        output_str += " " * indent_count + (f"    await callback_class.partial_update_all_{message_name_snake_cased}"
-                                            f"_post(stored_{message_name_snake_cased}_json_dict_list, "
-                                            f"{message_name_snake_cased}_update_json_dict_list)\n")
+        if pass_stored_obj_to_post_callback:
+            output_str += " " * indent_count + (f"    await callback_class.partial_update_all_{message_name_snake_cased}"
+                                                f"_post(stored_{message_name_snake_cased}_json_dict_list, "
+                                                f"updated_{message_name_snake_cased}_update_req_json_list)\n")
+        else:
+            output_str += " " * indent_count + (f"    await callback_class.partial_update_all_{message_name_snake_cased}"
+                                                f"_post(updated_{message_name_snake_cased}_update_req_json_list)\n")
         output_str += " " * indent_count + f"    return_obj = updated_{message_name_snake_cased}_update_req_json_list\n"
         output_str += " " * indent_count + f"else:\n"
-        output_str += " " * indent_count + (f"    await callback_class.partial_update_all_{message_name_snake_cased}"
-                                            f"_post(stored_{message_name_snake_cased}_json_dict_list, "
-                                            f"{message_name_snake_cased}_update_json_dict_list)\n")
+        if pass_stored_obj_to_post_callback:
+            output_str += " " * indent_count + (f"    await callback_class.partial_update_all_{message_name_snake_cased}"
+                                                f"_post(stored_{message_name_snake_cased}_json_dict_list, "
+                                                f"{message_name_snake_cased}_update_json_dict_list)\n")
+        else:
+            output_str += " " * indent_count + (f"    await callback_class.partial_update_all_{message_name_snake_cased}"
+                                                f"_post({message_name_snake_cased}_update_json_dict_list)\n")
         output_str += " " * indent_count + f"    return_obj = {message_name_snake_cased}_update_json_dict_list\n"
         output_str += " " * indent_count + f"if return_obj_copy:\n"
         output_str += " " * indent_count + f"    return return_obj\n"
@@ -2321,8 +2423,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
 
         if model_type == ModelType.Msgspec:
+            pass_stored_obj_to_post_callback = self._get_if_pass_stored_obj_to_pre_post_callback(
+                FastapiHttpRoutesFileHandler.flux_json_root_pass_stored_obj_to_partial_update_all_pre_post_callback,
+                **kwargs)
             output_str = self._handle_msgspec_common_underlying_patch_all_gen(message, aggregation_type,
-                                                                              msg_has_links, shared_lock_list)
+                                                                              msg_has_links, shared_lock_list,
+                                                                              pass_stored_obj_to_post_callback)
             output_str += f"@perf_benchmark\n"
             output_str += (f"async def underlying_partial_update_all_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_update_json_dict_list: List[Dict[str, Any]], "
@@ -2338,8 +2444,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"{message_name_snake_cased}_update_json_dict_list, filter_agg_pipeline, "
                            f"generic_callable, return_obj_copy)\n")
             output_str += "    if return_obj_copy:\n"
-            output_str += (f"        return_val = msgspec.convert(return_val, type=List[{message.proto.name}], "
-                           f"dec_hook=dec_hook)\n")
+            output_str += f"        return_val = {message.proto.name}.from_dict_list(return_val)\n"
             output_str += "    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
@@ -3062,8 +3167,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                               f"{message_name_snake_cased}_id, has_links={msg_has_links})\n"
         output_str += " " * indent_count + (f"    {message_name_snake_cased}_msgspec_obj = "
-                                            f"msgspec.convert({message_name_snake_cased}_json, "
-                                            f"type={message.proto.name}, dec_hook=dec_hook)\n")
+                                            f"{message.proto.name}.from_dict({message_name_snake_cased}_json)\n")
         output_str += " " * indent_count + (f"    await callback_class.read_by_id_{message_name_snake_cased}_post("
                                             f"{message_name_snake_cased}_msgspec_obj)\n")
         output_str += " " * indent_count + f"    return {message_name_snake_cased}_msgspec_obj\n\n\n"
@@ -3277,11 +3381,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                               f"limit_filter_agg, has_links={msg_has_links})\n"
         output_str += " " * indent_count + f"    if json_list:\n"
-        output_str += " " * indent_count + (f"        convert_type = projection_model if projection_model is not "
-                                            f"None else List[{message.proto.name}]\n")
-        output_str += " " * indent_count + (f"        {message_name_snake_cased}_msgspec_obj_list = "
-                                            f"msgspec.convert({return_obj_str}, "
-                                            f"type=convert_type, dec_hook=dec_hook)\n")
+        output_str += " " * indent_count + f"        if projection_model:\n"
+        output_str += " " * indent_count + (f"            {message_name_snake_cased}_msgspec_obj_list = "
+                                            f"projection_model.from_dict({return_obj_str})\n")
+        output_str += " " * indent_count + f"        else:\n"
+        output_str += " " * indent_count + (f"            {message_name_snake_cased}_msgspec_obj_list = "
+                                            f"{message.proto.name}.from_dict_list({return_obj_str})\n")
         output_str += " " * indent_count + f"    else:\n"
         output_str += " " * indent_count + f"        {message_name_snake_cased}_msgspec_obj_list = []\n"
         output_str += " " * indent_count + (f"    await callback_class.read_all_{message_name_snake_cased}_post("
@@ -3778,7 +3883,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += "\n\n"
         return output_str
 
-    def _handle_projection_query_methods(self, message):
+    def _handle_projection_query_methods(self, message, model_type: ModelType | None = None):
         output_str = ""
         for field in message.fields:
             if FastapiHttpRoutesFileHandler.is_option_enabled(field, FastapiHttpRoutesFileHandler.flux_fld_projections):
@@ -3817,12 +3922,16 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                     query_param_str += f"{meta_field_name}, "
                     query_param_with_type_str += f"{meta_field_name}: {self.proto_to_py_datatype(meta_field_value)}, "
             query_param_str += "start_date_time, end_date_time"
-            query_param_with_type_str += ("start_date_time: DateTime | None = None, "
-                                          "end_date_time: DateTime | None = None")
+            if model_type == ModelType.Msgspec:
+                query_param_with_type_str += ("start_date_time: Any | None = None, "
+                                              "end_date_time: Any | None = None")
+            else:
+                query_param_with_type_str += ("start_date_time: DateTime | None = None, "
+                                              "end_date_time: DateTime | None = None")
 
             # Http Filter Call
             output_str += self._handle_http_query_str(message, query_name, query_param_str, query_param_with_type_str,
-                                                      return_type_str=container_model_name)
+                                                      return_type_str=container_model_name, model_type=model_type)
 
             query_param_dict_str = "{"
             for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
@@ -3865,7 +3974,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
-                output_str += self._handle_projection_query_methods(message)
+                output_str += self._handle_projection_query_methods(message, model_type=ModelType.Dataclass)
         return output_str
 
     def handle_msgspec_CRUD_task(self) -> str:
@@ -3881,7 +3990,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
-                output_str += self._handle_projection_query_methods(message)
+                output_str += self._handle_projection_query_methods(message, model_type=ModelType.Msgspec)
         return output_str
 
     def _get_aggregate_query_var_list(self) -> List[str]:

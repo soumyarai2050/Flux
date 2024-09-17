@@ -24,7 +24,7 @@ message ChoreAccount {
   required string chore_account = 2;
 }
 
-message PortfolioLimits{
+message PortfolioLimits {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
@@ -54,7 +54,7 @@ message PortfolioLimits{
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  repeated AccountsNettNotional max_accounts_nett_notional = 2 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "post barter limit - hair-cut must be applied when setting this limit; Restrict the account set bartering if this limit breaches, raise alert at 50, 70, 80, 90, 95, 99 percent consumption; buy consumes the limit sell replenishes: executed + open notional; day-1 pause all strats - pause any strat that has strat-limit with any position that matches account-set if limit is breached"];
+  repeated AccountsNettNotional max_accounts_nett_notional = 2 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "post barter limit - hair-cut must be applied when setting this limit; Restrict the account-set bartering if this limit breaches, raise alert at 50, 70, 80, 90, 95, 99 percent consumption; buy consumes the limit sell replenishes: executed + open notional; day-1 pause all strats - pause any strat that has strat-limit with any position that matches account-set if limit is breached"];
   optional int32 max_open_baskets = 3 [(FluxFldValMin) = "50", (FluxFldHelp) = "max simultaneous open chores allowed per side for this portfolio"];
   optional float max_open_notional_per_side = 4 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "10000000", (FluxFldTitle) = "max open per side $", (FluxFldNumberFormat) = "$"];
   optional float max_gross_n_open_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "50000000", (FluxFldTitle) = "max gross n open $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "aggregated buy+sell: open+executed max allowed notional"];

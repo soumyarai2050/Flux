@@ -71,6 +71,8 @@ class BaseProtoPlugin(ABC):
     flux_json_root_ts_granularity_field: ClassVar[str] = "Granularity"
     flux_json_root_pass_stored_obj_to_update_pre_post_callback: ClassVar[str] = "PassStoredObjToUpdatePrePostCallback"
     flux_json_root_pass_stored_obj_to_update_all_pre_post_callback: ClassVar[str] = "PassStoredObjToUpdateAllPrePostCallback"
+    flux_json_root_pass_stored_obj_to_partial_update_pre_post_callback: ClassVar[str] = "PassStoredObjToPartialUpdatePostCallback"
+    flux_json_root_pass_stored_obj_to_partial_update_all_pre_post_callback: ClassVar[str] = "PassStoredObjToPartialUpdateAllPostCallback"
     flux_fld_val_time_field: ClassVar[str] = "FluxFldValTimeField"
     flux_fld_val_meta_field: ClassVar[str] = "FluxFldValMetaField"
     flux_json_root_ts_expire_after_sec_field: ClassVar[str] = "ExpireAfterSeconds"

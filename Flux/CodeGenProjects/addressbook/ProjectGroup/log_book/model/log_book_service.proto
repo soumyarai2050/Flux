@@ -6,7 +6,7 @@ import "projects_core.proto";
 
 package log_book;
 
-message AlertMeta{
+message AlertMeta {
   optional string component_file_path = 1;
   optional string source_file_name = 2;
   optional int32 line_num = 3;
@@ -15,7 +15,7 @@ message AlertMeta{
   optional string latest_detail = 6;
 }
 
-message StratAlert{
+message StratAlert {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED
@@ -89,11 +89,11 @@ message StratAlert{
   optional int32 alert_count = 5 [(FluxFldOrmNoUpdate) = true, (FluxFldColumnSize) = "small"];
   required string alert_brief = 6 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left", (FluxFldOrmNoUpdate) = true];
   // must prefix strat:<strat-name> for strat alerts
-  optional int64 last_update_analyzer_time = 7 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
-  optional AlertMeta alert_meta = 8 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
+  optional AlertMeta alert_meta = 7 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
+  optional int64 last_update_analyzer_time = 8 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
 }
 
-message PortfolioAlert{
+message PortfolioAlert {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
@@ -145,11 +145,45 @@ message PortfolioAlert{
   required Severity severity = 3 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED", (FluxFldOrmNoUpdate) = true];
   optional int32 alert_count = 4 [(FluxFldOrmNoUpdate) = true, (FluxFldColumnSize) = "small"];
   required string alert_brief = 5 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left", (FluxFldOrmNoUpdate) = true];
-  optional int64 last_update_analyzer_time = 6 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
-  optional AlertMeta alert_meta = 7 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
+  optional AlertMeta alert_meta = 6 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
+  optional int64 last_update_analyzer_time = 7 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
 }
 
-message RemoveStratAlertsForStratId{
+message ExecutorEventMeta {
+  required string strat_key = 1 [(FluxFldFilterEnable) = true];
+  required string execution_date = 2 [(FluxFldFilterEnable) = true, (FluxFldHelp) = "dd-mm-yyyy"];
+}
+
+message ExecutorEventJournal {
+  option (FluxMsgJsonRootTimeSeries) = {
+    MongoVersion: 7.0,
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
+    Granularity: Sec,
+    ExpireAfterSeconds: 7776000  // 3 months worth of seconds
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 40,
+    w: 8,
+    h: 8,
+    is_repeated: true,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "email_book_service.proto",
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required ExecutorEventMeta executor_event_meta = 2 [(FluxFldValMetaField) = true];
+  required int64 event_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required string event_name = 4 [(FluxFldFilterEnable) = true];
+  required string event_detail = 5;
+}
+
+message RemoveStratAlertsForStratId {
   option (FluxMsgJsonQuery) = {
       QueryName: "remove_strat_alerts_for_strat_id"
       QueryParams: "strat_id"
@@ -158,7 +192,7 @@ message RemoveStratAlertsForStratId{
   optional bool temp = 1;
 }
 
-message LogBookRestartTail{
+message LogBookRestartTail {
   option (FluxMsgJsonQuery) = {
       QueryName: "log_book_restart_tail"
       QueryParams: "log_file_name"
@@ -169,7 +203,7 @@ message LogBookRestartTail{
   optional bool temp = 1;
 }
 
-message LogBookForceKillTailExecutor{
+message LogBookForceKillTailExecutor {
   option (FluxMsgJsonQuery) = {
       QueryName: "log_book_force_kill_tail_executor"
       QueryParams: "log_file_path"
@@ -178,7 +212,7 @@ message LogBookForceKillTailExecutor{
   optional bool temp = 1;
 }
 
-message LogBookRemoveFileFromCreatedCache{
+message LogBookRemoveFileFromCreatedCache {
     option (FluxMsgJsonQuery) = {
       QueryName: "log_book_remove_file_from_created_cache"
       QueryParams: "log_file_path_list"
@@ -187,7 +221,7 @@ message LogBookRemoveFileFromCreatedCache{
   optional bool temp = 1;
 }
 
-message HandlePortfolioAlertsFromTailExecutor{
+message HandlePortfolioAlertsFromTailExecutor {
     option (FluxMsgJsonQuery) = {
       QueryName: "handle_portfolio_alerts_from_tail_executor"
       QueryParams: "portfolio_alert_data_list"
@@ -197,7 +231,7 @@ message HandlePortfolioAlertsFromTailExecutor{
   optional bool temp = 1;
 }
 
-message HandleStratAlertsFromTailExecutor{
+message HandleStratAlertsFromTailExecutor {
     option (FluxMsgJsonQuery) = {
       QueryName: "handle_strat_alerts_from_tail_executor"
       QueryParams: "strat_alert_data_list"
@@ -207,7 +241,7 @@ message HandleStratAlertsFromTailExecutor{
   optional bool temp = 1;
 }
 
-message PortfolioAlertFailLogger{
+message PortfolioAlertFailLogger {
     option (FluxMsgJsonQuery) = {
       QueryName: "portfolio_alert_fail_logger"
       QueryParams: "log_msg"
@@ -216,7 +250,7 @@ message PortfolioAlertFailLogger{
   optional bool temp = 1;
 }
 
-message DismissStratAlertByBriefStr{
+message DismissStratAlertByBriefStr {
   option (FluxMsgJsonQuery) = {
       QueryName: "dismiss_strat_alert_by_brief_str"
       QueryParams: "strat_id"
@@ -227,15 +261,14 @@ message DismissStratAlertByBriefStr{
   optional bool temp = 1;
 }
 
-message ShutDownLogBook{
+message ShutDownLogBook {
   option (FluxMsgJsonQuery) = {
       QueryName: "shutdown_log_book"
   };
   optional bool temp = 1;
 }
 
-
-message StratAlertIdToObjCache{
+message StratAlertIdToObjCache {
   option (FluxMsgJsonQuery) = {
       QueryName: "verify_strat_alert_id_in_strat_alert_id_to_obj_cache_dict"
       QueryParams: "strat_alert_id"
@@ -244,7 +277,7 @@ message StratAlertIdToObjCache{
   optional bool is_id_present = 1;
 }
 
-message PortfolioAlertIdToObjCache{
+message PortfolioAlertIdToObjCache {
   option (FluxMsgJsonQuery) = {
       QueryName: "verify_portfolio_alert_id_in_get_portfolio_alert_id_to_obj_cache_dict"
       QueryParams: "portfolio_alert_id"
@@ -253,7 +286,7 @@ message PortfolioAlertIdToObjCache{
   optional bool is_id_present = 1;
 }
 
-message StratAlertCacheDictByStratIdDict{
+message StratAlertCacheDictByStratIdDict {
   option (FluxMsgJsonQuery) = {
       QueryName: "verify_strat_alert_id_in_strat_alert_cache_dict_by_strat_id_dict"
       QueryParams: "strat_id"
@@ -264,8 +297,7 @@ message StratAlertCacheDictByStratIdDict{
   optional bool is_key_present = 1;
 }
 
-
-message PortfolioAlertCacheDict{
+message PortfolioAlertCacheDict {
   option (FluxMsgJsonQuery) = {
       QueryName: "verify_portfolio_alerts_cache_dict"
       QueryParams: "strat_cache_key"
@@ -274,8 +306,7 @@ message PortfolioAlertCacheDict{
   optional bool is_key_present = 1;
 }
 
-
-message StratIdInStratAlertCacheDictByStratIdDict{
+message StratIdInStratAlertCacheDictByStratIdDict {
   option (FluxMsgJsonQuery) = {
       QueryName: "verify_strat_id_in_strat_alert_cache_dict_by_strat_id_dict"
       QueryParams: "strat_id"
@@ -284,8 +315,20 @@ message StratIdInStratAlertCacheDictByStratIdDict{
   optional bool is_id_present = 1;
 }
 
+message StratStateUpdateMatcher {
+  option (FluxMsgJsonQuery) = {
+      QueryName: "strat_state_update_matcher"
+      QueryParams: "strat_id"
+      QueryParamsDataType: "int"
+      QueryParams: "message"
+      QueryParamsDataType: "str"
+      QueryParams: "log_file_path"
+      QueryParamsDataType: "str"
+  };
+  optional bool temp = 1;
+}
 
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
-message ImportWarningAvoidDummyMessage{
+message ImportWarningAvoidDummyMessage {
   optional ButtonType temp = 1;
 }

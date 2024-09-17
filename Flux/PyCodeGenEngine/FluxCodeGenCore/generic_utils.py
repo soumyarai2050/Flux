@@ -49,7 +49,7 @@ def validate_pendulum_datetime(dt: datetime.datetime | str | None, datetime_form
         return dt
 
 
-async def init_max_id_handler(model_class_type):
+async def init_max_id_handler(model_class_type) -> int:
     latest_obj = await model_class_type.collection_obj.find_one(sort=[("_id", -1)])
     if latest_obj is not None:
         max_val = latest_obj.get("_id")
@@ -65,6 +65,7 @@ async def init_max_id_handler(model_class_type):
     else:
         max_update_val = 0
     model_class_type.init_max_id(int(max_val), int(max_update_val))
+    return max_val
 
 
 async def init_nested_max_id_handler(model_class_type, nested_field_name, nested_field_type):
@@ -79,3 +80,4 @@ async def init_nested_max_id_handler(model_class_type, nested_field_name, nested
     else:
         max_id = 0
     nested_field_type.init_max_id(max_id, None)  # passing None as max_update_id will ignore update
+    return max_id

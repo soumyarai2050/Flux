@@ -173,6 +173,7 @@ def symbol_overview_obj_list():
               "closing_px": 80,
               "open_px": 80,
               "lot_size": 100,  # should be greater than 100
+              "tick_size": 0.001,
               "last_update_date_time": get_utc_date_time(),
               "force_publish": False
             })
@@ -204,7 +205,8 @@ def pair_strat_(pair_securities_with_sides_):
             }),
             "exch_response_max_seconds": 5,
             "common_premium": 40,
-            "hedge_ratio": 1
+            "hedge_ratio": 1,
+            "mstrat": "Mstrat_1"
         }),
         "pair_strat_params_update_seq_num": 0,
         "market_premium": 0

@@ -14,7 +14,7 @@ option (FluxFileWebPageUIData) = {
   theme: THEME_LIGHT
 };
 
-message StratLeg{
+message StratLeg {
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
   required Security sec = 2 [(FluxFldOrmNoUpdate) = true];
   optional Side side = 3 [default = SIDE_UNSPECIFIED, (FluxFldOrmNoUpdate) = true, (FluxFldNoCommonKey) = true, (FluxFldColor) = "BUY=SUCCESS,SELL=ERROR"];
@@ -44,6 +44,7 @@ message PairStratParams {
   // these are specific to CB-EQT strat - move to derived later
   required float common_premium = 6 [(FluxFldNumberFormat) = "%", (FluxFldDiffThreshold) = 2, (FluxFldNoCommonKey) = true];
   optional float hedge_ratio = 7 [default = 1];
+  optional string mstrat = 8;
 }
 
 
@@ -89,7 +90,6 @@ message ChoreLimits {
   optional float max_chore_notional_algo = 10 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "500000", (FluxFldTitle) = "max chore algo $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "algo chore qty times limit px must be less than this limit"];
   optional int32 max_contract_qty_algo = 11 [(FluxFldValMax) = "10000", (FluxFldHelp) = "algo chore max qty for securities that barter in contracts"];
   optional int32 max_chore_qty_algo = 12 [(FluxFldValMax) = "1000000", (FluxFldHelp) = "algo chore max qty for securities that barter in shares"];
-
 }
 
 message SystemControl {
@@ -101,7 +101,8 @@ message SystemControl {
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
-    PassStoredObjToUpdatePrePostCallback: true
+    PassStoredObjToUpdatePrePostCallback: true,
+    PassStoredObjToPartialUpdatePostCallback: True,
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
@@ -199,7 +200,9 @@ message PairStrat {
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
-    PassStoredObjToUpdatePrePostCallback: true
+    PassStoredObjToUpdatePrePostCallback: true,
+    PassStoredObjToPartialUpdatePostCallback: True,
+    PassStoredObjToPartialUpdateAllPostCallback: True
   };
     option (FluxMsgJsonQuery) = {
       QueryName: "get_pair_strat_sec_filter_json",
@@ -253,7 +256,7 @@ message PairStrat {
     // CodeGen to handle appropriate datetime generation if the FluxFldValIsDateTime option is set
     optional int64 last_active_date_time = 2 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 2, (FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true];
     optional int32  frequency = 3 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 1, (FluxFldServerPopulate) = true];
-    required PairStratParams pair_strat_params = 4;
+    required PairStratParams pair_strat_params = 4 [(FluxFldAutoComplete) = "mstrat:Mstrat_List"];
     optional int64 pair_strat_params_update_seq_num = 7 [(FluxFldHide) = "True"];
     optional string host = 8 [(FluxFldHide) = "True"];
     optional int64 port = 9 [(FluxFldHide) = "True"];
@@ -335,7 +338,9 @@ message SampleModel{
     PatchAllOp: AggregateType_UpdateAggregate,
     DeleteOp: AggregateType_UpdateAggregate,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
-    SetReentrantLock: false
+    SetReentrantLock: false,
+    PassStoredObjToPartialUpdatePostCallback: True,
+    PassStoredObjToPartialUpdateAllPostCallback: True
   };
     option (FluxMsgAggregateQueryVarName) = "sample_cum_aggregate_pipeline";
 

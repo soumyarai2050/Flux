@@ -4,7 +4,6 @@ from typing import List, Dict, ClassVar, Tuple
 import os
 from pathlib import PurePath
 
-from pydantic import field_validator
 from filelock import FileLock
 from pendulum import DateTime
 
@@ -12,7 +11,7 @@ from pendulum import DateTime
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
     Side, Position, PositionType, InstrumentType)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
-    FillsJournalBaseModel)
+    FillsJournalBaseModel, ChoreStatusType)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link_base import BarteringLinkBase
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
     executor_config_yaml_dict, EXECUTOR_PROJECT_DATA_DIR)
@@ -20,7 +19,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service
     get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_log_simulator)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
     get_bkr_from_underlying_account)
-from FluxPythonUtils.scripts.utility_functions import dict_or_list_records_csv_reader
+from FluxPythonUtils.scripts.utility_functions import dict_or_list_records_csv_reader, transform_to_str
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 
 
@@ -29,14 +28,27 @@ log_simulate_logger = logging.getLogger("log_simulator")
 
 class FillsJournalCont(FillsJournalBaseModel):
 
+    @staticmethod
+    def transform(kwargs: Dict):
+        field: str
+        fields = ["fill_symbol"]
+        for field in fields:
+            v = kwargs.get(field)
+            kwargs[field] = transform_to_str(v)
+
     @classmethod
     def from_kwargs(cls, **kwargs):
-        fill_symbol = kwargs.pop("fill_symbol", None)
-        if fill_symbol is not None:
-            kwargs["fill_symbol"] = str(fill_symbol)
+        cls.transform(kwargs)
+        fills_journal_cont = super().from_kwargs(**kwargs)
+        return fills_journal_cont
 
-        sec_pos_extended = super().from_kwargs(**kwargs)
-        return sec_pos_extended
+    @classmethod
+    def from_dict_list(cls, args_dict_list: List[Dict], **kwargs):
+        args_dict: Dict
+        for args_dict in args_dict_list:
+            cls.transform(args_dict)
+        fills_journal_cont_list = super().from_dict_list(args_dict_list, **kwargs)
+        return fills_journal_cont_list
 
 
 class LogBarterSimulator(BarteringLinkBase):
@@ -58,7 +70,7 @@ class LogBarterSimulator(BarteringLinkBase):
         super(LogBarterSimulator, self).__init__(executor_config_yaml_dict.get("inst_id"))
 
     @classmethod
-    def load_positions_by_symbol_dict(cls, symbol_type_dict: Dict[str, str]):
+    def load_positions_by_symbols_dict(cls, symbol_type_dict: Dict[str, str]):
         symbol_list: List[str] = [symbol for symbol in symbol_type_dict]
         broker_sec_pos_dict: Dict[str, Dict[str, List[Position]]] = {}
 
@@ -95,7 +107,7 @@ class LogBarterSimulator(BarteringLinkBase):
 
                 sec_pos_dict: Dict[str, List[Position]] = broker_sec_pos_dict[broker]
 
-                if not sec_id in sec_pos_dict:
+                if sec_id not in sec_pos_dict:
                     sec_pos_dict[sec_id] = []
 
                 bot_size: int = chore_fill.fill_qty if chore_fill.fill_side == Side.BUY else 0
@@ -183,3 +195,18 @@ class LogBarterSimulator(BarteringLinkBase):
                 f"{system_sec_id_str}"
                 f"{underlying_account_str}")
         return True
+
+    @classmethod
+    async def place_amend_chore(cls, chore_id: str, px: float | None = None, qty: int | None = None) -> bool:
+        raise NotImplementedError
+
+    @classmethod
+    async def is_chore_open(cls, chore_id: str) -> bool:
+        raise NotImplementedError
+
+    @classmethod
+    async def get_chore_status(cls, chore_id: str) -> Tuple[ChoreStatusType | None, str | None, int | None]:
+        """
+        returns chore_status (ChoreStatusType), any_chore_text, filled-Qty
+        """
+        raise NotImplementedError

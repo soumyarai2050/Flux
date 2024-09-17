@@ -15,7 +15,9 @@ message StratView{
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
-    PassStoredObjToUpdatePrePostCallback: true
+    PassStoredObjToUpdatePrePostCallback: true,
+    PassStoredObjToPartialUpdatePostCallback: True,
+    PassStoredObjToPartialUpdateAllPostCallback: True
   };
   option (FluxMsgWidgetUIOption) = {
     depending_proto_file_name: "email_book_service.proto",

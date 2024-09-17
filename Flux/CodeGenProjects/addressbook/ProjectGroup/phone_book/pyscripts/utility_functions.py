@@ -1,14 +1,13 @@
+# standard imports
 import logging
 from pathlib import PurePath
-from fastapi.encoders import jsonable_encoder
 import time
 
+# project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     get_strat_key_from_pair_strat)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     CURRENT_PROJECT_DIR as PAIR_STRAT_ENGINE_DIR, email_book_service_http_client)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
-    photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
@@ -50,14 +49,12 @@ def unload_strat(strat_id: int, force: bool = False):
             raise Exception(err_str_)
 
         pair_strat_obj = email_book_service_http_client.patch_pair_strat_client(
-            jsonable_encoder(PairStratBaseModel(id=strat_id, strat_state=StratState.StratState_PAUSED),
-                             by_alias=True, exclude_none=True))
+            {'_id': strat_id, 'strat_state': StratState.StratState_PAUSED})
         time.sleep(5)
 
     if pair_strat_obj.strat_state in [StratState.StratState_PAUSED, StratState.StratState_ERROR]:
         pair_strat_obj = email_book_service_http_client.patch_pair_strat_client(
-            jsonable_encoder(PairStratBaseModel(id=strat_id, strat_state=StratState.StratState_DONE),
-                             by_alias=True, exclude_none=True))
+            {'_id': strat_id, 'strat_state': StratState.StratState_DONE})
         time.sleep(5)
 
     strat_collection_obj: StratCollectionBaseModel = get_strat_collection()
@@ -86,8 +83,7 @@ def recycle_strat(strat_id: int, force: bool = False):
     unload_strat(strat_id, force)
     time.sleep(2)
 
-    strat_collection_obj: StratCollectionBaseModel = get_strat_collection()
-    updated_strat_collection_obj: StratCollectionBaseModel = deepcopy(strat_collection_obj)
+    updated_strat_collection_obj: StratCollectionBaseModel = get_strat_collection()
     updated_strat_collection_obj.loaded_strat_keys.append(strat_key)
     updated_strat_collection_obj.buffered_strat_keys.remove(strat_key)
     email_book_service_http_client.put_strat_collection_client(updated_strat_collection_obj)

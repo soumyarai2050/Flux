@@ -18,7 +18,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydenti
 
 
 def retain_broker_and_position_disable(source_brokers: List[BrokerBaseModel],
-                                       dest_broker_dict: Dict[str, Broker | BrokerOptional]):
+                                       dest_broker_dict: Dict[str, BrokerBaseModel]):
     for broker in source_brokers:
         dest_broker: Broker | None = BrokerUtil.retain_broker_disable(broker, dest_broker_dict)
         if dest_broker is None:
@@ -29,9 +29,9 @@ def retain_broker_and_position_disable(source_brokers: List[BrokerBaseModel],
     return dest_broker_dict
 
 
-def merge_eligible_brokers_by_pos_type(source_brokers: List[BrokerBaseModel], dest_broker_dict: Dict[str, Broker],
-                                       pos_type: PositionType):
-    dest_broker_append_list: List[Broker] = list()
+def merge_eligible_brokers_by_pos_type(source_brokers: List[BrokerBaseModel],
+                                       dest_broker_dict: Dict[str, BrokerBaseModel], pos_type: PositionType):
+    dest_broker_append_list: List[BrokerBaseModel] = list()
     for source_broker in source_brokers:
         # 1. Remove all current pos_type (example PTH) positions from source_broker to overwrite with new positions
         if BrokerUtil.remove_sec_position_by_type(source_broker, pos_type):
@@ -47,14 +47,14 @@ def merge_eligible_brokers_by_pos_type(source_brokers: List[BrokerBaseModel], de
             dest_broker.bkr_disable = source_broker.bkr_disable
             # now merge source into dest (dest is posted as updated value)
             BrokerUtil.merge(dest_broker, source_broker)
-    merged_eligible_broker_list: List[Broker] = dest_broker_append_list + [*(dest_broker_dict.values())]
+    merged_eligible_broker_list: List[BrokerBaseModel] = dest_broker_append_list + [*(dest_broker_dict.values())]
     return merged_eligible_broker_list
 
 
 @except_n_log_alert()
 def put_portfolio_limits_eligible_brokers(portfolio_limits: PortfolioLimitsBaseModel,
-                                          new_eligible_brokers: List[Broker],
-                                          dest_broker_dict: Dict[str, Broker], pos_type: PositionType):
+                                          new_eligible_brokers: List[BrokerBaseModel],
+                                          dest_broker_dict: Dict[str, BrokerBaseModel], pos_type: PositionType):
     if portfolio_limits.eligible_brokers is not None:
         dest_broker_dict = retain_broker_and_position_disable(portfolio_limits.eligible_brokers, dest_broker_dict)
         # merge new and old (new_eligible_brokers are all inside dest_broker_dict)
@@ -77,8 +77,9 @@ def put_portfolio_limits_eligible_brokers(portfolio_limits: PortfolioLimitsBaseM
 
 
 @except_n_log_alert()
-def create_or_update_portfolio_limits_eligible_brokers(eligible_brokers: List[Broker],
-                                                       dest_broker_dict: Dict[str, Broker], pos_type: PositionType):
+def create_or_update_portfolio_limits_eligible_brokers(eligible_brokers: List[BrokerBaseModel],
+                                                       dest_broker_dict: Dict[str, BrokerBaseModel],
+                                                       pos_type: PositionType):
     portfolio_limits: PortfolioLimitsBaseModel | None = get_portfolio_limits()
     if portfolio_limits is None:  # no portfolio limits set yet - create one
         create_portfolio_limits(eligible_brokers)
@@ -86,7 +87,6 @@ def create_or_update_portfolio_limits_eligible_brokers(eligible_brokers: List[Br
         put_portfolio_limits_eligible_brokers(portfolio_limits, eligible_brokers, dest_broker_dict, pos_type)
 
 
-# deprecated
 def update_portfolio_alert(alert_brief: str, alert_details: str | None = None,
                            impacted_chores: List[ChoreBrief] | None = None,
                            severity: Severity = Severity.Severity_ERROR):
@@ -103,7 +103,6 @@ def update_strat_alert_by_sec_and_side(sec_id: str, side: Side, alert_brief: str
     pass
 
 
-# deprecated
 @except_n_log_alert()
 def block_active_strat_with_restricted_security(sec_id_list: List[str]):
     pass

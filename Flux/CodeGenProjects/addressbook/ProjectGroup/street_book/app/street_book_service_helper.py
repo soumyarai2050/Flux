@@ -19,8 +19,10 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic
     PairStrat)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client, get_symbol_side_key)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import log_book_service_http_client
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import post_book_service_http_client
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
+    log_book_service_http_client)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
+    post_book_service_http_client)
 
 update_strat_status_lock: threading.Lock = threading.Lock()
 
@@ -199,8 +201,7 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
                                             market_barter_volume_participation=market_barter_volume_participation,
                                             market_depth=market_depth,
                                             residual_restriction=residual_restriction,
-                                            min_chore_notional=100, min_chore_notional_allowance=10
-                                            )
+                                            min_chore_notional=100, min_chore_notional_allowance=10)
     return strat_limits
 
 
@@ -280,15 +281,15 @@ def chore_has_terminal_state(chore_snapshot: ChoreSnapshot) -> bool:
 
 def check_n_update_conv_px(ticker: str, conv_px: float | None, security_record: SecurityRecord):
     if (not conv_px) or (math.isclose(conv_px, 0)):
-        err: str = f"Unexpected! {conv_px=} for {ticker=}, in MD symbol_overview_obj"
+        err: str = f"Unexpected! {conv_px=} for {ticker=}, in MD symbol_overview_obj, "
         if security_record:
             err += f"enriching from static data instead, {security_record.conv_px=}"
             conv_px = security_record.conv_px
-        # else not required - handled via "iff err and not security_record" section
+        # else not required - handled via "if err and not security_record" section
     elif security_record and security_record.conv_px and (not math.isclose(security_record.conv_px, 0)):
         if not math.isclose(security_record.conv_px, conv_px):
             logging.error(f"static data conv_px: {security_record.conv_px} mismatches symbol_overview conv_px: "
-                          f"{conv_px}, proceeding with static data conv_px for {security_record.ticker=}")
+                          f"{conv_px}, proceeding with static data conv_px for {security_record.ticker}")
             conv_px = security_record.conv_px
     return conv_px
 
@@ -303,23 +304,29 @@ def create_symbol_overview_pre_helper(static_data: SecurityRecordManager, symbol
                     f"{ticker=}, in MD symbol_overview_obj, ")
         if security_record:
             err += (f"enriching from static data instead, {security_record.limit_up_px=} and "
-                    f"{security_record.limit_dn_px}")
+                    f"{security_record.limit_dn_px=}")
             symbol_overview_obj.limit_up_px = security_record.limit_up_px
             symbol_overview_obj.limit_dn_px = security_record.limit_dn_px
-        # else not required - handled via "iff err and not security_record" section
+        # else not required - handled via "if err and not security_record" section
 
     symbol_overview_obj.conv_px = check_n_update_conv_px(ticker, symbol_overview_obj.conv_px, security_record)
 
     if (not symbol_overview_obj.lot_size) or (math.isclose(symbol_overview_obj.lot_size, 0)):
-        err: str = f"Unexpected! {symbol_overview_obj.lot_size=} for {ticker=}, in MD symbol_overview_obj"
+        err: str = f"Unexpected! {symbol_overview_obj.lot_size=} for {ticker=}, in MD symbol_overview_obj, "
         if security_record:
             err += f"enriching from static data instead, {security_record.lot_size=}"
             symbol_overview_obj.lot_size = security_record.lot_size
         # else not required - handled via "if err and not security_record" section
 
+    if (not symbol_overview_obj.tick_size) or (math.isclose(symbol_overview_obj.tick_size, 0)):
+        debug_: str = f"Found {symbol_overview_obj.tick_size=} for {ticker=}, in MD symbol_overview_obj, "
+        if security_record:
+            debug_ += f"enriching from static data instead, {security_record.tick_size=}"
+            symbol_overview_obj.tick_size = security_record.tick_size
+
     if err and not security_record:
         err += f"enriching from static data failed too, no security_record found for {ticker}"
-        logging.warning(err)
+        logging.warning(f"{err}")
 
     # check and add last update datetime to current time if not present [log warning]
     if not symbol_overview_obj.last_update_date_time:

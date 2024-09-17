@@ -496,12 +496,6 @@ def test_timeit_5000_reads(static_data_, clean_and_set_limits, leg1_leg2_symbol_
         copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
         max_loop_count_per_side, refresh_sec_update_fixture)
 
-    #
-    # executor_web_client = (
-    #     place_sanity_chores(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
-    #                         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
-    #                         max_loop_count_per_side, refresh_sec_update_fixture))
-
     # reading chore_snapshot 5000 times
     total_read_counts = 5000
     total_chore_snapshot_obj = max_loop_count_per_side*2
@@ -517,3 +511,41 @@ def test_timeit_5000_reads(static_data_, clean_and_set_limits, leg1_leg2_symbol_
 
 # Msgspec - Total time taken for 5000 reads of 50 chore_snapshot is: 44.873951098999896 secs
 # Beanie - Total time taken for 5000 reads of 50 chore_snapshot is: 76.9152190049972 secs
+
+
+@pytest.mark.nightly
+def test_timeit_5000_patch(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+                           expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+                           last_barter_fixture_list, market_depth_basemodel_list,
+                           buy_chore_, sell_chore_,
+                           max_loop_count_per_side, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+
+    active_pair_strat, executor_http_client = (
+        create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                expected_strat_status_, symbol_overview_obj_list,
+                                market_depth_basemodel_list))
+
+    total_patch_counts = 5000
+    start_time = timeit.default_timer()
+    for i in range(total_patch_counts):
+        active_pair_strat.pair_strat_params.exch_response_max_seconds = i
+        active_pair_strat.pair_strat_params.hedge_ratio = float(i)
+        # active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id = "i"
+        updated_obj = (
+            email_book_service_native_web_client.patch_pair_strat_client(
+                active_pair_strat.to_json_dict(exclude_none=True)))
+        active_pair_strat.last_active_date_time = updated_obj.last_active_date_time
+        active_pair_strat.frequency = updated_obj.frequency
+        active_pair_strat.pair_strat_params_update_seq_num = updated_obj.pair_strat_params_update_seq_num
+        assert updated_obj == active_pair_strat, \
+            f"Mismatched pair_strat obj: expected {active_pair_strat}, updated {updated_obj}"
+    end_time = timeit.default_timer()
+
+    total_time = (end_time - start_time)
+    print(f"Total time taken for 5000 patch of pair_strat is: {total_time} secs")
+
+# Total time taken for 5000 patch of pair_strat is: 26.107542213998386 secs - with bug
+# Total time taken for 5000 patch of pair_strat is: 31.730079086999922 secs - with deepcopy
+# Total time taken for 5000 patch of pair_strat is: 27.38354792700011 secs - with extra fetch

@@ -8,7 +8,7 @@ import os
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
     Security, Side)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
-    ChoreBrief, ChoreJournal, ChoreEventType)
+    ChoreBrief, ChoreJournal, ChoreEventType, ChoreStatusType)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     EmailBookServiceHttpClient, email_book_service_http_client)
@@ -45,7 +45,7 @@ class BarteringLinkBase(ABC):
 
     def subscribe(self, listener_id: str, asyncio_loop: asyncio.AbstractEventLoop,
                   ric_filters: List[str] | None, sedol_filters: List[str] | None,
-                  block_bartering_symbol_side_events: Dict[str, Tuple[Side, str]]):
+                  block_bartering_symbol_side_events: Dict[str, Tuple[Side, str]], mstrat: str | None = None):
         logging.warning("Warning: BarteringLinkBase subscribe invoked - subscribe call has no effect")
 
     def unsubscribe(self):
@@ -97,6 +97,13 @@ class BarteringLinkBase(ABC):
 
     @classmethod
     @abstractmethod
+    async def place_amend_chore(cls, chore_id: str, px: float | None = None, qty: int | None = None) -> bool:
+        """
+        derived to implement connector to underlying link provider
+        """
+
+    @classmethod
+    @abstractmethod
     async def place_cxl_chore(cls, chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
                               system_sec_id: str | None = None, underlying_account: str | None = None) -> bool:
         """
@@ -104,11 +111,30 @@ class BarteringLinkBase(ABC):
         """
 
     @classmethod
+    @abstractmethod
+    async def is_chore_open(cls, chore_id: str) -> bool:
+        """
+        derived to implement connector to underlying link provider
+        return True if chore found open
+        """
+
+    @classmethod
+    @abstractmethod
+    async def get_chore_status(cls, chore_id: str) -> Tuple[ChoreStatusType | None, str | None, int | None]:
+        """
+        derived to implement connector to underlying link provider
+        return appropriate returns chore_status (ChoreStatusType), any_chore_text, filled-Qty if chore found otherwise:
+            return None, None, None [indicating no chore found for this chore_id]
+        throws exception if found chore state is unsupported
+        """
+
+
+    @classmethod
     async def internal_chore_state_update(cls, chore_event: ChoreEventType, chore_id: str, side: Side | None = None,
                                           bartering_sec_id: str | None = None, system_sec_id: str | None = None,
                                           underlying_account: str | None = None, msg: str | None = None) -> bool:
         """use for rejects New / Cxl for now - maybe other use cases in future"""
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes_imports import (
             underlying_create_chore_journal_http)
 
         security = Security(sec_id=system_sec_id)

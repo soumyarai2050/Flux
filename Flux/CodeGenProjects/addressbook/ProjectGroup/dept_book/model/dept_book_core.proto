@@ -51,7 +51,7 @@ message InventoryRange {
 
 message OptimizerCriteria {
     optional PositionType pos_type = 1 [(FluxFldHelp) = "pos_type to optimize - if not found, no optimization available for that sec id"];
-    optional int64 min_notional = 2 [(FluxFldHelp) = "min required notional (at better cost) to match"];
+    optional int64 min_notional = 2 [(FluxFldTitle) = "min $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "min required notional (at better cost) to match"];
 }
 
 message Inventory {
@@ -69,14 +69,14 @@ message DashLeg {
     optional string company = 4 [(FluxFldServerPopulate) = true];
     optional float vwap = 5 [(FluxFldServerPopulate) = true];
     optional float vwap_change = 6 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against yesterday close px"];
-    optional float market_notional = 7 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "market current total last barter notional"];
-    optional float consumed_notional = 8 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "all strat total leg filled notional"];
+    optional float market_notional = 7 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldTitle) = "market $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "market current total last barter notional"];
+    optional float consumed_notional = 8 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldTitle) = "consumed $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "all strat total leg filled notional"];
 }
 
 message InventorySummary {
     required int64 cum_qty = 1 [(FluxFldServerPopulate) = true];
     optional float avg_rate = 2 [(FluxFldNumberFormat) = "%"];
-    optional float usd_notional = 3 [(FluxFldDisplayType) = "int"];
+    optional float usd_notional = 3 [(FluxFldTitle) = "usd $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int"];
 }
 
 message InventoryRequest {
@@ -87,7 +87,7 @@ message InventoryRequest {
     optional int64 update_time = 5 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true];
     optional int64 qty = 6 [(FluxFldServerPopulate) = true];
     optional float max_rate = 7 [(FluxFldNumberFormat) = "%"];
-    optional float usd_notional = 8 [(FluxFldDisplayType) = "int"];
+    optional float usd_notional = 8 [(FluxFldTitle) = "usd $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int"];
     optional string note = 9;
 }
 

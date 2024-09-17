@@ -1,5 +1,4 @@
 # standard imports
-from functools import lru_cache
 from typing import List, Tuple, Dict, Any
 
 # project imports
@@ -28,9 +27,10 @@ def get_pair_strat_log_key(pair_strat: PairStrat | PairStratBaseModel | PairStra
         if pair_strat.pair_strat_params.strat_leg2 is not None:
             leg_2_sec_id = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
             leg_2_side = pair_strat.pair_strat_params.strat_leg2.side
-            symbol_side_key = get_symbol_side_key([(leg_1_sec_id, leg_1_side), (leg_2_sec_id, leg_2_side)])
+            symbol_side_key = get_symbol_side_key([(leg_1_sec_id, Side(leg_1_side)),
+                                                   (leg_2_sec_id, Side(leg_2_side))])
         else:
-            symbol_side_key = get_symbol_side_key([(leg_1_sec_id, leg_1_side)])
+            symbol_side_key = get_symbol_side_key([(leg_1_sec_id, Side(leg_1_side))])
         base_pair_strat_key = EmailBookServiceKeyHandler.get_log_key_from_pair_strat(pair_strat)
         pair_strat_key = f"{symbol_side_key}-{base_pair_strat_key}"
         pair_strat_id_key[pair_strat.id] = pair_strat_key
@@ -48,9 +48,9 @@ def get_pair_strat_dict_log_key(pair_strat_dict: Dict[str, Any]):
         if (strat_leg2 := pair_strat_dict["pair_strat_params"].get("strat_leg2")) is not None:
             leg_2_sec_id = strat_leg2["sec"]["sec_id"]
             leg_2_side = strat_leg2.get("side")
-            symbol_side_key = get_symbol_side_key([(leg_1_sec_id, leg_1_side), (leg_2_sec_id, leg_2_side)])
+            symbol_side_key = get_symbol_side_key([(leg_1_sec_id, Side(leg_1_side)), (leg_2_sec_id, Side(leg_2_side))])
         else:
-            symbol_side_key = get_symbol_side_key([(leg_1_sec_id, leg_1_side)])
+            symbol_side_key = get_symbol_side_key([(leg_1_sec_id, Side(leg_1_side))])
         base_pair_strat_key = f'{leg_1_sec_id}' + '_' + f'{leg_2_sec_id}' + '_' + f'{pair_strat_id}'
         pair_strat_key = f"{symbol_side_key}-{base_pair_strat_key}"
         pair_strat_id_key[pair_strat_id] = pair_strat_key

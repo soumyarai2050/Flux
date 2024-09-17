@@ -22,7 +22,8 @@ from FluxPythonUtils.scripts.utility_functions import clear_semaphore
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecord, SecType
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.chore_check import ChoreControl
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.chore_check import (
+    ChoreControl, initialize_chore_control)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_data_manager import BarteringDataManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.strat_cache import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import (
@@ -132,7 +133,7 @@ class StreetBook(Service):
                 block_bartering_symbol_side_events[secondary_bartering_symbol] = (blocked_side, "ALL")
         return True  # block applied [blocked side either settled_tradable or fully not tradable]
 
-    def get_subscription_data(self) -> Tuple[List[str], List[str], Dict[str, Tuple[Side, str]]]:
+    def get_subscription_data(self) -> Tuple[List[str], List[str], Dict[str, Tuple[Side, str]], str | None]:
         pair_strat_: PairStrat
         # store bartering symbol and side of sec that are not intraday true
 
@@ -157,7 +158,8 @@ class StreetBook(Service):
         else:
             secondary_symbols.append(leg2_sec_rec.ric)
             secondary_symbols.append(leg2_sec_rec.secondary_ric)
-        return [leg1_sec_rec.sedol], secondary_symbols, block_bartering_symbol_side_events
+        mstrat: str | None = pair_strat_.pair_strat_params.mstrat
+        return [leg1_sec_rec.sedol], secondary_symbols, block_bartering_symbol_side_events, mstrat
 
     @staticmethod
     def executor_trigger(bartering_data_manager_: BarteringDataManager, strat_cache: StratCache,
@@ -165,14 +167,15 @@ class StreetBook(Service):
         street_book: StreetBook = StreetBook(bartering_data_manager_, strat_cache, mobile_book_container_cache)
         street_book_thread = Thread(target=street_book.run, daemon=True).start()
         block_bartering_symbol_side_events: Dict[str, Tuple[Side, str]]
-        sedol_symbols, ric_symbols, block_bartering_symbol_side_events = street_book.get_subscription_data()
+        sedol_symbols, ric_symbols, block_bartering_symbol_side_events, mstrat = street_book.get_subscription_data()
         listener_sedol_key = [f'{sedol_symbol}-' for sedol_symbol in sedol_symbols]
         listener_ric_key = [f'{ric_symbol}-' for ric_symbol in ric_symbols]
         listener_id = f"{listener_sedol_key}-{listener_ric_key}-{os.getpid()}"
         street_book.bartering_link.log_key = strat_cache.get_key()
         street_book.bartering_link.subscribe(listener_id, StreetBook.asyncio_loop, ric_filters=ric_symbols,
                                               sedol_filters=sedol_symbols,
-                                              block_bartering_symbol_side_events=block_bartering_symbol_side_events)
+                                              block_bartering_symbol_side_events=block_bartering_symbol_side_events,
+                                              mstrat=mstrat)
         # trigger executor md start [ name to use tickers ]
 
         return street_book, street_book_thread
@@ -188,6 +191,7 @@ class StreetBook(Service):
         self.meta_bartering_symbol_side_dict: Dict[str, Side] = {}
         self.meta_symbols_n_sec_id_source_dict: Dict[str, str] = {}  # stores symbol and symbol type [RIC, SEDOL, etc.]
         self.market = Market(MarketID.IN)
+        self.cn_eqt_min_qty: Final[int] = 100
         self.allow_multiple_unfilled_chore_pairs_per_strat: Final[bool] = allow_multiple_unfilled_chore_pairs_per_strat \
             if (allow_multiple_unfilled_chore_pairs_per_strat :=
                 executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat")) is not None else False
@@ -234,10 +238,8 @@ class StreetBook(Service):
         # 1-time prepare param used by update_aggressive_market_depths_in_cache call for this strat [init on first use]
         self.aggressive_symbol_side_tuples_dict: Dict[str, List[Tuple[str, str]]] = {}
         StreetBook.initialize_underlying_http_routes()  # Calling underlying instances init
-        # init ChoreControl.max_spread_in_bips from config [we could instead send config to chore control class var to
-        # init any dependent vars]
-        max_spread_in_bips: int = int(executor_config_yaml_dict.get("max_spread_in_bips"))
-        ChoreControl.max_spread_in_bips = max_spread_in_bips
+        # initialize ChoreControl class vars
+        initialize_chore_control()
 
         # attributes to be set in run method
         self.leg_1_symbol: str | None = None
@@ -259,7 +261,7 @@ class StreetBook(Service):
             else:
                 return False
 
-    def init_meta_dict(self):
+    def init_meta_dicts(self):
         pair_strat_: PairStrat
         pair_strat_, _ = self.strat_cache.get_pair_strat()
         strat_leg1 = pair_strat_.pair_strat_params.strat_leg1
@@ -273,7 +275,7 @@ class StreetBook(Service):
             self.meta_no_executed_tradable_symbol_replenishing_side_dict[leg1_bartering_symbol] = replenishing_side
         self.meta_symbols_n_sec_id_source_dict[leg1_bartering_symbol] = SecurityIdSource.SEDOL
 
-        # TODO Non CN Leg2 to Leg3 handling upgrades to be done here
+        # TODO Non CN Leg2 or Leg3 handling upgrades to be done here
         strat_leg2 = pair_strat_.pair_strat_params.strat_leg2
         leg2_ticker: str = strat_leg2.sec.sec_id
         leg2_sec_rec: SecurityRecord = self.strat_cache.static_data.get_security_record_from_ticker(leg2_ticker)
@@ -291,7 +293,7 @@ class StreetBook(Service):
             self.meta_no_executed_tradable_symbol_replenishing_side_dict[connect_ric] = replenishing_side
 
     def start_pos_cache(self) -> bool:
-        self.init_meta_dict()
+        self.init_meta_dicts()
 
         with self.strat_cache.re_ent_lock:
             strat_limits: StratLimitsBaseModel
@@ -303,7 +305,7 @@ class StreetBook(Service):
                        f"{strat_limits_tuple}")
                 logging.error(err)
                 return False
-            logging.info(f"{strat_limits.id=};;;{strat_limits}")
+            logging.info(f"{strat_limits.id=};;;{strat_limits=}")
             brokers: List[BrokerBaseModel] = strat_limits.eligible_brokers
             sod_n_intraday_pos_dict: Dict[str, Dict[str, List[Position]]] | None = None
             if hasattr(self.bartering_link, "load_positions_by_symbols_dict"):
@@ -530,6 +532,8 @@ class StreetBook(Service):
                           f"{new_ord.qty=}, key: {get_symbol_side_key([(system_symbol, new_ord.side)])}")
             err_dict["extract_availability"] = f"{system_symbol}"
             return ChoreControl.ORDER_CONTROL_EXTRACT_AVAILABILITY_FAIL
+        if new_ord.mstrat is None:
+            new_ord.mstrat = pair_strat.pair_strat_params.mstrat
         try:
             if not SecPosExtended.validate_all(system_symbol, new_ord.side, sec_pos_extended_list):
                 return ChoreControl.ORDER_CONTROL_REQUIRED_DATA_MISSING_FAIL
@@ -550,7 +554,7 @@ class StreetBook(Service):
                                                                                       err_dict, check_mask)):
                 # secondary bartering block
                 # pair_strat not active: disallow chore from proceeding
-                # system not in UAT & not bartering time: disallow chore from processing [UAT barters outside hours]
+                # system not in UAT & not bartering time: disallow chore from proceeding [UAT barters outside hours]
                 pair_strat = self._get_latest_pair_strat()
                 if pair_strat.strat_state != StratState.StratState_ACTIVE or self.market.is_not_uat_nor_bartering_time():
                     logging.error(f"Secondary Block place chore - strat in {pair_strat.strat_state} state (block as "
@@ -563,7 +567,7 @@ class StreetBook(Service):
                 sent_qty: int = 0
                 remaining_qty: int = new_ord.qty
                 for idx, sec_pos_extended in enumerate(sec_pos_extended_list):
-                    bartering_symbol = sec_pos_extended.bartering_account
+                    bartering_symbol = sec_pos_extended.security.sec_id
                     symbol_type = "SEDOL" if sec_pos_extended.security.inst_type == InstrumentType.CB else "RIC"
                     account = sec_pos_extended.bartering_account
                     exchange = sec_pos_extended.bartering_route
@@ -590,11 +594,11 @@ class StreetBook(Service):
                                       f"{sec_pos_extended_list}")
                     if not self.bartering_link_place_new_chore(new_ord.px, new_ord.qty, new_ord.side, bartering_symbol,
                                                              system_symbol, symbol_type, account, exchange,
-                                                             internal_ord_id=internal_ord_id):
+                                                             internal_ord_id=internal_ord_id, mstrat=new_ord.mstrat):
                         # reset unack for subsequent chores to go through - this chore did fail to go through
                         self.set_unack(system_symbol, False, internal_ord_id)
                         if 0 != idx:
-                            # handle partial fill
+                            # handle partial fail
                             err_dict["FAILED_QTY"] = orig_new_chore_qty - sent_qty
                         return ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
                     else:
@@ -614,9 +618,13 @@ class StreetBook(Service):
                     self.strat_cache.pos_cache.return_availability(system_symbol, sec_pos_extended)
 
     def bartering_link_place_new_chore(self, px: float, qty: int, side: Side, bartering_symbol: str, system_symbol: str,
-                                     symbol_type: str, account: str, exchange: str, internal_ord_id: str | None = None):
+                                     symbol_type: str, account: str, exchange: str,
+                                     internal_ord_id: str | None = None, mstrat: str | None = None):
+        kwargs = {}
+        if mstrat is not None:
+            kwargs["mstrat"] = mstrat
         run_coro = self.bartering_link.place_new_chore(px, qty, side, bartering_symbol, system_symbol, symbol_type,
-                                                     account, exchange, internal_ord_id=internal_ord_id)
+                                                     account, exchange, internal_ord_id=internal_ord_id, **kwargs)
         future = asyncio.run_coroutine_threadsafe(run_coro, StreetBook.asyncio_loop)
 
         # block for task to finish [run as coroutine helps enable http call via asyncio, other threads use freed CPU]
@@ -779,9 +787,11 @@ class StreetBook(Service):
                             hedge_ratio = pair_strat.pair_strat_params.hedge_ratio
                         if (consumable_participation_notional * hedge_ratio) > self.strat_limit.min_chore_notional:
                             err_dict["consumable_participation_qty"] = f"{consumable_participation_qty}"
-                            logging.warning(f"hedge ratio adjusted retryable {warn_}")
+                            logging.warning(f"hedge_ratio adjusted retryable {warn_}")
                         else:
-                            logging.warning(f"hedge ratio adjusted non-retryable {warn_}")
+                            logging.warning(f"hedge_ratio adjusted non-retryable {warn_}")
+                    else:  # check passed - no action
+                        logging.debug(f"{consumable_participation_qty=}; {new_ord=}")
 
                 else:
                     strat_brief_key: str = get_strat_brief_log_key(strat_brief)
@@ -830,7 +840,8 @@ class StreetBook(Service):
         # chore qty / chore contract qty checks
         if (InstrumentType.INSTRUMENT_TYPE_UNSPECIFIED != new_ord.security.inst_type != InstrumentType.EQT and
                 chore_limits.max_contract_qty):
-            checks_passed_ = ChoreControl.check_max_contract_qty(chore_limits, new_ord.qty, sys_symbol, new_ord.side)
+            checks_passed_ = ChoreControl.check_max_chore_contract_qty(chore_limits, new_ord.qty, sys_symbol,
+                                                                       new_ord.side)
         else:
             checks_passed_ = ChoreControl.check_max_chore_qty(chore_limits, new_ord.qty, sys_symbol, new_ord.side)
         # apply chore qty / chore contract qty check result
@@ -900,7 +911,7 @@ class StreetBook(Service):
         if os.path.exists(generation_start_file_path):
             # first stopping script if already exists
             process = subprocess.Popen([f"{generation_stop_file_path}"])
-            # wait for scripts complete execution and delete existing stop and start scripts
+            # wait for scripts to complete execution and delete existing stop and start scripts
             process.wait()
 
         create_md_shell_script(md_shell_env_data, str(generation_start_file_path), mode="MD",
@@ -972,7 +983,7 @@ class StreetBook(Service):
             future.result()
         except Exception as e_:
             logging.exception(f"underlying_handle_strat_activate_query_http failed for pair_strat_id: "
-                              f"{self.pair_street_book_id}; Exiting executor run trigger;;;exception: {e_}")
+                              f"{self.pair_street_book_id}; Exiting executor run();;;exception: {e_}")
             return -5001
 
         max_retry_count: Final[int] = 12
@@ -1156,7 +1167,7 @@ class StreetBook(Service):
 
     @staticmethod
     def get_cb_lot_size_from_cb_symbol_overview_(
-            cb_symbol_overview: SymbolOverviewBaseModel | SymbolOverview) -> int | None:
+            cb_symbol_overview: SymbolOverviewBaseModel | SymbolOverview | None) -> int | None:
         """
         Assumes non-none cb_symbol_overview passed
         """
@@ -1414,7 +1425,7 @@ class StreetBook(Service):
                               f"{self.strat_cache.leg1_fx_symbol = };;; {self.strat_cache = }")
                 return None
 
-    def process_cxl_request(self, force_cxl_only: bool = True):
+    def process_cxl_request(self, force_cxl_only: bool = False):
         cancel_chores_and_date_tuple = self.strat_cache.get_cancel_chore(self._cancel_chores_update_date_time)
         if cancel_chores_and_date_tuple is not None:
             cancel_chores, self._cancel_chores_update_date_time = cancel_chores_and_date_tuple
@@ -1436,7 +1447,7 @@ class StreetBook(Service):
                             logging.warning(f"{force_cxl_only=} and {cancel_chore.force_cancel=} leaving unprocessed "
                                             f"{cancel_chore=}")
                         if not res:
-                            # check in DB if this chore needs cancellation, other set cancel_chore.cxl_confirmed to
+                            # check in DB if this chore needs cancellation, otherwise set cancel_chore.cxl_confirmed to
                             # true and stop processing it
                             pass
 
@@ -1495,7 +1506,7 @@ class StreetBook(Service):
         """
         Args:
             strat_brief:
-            ol: current oder limits as set by system / user
+            ol: current chore limits as set by system / user
         Returns:
             0: indicates done; no notional to consume on at-least 1 leg & no-open chores for this strat in market
             -1: indicates needs-processing; strat has notional left to consume on both legs or has unack leg
@@ -1530,7 +1541,7 @@ class StreetBook(Service):
         open_chore_count: int = self.strat_cache.get_open_chore_count_from_cache()
         has_unack_leg = self.strat_cache.has_unack_leg()
         if has_unack_leg:
-            if log_error:  # [chore impact not applied]
+            if log_error:  # [chore impact not applied yet]
                 logging.debug(f"blocked opportunity search, has unack leg and {open_chore_count} open chore(s)")
             return False
         if not self.strat_limit.max_open_chores_per_side:
@@ -1539,7 +1550,7 @@ class StreetBook(Service):
         else:
             if self.strat_limit.max_open_chores_per_side < open_chore_count:
                 if log_error:
-                    logging.error(f"blocked opportunity search, has {open_chore_count} open chore(s), allowed: "
+                    logging.debug(f"blocked opportunity search, has {open_chore_count} open chore(s), allowed: "
                                   f"{self.strat_limit.max_open_chores_per_side=}")
                 return False
         if not self.allow_multiple_unfilled_chore_pairs_per_strat:
@@ -1657,6 +1668,7 @@ class StreetBook(Service):
                 # system not in UAT & not bartering time: disallow chore from proceeding [UAT barters outside hours]
                 if pair_strat.strat_state != StratState.StratState_ACTIVE or self.market.is_not_uat_nor_bartering_time():
                     self.process_cxl_request(force_cxl_only=True)
+                    continue
                 else:
                     strat_limits_tuple = self.strat_cache.get_strat_limits()
                     self.strat_limit, strat_limits_update_date_time = strat_limits_tuple
@@ -1781,5 +1793,5 @@ class StreetBook(Service):
             except Exception as e:
                 logging.exception(f"Run for {pair_strat_id=} returned with exception: {e}")
                 return -1
-        logging.info(f"exiting internal_run of {pair_strat_id=}, graceful shutdown of this strat")
+        logging.info(f"exiting internal_run of {pair_strat_id=}, graceful shutdown this strat")
         return 0

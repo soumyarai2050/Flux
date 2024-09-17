@@ -35,7 +35,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     compute_max_single_leg_notional, get_premium)
 from FluxPythonUtils.scripts.utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger,
-    handle_refresh_configurable_data_members, parse_to_int)
+    handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecordManager)
@@ -368,7 +368,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     strat_key = self.strat_cache.get_key()
                 if should_sleep:
                     time.sleep(self.min_refresh_interval)
-
                 service_up_flag_env_var = os.environ.get(f"street_book_{self.port}")
 
                 if service_up_flag_env_var == "1":
@@ -443,7 +442,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 try:
                                     updated_pair_strat = email_book_service_http_client.put_pair_strat_client(pair_strat)
                                 except Exception as exp:
-                                    logging.exception(f"patch_pair_strat_client failed for {strat_key};;;"
+                                    logging.exception(f"put_pair_strat_client failed for {strat_key};;;"
                                                       f"{exp=}, {pair_strat=}")
                                     continue
                                 else:
@@ -605,6 +604,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
     def app_launch_pre(self):
         StreetBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_routes()
+        # to be called only after logger is initialized - to prevent getting overridden
+        set_package_logger_level("filelock", logging.WARNING)
         if self.market.is_test_run:
             BarterSimulator.chore_create_async_callable = (
                 StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_journal_http)
@@ -647,7 +648,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     os.remove(so_file_path)
             except Exception as e:
                 err_str_ = f"Something went wrong while deleting so shell script, exception: {e}"
-                logging.error(err_str_)
+                logging.exception(err_str_)
 
             # renaming simulator log file
             if os.path.exists(self.log_simulator_file_path):
@@ -713,19 +714,19 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             else:
                 eqt_close_px = symbol_overview.closing_px
         # send None for self.orig_intra_day_bot/sld to force re-compute intraday based on current bot/sld snapshot
-        # 1st time at process start self.orig_intra_day_boy/sld is None to force compute
-        computed_max_single_leg_notional, self.orig_intra_day_dot, self.orig_intra_day_sld = \
+        # 1st time at process start self.orig_intra_day_bot/sld is None to force compute
+        computed_max_single_leg_notional, self.orig_intra_day_bot, self.orig_intra_day_sld = \
             compute_max_single_leg_notional(self.static_data, updated_strat_limits_obj.eligible_brokers, cb_symbol,
                                             eqt_symbol, side, self.usd_fx, cb_close_px, eqt_close_px,
                                             self.orig_intra_day_bot, self.orig_intra_day_sld)
         if math.isclose(computed_max_single_leg_notional, updated_strat_limits_obj.max_single_leg_notional) and \
                 math.isclose(computed_max_single_leg_notional, stored_strat_limits_obj.max_single_leg_notional):
-            return False # no action as no change
+            return False  # no action as no change
         if get_default_max_notional() < computed_max_single_leg_notional:
             # not allowed to go above default max CB Notional
             logging.warning(f"blocked assignment of computed CB notional: {computed_max_single_leg_notional:,} as it "
                             f"breaches default max_single_leg_notional: {get_default_max_notional():,}, setting to "
-                            f"default max_single_leg_notional instead. symbol_side_key: "
+                            f"default max_single_leg_notional instead, symbol_side_key: "
                             f"{get_symbol_side_key([(symbol, side)])}")
             computed_max_single_leg_notional = get_default_max_notional()
 
@@ -748,7 +749,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                  not math.isclose(computed_max_single_leg_notional, updated_strat_limits_obj.max_single_leg_notional):
             warn_str_: str = (f"increased computed max_single_leg_notional to: {computed_max_single_leg_notional:,}, "
                               f"note: this exceeds older max_single_leg_notional: "
-                              f" {updated_strat_limits_obj.max_single_leg_notional:,}, for symbol_side "
+                              f"{updated_strat_limits_obj.max_single_leg_notional:,}, for symbol_side "
                               f"{get_symbol_side_key([(symbol, side)])}")
             logging.warning(warn_str_)
 
@@ -767,7 +768,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     email_book_service_http_client.patch_pair_strat_client(
                         updated_pair_strat_obj.to_dict(exclude_none=True))
                     logging.critical(f"pausing strat! new computed {balance_notional=} found <= 0; "
-                                     f"as current {acquired_notional:,} >= new"
+                                     f"as current {acquired_notional=:,} >= new"
                                      f"{computed_max_single_leg_notional=:,};;;old balance_notional: "
                                      f"{stored_strat_status_obj.balance_notional:,} old max_single_leg_notional: "
                                      f"{stored_strat_limits_obj.max_single_leg_notional:,} "
@@ -795,14 +796,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             f"instead, symbol_side_key: {get_symbol_side_key([(symbol, side)])}")
             computed_max_open_single_leg_notional = get_default_max_open_single_leg_notional()
 
-        # check for user assigned max_net_filled_notional
+        # check for user assigned max_open_single_leg_notional
         if not math.isclose(stored_strat_limits_obj.max_open_single_leg_notional,
                             updated_strat_limits_obj.max_open_single_leg_notional):
             if computed_max_open_single_leg_notional > updated_strat_limits_obj.max_open_single_leg_notional:
-                computed_max_net_filled_notional = updated_strat_limits_obj.max_open_single_leg_notional
+                computed_max_open_single_leg_notional = updated_strat_limits_obj.max_open_single_leg_notional
             else:
                 logging.warning(
-                    f"blocked assignment of user desired {updated_strat_limits_obj.max_open_single_leg_notional=:,}"
+                    f"blocked assignment of user desired {updated_strat_limits_obj.max_open_single_leg_notional=:,.0f}"
                     f" as it breaches available {computed_max_open_single_leg_notional=:,}, setting to "
                     f"computed_max_open_single_leg_notional instead, "
                     f"symbol_side_key: {get_symbol_side_key([(symbol, side)])}")
@@ -862,15 +863,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                             side, self.usd_fx, cb_close_px, eqt_close_px, self.orig_intra_day_bot,
                                             self.orig_intra_day_sld))
         if math.isclose(computed_max_single_leg_notional, strat_limits_obj.max_single_leg_notional):
-            return   # no action as no change
+            return  # no action as no change
         if get_default_max_notional() < computed_max_single_leg_notional:
             # not allowed to go above default max CB Notional
             logging.warning(f"blocked assignment of computed CB notional: {computed_max_single_leg_notional:,} as it "
                             f"breaches default max_single_leg_notional: {get_default_max_notional():,}, setting to "
-                            f"default max_single_leg_notional instead. symbol_side_key: "
+                            f"default max_single_leg_notional instead, symbol_side_key: "
                             f"{get_symbol_side_key([(symbol, side)])}")
             computed_max_single_leg_notional = get_default_max_notional()
-        # for both if/else computed_max_single_leg_notional is not good to replace max_single_leg_notional
+        # for both if/else computed_max_single_leg_notional is now good to replace max_single_leg_notional
         strat_limits_obj.max_single_leg_notional = computed_max_single_leg_notional
         if computed_max_single_leg_notional < strat_limits_obj.max_open_single_leg_notional:
             strat_limits_obj.max_open_single_leg_notional = computed_max_single_leg_notional
@@ -1360,6 +1361,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     strat_limits.cancel_rate.waived_min_rolling_notional > 0):
                 last_n_sec_chore_qty = await self.get_last_n_sec_chore_qty(
                     symbol, side, strat_limits.cancel_rate.waived_min_rolling_period_seconds)
+                logging.debug(f"_update_strat_status_from_fill_journal: {last_n_sec_chore_qty=}, {symbol=}, {side=}")
                 if (last_n_sec_chore_qty * self.get_usd_px(symbol_side_snapshot_.avg_px, symbol) >
                         strat_limits.cancel_rate.waived_min_rolling_notional):
                     min_notional_condition_met = True
@@ -1376,7 +1378,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                                      symbol_side_snapshot_,
                                                                      strat_brief_.pair_sell_side_bartering_brief,
                                                                      Side.SELL))
-        # else not required: no further paise_strat eval needed
+        # else not required: no further pause_strat eval needed
         if pause_strat:
             self.pause_strat()
 
@@ -1751,7 +1753,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             # chore snapshot with same obj
 
             if ChoreStatusType.OE_DOD == prior_chore_status:
-                # CXL after CXL: nno further processing
+                # CXL after CXL: no further processing needed
                 chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                                         underlying_update_chore_snapshot_http(chore_snapshot))
                 return (True, )
@@ -3744,10 +3746,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         side = symbol_side_snapshot.side
         symbol = security.sec_id
 
-        hedge_ratio: float = 1.0
-        if symbol == self.strat_leg_2.sec.sec_id:
-            hedge_ratio = self.get_hedge_ratio()
-        # else not required: if bartering_side_brief is of leg1 side then no use of hedge ratio
+        hedge_ratio: float = self.get_hedge_ratio()
 
         async with StratBrief.reentrant_lock:
             strat_brief_tuple = self.strat_cache.get_strat_brief()
@@ -3985,7 +3984,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                          f"strat_brief update")
                         logging.error(err_str_)
                         return
-                    consumable_notional = ((strat_limits.max_single_leg_notional * hedge_ratio) -
+                    max_leg_notional = strat_limits.max_single_leg_notional * hedge_ratio if (
+                            symbol == self.strat_leg_2.sec.sec_id) else strat_limits.max_single_leg_notional
+                    consumable_notional = (max_leg_notional -
                                            symbol_side_snapshot.total_fill_notional - open_notional)
                     consumable_open_notional = strat_limits.max_open_single_leg_notional - open_notional
                     security_float = self.static_data.get_security_float_from_ticker(symbol)
@@ -4101,7 +4102,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                              (other_leg_residual_qty * self.get_usd_px(other_leg_last_barter_px, other_leg_tob_symbol)))
                     else:
                         logging.error(f"_update_strat_brief_from_chore_or_fill failed invalid TOBs from cache for key: "
-                                      f"{get_chore_snapshot_log_key(chore_snapshot)};;;buy TOB: {top_of_book_obj}: sell"
+                                      f"{get_chore_snapshot_log_key(chore_snapshot)};;;buy TOB: {top_of_book_obj}; sell"
                                       f" TOB: {other_leg_top_of_book}, {chore_snapshot=}")
                         return
 
@@ -4973,10 +4974,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                     fetched_strat_status_obj.total_cxl_buy_qty -
                                     chore_snapshot_obj.last_update_fill_qty)
                                 update_strat_status_obj.total_cxl_buy_notional = (
-                                        fetched_strat_status_obj.total_cxl_buy_notional -
-                                        (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                                         chore_snapshot_obj.chore_brief.security.sec_id) *
-                                         chore_snapshot_obj.last_update_fill_qty))
+                                    fetched_strat_status_obj.total_cxl_buy_notional -
+                                    (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
+                                                     chore_snapshot_obj.chore_brief.security.sec_id) *
+                                     chore_snapshot_obj.last_update_fill_qty))
                             update_strat_status_obj.avg_cxl_buy_px = (
                                 (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_buy_notional,
                                                                chore_snapshot_obj.chore_brief.security.sec_id) /
@@ -5025,8 +5026,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         update_strat_status_obj.total_fill_sell_notional = (
                                 fetched_strat_status_obj.total_fill_sell_notional +
                                 chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(
-                            chore_snapshot_obj.last_update_fill_px,
-                            chore_snapshot_obj.chore_brief.security.sec_id))
+                                    chore_snapshot_obj.last_update_fill_px,
+                                    chore_snapshot_obj.chore_brief.security.sec_id))
                         if update_strat_status_obj.total_fill_sell_qty:
                             update_strat_status_obj.avg_fill_sell_px = \
                                 self.get_local_px_or_notional(update_strat_status_obj.total_fill_sell_notional,
@@ -5150,10 +5151,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     # BarteringDataManager updates
     ############################
 
-    async def partial_update_chore_journal_post(self, stored_chore_journal_obj_json: Dict[str, Any], 
-                                                updated_chore_journal_obj_json: Dict[str, Any]):
-        updated_chore_journal_obj = msgspec.convert(updated_chore_journal_obj_json, 
-                                                    type=ChoreJournal, dec_hook=dec_hook)
+    async def partial_update_chore_journal_post(self, updated_chore_journal_obj_json: Dict[str, Any]):
+        updated_chore_journal_obj = ChoreJournal.from_dict(updated_chore_journal_obj_json)
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_chore_journal_get_all_ws(updated_chore_journal_obj)
 
@@ -5165,10 +5164,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_chore_snapshot_get_all_ws(updated_chore_snapshot_obj)
 
-    async def partial_update_chore_snapshot_post(self, stored_chore_snapshot_obj_json: Dict[str, Any],
-                                                 updated_chore_snapshot_obj_json: Dict[str, Any]):
-        updated_chore_snapshot_obj = msgspec.convert(updated_chore_snapshot_obj_json,
-                                                     type=ChoreSnapshot, dec_hook=dec_hook)
+    async def partial_update_chore_snapshot_post(self, updated_chore_snapshot_obj_json: Dict[str, Any]):
+        updated_chore_snapshot_obj = ChoreSnapshot.from_dict(updated_chore_snapshot_obj_json)
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_chore_snapshot_get_all_ws(updated_chore_snapshot_obj)
 
@@ -5180,10 +5177,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_symbol_side_snapshot_get_all_ws(updated_symbol_side_snapshot_obj)
 
-    async def partial_update_symbol_side_snapshot_post(self, stored_symbol_side_snapshot_obj_json: Dict[str, Any],
-                                                       updated_symbol_side_snapshot_obj_json: Dict[str, Any]):
-        updated_symbol_side_snapshot_obj = msgspec.convert(updated_symbol_side_snapshot_obj_json,
-                                                           type=SymbolSideSnapshot, dec_hook=dec_hook)
+    async def partial_update_symbol_side_snapshot_post(self, updated_symbol_side_snapshot_obj_json: Dict[str, Any]):
+        updated_symbol_side_snapshot_obj = SymbolSideSnapshot.from_dict(updated_symbol_side_snapshot_obj_json)
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_symbol_side_snapshot_get_all_ws(updated_symbol_side_snapshot_obj)
 
@@ -5203,9 +5198,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                  updated_strat_status_obj.total_fill_sell_notional)
         logging.db(log_str)
 
-    async def partial_update_strat_status_post(self, stored_strat_status_obj_json: Dict[str, Any],
-                                               updated_strat_status_obj_json: Dict[str, Any]):
-        updated_strat_status_obj = msgspec.convert(updated_strat_status_obj_json, type=StratStatus, dec_hook=dec_hook)
+    async def partial_update_strat_status_post(self, updated_strat_status_obj_json: Dict[str, Any]):
+        updated_strat_status_obj = StratStatus.from_dict(updated_strat_status_obj_json)
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_strat_status_get_all_ws(updated_strat_status_obj)
 
@@ -5372,10 +5366,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         logging.info(f"TOB Created for id: {top_of_book_obj.id} for symbol: {top_of_book_obj.symbol};;;"
                      f"{top_of_book_obj=}")
 
-    async def partial_update_fills_journal_post(self, stored_fills_journal_obj_json: Dict[str, Any],
-                                                updated_fills_journal_obj_json: Dict[str, Any]):
-        updated_fills_journal_obj = msgspec.convert(updated_fills_journal_obj_json,
-                                                    type=FillsJournal, dec_hook=dec_hook)
+    async def partial_update_fills_journal_post(self, updated_fills_journal_obj_json: Dict[str, Any]):
+        updated_fills_journal_obj = FillsJournal.from_dict(updated_fills_journal_obj_json)
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_fills_journal_get_all_ws(updated_fills_journal_obj)
 
@@ -5387,9 +5379,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_strat_brief_get_all_ws(updated_strat_brief_obj)
 
-    async def partial_update_strat_brief_post(self, stored_strat_brief_obj_json: Dict[str, Any],
-                                              updated_strat_brief_obj_json: Dict[str, Any]):
-        updated_strat_brief_obj = msgspec.convert(updated_strat_brief_obj_json, type=StratBrief, dec_hook=dec_hook)
+    async def partial_update_strat_brief_post(self, updated_strat_brief_obj_json: Dict[str, Any]):
+        updated_strat_brief_obj = StratBrief.from_dict(updated_strat_brief_obj_json)
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_strat_brief_get_all_ws(updated_strat_brief_obj)
 
@@ -5450,7 +5441,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
     async def partial_update_strat_limits_post(self, stored_strat_limits_obj_json: Dict[str, Any],
                                                updated_strat_limits_obj_json: Dict[str, Any]):
-        updated_strat_limits_obj = msgspec.convert(updated_strat_limits_obj_json, type=StratLimits, dec_hook=dec_hook)
+        updated_strat_limits_obj = StratLimits.from_dict(updated_strat_limits_obj_json)
         await self._update_strat_limits_post(stored_strat_limits_obj_json, updated_strat_limits_obj)
 
     async def create_new_chore_post(self, new_chore_obj: NewChore):
@@ -5463,9 +5454,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         self.bartering_data_manager.handle_cancel_chore_get_all_ws(cancel_chore_obj)
         release_notify_semaphore()
 
-    async def partial_update_cancel_chore_post(self, stored_cancel_chore_obj_json: Dict[str, Any],
-                                               updated_cancel_chore_obj_json: Dict[str, Any]):
-        updated_cancel_chore_obj = msgspec.convert(updated_cancel_chore_obj_json, type=CancelChore, dec_hook=dec_hook)
+    async def partial_update_cancel_chore_post(self, updated_cancel_chore_obj_json: Dict[str, Any]):
+        updated_cancel_chore_obj = CancelChore.from_dict(updated_cancel_chore_obj_json)
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_cancel_chore_get_all_ws(updated_cancel_chore_obj)
         release_notify_semaphore()
@@ -5496,10 +5486,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         self.bartering_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
         release_notify_semaphore()
 
-    async def partial_update_symbol_overview_post(self, stored_symbol_overview_obj_json: Dict[str, Any],
-                                                  updated_symbol_overview_obj_json: Dict[str, Any]):
-        updated_symbol_overview_obj = msgspec.convert(updated_symbol_overview_obj_json,
-                                                      type=SymbolOverview, dec_hook=dec_hook)
+    async def partial_update_symbol_overview_post(self, updated_symbol_overview_obj_json: Dict[str, Any]):
+        updated_symbol_overview_obj = SymbolOverview.from_dict(updated_symbol_overview_obj_json)
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
         release_notify_semaphore()
@@ -5520,10 +5508,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
             release_notify_semaphore()
 
-    async def partial_update_all_symbol_overview_post(self, stored_symbol_overview_dict_list: List[Dict[str, Any]],
-                                                      updated_symbol_overview_dict_list: List[Dict[str, Any]]):
-        updated_symbol_overview_obj_list = msgspec.convert(updated_symbol_overview_dict_list,
-                                                           type=List[SymbolOverview], dec_hook=dec_hook)
+    async def partial_update_all_symbol_overview_post(self, updated_symbol_overview_dict_list: List[Dict[str, Any]]):
+        updated_symbol_overview_obj_list = SymbolOverview.from_dict_list(updated_symbol_overview_dict_list)
         # updating bartering_data_manager's strat_cache
         for symbol_overview_obj in updated_symbol_overview_obj_list:
             self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
@@ -5655,7 +5641,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                               f" chore for this call, will retry again in {self.min_refresh_interval} secs")
                 return
         else:
-            logging.error(f"Received strat_limits_tuple as None form strat_cache, ignoring cxl expiring chore "
+            logging.error(f"Received strat_limits_tuple as None from strat_cache, ignoring cxl expiring chore "
                           f"for this call, will retry again in {self.min_refresh_interval} secs")
             return
 
@@ -5685,10 +5671,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 # else not required: If time-delta is still less than residual_mark_seconds then avoiding
                 # cancellation of chore
             elif chore_has_terminal_state(open_chore_snapshot):
-                logging.error(f"Unexpected or Rare: Received {open_chore_snapshot.chore_status=}, bug or race in "
-                              f"get_open_chore_snapshots, results should not have any non-open chore_snapshot, unless"
-                              f" under ignorable race condition [i.e. chore went DOD/Fully-Filled after queried DB "
-                              f"via get_open_chore_snapshots] for {get_chore_snapshot_log_key(open_chore_snapshot)}")
+                logging.warning(f"Unexpected or Rare: Received {open_chore_snapshot.chore_status=}, bug or race in "
+                                f"get_open_chore_snapshots, results should not have any non-open chore_snapshot, unless"
+                                f" under ignorable race condition [i.e. chore went DOD/Fully-Filled after queried DB "
+                                f"via get_open_chore_snapshots] for {get_chore_snapshot_log_key(open_chore_snapshot)}")
             # else not required: avoiding cxl request if chore_snapshot already got cxl request
 
     async def get_strat_brief_from_symbol_query_pre(self, strat_brief_class_type: Type[StratBrief], security_id: str):
@@ -5713,7 +5699,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             return [executor_check_snapshot]
         else:
             # will only return [] if some error occurred - outside market hours this is not an error
-            # if strat cache not present - there os a bigger error detected elsewhere
+            # if strat cache not present - there is a bigger error detected elsewhere
             if self.strat_cache:
                 if not self.market.is_non_bartering_time():
                     logging.error(f"no executor_check_snapshot for: {get_symbol_side_key([(symbol, side)])}, as "

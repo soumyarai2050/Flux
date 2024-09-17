@@ -14,7 +14,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 import protogen
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, \
     parse_string_to_original_types, convert_to_capitalized_camel_case
-from Flux.PyCodeGenEngine.PluginFastApi.fastapi_base_routes_file_handler import FastapiBaseRoutesFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_base_routes_file_handler import FastapiBaseRoutesFileHandler, ModelType
 
 
 class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
@@ -370,19 +370,30 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
     def _handle_projection_ws_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
                                         query_params_with_type_str: str, query_args_dict_str: str,
-                                        projection_model_name: str | None = None) -> str:
+                                        projection_model_name: str | None = None,
+                                        model_type: ModelType | None = None) -> str:
         output_str = f"@perf_benchmark\n"
         output_str += (f"async def underlying_{query_name}_query_ws(websocket: WebSocket, "
                        f"{query_params_with_type_str}, need_initial_snapshot: bool | None = True):\n")
         if projection_model_name:
-            output_str += (f"    filter_callable, projection_agg_pipeline_callable = "
-                           f"await callback_class.{query_name}_query_ws_pre()\n")
-            output_str += f"    agg_params = {query_args_dict_str}\n"
-            output_str += (f"    await generic_projection_query_ws(websocket, "
-                           f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                           f"{message.proto.name}, filter_callable, agg_params")
-            output_str += (f", projection_agg_pipeline_callable=projection_agg_pipeline_callable, "
-                           f"projection_model={projection_model_name}, need_initial_snapshot=need_initial_snapshot)\n")
+            if model_type  != ModelType.Msgspec:
+                output_str += (f"    filter_callable, projection_agg_pipeline_callable = "
+                               f"await callback_class.{query_name}_query_ws_pre()\n")
+                output_str += f"    agg_params = {query_args_dict_str}\n"
+                output_str += (f"    await generic_projection_query_ws(websocket, "
+                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                               f"{message.proto.name}, filter_callable, agg_params")
+                output_str += (f", projection_agg_pipeline_callable=projection_agg_pipeline_callable, "
+                               f"projection_model={projection_model_name}, need_initial_snapshot=need_initial_snapshot)\n")
+            else:
+                output_str += (f"    filter_callable, projection_agg_pipeline_callable = "
+                               f"await callback_class.{query_name}_query_ws_pre()\n")
+                output_str += f"    agg_params = {query_args_dict_str}\n"
+                output_str += (f"    await generic_projection_query_ws(websocket, "
+                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                               f"{message.proto.name}, filter_callable, agg_params")
+                output_str += (f", projection_agg_pipeline_callable=projection_agg_pipeline_callable, "
+                               f"need_initial_snapshot=need_initial_snapshot)\n")
         else:
             output_str += f"    filter_callable = await callback_class.{query_name}_query_ws_pre()\n"
             output_str += f'    params_json = {query_args_dict_str}\n'
@@ -453,7 +464,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += "\n\n"
         return output_str
 
-    def _handle_projection_ws_query_methods(self, message):
+    def _handle_projection_ws_query_methods(self, message, model_type: ModelType):
         output_str = ""
         for field in message.fields:
             if FastapiWsRoutesFileHandler.is_option_enabled(field, FastapiWsRoutesFileHandler.flux_fld_projections):
@@ -491,8 +502,12 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                     query_param_str += f"{meta_field_name}, "
                     query_param_with_type_str += f"{meta_field_name}: {self.proto_to_py_datatype(meta_field_value)}, "
             query_param_str += "start_date_time, end_date_time"
-            query_param_with_type_str += ("start_date_time: DateTime | None = None, "
-                                          "end_date_time: DateTime | None = None")
+            if model_type == ModelType.Msgspec:
+                query_param_with_type_str += ("start_date_time: Any | None = None, "
+                                              "end_date_time: Any | None = None")
+            else:
+                query_param_with_type_str += ("start_date_time: DateTime | None = None, "
+                                              "end_date_time: DateTime | None = None")
 
             query_param_dict_str = "{"
             for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
@@ -507,10 +522,10 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             # WS method
             output_str += self._handle_projection_ws_query_str(message, query_name, query_param_str,
                                                                query_param_with_type_str, query_param_dict_str,
-                                                               container_model_name)
+                                                               container_model_name, model_type)
         return output_str
 
-    def handle_ws_CRUD_task(self) -> str:
+    def handle_ws_CRUD_task(self, model_type: ModelType) -> str:
         output_str = ""
         for message in self.root_message_list:
             if FastapiWsRoutesFileHandler.is_option_enabled(message, FastapiWsRoutesFileHandler.flux_msg_json_root):
@@ -525,7 +540,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         for message in self.root_message_list:
             if FastapiWsRoutesFileHandler.is_option_enabled(message,
                                                             FastapiWsRoutesFileHandler.flux_msg_json_root_time_series):
-                output_str += self._handle_projection_ws_query_methods(message)
+                output_str += self._handle_projection_ws_query_methods(message, model_type)
 
         return output_str
 
@@ -547,5 +562,15 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
         output_str = f"from {base_routes_file_path} import *\n\n"
-        output_str += self.handle_ws_CRUD_task()
+        output_str += self.handle_ws_CRUD_task(ModelType.Beanie)
+        return output_str
+
+    def handle_ws_msgspec_routes_file_gen(self) -> str:
+        # running pre-requisite method to set shared lock option info
+        self._get_messages_having_links()
+        self._set_shared_lock_name_to_pydentic_class_dict()
+
+        base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
+        output_str = f"from {base_routes_file_path} import *\n\n"
+        output_str += self.handle_ws_CRUD_task(ModelType.Msgspec)
         return output_str

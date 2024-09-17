@@ -7,7 +7,6 @@ import "barter_core.proto";
 import "mobile_book_n_street_book_n_basket_book_core.proto";
 import "dept_book_n_mobile_book_n_street_book_n_basket_book_core.proto";
 import "street_book_n_post_book_core.proto";
-// import "street_book_service.proto";
 
 package mobile_book;
 
@@ -71,7 +70,7 @@ message MobileBookBrief{
 
 message TickByTickBBO {
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 5.0,
+    MongoVersion: 7.0,
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -97,7 +96,7 @@ message MarketBarterVolume {
 
 message RawMarketDepthHistory {
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 5.0,
+    MongoVersion: 7.0,
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,

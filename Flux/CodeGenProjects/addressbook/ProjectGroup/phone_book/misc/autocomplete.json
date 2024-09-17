@@ -41,6 +41,10 @@
       "H_List_10"
     ],
     "Premium": "CB_List",
-    "AH": "H_List"
+    "AH": "H_List",
+    "Mstrat_List": [
+      "Mstrat_1",
+      "Mstrat_2"
+    ]
   }
 }

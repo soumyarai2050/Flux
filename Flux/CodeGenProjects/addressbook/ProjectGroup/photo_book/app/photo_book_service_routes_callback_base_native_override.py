@@ -236,9 +236,9 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
     async def update_strat_view_post(self, stored_strat_view_obj: StratView, updated_strat_view_obj: StratView):
         await self._update_strat_view_post(stored_strat_view_obj, updated_strat_view_obj)
 
-    async def partial_update_strat_view_post(self, stored_strat_view_obj: Dict,
-                                             updated_strat_view_obj: Dict):
-        await self._update_strat_view_post(stored_strat_view_obj, updated_strat_view_obj)
+    async def partial_update_strat_view_post(self, stored_strat_view_obj_json: Dict[str, Any],
+                                             updated_strat_view_obj_json: Dict[str, Any]):
+        await self._update_strat_view_post(stored_strat_view_obj_json, updated_strat_view_obj_json)
 
     async def partial_update_all_strat_view_post(self, stored_strat_view_dict_list: List[Dict[str, Any]],
                                                  updated_strat_view_dict_list: List[Dict[str, Any]]):
@@ -247,7 +247,7 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
 
             task = asyncio.create_task(
                 self._update_strat_view_post(stored_strat_view_dict_list[idx], updated_strat_view_obj),
-                name=str(f"{updated_strat_view_obj.get("_id")}"))
+                name=f"{str(updated_strat_view_obj.get('_id'))}")
             tasks.append(task)
 
         if tasks:

@@ -5,7 +5,7 @@ import os
 import logging
 import asyncio
 
-os.environ["DBType"] = "beanie"
+os.environ["ModelType"] = "msgspec"
 # project imports
 from Flux.CodeGenProjects.performance_benchmark.generated.Pydentic.performance_benchmark_service_model_imports import (
     ProcessedPerformanceAnalysis)

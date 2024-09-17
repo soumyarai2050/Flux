@@ -483,10 +483,12 @@ def test_patch_all_time_series_model(clean_and_set_limits, web_client):
 
 
 # todo: currently contains beanie http call of sample models, once cache http is implemented test that too
+@pytest.mark.nightly
 @pytest.mark.parametrize("pydantic_basemodel", [SampleModelBaseModel, SampleTSModel1BaseModel])
 # checking both JsonRoot and TimeSeries
 def test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_set_limits,
-                                                        pydantic_basemodel: Type[MsgspecBaseModel]):
+                                                        pydantic_basemodel: Type[SampleModelBaseModel |
+                                                                                 SampleTSModel1BaseModel]):
     """
     This test case contains check of update aggregate feature available in beanie part, put and patch http calls.
     """
@@ -515,6 +517,47 @@ def test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_
             assert current_index_updated_obj.cum_sum_of_num == counter, \
                 (f"Mismatched: aggregated update must have updated cum_sum_of_num: "
                  f"{current_index_updated_obj.cum_sum_of_num} to {counter} after put operation")
+
+
+def test_verify_stored_n_update_obj_are_diff_in_post_callback_in_patch_http(static_data_, clean_and_set_limits):
+    sample_model = SampleModelBaseModel.from_kwargs(sample="sample", date=DateTime.utcnow(), num=1)
+    created_sample_model = email_book_service_native_web_client.create_sample_model_client(sample_model)
+
+    try: 
+        created_sample_model.sample = "update_text"
+        updated_sample_model = email_book_service_native_web_client.patch_sample_model_client(
+            created_sample_model.to_json_dict())
+        assert updated_sample_model == created_sample_model, \
+            f"Mismatched: expected: {created_sample_model}, updated: {updated_sample_model}"
+    except Exception as e:
+        if "Found stored_sample_model_obj_json == updated_sample_model_obj_json" in str(e):
+            assert False, ("Unexpected: Found stored obj and updated equal in post callback after generic call "
+                           "in patch of SampleModel - must not be equal")
+        else:
+            raise e
+
+
+def test_verify_stored_n_update_obj_are_diff_in_post_callback_in_patch_all_http(static_data_, clean_and_set_limits):
+    sample_model = SampleModelBaseModel.from_kwargs(sample="sample", date=DateTime.utcnow(), num=1)
+    created_obj_list = []
+    for i in range(5):
+        created_sample_model = email_book_service_native_web_client.create_sample_model_client(sample_model)
+        created_obj_list.append(created_sample_model)
+
+    try:
+        for created_obj in created_obj_list:
+            created_obj.sample = f"update_text_{created_obj.id}"
+
+        updated_sample_model_list = email_book_service_native_web_client.patch_all_sample_model_client(
+            [obj.to_json_dict() for obj in created_obj_list])
+        assert updated_sample_model_list == created_obj_list, \
+            f"Mismatched: expected: {created_obj_list}, updated: {updated_sample_model_list}"
+    except Exception as e:
+        if "Found stored_sample_model_dict_list == updated_sample_model_dict_list" in str(e):
+            assert False, ("Unexpected: Found stored obj list and updated obj list equal in post callback after "
+                           "generic call in patch all of SampleModel - must not be equal")
+        else:
+            raise e
 
 
 # sanity test to create and activate pair_strat
@@ -6421,6 +6464,262 @@ def test_unload_reload_strat_from_collection(
         raise Exception(e)
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_unload_strat_from_strat_view_unload_ui_button(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    created_pair_strat, executor_web_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        executor_web_client.barter_simulator_reload_config_query_client()
+
+        total_chore_count_for_each_side = 1
+        place_sanity_chores_for_executor(
+            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            residual_wait_sec, executor_web_client)
+
+        # Unloading Strat
+        strat_view_obj = photo_book_web_client.get_strat_view_client(created_pair_strat.id)
+        # simulating ui button update - making unload_strat True
+        strat_view_obj.unload_strat = True
+        update_strat_view = photo_book_web_client.put_strat_view_client(strat_view_obj)
+        assert update_strat_view == strat_view_obj, \
+            f"Mismatched strat_view: expected {strat_view_obj}, updated {update_strat_view}"
+
+        time.sleep(20)
+
+        # verifying pair_strat
+        pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
+        assert not pair_strat.is_partially_running, \
+            "Mismatch: is_partially_running must be False after strat unload"
+        assert not pair_strat.is_executor_running, \
+            "Mismatch: is_executor_running must be False after strat unload"
+
+        # verifying strat_collection
+        strat_key = get_strat_key_from_pair_strat(created_pair_strat)
+        strat_collection = email_book_service_native_web_client.get_strat_collection_client(1)
+        assert strat_key in strat_collection.buffered_strat_keys, \
+            f"Not Found: expected {strat_key=} in {strat_collection.buffered_strat_keys=}"
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    # Since config file is removed while unloading - no need to revert changes
+
+
+@pytest.mark.nightly
+def test_recycle_strat_from_strat_view_recycle_ui_button(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    created_pair_strat, executor_web_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+                                           market_depth_basemodel_list))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        executor_web_client.barter_simulator_reload_config_query_client()
+
+        total_chore_count_for_each_side = 1
+        place_sanity_chores_for_executor(
+            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            residual_wait_sec, executor_web_client)
+
+        executor_port = created_pair_strat.port
+
+        # Recycling Strat
+        strat_view_obj = photo_book_web_client.get_strat_view_client(created_pair_strat.id)
+        # simulating ui button update - making recycle_strat True
+        strat_view_obj.recycle_strat = True
+        update_strat_view = photo_book_web_client.put_strat_view_client(strat_view_obj)
+        assert update_strat_view == strat_view_obj, \
+            f"Mismatched strat_view: expected {strat_view_obj}, updated {update_strat_view}"
+
+        time.sleep(2*residual_wait_sec)   # waiting for strat to get loaded completely
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    # Since config file is removed while unloading - no need to revert changes
+
+    loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
+    assert loaded_pair_strat.is_partially_running, \
+        ("Unexpected: After strat is loaded by this point since all service up check is done is_partially_running "
+         f"must be True, found False, pair_strat: {loaded_pair_strat}")
+    assert loaded_pair_strat.port != executor_port, \
+        (f"Mismatch: expected new port - found same as before recycle, last port: {executor_port}, "
+         f"new_port: {loaded_pair_strat.port}")
+
+    executor_http_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(loaded_pair_strat.host,
+                                                                                        loaded_pair_strat.port)
+    symbol_overview_list = executor_http_client.get_all_symbol_overview_client()
+
+    for symbol_overview in symbol_overview_list:
+        executor_http_client.put_symbol_overview_client(symbol_overview)
+
+    time.sleep(residual_wait_sec)   # waiting for strat to get loaded completely
+
+    loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
+    assert loaded_pair_strat.is_executor_running, \
+        ("Unexpected: After strat is loaded by this point since all service up check is done is_partially_running "
+         f"must be True, found False, pair_strat: {loaded_pair_strat}")
+    assert loaded_pair_strat.strat_state == StratState.StratState_READY, \
+        (f"Unexpected, StratState must be READY but found state: {loaded_pair_strat.strat_state}, "
+         f"pair_strat: {loaded_pair_strat}")
+
+    pair_strat = PairStratBaseModel.from_kwargs(_id=created_pair_strat.id, strat_state=StratState.StratState_ACTIVE)
+    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(generic_encoder(
+        pair_strat, exclude_none=True))
+    assert activated_pair_strat.strat_state == StratState.StratState_ACTIVE, \
+        (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
+         f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
+    print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # updating market_depth to update cache in reloaded strat
+        update_market_depth(executor_http_client)
+
+        total_chore_count_for_each_side = 2
+        place_sanity_chores_for_executor(
+            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            residual_wait_sec, executor_http_client, True)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+def _check_all_strat_pause_by_system_control_ui_button_update(
+        leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        max_loop_count_per_side, refresh_sec_update_fixture, update_type: str):
+    max_loop_count_per_side = 2
+    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:10]
+    result_list: List[Tuple[str, str, PairStratBaseModel, StreetBookServiceHttpClient]] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
+        results = [executor.submit(place_sanity_chores, leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
+                                   copy.deepcopy(expected_strat_limits_),
+                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(symbol_overview_obj_list),
+                                   copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
+                                   max_loop_count_per_side, refresh_sec_update_fixture)
+                   for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
+            else:
+                buy_symbol, sell_symbol, created_pair_strat, executor_web_client = future.result()
+                result_list.append((buy_symbol, sell_symbol, created_pair_strat, executor_web_client))
+
+    # Simulating all strat pause - initiating all start pause using pause_all_strats field update in system_control
+    if update_type.lower() == "patch":
+        system_control_obj = SystemControlBaseModel(id=1, kill_switch=False, pause_all_strats=True)
+        updated_system_control = email_book_service_native_web_client.patch_system_control_client(
+            system_control_obj.to_json_dict(exclude_none=True))
+        assert updated_system_control == system_control_obj, \
+            f"Mismatch system_control: expected: {system_control_obj}, updated: {updated_system_control}"
+    else:
+        system_control_obj = email_book_service_native_web_client.get_system_control_client(system_control_id=1)
+        system_control_obj.pause_all_strats = True
+        updated_system_control = email_book_service_native_web_client.put_system_control_client(
+            system_control_obj)
+        assert updated_system_control == system_control_obj, \
+            f"Mismatch system_control: expected: {system_control_obj}, updated: {updated_system_control}"
+
+    time.sleep(5)
+
+    # checking alert
+    check_str = "Triggered pause_all_strat event at"
+    assert_fail_msg = f"Can't find alert of {check_str!r} in portfolio_alert"
+    check_alert_str_in_portfolio_alert(check_str, assert_fail_msg)
+
+    # verifying all strat pause
+    pair_strat_list = email_book_service_beanie_web_client.get_all_pair_strat_client()
+    for pair_strat_ in pair_strat_list:
+        assert pair_strat_.strat_state == StratState.StratState_PAUSED, \
+            f"Mismatched pair_strat.strat_state: expected: {pair_strat_.strat_state}, updated {StratState.StratState_PAUSED}"
+
+
+@pytest.mark.nightly
+def test_all_strat_pause_by_system_control_ui_button_though_patch(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    _check_all_strat_pause_by_system_control_ui_button_update(
+        leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        max_loop_count_per_side, refresh_sec_update_fixture, "patch")
+
+
+@pytest.mark.nightly
+def test_all_strat_pause_by_system_control_ui_button_though_put(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    _check_all_strat_pause_by_system_control_ui_button_update(
+        leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        max_loop_count_per_side, refresh_sec_update_fixture, "put")
 
 
 @pytest.mark.nightly

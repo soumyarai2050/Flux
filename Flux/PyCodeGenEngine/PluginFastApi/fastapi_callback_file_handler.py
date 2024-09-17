@@ -181,9 +181,15 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                          f"stored_{message_name_snake_cased}_obj_json: Dict[str, Any], " \
                          f"updated_{message_name_snake_cased}_obj_json: Dict[str, Any]):\n"
             output_str += f"        return updated_{message_name_snake_cased}_obj_json\n\n"
-            output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
-                          f"stored_{message_name_snake_cased}_obj_json: Dict[str, Any], " \
-                          f"updated_{message_name_snake_cased}_obj_json: Dict[str, Any]):\n"
+            pass_stored_obj_to_pre_post_callback = self._get_if_pass_stored_obj_to_pre_post_callback(
+                FastapiCallbackFileHandler.flux_json_root_pass_stored_obj_to_partial_update_pre_post_callback, **kwargs)
+            if pass_stored_obj_to_pre_post_callback:
+                output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
+                              f"stored_{message_name_snake_cased}_obj_json: Dict[str, Any], " \
+                              f"updated_{message_name_snake_cased}_obj_json: Dict[str, Any]):\n"
+            else:
+                output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
+                              f"updated_{message_name_snake_cased}_obj_json: Dict[str, Any]):\n"
             output_str += "        pass\n\n"
         else:
             output_str = f"    async def partial_update_{message_name_snake_cased}_pre(self, " \
@@ -211,9 +217,15 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                          f"stored_{message_name_snake_cased}_dict_list: List[Dict[str, Any]], " \
                          f"updated_{message_name_snake_cased}_dict_list: List[Dict[str, Any]]):\n"
             output_str += f"        return updated_{message_name_snake_cased}_dict_list\n\n"
-            output_str += f"    async def partial_update_all_{message_name_snake_cased}_post(self, " \
-                          f"stored_{message_name_snake_cased}_dict_list: List[Dict[str, Any]], " \
-                          f"updated_{message_name_snake_cased}_dict_list: List[Dict[str, Any]]):\n"
+            pass_stored_obj_to_pre_post_callback = self._get_if_pass_stored_obj_to_pre_post_callback(
+                FastapiCallbackFileHandler.flux_json_root_pass_stored_obj_to_partial_update_all_pre_post_callback, **kwargs)
+            if pass_stored_obj_to_pre_post_callback:
+                output_str += f"    async def partial_update_all_{message_name_snake_cased}_post(self, " \
+                              f"stored_{message_name_snake_cased}_dict_list: List[Dict[str, Any]], " \
+                              f"updated_{message_name_snake_cased}_dict_list: List[Dict[str, Any]]):\n"
+            else:
+                output_str += f"    async def partial_update_all_{message_name_snake_cased}_post(self, " \
+                              f"updated_{message_name_snake_cased}_dict_list: List[Dict[str, Any]]):\n"
             output_str += "        pass\n\n"
         else:
             output_str = f"    async def partial_update_all_{message_name_snake_cased}_pre(self, " \
