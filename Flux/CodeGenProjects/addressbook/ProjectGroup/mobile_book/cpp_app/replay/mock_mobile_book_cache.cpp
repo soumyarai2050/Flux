@@ -20,21 +20,6 @@ void websocket_cleanup() {
 }
 
 
-void initialize_database(const char *db_uri, const char *db_name, PyObject *port_dict) {
-
-    LOG_ERROR_IMPL(GetLogger(), "inside: {}", __func__);	
-    MongoDBHandlerSingleton::get_instance(db_uri, db_name);
-
-    // Acquire the GIL
-    PyGILState_STATE gstate = PyGILState_Ensure();
-    // Update the port dictionary
-    PyDict_SetItemString(port_dict, top_of_book_port_key.c_str(), PyLong_FromLong(tob_ws_port));
-    PyDict_SetItemString(port_dict, market_depth_port_key.c_str(), PyLong_FromLong(md_ws_port));
-    PyDict_SetItemString(port_dict, last_barter_port_key.c_str(), PyLong_FromLong(lt_ws_port));
-
-    // Release the GIL
-    PyGILState_Release(gstate);
-}
 
 extern "C" void create_or_update_last_barter_n_tob([[maybe_unused]] const int32_t id, const char *symbol,
 	const char *exch_id, [[maybe_unused]] const char *exch_time, [[maybe_unused]] const char *arrival_time, const double px,
@@ -47,8 +32,16 @@ extern "C" void create_or_update_last_barter_n_tob([[maybe_unused]] const int32_
 	PyLastBarter last_barter{{symbol, exch_id}, time_str.c_str(), time_str.c_str(),
 		px, qty, premium, {market_barter_volume_id, participation_period_last_barter_qty_sum, applicable_period_seconds}};
 
-	auto sp_mongo_db = MongoDBHandlerSingleton::get_instance();
-	static MobileBookConsumer mobile_book_consumer(sp_mongo_db, top_of_book_websocket_server,
+    const char* app_name = getenv("simulate_config_yaml_file");
+    if (!app_name) {
+        throw std::runtime_error("export env variable {app_name}");
+    }
+    if (access(app_name, F_OK) != 0) {
+        throw std::runtime_error(std::format("{} not accessable", app_name));
+    }
+    YAML::Node config_file = YAML::LoadFile(app_name);
+    auto db = MongoDBHandlerSingleton::get_instance();
+	static MobileBookConsumer mobile_book_consumer(config_file, db, top_of_book_websocket_server,
 	last_barter_websocket_server, market_depth_websocket_server);
 	mobile_book_consumer.process_last_barter(last_barter);
 }
@@ -65,10 +58,20 @@ extern "C" void create_or_update_md_n_tob([[maybe_unused]] const int32_t id, con
 
 	PyMktDepth mkt_depth{symbol, time_str.c_str(), time_str.c_str(), side, position, px,
 		qty, market_maker, is_smart_depth, cumulative_notional, cumulative_qty, cumulative_avg_px};
-	auto sp_mongo_db = MongoDBHandlerSingleton::get_instance();
 
-	static MobileBookConsumer mobile_book_consumer(sp_mongo_db, top_of_book_websocket_server,
+	const char* app_name = getenv("simulate_config_yaml_file");
+    if (!app_name) {
+        throw std::runtime_error("export env variable {app_name}");
+    }
+    if (access(app_name, F_OK) != 0) {
+        throw std::runtime_error(std::format("{} not accessable", app_name));
+    }
+
+    YAML::Node config_file = YAML::LoadFile(app_name);
+    auto db = MongoDBHandlerSingleton::get_instance();
+	static MobileBookConsumer mobile_book_consumer(config_file, db, top_of_book_websocket_server,
 	last_barter_websocket_server, market_depth_websocket_server);
+
 	mobile_book_consumer.process_market_depth(mkt_depth);
 
 }

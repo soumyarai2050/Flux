@@ -6,7 +6,6 @@ message (WARNING ${CMAKE_MODULE_PATH})
 set(HOME $ENV{HOME})
 message(WARNING ${HOME})
 find_package(Mongo REQUIRED)
-find_package(Python REQUIRED COMPONENTS Development)
 
 set(LIBS_ROOT_DIR ${HOME}/cpp_libs/libs_13)
 message(WARNING ${LIBS_ROOT_DIR})
@@ -20,8 +19,6 @@ set(CPP_YAML_LIB ${LIBS_ROOT_DIR}/cpp_yaml/lib/libyaml-cpp.so)
 set(protobuf_lib ${libabsl_ROOT_PATH}/libprotobuf.a)
 set(lib_utf ${libabsl_ROOT_PATH}/libutf8_validity.a)
 
-set(PYTHON_INCLUDE /usr/include/python3.12)
-set(PYTHON_LIB /usr/lib/x86_64-linux-gnu/libpython3.12.so)
 
 set(Boost_INCLUDE_DIRS ${LIBS_ROOT_DIR}/boost/include)
 set(Boost_INCLUDE_LIBS ${LIBS_ROOT_DIR}/boost/lib)
@@ -103,7 +100,7 @@ message(WARNING ${BSON_INCLUDE_DIR})
 
 include_directories(${MONGO_INCLUDE_DIR} ${BSON_THIRD_PARTY_INCLUDE_DIR} ${BSON_INCLUDE_DIR} ${Boost_INCLUDE_DIRS}
         ${Protobuf_INCLUDE_DIRS} ${ABSL_INCLUDE_DIR} ${CppCodec} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
-         ${PYTHON_INCLUDE} ${QUILL_INCLUDE} ${CPP_YAML_INCLUDE_DIR})
+         ${QUILL_INCLUDE} ${CPP_YAML_INCLUDE_DIR})
 
 set(MD_MODEL ../../generated/CppProto2)
 # protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/mobile_book_service.proto)
@@ -116,7 +113,6 @@ set(SRC_FILES
 )
 
 message(SRC_FILES ${SRC_FILES})
-message(${Python_LIBRARIES})
 # Create shared library including dependencies
 add_library(marketdataprovider SHARED ${SRC_FILES} cpp_app_launcher.cpp
         mongo_db_singleton.cpp
@@ -126,7 +122,6 @@ add_library(marketdataprovider SHARED ${SRC_FILES} cpp_app_launcher.cpp
 
 # Link dependencies to the shared library
 target_link_libraries(marketdataprovider
-        ${PYTHON_LIB}
         ${MONGO_LIB}
         ${BSON_LIB}
         ${protobuf_lib}
@@ -149,7 +144,6 @@ add_executable(mobile_book_exec main.cpp ${SRC_FILES}
 target_compile_options(mobile_book_exec PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-error=unused-parameter -DUSE_LOGGING)
 ## Link the shared library to the executable
 target_link_libraries(mobile_book_exec
-        ${PYTHON_LIB}
         ${MONGO_LIB}
         ${BSON_LIB}
         ${protobuf_lib}

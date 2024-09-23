@@ -10,15 +10,8 @@ import "street_book_n_post_book_core.proto";
 
 package mobile_book;
 
-// Set the FluxImportFileModelOptions option
 option (FluxFileImportDependencyModel) = {
-  ImportFileName: "dept_book_n_mobile_book_n_street_book_core.proto",
-  ImportModelName: "SymbolOverview",
-  ImportModelName: "SymbolOverviewList"
-};
-
-option (FluxFileImportDependencyModel) = {
-  ImportFileName: "mobile_book_n_street_book_core.proto",
+  ImportFileName: "mobile_book_n_street_book_n_basket_book_core.proto",
   ImportModelName: "TopOfBook",
   ImportModelName: "MarketDepth",
   ImportModelName: "LastBarter",
@@ -26,7 +19,9 @@ option (FluxFileImportDependencyModel) = {
   ImportModelName: "MarketDepthList",
   ImportModelName: "LastBarterList",
   ImportModelName: "RawLastBarterHistory",
-  ImportModelName: "RawLastBarterHistoryList"
+  ImportModelName: "RawLastBarterHistoryList",
+    ImportModelName: "SymbolOverview",
+  ImportModelName: "SymbolOverviewList"
 };
 
 option (FluxFileImportDependencyModel) = {

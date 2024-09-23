@@ -19,8 +19,6 @@ namespace FluxCppCore {
         std::istringstream iss(time_str);
         std::tm tm = {};
         char separator;
-        char dot;
-        int microseconds = 0;
 
         // Check the separator between date and time
         if (time_str.find('T') != std::string::npos) {
@@ -31,8 +29,8 @@ namespace FluxCppCore {
             throw std::runtime_error("Invalid time string format");
         }
 
-        // Parse the string into tm struct and microseconds
-        iss >> std::get_time(&tm, ("%Y-%m-%d" + std::string(1, separator) + "%H:%M:%S").c_str()) >> dot >> microseconds;
+        // Parse the string into tm struct
+        iss >> std::get_time(&tm, ("%Y-%m-%d" + std::string(1, separator) + "%H:%M:%S").c_str());
 
         // Check if parsing succeeded
         if (iss.fail()) {
@@ -48,9 +46,6 @@ namespace FluxCppCore {
 
         // Convert time_t to microseconds since epoch
         auto timestamp_us = std::chrono::system_clock::from_time_t(time_t);
-
-        // Add microseconds to timestamp
-        timestamp_us += std::chrono::microseconds(microseconds);
 
         // Return timestamp in milliseconds
         return std::chrono::duration_cast<std::chrono::milliseconds>(timestamp_us.time_since_epoch()).count();

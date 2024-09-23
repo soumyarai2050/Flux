@@ -27,7 +27,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import config_dict
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import SharedMarketDepth
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import ExtendedMarketDepth
 
 
 # deprecated - replaced by market_depth cython cache impl
@@ -490,7 +490,7 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         raise NotImplementedError
 
     def set_sorted_market_depths(self, system_symbol: str, side: str, newest_exch_time: datetime,
-                                 sorted_market_depths: List[MarketDepthBaseModel | SharedMarketDepth]) -> DateTime:
+                                 sorted_market_depths: List[MarketDepthBaseModel | ExtendedMarketDepth]) -> DateTime:
         if self._market_depths_conts is None:
             self._market_depths_conts = []
             _market_depths_cont = MarketDepthsCont(system_symbol)

@@ -13,6 +13,18 @@ namespace mobile_book_handler {
         shutdown_db_n_ws_thread = false;
     }
 
+    extern "C" int32_t get_tob_ws_port() {
+        return tob_ws_port;
+    }
+
+    extern "C" int32_t get_md_ws_port() {
+        return md_ws_port;
+    }
+
+    extern "C" int32_t get_lt_ws_port() {
+        return lt_ws_port;
+    }
+
     last_barter_fp_t last_barter_fp{nullptr};
     mkt_depth_fp_t mkt_depth_fp{nullptr};
 

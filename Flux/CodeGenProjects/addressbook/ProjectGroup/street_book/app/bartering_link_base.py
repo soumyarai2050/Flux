@@ -128,7 +128,6 @@ class BarteringLinkBase(ABC):
         throws exception if found chore state is unsupported
         """
 
-
     @classmethod
     async def internal_chore_state_update(cls, chore_event: ChoreEventType, chore_id: str, side: Side | None = None,
                                           bartering_sec_id: str | None = None, system_sec_id: str | None = None,

@@ -11,7 +11,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
     MobileBookMutexManager, executor_config_yaml_dict)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import TopOfBook
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import ExtendedTopOfBook
 
 
 class ChoreControl:
@@ -138,24 +138,73 @@ class ChoreControl:
         return cls.ORDER_CONTROL_SUCCESS
 
     @classmethod
-    def check_min_chore_notional(cls, pair_strat: PairStrat, strat_limits: StratLimits | StratLimitsBaseModel,
+    def check_min_chore_notional(cls, strat_mode: StratMode, strat_limits: StratLimits | StratLimitsBaseModel,
                                  new_ord: NewChoreBaseModel, chore_usd_notional: float):
         if new_ord.finishing_chore:
             # check_min_chore_notional should not be applied to finishing chore
             return cls.ORDER_CONTROL_SUCCESS
         # else continue with check
         system_symbol = new_ord.security.sec_id
-        if pair_strat.pair_strat_params.strat_mode == StratMode.StratMode_Aggressive:
+        if strat_mode == StratMode.StratMode_Aggressive:
             # min chore notional is to be an chore opportunity condition instead of chore check
             checks_passed_ = ChoreControl.check_min_chore_notional_aggressive(strat_limits, chore_usd_notional,
                                                                               system_symbol, new_ord.side)
-        elif pair_strat.pair_strat_params.strat_mode == StratMode.StratMode_Relaxed:
+        elif strat_mode == StratMode.StratMode_Relaxed:
             checks_passed_ = ChoreControl.check_min_chore_notional_relaxed(strat_limits, chore_usd_notional,
                                                                            system_symbol, new_ord.side)
         else:
             checks_passed_ = ChoreControl.check_min_chore_notional_normal(strat_limits, chore_usd_notional,
                                                                           system_symbol, new_ord.side)
         return checks_passed_
+
+    # todo: to be added when merge task is started
+    # def check_chore_limits(self, top_of_book: TopOfBook, chore_limits: ChoreLimitsBaseModel,
+    #                        strat_mode: StratMode, new_ord: NewChoreBaseModel, chore_usd_notional: float,
+    #                        check_mask: int = ChoreControl.ORDER_CONTROL_SUCCESS):
+    #     sys_symbol = new_ord.security.sec_id
+    #     checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS
+    #     # TODO: min chore notional is to be a chore opportunity condition instead of chore check
+    #     checks_passed_ = ChoreControl.check_min_chore_notional(strat_mode, self.strat_limit, new_ord,
+    #                                                            chore_usd_notional)
+    #     if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS:
+    #         checks_passed |= checks_passed_
+    #
+    #     if check_mask == ChoreControl.ORDER_CONTROL_CONSUMABLE_PARTICIPATION_QTY_FAIL:
+    #         return checks_passed  # skip other chore checks, they were conducted before, this is qty down adjusted chore
+    #
+    #     checks_passed_ = ChoreControl.check_max_chore_notional(chore_limits, chore_usd_notional, sys_symbol,
+    #                                                            new_ord.side)
+    #     if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS:
+    #         checks_passed |= checks_passed_
+    #
+    #     # chore qty / chore contract qty checks
+    #     if (InstrumentType.INSTRUMENT_TYPE_UNSPECIFIED != new_ord.security.inst_type != InstrumentType.EQT and
+    #             chore_limits.max_contract_qty):
+    #         checks_passed_ = ChoreControl.check_max_chore_contract_qty(chore_limits, new_ord.qty, sys_symbol,
+    #                                                                    new_ord.side)
+    #     else:
+    #         checks_passed_ = ChoreControl.check_max_chore_qty(chore_limits, new_ord.qty, sys_symbol, new_ord.side)
+    #     # apply chore qty / chore contract qty check result
+    #     if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS:
+    #         checks_passed |= checks_passed_
+    #
+    #     if new_ord.security.inst_type == InstrumentType.EQT:
+    #         checks_passed_ = ChoreControl.check_min_eqt_chore_qty(chore_limits, new_ord.qty, sys_symbol, new_ord.side)
+    #         # apply min eqt chore qty check result
+    #         if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS:
+    #             checks_passed |= checks_passed_
+    #
+    #     if sys_symbol == self.leg_1_symbol:
+    #         mobile_book_container = self.mobile_book_container_cache.leg_1_mobile_book_container
+    #     else:
+    #         mobile_book_container = self.mobile_book_container_cache.leg_2_mobile_book_container
+    #     checks_passed_ = ChoreControl.check_px(top_of_book, self.sym_ovrw_getter, chore_limits, new_ord.px,
+    #                                            new_ord.usd_px, new_ord.qty, new_ord.side,
+    #                                            sys_symbol, mobile_book_container)
+    #     if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS:
+    #         checks_passed |= checks_passed_
+    #
+    #     return checks_passed
 
     @classmethod
     def check_max_chore_notional_(cls, max_chore_notional: float, chore_usd_notional: float,
@@ -250,20 +299,19 @@ class ChoreControl:
 
     # Utility methods - ideally different file - not here
     @staticmethod
-    def get_last_barter_reference_px(top_of_book: TopOfBook, side: Side, system_symbol: str,
+    def get_last_barter_reference_px(top_of_book: ExtendedTopOfBook, side: Side, system_symbol: str,
                                     sym_overview) -> float | None:
         reference_px: float | None = None
-        with MobileBookMutexManager(top_of_book):
-            if not top_of_book.last_barter:
-                # if its auction / SOD time - handle missing last barter by using reference_px as closing px instead
-                logging.warning(f"generated {str(side)} chore, symbol: {system_symbol}; top_of_book.last_barter is found "
-                                f"None, using closing px as reference px symbol_side_key: "
-                                f"{get_symbol_side_key([(system_symbol, side)])};;;tob: {top_of_book}")
-                if sym_overview is not None:
-                    reference_px = sym_overview.closing_px
-            else:
-                reference_px = top_of_book.last_barter.px
-            return reference_px
+        if not top_of_book.last_barter:
+            # if its auction / SOD time - handle missing last barter by using reference_px as closing px instead
+            logging.warning(f"generated {str(side)} chore, symbol: {system_symbol}; top_of_book.last_barter is found "
+                            f"None, using closing px as reference px symbol_side_key: "
+                            f"{get_symbol_side_key([(system_symbol, side)])};;;tob: {top_of_book}")
+            if sym_overview is not None:
+                reference_px = sym_overview.closing_px
+        else:
+            reference_px = top_of_book.last_barter.px
+        return reference_px
 
     @staticmethod
     def get_spread_in_bips(px1: float, px2: float) -> int:
@@ -330,22 +378,21 @@ class ChoreControl:
         return px_by_max_level
 
     @staticmethod
-    def _get_tob_bid_n_ask_quote_px(tob: TopOfBook, side: Side, system_symbol: str) -> Tuple[int, int] | None:
-        with MobileBookMutexManager(tob):
-            if not (tob.ask_quote and tob.ask_quote.px and tob.bid_quote and tob.bid_quote.px):
-                # @@@ below error log is used in specific test case for string matching - if changed here
-                # needs to be changed in test also
-                logging.error(f"blocked generated {str(side)} chore, symbol: {system_symbol}, side: {side} as tob"
-                              f" has incomplete data, symbol_side_key: "
-                              f"{get_symbol_side_key([(system_symbol, side)])};;;TOB: {tob}")
-                return None     # None return blocks the chore from going further
-            else:
-                return tob.bid_quote.px, tob.ask_quote.px
+    def _get_tob_bid_n_ask_quote_px(tob: ExtendedTopOfBook, side: Side, system_symbol: str) -> Tuple[int, int] | None:
+        if not (tob.ask_quote and tob.ask_quote.px and tob.bid_quote and tob.bid_quote.px):
+            # @@@ below error log is used in specific test case for string matching - if changed here
+            # needs to be changed in test also
+            logging.error(f"blocked generated {str(side)} chore, symbol: {system_symbol}, side: {side} as tob"
+                          f" has incomplete data, symbol_side_key: "
+                          f"{get_symbol_side_key([(system_symbol, side)])};;;TOB: {tob}")
+            return None     # None return blocks the chore from going further
+        else:
+            return tob.bid_quote.px, tob.ask_quote.px
 
     @staticmethod
-    def get_breach_threshold_px(tob: TopOfBook, sym_ovrw_getter: Callable,
+    def get_breach_threshold_px(tob: ExtendedTopOfBook, sym_ovrw_getter: Callable,
                                 chore_limits: ChoreLimitsBaseModel, side: Side, system_symbol: str,
-                                mobile_book_container = None, is_algo: bool = False) -> float | None:
+                                mobile_book_container=None, is_algo: bool = False) -> float | None:
         """
         Args:
             tob:
@@ -359,10 +406,13 @@ class ChoreControl:
             min breach threshold and max breach threshold
         """
         breach_threshold_px: float | None = None  # None if returned blocks the chore from going further
-        px_by_max_level = ChoreControl._get_px_by_max_level(system_symbol, side, chore_limits, mobile_book_container)
-        if px_by_max_level is None:
-            # _get_px_by_max_level logs error internally
-            return None
+        if mobile_book_container:
+            px_by_max_level = ChoreControl._get_px_by_max_level(system_symbol, side, chore_limits, mobile_book_container)
+            if px_by_max_level is None:
+                # _get_px_by_max_level logs error internally
+                return None
+        else:
+            px_by_max_level = None
         sym_ovrw = sym_ovrw_getter(system_symbol)
         last_barter_reference_px: float | None = ChoreControl.get_last_barter_reference_px(tob, side, system_symbol,
                                                                                          sym_ovrw)
@@ -401,7 +451,10 @@ class ChoreControl:
             # below same as: aggressive_quote.px * (1 + (max_basis_points / 10000))
             max_px_by_bbbo_basis_point: float = aggressive_quote_px + (aggressive_quote_px * max_basis_points / 10000)
 
-            breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation, px_by_max_level)
+            if mobile_book_container:
+                breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation, px_by_max_level)
+            else:
+                breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation)
             # breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation)
             # implies don't fail price check if target price is within last_barter + 1 tick OR aggressive BBBO + 1 tick
             breach_threshold_px_tick_size_check_applied: float
@@ -422,10 +475,14 @@ class ChoreControl:
             if not aggressive_quote_px:
                 return None  # error logged in _get_aggressive_tob_ask_quote_px
             min_px_by_lt_deviation: float = last_barter_reference_px - (last_barter_reference_px / 100 * max_px_deviation)
-            # below same as: aggressive_quote.px - ((aggressive_quote.px / 100) * (max_basis_points / 100))
-            min_px_by_bbbo_basis_point: float = aggressive_quote_px - (.01 * (aggressive_quote_px + max_basis_points))
+            # below same as: aggressive_quote.px * (1 - (max_basis_points / 10000))
+            min_px_by_bbbo_basis_point: float = aggressive_quote_px - (aggressive_quote_px * max_basis_points / 10000)
 
-            breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation, px_by_max_level)
+            if mobile_book_container:
+                breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation, px_by_max_level)
+            else:
+                breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation)
+
             # breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation)
             # implies don't fail price check if target price is within last_barter - 1 tick OR aggressive BBBO - 1 tick
             breach_threshold_px_tick_size_check_applied: float
@@ -443,19 +500,18 @@ class ChoreControl:
         return breach_threshold_px_tick_size_check_applied
 
     @staticmethod
-    def _get_tob_last_barter_px(top_of_book: TopOfBook, side: Side) -> float | None:
-        with MobileBookMutexManager(top_of_book):
-            if top_of_book.last_barter is None or math.isclose(top_of_book.last_barter.px, 0):
-                # @@@ below error log is used in specific test case for string matching - if changed here
-                # needs to be changed in test also
-                logging.error(f"blocked generated chore, symbol: {top_of_book.symbol}, side: {side} as "
-                              f"top_of_book.last_barter.px is none or 0, symbol_side_key: "
-                              f" {get_symbol_side_key([(top_of_book.symbol, side)])}")
-                return None
-            return top_of_book.last_barter.px
+    def _get_tob_last_barter_px(top_of_book: ExtendedTopOfBook, side: Side) -> float | None:
+        if top_of_book.last_barter is None or math.isclose(top_of_book.last_barter.px, 0):
+            # @@@ below error log is used in specific test case for string matching - if changed here
+            # needs to be changed in test also
+            logging.error(f"blocked generated chore, symbol: {top_of_book.symbol}, side: {side} as "
+                          f"top_of_book.last_barter.px is none or 0, symbol_side_key: "
+                          f" {get_symbol_side_key([(top_of_book.symbol, side)])}")
+            return None
+        return top_of_book.last_barter.px
 
     @staticmethod
-    def get_breach_threshold_px_ext(top_of_book: TopOfBook, sym_ovrw_getter: Callable,
+    def get_breach_threshold_px_ext(top_of_book: ExtendedTopOfBook | TopOfBook, sym_ovrw_getter: Callable,
                                     chore_limits: ChoreLimits | ChoreLimitsBaseModel, side: Side, system_symbol: str,
                                     mobile_book_container = None, is_algo: bool = False) -> float | None:
         # TODO important - check and change reference px in cases where last px is not available
@@ -475,7 +531,7 @@ class ChoreControl:
         return breach_threshold_px
 
     @staticmethod
-    def check_px(tob: TopOfBook, sym_ovrw_getter: Callable, chore_limits: ChoreLimitsBaseModel,
+    def check_px(tob: ExtendedTopOfBook, sym_ovrw_getter: Callable, chore_limits: ChoreLimitsBaseModel,
                  px: float, usd_px: float, qty: int, side: Side, system_symbol: str,
                  mobile_book_container = None, is_algo: bool = False) -> int:
         checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS

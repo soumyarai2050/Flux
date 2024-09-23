@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Python.h>
 #include "mobile_book_consumer.h"
 #include "mongo_db_singleton.h"
 
@@ -13,7 +12,7 @@ extern std::thread market_depth_ws_thread;
 
 extern "C" void websocket_cleanup();
 
-extern "C" void initialize_database(const char* db_uri, const char* db_name, PyObject* port_dict);
+extern "C" void initialize_database(const char* db_uri, const char* db_name);
 
 extern "C" void create_or_update_md_n_tob([[maybe_unused]] const int32_t id, const char *symbol,
     [[maybe_unused]] const char *exch_time, [[maybe_unused]] const char *arrival_time, const char side, const int32_t position,

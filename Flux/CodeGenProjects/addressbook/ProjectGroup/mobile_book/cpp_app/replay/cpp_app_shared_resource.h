@@ -17,6 +17,9 @@ namespace mobile_book_handler {
     extern const std::chrono::seconds TIME_OUT_CONNECTION;
     extern std::atomic<bool> shutdown_db_n_ws_thread;
     void signal_handler([[maybe_unused]] int signal);
+    extern "C" int32_t get_tob_ws_port();
+    extern "C" int32_t get_md_ws_port();
+    extern "C" int32_t get_lt_ws_port();
 
     struct SymbolNExchId {
         std::string sym_;

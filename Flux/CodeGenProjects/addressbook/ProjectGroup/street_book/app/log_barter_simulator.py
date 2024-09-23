@@ -177,7 +177,11 @@ class LogBarterSimulator(BarteringLinkBase):
                 f"symbol_type{cls.val_sep}{symbol_type}{cls.fld_sep}underlying_account"
                 f"{cls.val_sep}{account}{exchange_str}{cls.fld_sep}internal_ord_id{cls.val_sep}{internal_ord_id}")
         cls.int_id += 1
-        return True, str(cls.int_id)
+        sync_check = kwargs.get("sync_check")
+        if sync_check:
+            return True, f"place_new_chore---{cls.int_id}"
+        else:
+            return True, str(cls.int_id)
 
     @classmethod
     async def place_cxl_chore(cls, chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,

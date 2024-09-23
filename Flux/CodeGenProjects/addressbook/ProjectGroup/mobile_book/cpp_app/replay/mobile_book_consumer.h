@@ -4,7 +4,7 @@
 #include "mobile_book_web_socket_server.h"
 #include "mongo_db_codec.h"
 #include "queue_handler.h"
-
+#include "mongo_db_singleton.h"
 
 
 class MobileBookInterface {
@@ -14,10 +14,12 @@ public:
 	virtual void go() = 0;
 
 protected:
-	MobileBookInterface(std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db,
+	MobileBookInterface(YAML::Node &config,
+		std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db,
 		mobile_book_handler::MobileBookTopOfBookWebSocketServer<mobile_book::TopOfBook> &r_top_of_book_websocket_server,
 		mobile_book_handler::MobileBookLastBarterWebSocketServer<mobile_book::LastBarter> &r_last_barter_websocket_server,
 		mobile_book_handler::MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> &r_market_depth_websocket_server) :
+	m_config_file_(config),
 	m_sp_mongo_db_(std::move(sp_mongo_db)),  m_top_of_book_db_codec_(m_sp_mongo_db_), m_market_depth_db_codec_(m_sp_mongo_db_),
 	m_last_barter_db_codec_(m_sp_mongo_db_), m_market_depth_history_db_codec_(m_sp_mongo_db_),
 	m_last_barter_history_db_codec_(m_sp_mongo_db_), mr_top_of_book_web_socket_server_(r_top_of_book_websocket_server),
@@ -27,6 +29,7 @@ protected:
 		m_market_depth_history_db_codec_.get_all_data_from_collection(m_market_depth_history_collection_);
 	}
 
+	YAML::Node &m_config_file_;
 	std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db_;
 	FluxCppCore::MongoDBCodec<mobile_book::TopOfBook, mobile_book::TopOfBookList> m_top_of_book_db_codec_;
 	FluxCppCore::MongoDBCodec<mobile_book::MarketDepth, mobile_book::MarketDepthList> m_market_depth_db_codec_;
@@ -40,16 +43,42 @@ protected:
 	mobile_book_handler::MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> &mr_market_depth_web_socket_server_;
 	mobile_book::RawLastBarterHistoryList m_last_barter_collection_;
 	mobile_book::RawMarketDepthHistoryList m_market_depth_history_collection_;
+
+	std::string get_db_uri() const {
+		return m_config_file_["mongo_server"].as<std::string>();
+	}
+
+	std::string get_db_name() const {
+		return m_config_file_["db_name"].as<std::string>();
+	}
+
+	int32_t get_top_of_book_ws_port() const {
+		return m_config_file_["top_of_book_ws_port"].as<int32_t>();
+	}
+
+	int32_t get_last_barter_ws_port() const {
+		return m_config_file_["last_barter_ws_port"].as<int32_t>();
+	}
+
+	int32_t get_market_depth_ws_port() const {
+		return m_config_file_["market_depth_ws_port"].as<int32_t>();
+	}
+
+	auto get_ws_timeout() const {
+		auto timeout =  m_config_file_["websocket_timeout"].as<int32_t>();
+		return std::chrono::seconds(timeout);
+	}
 };
 
 
 class MobileBookConsumer : public MobileBookInterface {
 public:
-	explicit MobileBookConsumer(std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db,
-	mobile_book_handler::MobileBookTopOfBookWebSocketServer<mobile_book::TopOfBook> &r_top_of_book_websocket_server,
-	mobile_book_handler::MobileBookLastBarterWebSocketServer<mobile_book::LastBarter> &r_last_barter_websocket_server,
-	mobile_book_handler::MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> &r_market_depth_websocket_server) :
-	MobileBookInterface(std::move(sp_mongo_db), r_top_of_book_websocket_server, r_last_barter_websocket_server,
+	explicit MobileBookConsumer(YAML::Node& r_config_file,
+		std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db,
+		mobile_book_handler::MobileBookTopOfBookWebSocketServer<mobile_book::TopOfBook> &r_top_of_book_websocket_server,
+		mobile_book_handler::MobileBookLastBarterWebSocketServer<mobile_book::LastBarter> &r_last_barter_websocket_server,
+		mobile_book_handler::MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> &r_market_depth_websocket_server) :
+	MobileBookInterface(r_config_file, std::move(sp_mongo_db), r_top_of_book_websocket_server, r_last_barter_websocket_server,
 		r_market_depth_websocket_server) {
 
 		start_thread();

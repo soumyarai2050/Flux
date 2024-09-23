@@ -35,7 +35,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     compute_max_single_leg_notional, get_premium)
 from FluxPythonUtils.scripts.utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger,
-    handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int)
+    handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, YAMLConfigurationManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecordManager)
@@ -66,7 +66,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book import (
-    StreetBook, BarteringDataManager, get_bartering_link, TopOfBook, MarketDepth, MobileBookContainerCache,
+    StreetBook, BarteringDataManager, get_bartering_link, ExtendedTopOfBook, MarketDepth, MobileBookContainerCache,
     add_container_obj_for_symbol)
 
 
@@ -285,11 +285,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         self.mobile_book_provider.register_last_barter_fp(self.lt_callback)
         self.md_callback = market_depth_callback_type(market_depth_callback)
         self.mobile_book_provider.register_mkt_depth_fp(self.md_callback)
-        self.mobile_book_provider.initialize_database.argtypes = [
-            ctypes.c_char_p,
-            ctypes.c_char_p,
-            ctypes.py_object
-        ]
         self.mobile_book_provider.create_or_update_md_n_tob.argtypes = [
             ctypes.c_int32,
             ctypes.c_char_p,
@@ -318,9 +313,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             ctypes.c_int64,
             ctypes.c_int32
         ]
-        self.mobile_book_provider.initialize_database.restype = None
+        self.mobile_book_provider.cpp_app_launcher.argtypes = None
+        self.mobile_book_provider.get_tob_ws_port.argtypes = None
+        self.mobile_book_provider.get_md_ws_port.argtypes = None
+        self.mobile_book_provider.get_lt_ws_port.argtypes = None
         self.mobile_book_provider.create_or_update_md_n_tob.restype = None
         self.mobile_book_provider.create_or_update_last_barter_n_tob.restype = None
+        self.mobile_book_provider.get_tob_ws_port.restype = ctypes.c_int32
+        self.mobile_book_provider.get_md_ws_port.restype = ctypes.c_int32
+        self.mobile_book_provider.get_lt_ws_port.restype = ctypes.c_int32
+        self.mobile_book_provider.cpp_app_launcher.restype = None
 
     def get_generic_read_route(self):
         return None
@@ -417,6 +419,24 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 dest_config_file_path = self.simulate_config_yaml_file_path
                                 shutil.copy(temp_config_file_path, dest_config_file_path)
 
+                                mongo_server = executor_config_yaml_dict.get("mongo_server")
+
+                                simulate_config_yaml_file_data = YAMLConfigurationManager.load_yaml_configurations(
+                                    self.simulate_config_yaml_file_path, load_as_str=True)
+                                simulate_config_yaml_file_data += "\n\n"
+                                simulate_config_yaml_file_data += f"leg_1_symbol: {self.strat_leg_1.sec.sec_id}\n"
+                                simulate_config_yaml_file_data += f"leg_1_feed_code: {self.strat_leg_1.exch_id}\n"
+                                simulate_config_yaml_file_data += f"leg_2_symbol: {self.strat_leg_2.sec.sec_id}\n"
+                                simulate_config_yaml_file_data += f"leg_2_feed_code: {self.strat_leg_2.exch_id}\n\n"
+                                simulate_config_yaml_file_data += f"mongo_server: {mongo_server}\n"
+                                simulate_config_yaml_file_data += f"db_name: {self.db_name}\n\n"
+                                simulate_config_yaml_file_data += f"top_of_book_ws_port: {find_free_port()}\n"
+                                simulate_config_yaml_file_data += f"market_depth_ws_port: {find_free_port()}\n"
+                                simulate_config_yaml_file_data += f"last_barter_ws_port: {find_free_port()}\n"
+                                simulate_config_yaml_file_data += f"websocket_timeout: 300\n"
+                                YAMLConfigurationManager.update_yaml_configurations(
+                                    simulate_config_yaml_file_data, str(self.simulate_config_yaml_file_path))
+                                os.environ["simulate_config_yaml_file"] = str(self.simulate_config_yaml_file_path)
                                 # setting simulate_config_file_name
                                 BarteringLinkBase.simulate_config_yaml_path = self.simulate_config_yaml_file_path
                                 BarteringLinkBase.executor_port = self.port
@@ -430,14 +450,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                     pair_strat.port = self.port
 
                                     # Setting MobileBookCache instances for this symbol pair
-                                    md_port_dict: Dict = {}
-                                    mongo_server = executor_config_yaml_dict.get("mongo_server")
-                                    self.mobile_book_provider.initialize_database(
-                                        ctypes.c_char_p(mongo_server.encode('utf-8')),
-                                        ctypes.c_char_p(self.db_name.encode('utf-8')), md_port_dict)
-                                    pair_strat.top_of_book_port = md_port_dict.get("top_of_book_port")
-                                    pair_strat.market_depth_port = md_port_dict.get("market_depth_port")
-                                    pair_strat.last_barter_port = md_port_dict.get("last_barter_port")
+                                    pair_strat.top_of_book_port = self.mobile_book_provider.get_tob_ws_port()
+                                    pair_strat.market_depth_port = self.mobile_book_provider.get_md_ws_port()
+                                    pair_strat.last_barter_port = self.mobile_book_provider.get_lt_ws_port()
 
                                 try:
                                     updated_pair_strat = email_book_service_http_client.put_pair_strat_client(pair_strat)
@@ -1386,15 +1401,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     # Get specific Data handling Methods
     ####################################
 
-    def _get_top_of_book_from_symbol(self, symbol: str) -> TopOfBook | None:
+    def _get_top_of_book_from_symbol(self, symbol: str) -> ExtendedTopOfBook | None:
         if symbol == self.strat_leg_1.sec.sec_id:
             return self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book()
         elif symbol == self.strat_leg_2.sec.sec_id:
             return self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book()
 
     def _get_last_barter_px_n_symbol_tuples_from_tob(
-            self, current_leg_tob_obj: TopOfBook,
-            other_leg_tob_obj: TopOfBook) -> Tuple[Tuple[float, str], Tuple[float, str]]:
+            self, current_leg_tob_obj: ExtendedTopOfBook,
+            other_leg_tob_obj: ExtendedTopOfBook) -> Tuple[Tuple[float, str], Tuple[float, str]]:
         with (MobileBookMutexManager(current_leg_tob_obj, other_leg_tob_obj)):
             return ((current_leg_tob_obj.last_barter.px, current_leg_tob_obj.symbol),
                     (other_leg_tob_obj.last_barter.px, other_leg_tob_obj.symbol))
@@ -5336,8 +5351,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             self._call_cpp_mobile_book_updater_from_last_barter(last_barter_obj)
 
     @staticmethod
-    def validate_single_id_per_symbol(stored_tobs: List[TopOfBookBaseModel | TopOfBook],
-                                      cmp_tob: TopOfBook):
+    def validate_single_id_per_symbol(stored_tobs: List[TopOfBookBaseModel | ExtendedTopOfBook],
+                                      cmp_tob: ExtendedTopOfBook):
         err: str | None = None
         if stored_tobs[0] is not None and cmp_tob.symbol == stored_tobs[0].symbol and cmp_tob.id != stored_tobs[0].id:
             err = f"id_mismatched for same symbol! stored TOB: {stored_tobs[0]}, found TOB: {cmp_tob}"
@@ -5348,12 +5363,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     def update_fill(self):
         self.strat_cache.get_strat_brief()
 
-    async def create_top_of_book_post(self, top_of_book_obj: TopOfBook):
+    async def create_top_of_book_post(self, top_of_book_obj: ExtendedTopOfBook):
         # tob creation is expected to be rare [once per symbol] - extra precautionary code is fine
         # updating bartering_data_manager's cache
-        tob_tuple: Tuple[List[TopOfBookBaseModel | TopOfBook], DateTime] | None = (
+        tob_tuple: Tuple[List[TopOfBookBaseModel | ExtendedTopOfBook], DateTime] | None = (
             self.bartering_data_manager.strat_cache.get_top_of_book())
-        tob_list: List[TopOfBookBaseModel | TopOfBook] | None = None
+        tob_list: List[TopOfBookBaseModel | ExtendedTopOfBook] | None = None
         if tob_tuple is not None:
             tob_list, _ = tob_tuple
         if tob_list:
@@ -5901,7 +5916,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 return cached_chore_snapshot
         return []
 
-    async def get_tob_of_book_from_cache_query_pre(self, top_of_book_class_type: Type[TopOfBook]):
+    async def get_tob_of_book_from_cache_query_pre(self, top_of_book_class_type: Type[ExtendedTopOfBook]):
         # used in test case to verify cache after recovery
         tob_list = []
 

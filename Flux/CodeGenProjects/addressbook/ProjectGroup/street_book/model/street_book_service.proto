@@ -10,6 +10,7 @@ import "phone_book_n_street_book_core.proto";
 import "mobile_book_n_street_book_n_basket_book_core.proto";
 import "street_book_n_post_book_core.proto";
 import "street_book_n_basket_book_core.proto";
+import "street_book_n_post_book_n_basket_book_core.proto";
 
 package street_book;
 
@@ -345,31 +346,6 @@ message LastNSecMarketBarterVol{
   optional int64 last_n_sec_barter_vol = 1;
 }
 
-message BarterSimulatorProcessNewChore{
-  option (FluxMsgJsonQuery) = {
-    QueryName: "barter_simulator_place_new_chore",
-    QueryParams: "px",
-    QueryParamsDataType: "float",
-    QueryParams: "qty",
-    QueryParamsDataType: "int",
-    QueryParams: "side",
-    QueryParamsDataType: "Side",
-    QueryParams: "bartering_sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "system_sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "symbol_type",
-    QueryParamsDataType: "str",
-    QueryParams: "underlying_account",
-    QueryParamsDataType: "str",
-    QueryParams: "exchange",
-    QueryParamsDataType: "str | None = None",
-    QueryParams: "internal_ord_id",
-    QueryParamsDataType: "str | None = None"
-  };
-  required bool resp = 1;
-}
-
 message BarterSimulatorProcessCxlChore{
   option (FluxMsgJsonQuery) = {
     QueryName: "barter_simulator_place_cxl_chore",
@@ -519,4 +495,5 @@ message ImportWarningAvoidDummyMessage{
   optional CommandType temp5 = 5;
   optional DummyEnumSO temp6 = 6;
   optional ChoreSubmitType temp7 = 7;
+  optional DummyEnumSPB temp8 = 8;
 }
