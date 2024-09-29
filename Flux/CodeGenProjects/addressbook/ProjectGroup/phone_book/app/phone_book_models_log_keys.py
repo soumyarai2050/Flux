@@ -38,7 +38,7 @@ def get_pair_strat_log_key(pair_strat: PairStrat | PairStratBaseModel | PairStra
 
 
 def get_pair_strat_dict_log_key(pair_strat_dict: Dict[str, Any]):
-    pair_strat_id = pair_strat_dict.get("id")
+    pair_strat_id = pair_strat_dict.get("_id")
     if pair_strat_key := pair_strat_id_key.get(pair_strat_id):
         return pair_strat_key
     else:

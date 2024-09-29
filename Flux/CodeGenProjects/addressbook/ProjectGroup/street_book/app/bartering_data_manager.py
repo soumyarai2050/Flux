@@ -3,24 +3,23 @@ from threading import Thread
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_cache import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.strat_cache import StratCache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
-    get_fills_journal_log_key, get_chore_journal_log_key, get_chore_snapshot_log_key)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     is_ongoing_strat, ps_host, ps_port)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_pair_strat_log_key)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import market, get_bartering_link
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link import market, get_bartering_link
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_ws_data_manager import (
     EmailBookServiceDataManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_ws_data_manager import (
     StreetBookServiceDataManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
-    StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
     PairStrat, PairStratBaseModel, FxSymbolOverviewBaseModel)
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_bartering_data_manager import BaseBarteringDataManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
+    get_pair_strat_log_key, get_symbol_side_key)
 
 port = os.environ.get("PORT")
 if port is None or len(port) == 0:
@@ -31,20 +30,19 @@ else:
     port = parse_to_int(port)
 
 
-class BarteringDataManager(EmailBookServiceDataManager, StreetBookServiceDataManager):
+class BarteringDataManager(BaseBarteringDataManager, EmailBookServiceDataManager, StreetBookServiceDataManager):
 
     def __init__(self, executor_trigger_method: Callable,
-                 strat_cache: StratCache, mobile_book_container_cache):
+                 strat_cache: StratCache):
+        BaseBarteringDataManager.__init__(self)
         EmailBookServiceDataManager.__init__(self, ps_host, ps_port, strat_cache)
         StreetBookServiceDataManager.__init__(self, host, port, strat_cache)
         cpp_ws_url: str = f"ws://{host}:8083/"
         self.bartering_cache: BarteringCache = BarteringCache()
         self.strat_cache: StratCache = strat_cache
-        self.mobile_book_container_cache = mobile_book_container_cache
-        self.street_book = None
-        self.street_book_thread: Thread | None = None
 
         raise_exception = False
+        pair_strat: PairStrat | None = None
         pair_strat_tuple: Tuple[PairStrat, DateTime] = self.strat_cache.get_pair_strat()
         if pair_strat_tuple is None:
             raise_exception = True
@@ -76,8 +74,8 @@ class BarteringDataManager(EmailBookServiceDataManager, StreetBookServiceDataMan
         self.chore_limits_ws_get_all_cont.register_to_run()
         self.system_control_ws_get_all_cont.register_to_run()
         # overriding pair strat ws_get_all_const to filter by id
-        pair_strat_obj = self.strat_cache.get_pair_strat()[0]
-        self.pair_strat_ws_get_all_cont = self.pair_strat_ws_get_by_id_client(False, pair_strat_obj.id)
+        # reached here only when pair_strat is not None
+        self.pair_strat_ws_get_all_cont = self.pair_strat_ws_get_by_id_client(False, pair_strat.id)
         self.pair_strat_ws_get_all_cont.register_to_run()
         self.fx_symbol_overview_ws_get_all_cont.register_to_run()
         self.portfolio_limits_ws_get_all_cont.register_to_run()
@@ -119,8 +117,8 @@ class BarteringDataManager(EmailBookServiceDataManager, StreetBookServiceDataMan
                 if self.street_book is None:
                     # this is a new pair strat for processing, start its own thread with new strat executor object
                     self.strat_cache.stopped = False
-                    self.street_book, self.street_book_thread = (
-                        self.executor_trigger_method(self, self.strat_cache, self.mobile_book_container_cache))
+                    self.street_book, self.street_book_thread = self.executor_trigger_method(self,
+                                                                                                   self.strat_cache)
                     # update strat key to python processing thread
                 self.strat_cache.set_pair_strat(pair_strat_)
             if self.strat_status_ws_get_all_cont.notify:
@@ -206,17 +204,7 @@ class BarteringDataManager(EmailBookServiceDataManager, StreetBookServiceDataMan
     #         logging.error(f"unexpected: chore journal with non-matching symbol found in pre-matched strat-cache, "
     #                       f"chore_journal_key: {get_chore_journal_log_key(chore_journal_)}")
 
-    def underlying_handle_chore_snapshot_ws(self, **kwargs):
-        chore_snapshot_: ChoreSnapshotBaseModel | ChoreSnapshot = kwargs.get("chore_snapshot_")
-        with self.strat_cache.re_ent_lock:
-            is_unack: bool = False
-            # ChoreStatusType.OE_CXL_UNACK not included here - this leads to seconds leg block cases - max open chore to
-            # prevent more chores from going to market if / when too many cancel un-ack chores are pending
-            if chore_snapshot_.chore_status == ChoreStatusType.OE_UNACK:
-                is_unack = True
-                StratCache.chore_id_to_symbol_side_tuple_dict[chore_snapshot_.chore_brief.chore_id] = \
-                    (chore_snapshot_.chore_brief.security.sec_id, chore_snapshot_.chore_brief.side)
-
+    def handle_unack_state(self, is_unack: bool, chore_snapshot_: ChoreSnapshotBaseModel | ChoreSnapshot):
         cached_pair_strat, _ = self.strat_cache.get_pair_strat()
         if chore_snapshot_.chore_brief.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
             if chore_snapshot_.chore_brief.user_data:
@@ -227,8 +215,13 @@ class BarteringDataManager(EmailBookServiceDataManager, StreetBookServiceDataMan
                 self.strat_cache.set_has_unack_leg2(is_unack, chore_snapshot_.chore_brief.user_data)
             # else not required, external chore TODO: Add check for specific user data
         else:
+            chore_snapshot_key = get_symbol_side_key([(chore_snapshot_.chore_brief.security.sec_id,
+                                                       chore_snapshot_.chore_brief.side)])
             logging.error(f"unexpected: chore snapshot with non-matching symbol found in pre-matched strat-cache, "
-                          f"chore_snapshot_key: {get_chore_snapshot_log_key(chore_snapshot_)};;;{chore_snapshot_=}")
+                          f"{chore_snapshot_key=};;;{chore_snapshot_=}")
+
+    def underlying_handle_chore_snapshot_ws(self, **kwargs):
+        self.underlying_handle_chore_snapshot_ws_(**kwargs)
 
     def handle_fx_symbol_overview_get_all_ws(self, fx_symbol_overview_: FxSymbolOverviewBaseModel, **kwargs):
         if fx_symbol_overview_.symbol in StratCache.fx_symbol_overview_dict:

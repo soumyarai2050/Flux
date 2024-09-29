@@ -35,7 +35,7 @@ class BarteringLinkBase(ABC):
     executor_host = host
     pair_strat_config_dict = pair_strat_config_yaml_dict
     pair_strat_web_client: ClassVar[EmailBookServiceHttpClient] = email_book_service_http_client
-    portfolio_config_path: Final[PurePath] = (PurePath(__file__).parent.parent / "data" /
+    portfolio_config_path: Final[PurePath] = (PurePath(__file__).parent.parent.parent / "street_book" / "data" /
                                               "kill_switch_simulate_config.yaml")
     portfolio_config_dict: ClassVar[Dict | None] = load_configs(str(portfolio_config_path))
 
@@ -89,7 +89,7 @@ class BarteringLinkBase(ABC):
     @abstractmethod
     async def place_new_chore(cls, px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str,
                               symbol_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
-                              internal_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
+                              client_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
         """
         derived to implement connector to underlying link provider, and
         return bool indicating success/fail and unique-id-str/err-description in second param
@@ -127,6 +127,7 @@ class BarteringLinkBase(ABC):
             return None, None, None [indicating no chore found for this chore_id]
         throws exception if found chore state is unsupported
         """
+
 
     @classmethod
     async def internal_chore_state_update(cls, chore_event: ChoreEventType, chore_id: str, side: Side | None = None,

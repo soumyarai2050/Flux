@@ -3,6 +3,7 @@ syntax = "proto2";
 import "flux_options.proto";
 import "projects_core.proto";
 import "street_book_n_post_book_core.proto";
+import "street_book_n_post_book_n_basket_book_core.proto";
 
 package post_book;
 
@@ -49,4 +50,5 @@ message IsPortfolioLimitsBreached{
 message ImportWarningAvoidDummyMessage{
   optional DummyEnumSO temp1 = 1;
   optional DummyEnumP temp2 = 2;
+  optional DummyEnumSPB temp3 = 3;
 }

@@ -23,7 +23,8 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultMsg
 from Flux.PyCodeGenEngine.FluxCodeGenCore.ws_connection_manager import WSData
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
 from FluxPythonUtils.scripts.utility_functions import (
-    execute_tasks_list_with_all_completed, handle_ws, compare_n_patch_dict, compare_n_patch_list)
+    execute_tasks_list_with_all_completed, handle_ws, compare_n_patch_dict,
+    compare_n_patch_list, non_jsonable_types_handler)
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_route_utils import get_aggregate_pipeline, generic_perf_benchmark
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel, enc_hook, remove_none_values
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import get_non_stored_ids
@@ -73,7 +74,7 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
                                                   has_links=has_links, is_projection_type=True)
         # else not required: passing provided list of dict if ws_data is not of projection type
 
-        json_str = orjson.dumps(db_obj_dict_list, default=str).decode('utf-8')
+        json_str = orjson.dumps(db_obj_dict_list, default=non_jsonable_types_handler).decode('utf-8')
         await broadcast_callable(json_str, ws_data, tasks_list)
 
 
@@ -96,7 +97,7 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
                                         has_links=has_links, is_projection_type=True)
         # else not required: passing provided db_obj_dict if ws_data is not of projection type
 
-        json_str = orjson.dumps(db_obj_dict, default=str).decode("utf-8")
+        json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
         if broadcast_with_id:
             await broadcast_callable(json_str, db_obj_id, ws_data, tasks_list)
         else:
@@ -227,6 +228,10 @@ async def generic_post_http(msgspec_class_type: Type[MsgspecModel],
                             update_agg_pipeline: Any = None, has_links: bool = False) -> Dict[str, Any] | bool:
     collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
     obj_json = create_obj.to_dict()
+    obj_id = create_obj.id
+    if obj_id is not None:
+        msgspec_class_type.init_max_id(obj_id, None)    # updates max_id to this id if is > than existing max_id
+
     insert_one_result: pymongo.results.InsertOneResult = await collection_obj.insert_one(obj_json)
 
     await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
@@ -245,6 +250,10 @@ async def generic_post_all_http(msgspec_class_type: Type[MsgspecModel], proto_pa
                                 filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None,
                                 has_links: bool = False) -> List[Dict[str, Any]] | bool:
     collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+    for create_obj in create_obj_list:
+        obj_id = create_obj.id
+        if obj_id is not None:
+            msgspec_class_type.init_max_id(obj_id, None)  # updates max_id to this id if is > than existing max_id
     obj_json_list = msgspec.to_builtins(create_obj_list, builtin_types=[DateTime])
     insert_many_result: pymongo.results.InsertManyResult = await collection_obj.insert_many(obj_json_list)
 
@@ -692,7 +701,7 @@ async def _generic_read_ws(msgspec_class_type: Type[MsgspecModel], ws: WebSocket
         if need_initial_snapshot is None or need_initial_snapshot:
             json_obj_list = \
                 await get_obj_list(msgspec_class_type, filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
-            json_obj_list_str = json.dumps(json_obj_list, default=str)
+            json_obj_list_str = json.dumps(json_obj_list, default=non_jsonable_types_handler)
             await msgspec_class_type.read_ws_path_ws_connection_manager. \
                 send_json_to_websocket(json_obj_list_str, ws)
         # else not required: no initial snapshot is provided on this connection
@@ -778,7 +787,7 @@ async def generic_projection_query_ws(ws: WebSocket, project_name: str, msgspec_
 
             json_obj_list = await get_obj_list(msgspec_class_type,
                                                filter_agg_pipeline=projection_agg_pipeline)
-            json_str = json.dumps(json_obj_list, default=str)
+            json_str = json.dumps(json_obj_list, default=non_jsonable_types_handler)
             await msgspec_class_type.read_ws_path_ws_connection_manager. \
                 send_json_to_websocket(json_str, ws)
         # else not required: no initial snapshot is provided on this connection
@@ -849,7 +858,7 @@ async def generic_read_by_id_ws(ws: WebSocket, project_name: str, msgspec_class_
                 raise HTTPException(status_code=404, detail=id_not_found.format_msg(msgspec_class_type.__name__,
                                                                                     db_obj_id))
             else:
-                fetched_obj_json_str = json.dumps(fetched_json_obj, default=str)
+                fetched_obj_json_str = json.dumps(fetched_json_obj, default=non_jsonable_types_handler)
                 await msgspec_class_type.read_ws_path_with_id_ws_connection_manager.send_json_to_websocket(
                     fetched_obj_json_str, ws)
         # else not required: no initial snapshot is provided on this connection

@@ -24,6 +24,8 @@ from Flux.PyCodeGenEngine.PluginFastApi.fastapi_http_client_file_handler import 
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_client_file_handler import FastapiWSClientFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ui_proxy_config_handler import FastapiUIProxyConfigHandler
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
+    root_core_proto_files, project_grp_core_proto_files, project_dir)
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, convert_camel_case_to_specific_case
 
 
@@ -49,6 +51,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         self.app_is_router: bool = True
         self.custom_id_primary_key_messages: List[protogen.Message] = []
         self.msg_type_to_nested_root_type_field_name_n_type_dict: Dict[protogen.Message, List[Tuple[str, str]]] = {}
+        self.model_file_suffix = "msgspec_model"
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message],
                                                  avoid_non_roots: bool | None = None):
@@ -74,24 +77,16 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
                 # else not required: If json root option don't have reentrant field then considering it requires
                 # reentrant lock as default and avoiding its append to reentrant lock non-required list
 
-                if message not in self.root_message_list:
-                    self.root_message_list.append(message)
-                # else not required: avoiding repetition
+                self.update_root_msg_list(message)
 
                 if MsgspecFastApiPlugin.default_id_field_name in [field.proto.name for field in message.fields]:
                     self.custom_id_primary_key_messages.append(message)
             else:
                 if not avoid_non_roots:
-                    if message not in self.non_root_message_list:
-                        self.non_root_message_list.append(message)
-                    # else not required: avoiding repetition
+                    self.update_non_root_msg_list(message)
 
             # Adding query messages
-            if self.is_option_enabled(message, MsgspecFastApiPlugin.flux_msg_json_query):
-                if message not in self.message_to_query_option_list_dict:
-                    self.message_to_query_option_list_dict[message] = self.get_query_option_message_values(message)
-                # else not required: avoiding repetition
-            # else not required: avoiding list append if msg is not having option for query
+            self.update_query_data_members(message)
 
             self.load_dependency_messages_and_enums_in_dicts(message)
 
@@ -245,7 +240,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         output_str += f'    return db_handler\n'
         return output_str
 
-    def handle_database_file_gen(self) -> str:
+    def handle_database_file_gen(self, file: protogen.File) -> str:
         output_str = "import os\n"
         output_str += "import motor\n"
         output_str += "import motor.motor_asyncio\n"
@@ -254,18 +249,30 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
 
         output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n"
         output_str += f'\n\n'
+
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
-        output_str += f'from {model_file_path} import *\n\n\n'
+        output_str += f'from {model_file_path} import *\n'
+        project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+        dependency_file_path_list = self.get_dependency_file_path_list(
+            file, root_core_proto_files, project_grp_core_proto_files,
+            self.model_file_suffix, str(project_grp_root_dir))
+
+        project_name = file.proto.package
+        for dependency_file_path in dependency_file_path_list:
+            if f"_n_{project_name}" in dependency_file_path or f"{project_name}_n_" in dependency_file_path:
+                output_str += f'from {dependency_file_path} import *\n'
+
+        if dependency_file_path_list:
+            output_str += "\n\n"
+
         output_str += self.handle_init_db()
 
         return output_str
 
-    def handle_fastapi_initialize_file_gen(self) -> str:
+    def handle_fastapi_initialize_file_gen(self, file: protogen.File) -> str:
         output_str = "import os\n"
         output_str += "from msgspec import Struct\n"
         output_str += "from fastapi import FastAPI\n"
-        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
-        output_str += f"from {model_file_path} import *\n"
         # else not required: if no message with custom id is found then avoiding import statement
         database_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.database_file_name)
         output_str += f"from {database_file_path} import init_db\n"
@@ -276,6 +283,22 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         output_str += f"from {routes_file_path} import *\n"
         routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.ws_routes_file_name)
         output_str += f"from {routes_file_path} import *\n\n"
+
+        # model imports
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
+        output_str += f"from {model_file_path} import *\n"
+        project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+        dependency_file_path_list = self.get_dependency_file_path_list(
+            file, root_core_proto_files, project_grp_core_proto_files,
+            self.model_file_suffix, str(project_grp_root_dir))
+
+        project_name = file.proto.package
+        for dependency_file_path in dependency_file_path_list:
+            if f"_n_{project_name}" in dependency_file_path or f"{project_name}_n_" in dependency_file_path:
+                output_str += f'from {dependency_file_path} import *\n'
+        if dependency_file_path_list:
+            output_str += "\n\n"
+
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n\n"
         output_str += f'@{self.fastapi_app_name}.on_event("startup")\n'
         output_str += f'async def connect():\n'
@@ -393,13 +416,13 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
 
         output_dict: Dict[str, str] = {
             # # Adding project´s database.py
-            self.database_file_name+".py": self.handle_database_file_gen(),
+            self.database_file_name+".py": self.handle_database_file_gen(file),
             #
             # # Adding project´s fastapi.py
-            self.fastapi_file_name + ".py": self.handle_fastapi_initialize_file_gen(),
+            self.fastapi_file_name + ".py": self.handle_fastapi_initialize_file_gen(file),
             #
             # # Adding route's callback class
-            self.routes_callback_file_name + ".py": self.handle_msgspec_callback_class_file_gen(),
+            self.routes_callback_file_name + ".py": self.handle_msgspec_callback_class_file_gen(file, self.model_file_suffix),
             #
             # Adding callback override set_instance file
             self.callback_override_set_instance_file_name + ".py":
@@ -413,7 +436,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
             self.routes_callback_import_file_name + ".py": self.handle_routes_callback_import_file_gen(),
 
             # Adding base routes.py
-            self.base_routes_file_name + ".py": self.handle_base_routes_file_gen(),
+            self.base_routes_file_name + ".py": self.handle_base_routes_file_gen(file, self.model_file_suffix),
 
             # Adding project's http routes.py
             self.http_routes_file_name + ".py": self.handle_http_msgspec_routes_file_gen(),
@@ -428,10 +451,10 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
             self.launch_file_name + ".py": self.handle_launch_file_gen(file),
 
             # Adding client file
-            self.client_file_name + ".py": self.handle_client_file_gen(file),
+            self.client_file_name + ".py": self.handle_client_file_gen(file, self.model_file_suffix),
 
             # Adding WS client file
-            self.ws_client_file_name + ".py": self.handle_ws_client_file_gen(file),
+            self.ws_client_file_name + ".py": self.handle_ws_client_file_gen(file, self.model_file_suffix),
 
             self.ws_ui_proxy_config_file_name: self.handle_ui_proxy_config_file_gen(file)
         }

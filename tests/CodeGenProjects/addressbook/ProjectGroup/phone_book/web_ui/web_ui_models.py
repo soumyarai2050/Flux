@@ -32,6 +32,11 @@ class FluxPropertyType(StrEnum):
     FluxFldValMax = "val_max"
 
 
+class InputType(StrEnum):
+    MAX_VALID_VALUE = auto()
+    INVALID_VALUE = auto()
+
+
 class DriverType(StrEnum):
     CHROME = "chrome"
     EDGE = "edge"
@@ -73,3 +78,7 @@ class ColorType(StrEnum):
     # ERROR = (156, 0, 6)
     WARNING = auto()
     CRITICAL = auto()
+
+class ButtonState(StrEnum):
+    HIDE = auto()
+    SHOW = auto()

@@ -1,18 +1,12 @@
 # standard imports
-import logging
 from datetime import timedelta
 from threading import RLock, Semaphore
-from typing import Dict, Tuple, Optional, ClassVar, Set
+from typing import Set
 import copy
-import pytz
-from pendulum import DateTime
-import inspect
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_pair_strat_log_key, get_symbol_side_key)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
-    get_fills_journal_log_key)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_base_strat_cache import \
@@ -22,12 +16,9 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetB
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import (
     StreetBookServiceKeyHandler)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.pos_cache import PosCache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
-# from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.ws_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import config_dict
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import ExtendedMarketDepth
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import ExtendedMarketDepth
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import BaseStratCache
 
 
 # deprecated - replaced by market_depth cython cache impl
@@ -72,32 +63,16 @@ class MarketDepthsCont:
                 self.ask_market_depths.append(market_depth)
 
 
-class ChoreSnapshotContainer:
-    def __init__(self, chore_snapshot: ChoreSnapshot | ChoreSnapshotBaseModel, has_fill: bool):
-        self.chore_snapshot: ChoreSnapshot | ChoreSnapshotBaseModel = chore_snapshot
-        self.has_fill: bool = has_fill
-
-
-class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache):
+class StratCache(BaseStratCache, EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache):
+    KeyHandler: Type[StreetBookServiceKeyHandler] = StreetBookServiceKeyHandler
     strat_cache_dict: Dict[str, 'StratCache'] = dict()  # symbol_side is the key
     add_to_strat_cache_rlock: RLock = RLock()
-    chore_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
-    # fx_symbol_overview_dict must be preloaded with supported fx pairs for system to work
-    fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | FxSymbolOverview | None] = {"USD|SGD": None}
-
-    error_prefix = "StratCache: "
-    load_static_data_mutex: Lock = Lock()
-    static_data_service_state: ClassVar[ServiceState] = ServiceState(
-        error_prefix=error_prefix + "static_data_service failed, exception: ")
-    static_data: SecurityRecordManager | None = None
 
     def __init__(self):
+        BaseStratCache.__init__(self)
         EmailBookServiceBaseStratCache.__init__(self)
         StreetBookServiceBaseStratCache.__init__(self)
         self.market = Market(MarketID.IN)
-        if not StratCache.static_data_service_state.ready:
-            StratCache.load_static_data()
-        self.re_ent_lock: RLock = RLock()
         self.notify_semaphore = Semaphore()
         self.stopped = True  # used by consumer thread to stop processing
         self.leg1_bartering_symbol: str | None = None
@@ -109,7 +84,6 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         # all fx always against usd - these are reused across strats
         self.leg1_fx_symbol: str = "USD|SGD"  # get this from static data based on leg1 symbol
         self.leg1_fx_tob: TopOfBookBaseModel | TopOfBook | None = None
-        self.leg1_fx_symbol_overview: FxSymbolOverviewBaseModel | FxSymbolOverview | None = None
 
         self._symbol_side_snapshots: List[SymbolSideSnapshotBaseModel |
                                           SymbolSideSnapshot | None] = [None, None]  # pre-create space for 2 legs
@@ -126,13 +100,6 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         self._market_depths_conts: List[MarketDepthsCont] | None = None
         self._market_depths_update_date_time: DateTime = DateTime.utcnow()
 
-        # chore-snapshot is also stored in here iff chore snapshot is open [and removed from here if otherwise]
-        self._chore_id_to_open_chore_snapshot_cont_dict: Dict[Any, ChoreSnapshotContainer] = {}  # no open
-        self._open_chore_snapshots_update_date_time: DateTime = DateTime.utcnow()
-        # temp store for has_fill till chore snapshot is created / has fill updated
-        self.open_chore_id_has_fill_set: Set = set()
-        self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock: Lock = Lock()
-
     def get_close_px(self, system_symbol: str):
         if system_symbol == self._symbol_overviews[0].symbol:
             if self._symbol_overviews[0].closing_px:
@@ -144,77 +111,18 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         logging.error(f"_symbol_overviews.closing_px not found in get_close_px called for: {system_symbol}")
         return None
 
-    def _check_log_over_fill(self, chore_snapshot: ChoreSnapshotBaseModel | ChoreSnapshot):
-        if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
-            # move strat to pause state via log analyzer if we sees overfill: (logic handles corner cases)
-            ord_brief = chore_snapshot.chore_brief
-            logging.critical(f"Chore found overfilled for symbol_side_key: "
-                             f"{get_symbol_side_key([(ord_brief.security.sec_id, ord_brief.side)])}; strat "
-                             f"will be paused, {self.get_key()};;;{chore_snapshot=}")
-
     def set_chore_snapshot(self, chore_snapshot: ChoreSnapshotBaseModel | ChoreSnapshot) -> DateTime:
         """
         override to enrich _chore_id_to_open_chore_snapshot_dict [invoke base first and then act here]
         """
         _chore_snapshots_update_date_time = super().set_chore_snapshot(chore_snapshot)
-        if not chore_snapshot.chore_brief.user_data:
-            return DateTime.now()  # external chore - no need to further cache
-        with self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock:
-            has_fill: bool = False
-            if chore_snapshot.chore_status not in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED,
-                                                   ChoreStatusType.OE_OVER_FILLED, ChoreStatusType.OE_OVER_CXLED]:
-                if chore_snapshot.chore_brief.chore_id in self.open_chore_id_has_fill_set:
-                    has_fill = True
-                if not (chore_snapshot_container := self._chore_id_to_open_chore_snapshot_cont_dict.get(
-                        chore_snapshot.chore_brief.chore_id)):
-                    chore_snapshot_container = ChoreSnapshotContainer(chore_snapshot, has_fill)
-                    self._chore_id_to_open_chore_snapshot_cont_dict[chore_snapshot.chore_brief.chore_id] = \
-                        chore_snapshot_container
-                else:
-                    chore_snapshot_container.chore_snapshot = chore_snapshot
-                    if not chore_snapshot_container.has_fill:
-                        chore_snapshot_container.has_fill = has_fill
-                    else:
-                        # has existing fill
-                        pass
-            else:
-                self._check_log_over_fill(chore_snapshot)
-                # chore is not open anymore, remove from chore_id_has_fill_set [set used only on open chores]
-                self.open_chore_id_has_fill_set.discard(chore_snapshot.chore_brief.chore_id)
-                # Providing the second argument None prevents the KeyError exception
-                self._chore_id_to_open_chore_snapshot_cont_dict.pop(chore_snapshot.chore_brief.chore_id, None)
+        ord_brief = chore_snapshot.chore_brief
+        # move strat to pause state via log analyzer if we sees overfill: (logic handles corner cases)
+        overfill_log_str = (f"Chore found overfilled for symbol_side_key: "
+                            f"{get_symbol_side_key([(ord_brief.security.sec_id, ord_brief.side)])}; strat "
+                            f"will be paused, {self.get_key()};;;{chore_snapshot=}")
+        self.handle_set_chore_snapshot(chore_snapshot, overfill_log_str)
         return _chore_snapshots_update_date_time  # ignore - helps with debug
-
-    def get_open_chore_snapshots(self) -> List[ChoreSnapshot]:
-        """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
-        with self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock:
-            return [open_chore_snapshot_cont.chore_snapshot for open_chore_snapshot_cont in
-                    self._chore_id_to_open_chore_snapshot_cont_dict.values()]
-
-    def get_open_chore_count_from_cache(self) -> int:
-        """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
-        return len(self._chore_id_to_open_chore_snapshot_cont_dict)
-
-    def check_has_open_chore_with_no_fill_from_cache(self) -> bool:
-        """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
-        open_chore_snapshot_cont: ChoreSnapshotContainer
-        with self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock:
-            for open_chore_snapshot_cont in self._chore_id_to_open_chore_snapshot_cont_dict.values():
-                if not open_chore_snapshot_cont.has_fill:
-                    return True
-        return False
-
-    def update_has_fill_on_open_chore_snapshot(self, fills_journal: FillsJournal):
-        if not fills_journal.user_data:
-            return  # external chore, no processing needed
-        with self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock:
-            open_chore_snapshot_cont: ChoreSnapshotContainer
-            if open_chore_snapshot_cont := self._chore_id_to_open_chore_snapshot_cont_dict.get(fills_journal.chore_id):
-                open_chore_snapshot_cont.has_fill = True
-            elif fills_journal.chore_id not in self.open_chore_id_has_fill_set:
-                # TODO: this also adds fills that may arrive post DOD (non Open chores) and reenter the set - add
-                #  periodic cleanup
-                self.open_chore_id_has_fill_set.add(fills_journal.chore_id)
 
     # not working with partially filled chores - check why
     def get_open_chore_count(self) -> int:
@@ -241,26 +149,6 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         for symbol_overview in self._symbol_overviews:
             if symbol_overview and symbol_overview_id == symbol_overview.id:
                 self._symbol_overviews.remove(symbol_overview)
-
-    @staticmethod
-    def get_key_n_symbol_from_fills_journal(
-            fills_journal: FillsJournalBaseModel | FillsJournal) -> Tuple[str | None, str | None]:
-        symbol: str
-        symbol_side_tuple = StratCache.chore_id_to_symbol_side_tuple_dict.get(fills_journal.chore_id)
-        if not symbol_side_tuple:
-            logging.error(f"Unknown {fills_journal.chore_id=} found for fill "
-                          f"{get_fills_journal_log_key(fills_journal)};;; {fills_journal=}")
-            return None, None
-        symbol, side = symbol_side_tuple
-        key: str | None = StreetBookServiceKeyHandler.get_key_from_fills_journal(fills_journal)
-        return key, symbol
-
-    def get_metadata(self, system_symbol: str) -> Tuple[str, str, str]:
-        """function to check system symbol's corresponding bartering_symbol, account, exchange (maybe fx in future ?)"""
-        bartering_symbol: str = system_symbol
-        account = "bartering_account"
-        exchange = "bartering_exchange"
-        return bartering_symbol, account, exchange
 
     def get_bartering_symbols(self) -> Tuple[str | None, str | None]:
         if not self.static_data_service_state.ready:
@@ -342,30 +230,8 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
         self._strat_limits_update_date_time = DateTime.utcnow()
         return self._strat_limits_update_date_time
 
-    def get_symbol_overview_from_symbol_obj(self, symbol: str) -> SymbolOverviewBaseModel | SymbolOverview | None:
-        symbol_overview_tuple = self.get_symbol_overview()
-        if symbol_overview_tuple is not None:
-            symbol_overview_list, _ = symbol_overview_tuple
-            for symbol_overview in symbol_overview_list:
-                if symbol_overview is not None and symbol_overview.symbol == symbol:
-                    return symbol_overview
-        # if no match - return None
-        return None
-
-    def get_symbol_overview_from_symbol(self, symbol: str, date_time: DateTime | None = None) -> \
-            Tuple[SymbolOverviewBaseModel | SymbolOverview, DateTime] | None:
-        symbol_overview_tuple = self.get_symbol_overview(date_time)
-
-        if symbol_overview_tuple is not None:
-            symbol_overview_list, _ = symbol_overview_tuple
-            for symbol_overview in symbol_overview_list:
-                if symbol_overview is not None and symbol_overview.symbol == symbol:
-                    if date_time is None or date_time < symbol_overview.last_update_date_time:
-                        return symbol_overview, symbol_overview.last_update_date_time
-        # if no match - return None
-        return None
-
     def set_symbol_overview(self, symbol_overview_: SymbolOverviewBaseModel | SymbolOverview):
+        self.handle_set_symbol_overview_in_symbol_cache(symbol_overview_)
         if self._pair_strat is not None:
             if symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
                 self._symbol_overviews[0] = symbol_overview_
@@ -396,6 +262,7 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
 
     # override of street_book_service_base_strat_cache.py set_top_of_book
     def set_top_of_book(self, top_of_book: TopOfBookBaseModel | TopOfBook) -> DateTime | None:
+        self.handle_set_top_of_book(top_of_book)
         if self._pair_strat is None:
             if not self.stopped:
                 logging.error(f"Unexpected: strat_cache has no pair strat for tob update of: {top_of_book.symbol}")
@@ -530,18 +397,6 @@ class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache
 
     def has_unack_leg2(self) -> bool:
         return len(self.unack_leg2_set) > 0
-
-    @classmethod
-    def load_static_data(cls):
-        with cls.load_static_data_mutex:
-            try:
-                cls.static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
-                if cls.static_data is not None:
-                    cls.static_data_service_state.ready = True
-                else:
-                    raise Exception(f"self.static_data init to None, unexpected!!")
-            except Exception as e:
-                cls.static_data_service_state.handle_exception(e)
 
     def get_key(self):
         if self._pair_strat:

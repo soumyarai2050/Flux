@@ -1,56 +1,43 @@
-import asyncio
-import datetime
-import inspect
 import logging
-import os
-import sys
-import threading
 import time
-from pathlib import PurePath
 from threading import Thread
 import math
-import traceback
-from fastapi.encoders import jsonable_encoder
-from typing import Callable, Final
 import subprocess
 import stat
 import random
 import ctypes
 
-from FluxPythonUtils.scripts.service import Service
-from FluxPythonUtils.scripts.utility_functions import clear_semaphore
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecord, SecType
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.chore_check import (
     ChoreControl, initialize_chore_control)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_data_manager import BarteringDataManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.strat_cache import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import (
-    get_bartering_link, BarteringLinkBase, market, config_dict)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link import (
+    get_bartering_link, BarteringLinkBase, config_dict)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
     get_consumable_participation_qty_http, get_new_chore_log_key,
-    get_strat_brief_log_key, create_stop_md_script, executor_config_yaml_dict, MobileBookMutexManager)
+    get_strat_brief_log_key, create_stop_md_script)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
+    executor_config_yaml_dict)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import MobileBookMutexManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, email_book_service_http_client, guaranteed_call_pair_strat_client,
-    get_premium, pair_strat_client_call_log_str, UpdateType, get_symbol_side_key)
+    get_symbol_side_key)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensions import SecPosExtended
 from Flux.PyCodeGenEngine.FluxCodeGenCore.perf_benchmark_decorators import perf_benchmark_sync_callable
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
     IsPortfolioLimitsBreached)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
     post_book_service_http_client)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import (
-    StratViewBaseModel)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
-    photo_book_service_http_client)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import (
-    MobileBookContainer, ExtendedTopOfBook, ExtendedMarketDepth, LastBarter, MarketBarterVolume, add_container_obj_for_symbol,
-    get_mobile_book_container, acquire_notify_semaphore)
-
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
+    SymbolCache, ExtendedTopOfBook, ExtendedMarketDepth)
+# below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import SymbolCacheContainer
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book import BaseBook
 
 def depths_str(depths: List[ExtendedMarketDepth], notional_fx_rate: float | None = None) -> str:
     if not notional_fx_rate:
@@ -79,20 +66,12 @@ def depths_str(depths: List[ExtendedMarketDepth], notional_fx_rate: float | None
         return f"empty: depths_str called with {depths=}"
 
 
-class MobileBookContainerCache(BaseModel):
-    leg_1_mobile_book_container: MobileBookContainer
-    leg_2_mobile_book_container: MobileBookContainer
-    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
-
-
-class StreetBook(Service):
+class StreetBook(BaseBook):
     # Query Callables
     underlying_get_aggressive_market_depths_query_http: Callable[..., Any] | None = None
     underlying_handle_strat_activate_query_http: Callable[..., Any] | None = None
     underlying_update_residuals_query_http: Callable[..., Any] | None = None
 
-    bartering_link: ClassVar[BarteringLinkBase] = get_bartering_link()
-    asyncio_loop: asyncio.AbstractEventLoop
     mobile_book_provider: ctypes.CDLL
 
     @classmethod
@@ -162,9 +141,8 @@ class StreetBook(Service):
         return [leg1_sec_rec.sedol], secondary_symbols, block_bartering_symbol_side_events, mstrat
 
     @staticmethod
-    def executor_trigger(bartering_data_manager_: BarteringDataManager, strat_cache: StratCache,
-                         mobile_book_container_cache: MobileBookContainerCache):
-        street_book: StreetBook = StreetBook(bartering_data_manager_, strat_cache, mobile_book_container_cache)
+    def executor_trigger(bartering_data_manager_: BarteringDataManager, strat_cache: StratCache):
+        street_book: StreetBook = StreetBook(bartering_data_manager_, strat_cache)
         street_book_thread = Thread(target=street_book.run, daemon=True).start()
         block_bartering_symbol_side_events: Dict[str, Tuple[Side, str]]
         sedol_symbols, ric_symbols, block_bartering_symbol_side_events, mstrat = street_book.get_subscription_data()
@@ -182,15 +160,13 @@ class StreetBook(Service):
 
     """ 1 instance = 1 thread = 1 pair strat"""
 
-    def __init__(self, bartering_data_manager_: BarteringDataManager, strat_cache: StratCache,
-                 mobile_book_container_cache: MobileBookContainerCache):
-        super().__init__()
+    def __init__(self, bartering_data_manager_: BarteringDataManager, strat_cache: StratCache):
+        super().__init__(bartering_data_manager_, strat_cache)
         # helps prevent reverse bartering on intraday positions where security level constraints exists
         self.meta_no_executed_tradable_symbol_replenishing_side_dict: Dict[str, Side] = {}
         # current strat bartering symbol and side dict - helps block intraday non recovery position updates
         self.meta_bartering_symbol_side_dict: Dict[str, Side] = {}
         self.meta_symbols_n_sec_id_source_dict: Dict[str, str] = {}  # stores symbol and symbol type [RIC, SEDOL, etc.]
-        self.market = Market(MarketID.IN)
         self.cn_eqt_min_qty: Final[int] = 100
         self.allow_multiple_unfilled_chore_pairs_per_strat: Final[bool] = allow_multiple_unfilled_chore_pairs_per_strat \
             if (allow_multiple_unfilled_chore_pairs_per_strat :=
@@ -201,13 +177,10 @@ class StreetBook(Service):
         self.leg2_consumed_depth: ExtendedMarketDepth | None = None
 
         self.pair_street_book_id: str | None = None
-        self.internal_new_chore_count: int = 0
 
         self.bartering_data_manager: BarteringDataManager = bartering_data_manager_
         self.strat_cache: StratCache = strat_cache
         self.sym_ovrw_getter: Callable = self.strat_cache.get_symbol_overview_from_symbol_obj
-        self.mobile_book_container_cache: MobileBookContainerCache = mobile_book_container_cache
-        self.leg1_fx: float | None = None
         self.buy_leg_single_lot_usd_notional: int | None = None
         self.sell_leg_single_lot_usd_notional: int | None = None
 
@@ -219,8 +192,6 @@ class StreetBook(Service):
         self._chore_limits_update_date_time: DateTime | None = None
         self._new_chores_update_date_time: DateTime | None = None
         self._new_chores_processed_slice: int = 0
-        self._cancel_chores_update_date_time: DateTime | None = None
-        self._cancel_chores_processed_slice: int = 0
         self._top_of_books_update_date_time: DateTime | None = None
         self._tob_leg1_update_date_time: DateTime | None = None
         self._tob_leg2_update_date_time: DateTime | None = None
@@ -233,19 +204,21 @@ class StreetBook(Service):
         self.leg2_notional: float = 0
 
         self.chore_pase_seconds = 0
-        # internal rejects to use:  -ive internal_reject_count + current date time as chore id
-        self.internal_reject_count = 0
         # 1-time prepare param used by update_aggressive_market_depths_in_cache call for this strat [init on first use]
         self.aggressive_symbol_side_tuples_dict: Dict[str, List[Tuple[str, str]]] = {}
         StreetBook.initialize_underlying_http_routes()  # Calling underlying instances init
-        # initialize ChoreControl class vars
-        initialize_chore_control()
 
         # attributes to be set in run method
         self.leg_1_symbol: str | None = None
         self.leg_1_side: Side | None = None
+        self.leg_1_symbol_cache: SymbolCache | None = None
         self.leg_2_symbol: str | None = None
         self.leg_2_side: Side | None = None
+        self.leg_2_symbol_cache: SymbolCache | None = None
+
+    @property
+    def derived_class_type(self):
+        raise StreetBook
 
     def check_chore_eligibility(self, side: Side, check_notional: float) -> bool:
         strat_brief, self._strat_brief_update_date_time = \
@@ -428,11 +401,6 @@ class StreetBook(Service):
         return leg1_tob, leg2_tob
 
     @staticmethod
-    def _get_tob_str(tob: ExtendedTopOfBook) -> str:
-        with MobileBookMutexManager(tob):
-            return str(tob)
-
-    @staticmethod
     def extract_legs_from_tobs(pair_strat, top_of_books) -> Tuple[ExtendedTopOfBook | None, ExtendedTopOfBook | None]:
         leg1_tob: ExtendedTopOfBook | None = None
         leg2_tob: ExtendedTopOfBook | None = None
@@ -444,10 +412,11 @@ class StreetBook(Service):
                 if pair_strat.pair_strat_params.strat_leg2.sec.sec_id == top_of_books[1].symbol:
                     leg2_tob = top_of_books[1]
                 else:
+                    with MobileBookMutexManager(top_of_books[1]):
+                        tob_str = str(top_of_books[1])
                     logging.error(f"unexpected security found in top_of_books[1]: {top_of_books[1].symbol=}, "
                                   f"expected: {pair_strat.pair_strat_params.strat_leg2.sec.sec_id}, pair_strat_key: "
-                                  f" {get_pair_strat_log_key(pair_strat)};;; top_of_book: "
-                                  f"{StreetBook._get_tob_str(top_of_books[1])}")
+                                  f" {get_pair_strat_log_key(pair_strat)};;; top_of_book: {tob_str}")
                     error = True
         elif pair_strat.pair_strat_params.strat_leg2.sec.sec_id == top_of_books[0].symbol:
             leg2_tob = top_of_books[0]
@@ -455,43 +424,24 @@ class StreetBook(Service):
                 if pair_strat.pair_strat_params.strat_leg1.sec.sec_id == top_of_books[1].symbol:
                     leg1_tob = top_of_books[1]
                 else:
+                    with MobileBookMutexManager(top_of_books[1]):
+                        tob_str = str(top_of_books[1])
                     logging.error(f"unexpected security found in top_of_books[1]: {top_of_books[1].symbol=}, "
                                   f"expected: {pair_strat.pair_strat_params.strat_leg1.sec.sec_id} pair_strat_key: "
-                                  f"{get_pair_strat_log_key(pair_strat)};;; top_of_book: "
-                                  f"{StreetBook._get_tob_str(top_of_books[1])}")
+                                  f"{get_pair_strat_log_key(pair_strat)};;; top_of_book: {tob_str}")
                     error = True
         else:
+            with MobileBookMutexManager(top_of_books[1]):
+                tob_str = str(top_of_books[1])
             logging.error(f"unexpected security found in top_of_books[0]: {top_of_books[0].symbol=}, "
                           f"expected either: {pair_strat.pair_strat_params.strat_leg1.sec.sec_id} or "
                           f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id} in pair_strat_key: "
-                          f"{get_pair_strat_log_key(pair_strat)};;; top_of_book: "
-                          f"{StreetBook._get_tob_str(top_of_books[1])}")
+                          f"{get_pair_strat_log_key(pair_strat)};;; top_of_book: {tob_str}")
             error = True
         if error:
             return None, None
         else:
             return leg1_tob, leg2_tob
-
-    def bartering_link_internal_chore_state_update(
-            self, chore_event: ChoreEventType, chore_id: str, side: Side | None = None,
-            bartering_sec_id: str | None = None, system_sec_id: str | None = None,
-            underlying_account: str | None = None, msg: str | None = None):
-        # coro needs public method
-        run_coro = self.bartering_link.internal_chore_state_update(chore_event, chore_id, side, bartering_sec_id,
-                                                                 system_sec_id, underlying_account, msg)
-        future = asyncio.run_coroutine_threadsafe(run_coro, StreetBook.asyncio_loop)
-        # block for start_executor_server task to finish
-        try:
-            return future.result()
-        except Exception as e:
-            logging.exception(f"_internal_reject_new_chore failed with exception: {e}")
-
-    def internal_reject_new_chore(self, new_chore: NewChoreBaseModel, reject_msg: str):
-        self.internal_reject_count += 1
-        internal_reject_chore_id: str = str(self.internal_reject_count * -1) + str(DateTime.utcnow())
-        self.bartering_link_internal_chore_state_update(
-            ChoreEventType.OE_INT_REJ, internal_reject_chore_id, new_chore.side, None,
-            new_chore.security.sec_id, None, reject_msg)
 
     def set_unack(self, system_symbol: str, unack_state: bool, internal_ord_id: str):
         if self.strat_cache._pair_strat.pair_strat_params.strat_leg1.sec.sec_id == system_symbol:
@@ -562,7 +512,8 @@ class StreetBook(Service):
                     return ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
                 orig_new_chore_qty = new_ord.qty
                 sec_pos_extended: SecPosExtended
-                self.internal_new_chore_count += 1
+
+                client_ord_id: str = self.get_client_chore_id()
                 sec_pos_extended_list_len: int = len(sec_pos_extended_list)
                 sent_qty: int = 0
                 remaining_qty: int = new_ord.qty
@@ -573,10 +524,10 @@ class StreetBook(Service):
                     exchange = sec_pos_extended.bartering_route
                     # create_date_time_gmt_epoch_micro_sec = int(DateTime.utcnow().timestamp() * 1_000_000)
                     suffix = "" if 1 == sec_pos_extended_list_len else f".{idx}"
-                    internal_ord_id: str = f"{self.bartering_link.inst_id}-{self.internal_new_chore_count}{suffix}"
+                    client_ord_id += suffix
 
                     # set unack for subsequent chores - this symbol to be blocked until this chore goes through
-                    self.set_unack(system_symbol, True, internal_ord_id)
+                    self.set_unack(system_symbol, True, client_ord_id)
                     if len(sec_pos_extended.positions) < 2:  # 0 is valid in long buy cases
                         if sec_pos_extended_list_len > 1:
                             new_ord.qty = sec_pos_extended.get_extracted_size()
@@ -592,11 +543,17 @@ class StreetBook(Service):
                         logging.error(f"Unexpected: extract_availability_list returned sec_pos_extended_list has "
                                       f"{len(sec_pos_extended.positions)=}, expected 0 or 1;;;{sec_pos_extended}; "
                                       f"{sec_pos_extended_list}")
-                    if not self.bartering_link_place_new_chore(new_ord.px, new_ord.qty, new_ord.side, bartering_symbol,
-                                                             system_symbol, symbol_type, account, exchange,
-                                                             internal_ord_id=internal_ord_id, mstrat=new_ord.mstrat):
+
+                    kwargs = {}
+                    if new_ord.mstrat is not None:
+                        kwargs["mstrat"] = new_ord.mstrat
+                    res, ret_id_or_err_desc = (
+                        StreetBook.bartering_link_place_new_chore(new_ord.px, new_ord.qty, new_ord.side, bartering_symbol,
+                                                                   system_symbol, symbol_type, account, exchange,
+                                                                   client_ord_id=client_ord_id, **kwargs))
+                    if not res:
                         # reset unack for subsequent chores to go through - this chore did fail to go through
-                        self.set_unack(system_symbol, False, internal_ord_id)
+                        self.set_unack(system_symbol, False, client_ord_id)
                         if 0 != idx:
                             # handle partial fail
                             err_dict["FAILED_QTY"] = orig_new_chore_qty - sent_qty
@@ -616,26 +573,6 @@ class StreetBook(Service):
             for sec_pos_extended in sec_pos_extended_list:
                 if not sec_pos_extended.consumed:
                     self.strat_cache.pos_cache.return_availability(system_symbol, sec_pos_extended)
-
-    def bartering_link_place_new_chore(self, px: float, qty: int, side: Side, bartering_symbol: str, system_symbol: str,
-                                     symbol_type: str, account: str, exchange: str,
-                                     internal_ord_id: str | None = None, mstrat: str | None = None):
-        kwargs = {}
-        if mstrat is not None:
-            kwargs["mstrat"] = mstrat
-        run_coro = self.bartering_link.place_new_chore(px, qty, side, bartering_symbol, system_symbol, symbol_type,
-                                                     account, exchange, internal_ord_id=internal_ord_id, **kwargs)
-        future = asyncio.run_coroutine_threadsafe(run_coro, StreetBook.asyncio_loop)
-
-        # block for task to finish [run as coroutine helps enable http call via asyncio, other threads use freed CPU]
-        try:
-            # ignore 2nd param: _id_or_err_str - logged in call and not used in strat executor yet
-            chore_sent_status, _id_or_err_str = future.result()
-            return chore_sent_status
-        except Exception as e:
-            logging.exception(f"bartering_link_place_new_chore failed for {system_symbol=} px-qty-side: {px}-{qty}-{side}"
-                              f" with exception;;;{e}")
-            return False
 
     def check_consumable_concentration(self, strat_brief: StratBrief | StratBriefBaseModel,
                                        bartering_brief: PairSideBarteringBriefBaseModel, qty: int,
@@ -824,8 +761,8 @@ class StreetBook(Service):
         sys_symbol = new_ord.security.sec_id
         checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS
         # TODO: min chore notional is to be a chore opportunity condition instead of chore check
-        checks_passed_ = ChoreControl.check_min_chore_notional(pair_strat, self.strat_limit, new_ord,
-                                                               chore_usd_notional)
+        checks_passed_ = ChoreControl.check_min_chore_notional(pair_strat.pair_strat_params.strat_mode,
+                                                               self.strat_limit, new_ord, chore_usd_notional)
         if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS:
             checks_passed |= checks_passed_
 
@@ -855,12 +792,12 @@ class StreetBook(Service):
                 checks_passed |= checks_passed_
 
         if sys_symbol == self.leg_1_symbol:
-            mobile_book_container = self.mobile_book_container_cache.leg_1_mobile_book_container
+            symbol_cache = self.leg_1_symbol_cache
         else:
-            mobile_book_container = self.mobile_book_container_cache.leg_2_mobile_book_container
+            symbol_cache = self.leg_2_symbol_cache
         checks_passed_ = ChoreControl.check_px(top_of_book, self.sym_ovrw_getter, chore_limits, new_ord.px,
                                                new_ord.usd_px, new_ord.qty, new_ord.side,
-                                               sys_symbol, mobile_book_container)
+                                               sys_symbol, symbol_cache)
         if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS:
             checks_passed |= checks_passed_
 
@@ -1019,8 +956,19 @@ class StreetBook(Service):
         # setting index for leg1 and leg2 symbols
         self.leg_1_symbol = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
         self.leg_1_side = pair_strat.pair_strat_params.strat_leg1.side
+        self.leg_1_symbol_cache = SymbolCacheContainer.get_symbol_cache(self.leg_1_symbol)
+        if self.leg_1_symbol_cache is None:
+            logging.error(f"Can't find symbol_cache for {self.leg_1_symbol=} - must have been added before triggering "
+                          f"StreetBook")
+            return -3002
+
         self.leg_2_symbol = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
         self.leg_2_side = pair_strat.pair_strat_params.strat_leg2.side
+        self.leg_2_symbol_cache = SymbolCacheContainer.get_symbol_cache(self.leg_2_symbol)
+        if self.leg_2_symbol_cache is None:
+            logging.error(f"Can't find symbol_cache for {self.leg_2_symbol=} - must have been added before triggering "
+                          f"StreetBook")
+            return -3003
 
         scripts_dir = PurePath(__file__).parent.parent / "scripts"
         # start file generator
@@ -1093,7 +1041,7 @@ class StreetBook(Service):
         """
         assumes single currency strat - may extend to accept symbol and send revised px according to underlying currency
         """
-        return px / self.leg1_fx
+        return px / self.usd_fx
 
     @perf_benchmark_sync_callable
     def _check_tob_n_place_non_systematic_chore(self, new_chore: NewChoreBaseModel, pair_strat: PairStrat,
@@ -1132,38 +1080,6 @@ class StreetBook(Service):
         if math.isclose(leg2_px, 0):
             return 0
         return leg1_px / leg2_px
-
-    def _get_bid_tob_px_qty(self, tob: ExtendedTopOfBook) -> Tuple[float | None, int | None]:
-        with MobileBookMutexManager(tob):
-            if tob.bid_quote is not None:
-                has_valid_px_qty = True
-                if not tob.bid_quote.qty:
-                    logging.error(f"Invalid {tob.bid_quote.qty = } found in tob of {tob.symbol = };;; {tob = }")
-                    has_valid_px_qty = False
-                elif math.isclose(tob.bid_quote.px, 0):
-                    logging.error(f"Invalid {tob.bid_quote.px = } found in tob of {tob.symbol = };;; {tob = }")
-                    has_valid_px_qty = False
-                if has_valid_px_qty:
-                    return tob.bid_quote.px, tob.bid_quote.qty
-            else:
-                logging.error(f"Can't find bid_quote in top of book, {tob.symbol = };;; {tob = }")
-        return None, None
-
-    def _get_ask_tob_px_qty(self, tob: ExtendedTopOfBook) -> Tuple[float | None, int | None]:
-        with MobileBookMutexManager(tob):
-            if tob.ask_quote is not None:
-                has_valid_px_qty = True
-                if not tob.ask_quote.qty:
-                    logging.error(f"Invalid {tob.ask_quote.qty = } found in tob of {tob.symbol = };;; {tob = }")
-                    has_valid_px_qty = False
-                elif math.isclose(tob.ask_quote.px, 0):
-                    logging.error(f"Invalid {tob.ask_quote.px = } found in tob of {tob.symbol = };;; {tob = }")
-                    has_valid_px_qty = False
-                if has_valid_px_qty:
-                    return tob.ask_quote.px, tob.ask_quote.qty
-            else:
-                logging.error(f"Can't find ask_quote in top of book, {tob.symbol = };;; {tob = }")
-        return None, None
 
     @staticmethod
     def get_cb_lot_size_from_cb_symbol_overview_(
@@ -1329,11 +1245,9 @@ class StreetBook(Service):
         chore_placed: int = ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
         leg_1_top_of_book: ExtendedTopOfBook = (
-            self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book(
-                self._top_of_books_update_date_time))
+            self.leg_1_symbol_cache.get_top_of_book(self._top_of_books_update_date_time))
         leg_2_top_of_book = (
-            self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book(
-                self._top_of_books_update_date_time))
+            self.leg_2_symbol_cache.get_top_of_book(self._top_of_books_update_date_time))
 
         if self._both_side_tob_has_data(leg_1_top_of_book, leg_2_top_of_book):
             top_of_books = [leg_1_top_of_book, leg_2_top_of_book]
@@ -1408,72 +1322,6 @@ class StreetBook(Service):
                 logging.debug(err_str_)
             return chore_placed
         return False
-
-    def get_leg1_fx(self):
-        if self.leg1_fx:
-            return self.leg1_fx
-        else:
-            if not self.strat_cache.leg1_fx_symbol_overview:
-                self.strat_cache.leg1_fx_symbol_overview = \
-                    StratCache.fx_symbol_overview_dict[self.strat_cache.leg1_fx_symbol]
-            if self.strat_cache.leg1_fx_symbol_overview and self.strat_cache.leg1_fx_symbol_overview.closing_px and \
-                    (not math.isclose(self.strat_cache.leg1_fx_symbol_overview.closing_px, 0)):
-                self.leg1_fx = self.strat_cache.leg1_fx_symbol_overview.closing_px
-                return self.leg1_fx
-            else:
-                logging.error(f"unable to find fx_symbol_overview for "
-                              f"{self.strat_cache.leg1_fx_symbol = };;; {self.strat_cache = }")
-                return None
-
-    def process_cxl_request(self, force_cxl_only: bool = False):
-        cancel_chores_and_date_tuple = self.strat_cache.get_cancel_chore(self._cancel_chores_update_date_time)
-        if cancel_chores_and_date_tuple is not None:
-            cancel_chores, self._cancel_chores_update_date_time = cancel_chores_and_date_tuple
-            if cancel_chores is not None:
-                final_slice = len(cancel_chores)
-                unprocessed_cancel_chores: List[CancelChoreBaseModel] = \
-                    cancel_chores[self._cancel_chores_processed_slice:final_slice]
-                self._cancel_chores_processed_slice = final_slice
-                cancel_chore: CancelChoreBaseModel
-                for cancel_chore in unprocessed_cancel_chores:
-                    if not cancel_chore.cxl_confirmed:
-                        res: bool = True
-                        if (not force_cxl_only) or cancel_chore.force_cancel:
-                            res = self.bartering_link_place_cxl_chore(cancel_chore.chore_id, cancel_chore.side,
-                                                                    bartering_sec_id=None,
-                                                                    system_sec_id=cancel_chore.security.sec_id,
-                                                                    underlying_account="NA")
-                        else:
-                            logging.warning(f"{force_cxl_only=} and {cancel_chore.force_cancel=} leaving unprocessed "
-                                            f"{cancel_chore=}")
-                        if not res:
-                            # check in DB if this chore needs cancellation, otherwise set cancel_chore.cxl_confirmed to
-                            # true and stop processing it
-                            pass
-
-                # if some update was on existing cancel_chores then this semaphore release was for that update only,
-                # therefore returning True to continue and wait for next semaphore release
-                return True
-        # all else return false - no cancel_chore to process
-        return False
-
-    def bartering_link_place_cxl_chore(self, chore_id, side, bartering_sec_id, system_sec_id, underlying_account) -> bool:
-        # coro needs public method
-        run_coro = self.bartering_link.place_cxl_chore(chore_id, side, bartering_sec_id, system_sec_id, underlying_account)
-        future = asyncio.run_coroutine_threadsafe(run_coro, StreetBook.asyncio_loop)
-
-        # block for start_executor_server task to finish
-        try:
-            # ignore return chore_journal: don't generate cxl chores in system, just treat cancel acks as unsol cxls
-            res: bool = future.result()
-            if not res:
-                logging.error(f"bartering_link_place_cxl_chore failed, {res=} returned")
-                return False
-            else:
-                return True
-        except Exception as e:
-            key = get_symbol_side_key([(system_sec_id, side)])
-            logging.exception(f"bartering_link_place_cxl_chore failed for: {key} with exception: {e}")
 
     def is_consumable_notional_tradable(self, strat_brief: StratBriefBaseModel, ol: ChoreLimitsBaseModel):
         if (not self.buy_leg_single_lot_usd_notional) or (not self.sell_leg_single_lot_usd_notional):
@@ -1580,7 +1428,7 @@ class StreetBook(Service):
             lot_size = self.get_cb_lot_size_from_cb_symbol_overview(symbol_overview)
         else:
             lot_size = symbol_overview.lot_size
-        return lot_size * symbol_overview.closing_px / self.leg1_fx
+        return lot_size * symbol_overview.closing_px / self.usd_fx
 
     def _init_lot_notional(self, pair_strat: PairStratBaseModel | PairStrat) -> bool:
         if self.buy_leg_single_lot_usd_notional and self.sell_leg_single_lot_usd_notional:
@@ -1639,7 +1487,7 @@ class StreetBook(Service):
             try:
                 logging.debug("street_book going to acquire semaphore")
                 # self.strat_cache.notify_semaphore.acquire()
-                acquire_notify_semaphore()
+                SymbolCacheContainer.acquire_notify_semaphore()
                 # remove all unprocessed signals from semaphore, logic handles all new updates in single iteration
                 # clear_semaphore(self.strat_cache.notify_semaphore)
                 logging.debug("street_book signaled")
@@ -1726,10 +1574,8 @@ class StreetBook(Service):
                     continue  # go next run - we don't stop processing - retry in next iteration
 
                 # 4.2 get top_of_book (new or old to be checked by respective strat based on strat requirement)
-                leg_1_top_of_book = (
-                    self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book())
-                leg_2_top_of_book = (
-                    self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book())
+                leg_1_top_of_book = self.leg_1_symbol_cache.get_top_of_book()
+                leg_2_top_of_book = self.leg_2_symbol_cache.get_top_of_book()
 
                 if not self._both_side_tob_has_data(leg_1_top_of_book, leg_2_top_of_book):
                     logging.warning(f"strats need both sides of TOB to be present, found  only leg_1 or only leg_2 "
@@ -1738,10 +1584,10 @@ class StreetBook(Service):
 
                 tobs = [leg_1_top_of_book, leg_2_top_of_book]
 
-                # 5. ensure leg1_fx is present - otherwise don't proceed - retry later
-                if not self.get_leg1_fx():
+                # 5. ensure usd_fx is present - otherwise don't proceed - retry later
+                if not self.get_usd_fx():
                     logging.error(f"USD fx rate not found for strat: {self.strat_cache.get_key()}, unable to proceed, "
-                                  f"fx symbol: {self.strat_cache.leg1_fx_symbol}, we'll retry in next attempt")
+                                  f"fx symbol: {StratCache.usd_fx_symbol}, we'll retry in next attempt")
                     continue
 
                 # 5.1 init_lot_notionals

@@ -226,16 +226,6 @@ def get_last_n_sec_total_barter_qty(symbol: str, last_n_sec: float):
     ]}
 
 
-def get_objs_from_symbol(symbol: str):
-    return {"aggregate": [
-        {
-            "$match": {
-                "symbol": symbol
-            }
-        }
-    ]}
-
-
 def get_symbol_overview_from_symbol(symbol: str):
     return {"aggregate": [
         {
@@ -306,62 +296,6 @@ def get_chore_snapshots_by_chore_status_list(chore_status_list: List[str]):
             "$match": {
                 '$or': chore_status_match
             }
-        }
-    ]}
-
-
-def get_last_n_chore_journals_from_chore_id(chore_id: str, journal_count: int):
-    return {"aggregate": [
-        {
-            "$match": {
-                "chore.chore_id": chore_id
-            },
-        },
-        {
-            "$sort": {"_id": -1},
-        },
-        {
-            "$limit": journal_count
-        }
-    ]}
-
-
-def get_symbol_side_underlying_account_cumulative_fill_qty(symbol: str, side: str):
-    return {"aggregate": [
-        {
-            '$match': {
-                '$and': [
-                    {
-                        'fill_symbol': symbol
-                    },
-                    {
-                        'fill_side': side
-                    }
-                ]
-            }
-        },
-        {
-            '$setWindowFields': {
-                'partitionBy': {
-                    'underlying_account': '$underlying_account'
-                },
-                'sortBy': {
-                    'fill_date_time': 1.0
-                },
-                'output': {
-                    'underlying_account_cumulative_fill_qty': {
-                        '$sum': '$fill_qty',
-                        'window': {
-                            'documents': [
-                                'unbounded', 'current'
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "$sort": {"fill_date_time": -1},
         }
     ]}
 

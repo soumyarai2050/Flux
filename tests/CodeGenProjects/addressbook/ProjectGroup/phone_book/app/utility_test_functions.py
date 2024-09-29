@@ -111,9 +111,7 @@ basket_book_web_client: BasketBookServiceHttpClient = (
                                                                    port=parse_to_int(BASKET_EXECUTOR_BEANIE_PORT)))
 
 static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
-project_dir_path = \
-    (PurePath(__file__).parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects" / "AddressBook" /
-     "ProjectGroup" / "phone_book")
+project_dir_path = (PurePath(__file__).parent.parent.parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects" / "AddressBook" / "ProjectGroup" / "phone_book")
 project_app_dir_path = project_dir_path / "app"
 test_project_dir_path = PurePath(__file__).parent.parent / 'data'
 test_config_file_path: PurePath = test_project_dir_path / "config.yaml"
@@ -2325,6 +2323,8 @@ def run_last_barter(leg1_symbol: str, leg2_symbol: str, last_barter_json_list: L
     if create_counts_per_side is None:
         create_counts_per_side = 20
     symbol_list = [leg1_symbol, leg2_symbol]
+    leg1_last_barter_obj = None
+    leg2_last_barter_obj = None
     for index, last_barter_json in enumerate(last_barter_json_list):
         for i in range(create_counts_per_side):
             last_barter_obj: LastBarterBaseModel = LastBarterBaseModel.from_dict(last_barter_json)
@@ -2340,6 +2340,12 @@ def run_last_barter(leg1_symbol: str, leg2_symbol: str, last_barter_json_list: L
             # putting gap in between created objs since mongodb stores datetime with milli-sec precision
             time.sleep(0.1)
 
+            if index == 0:
+                leg1_last_barter_obj = last_barter_obj
+            else:
+                leg2_last_barter_obj = last_barter_obj
+
+    return leg1_last_barter_obj, leg2_last_barter_obj
 
 # TODO: move it to web-ui
 def symbol_overview_list() -> List[SymbolOverviewBaseModel]:
@@ -2916,6 +2922,12 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
 
         email_book_service_native_web_client.delete_pair_strat_client(pair_strat.id)
         time.sleep(1)
+
+
+def clean_basket_book():
+    basket_chores = basket_book_web_client.get_all_basket_chore_client()
+    for basket_chore in basket_chores:
+        basket_book_web_client.delete_basket_chore_client(basket_chore.id)
 
 
 def set_n_verify_limits(expected_chore_limits_obj, expected_portfolio_limits_obj):

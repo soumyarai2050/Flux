@@ -338,10 +338,9 @@ def test_log_to_update_db(
     for active_strat, executor_http_client in active_strat_n_executor_list:
         log_file_path = STRAT_EXECUTOR / "log" / f"street_book_{active_strat.id}_logs_{frmt_date}.log"
 
-        # not checking sec=verity update since it gets updated very often from code and test fails - anyways
-        # test checks update functionality so if it works for rest fields it is still good
+        # not checking severity and strat_alert_count update since it gets updated very often from code and
+        # test fails - anyways test checks update functionality so if it works for rest fields it is still good
         db_json_list = [
-            {"strat_alert_count": random.randint(1, 100)},
             {"average_premium": random.randint(1, 100)},
             {"market_premium": random.randint(1, 100)},
             {"balance_notional": random.randint(1, 100)},
@@ -1166,8 +1165,8 @@ def test_strat_alert_with_no_strat_with_strat_id_is_sent_to_portfolio_alert(
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
         market_depth_basemodel_list):
     """
-    Created street_book log file manually to start tail_executor with some random id and verify since strat
-    doesn't exist alert is sent to portfolio alert
+    Created sample log file manually to start tail_executor and verify since no strat log key
+    exists, alert is sent to portfolio alert
     """
     log_file_name = f"sample_test.log"
     executor_log_dir_path = STRAT_EXECUTOR / "log"

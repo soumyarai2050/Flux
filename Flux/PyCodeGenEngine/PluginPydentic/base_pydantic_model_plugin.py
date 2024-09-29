@@ -18,37 +18,10 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
     time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
-from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
+    BaseProtoPlugin, main, project_dir, root_core_proto_files, project_grp_core_proto_files)
 from FluxPythonUtils.scripts.utility_functions import convert_to_capitalized_camel_case
 
-root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
-root_flux_core_config_yaml_dict = (
-    YAMLConfigurationManager.load_yaml_configurations(str(root_flux_core_config_yaml_path)))
-root_core_proto_files: List[str] = []
-option_files = root_flux_core_config_yaml_dict.get("options_files")
-core_or_util_files = root_flux_core_config_yaml_dict.get("core_or_util_files")
-if option_files is not None and option_files:
-    root_core_proto_files.extend(option_files)
-if core_or_util_files is not None and core_or_util_files:
-    root_core_proto_files.extend(core_or_util_files)
-
-project_dir = os.getenv("PROJECT_DIR")
-if project_dir is None or not project_dir:
-    err_str = f"env var PROJECT_DIR received as {project_dir}"
-    logging.exception(err_str)
-    raise Exception(err_str)
-
-project_grp_core_proto_files = []
-if "ProjectGroup" in project_dir:
-    project_group_flux_core_config_yaml_path = PurePath(project_dir).parent.parent / "flux_core.yaml"
-    project_group_flux_core_config_yaml_dict = (
-        YAMLConfigurationManager.load_yaml_configurations(str(project_group_flux_core_config_yaml_path)))
-    option_files = project_group_flux_core_config_yaml_dict.get("options_files")
-    core_or_util_files = project_group_flux_core_config_yaml_dict.get("core_or_util_files")
-    if option_files is not None and option_files:
-        project_grp_core_proto_files.extend(option_files)
-    if core_or_util_files is not None and core_or_util_files:
-        project_grp_core_proto_files.extend(core_or_util_files)
 
 class IdType(StrEnum):
     NO_ID = auto()
@@ -66,7 +39,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         super().__init__(base_dir_path)
         response_field_case_style = None
         if ((enum_type := os.getenv("ENUM_TYPE")) is not None and len(enum_type)) and \
-                ((response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None and \
+                ((response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None and
                  len(response_field_case_style)):
             self.enum_type = enum_type
             self.response_field_case_style: str = response_field_case_style
@@ -603,24 +576,15 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
         output_str = self.handle_imports()
 
-        if file.dependencies:
+        project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+        dependency_file_path_list = self.get_dependency_file_path_list(
+            file, root_core_proto_files, project_grp_core_proto_files,
+            self.model_file_suffix, str(project_grp_root_dir))
+        if dependency_file_path_list:
             output_str += "# Project imports\n"
-            for file_ in file.dependencies:
-                if file_.proto.name != "flux_options.proto":
-                    if file_.proto.name in root_core_proto_files:
-                        gen_model_import_path = (
-                            self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
-                                                          f"Pydantic.{file_.generated_filename_prefix}_{self.model_file_suffix}"))
-                    elif file_.proto.name in project_grp_core_proto_files:
-                        project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
-                        gen_model_import_path = (
-                            self.import_path_from_path_str(str(project_grp_root_dir),
-                                                           f"{file_.generated_filename_prefix}_{self.model_file_suffix}"))
-                    else:
-                        gen_model_import_path = (
-                            self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
-                                                          f"{file_.generated_filename_prefix}_{self.model_file_suffix}"))
-                    output_str += f"from {gen_model_import_path} import *\n"
+        for dependency_file_path in dependency_file_path_list:
+            output_str += f"from {dependency_file_path} import *\n"
+        if dependency_file_path_list:
             output_str += "\n\n"
 
         output_str += f"{BasePydanticModelPlugin.default_id_type_var_name} = {self.default_id_field_type}\n"

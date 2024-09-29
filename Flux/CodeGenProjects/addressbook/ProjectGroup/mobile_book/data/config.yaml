@@ -17,6 +17,8 @@ mongo_server: "mongodb://localhost:27017"
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
+msgspec_override_type: "native"
+dataclass_override_type: "native"
 beanie_override_type: "native"
 cache_override_type: "bare"
 

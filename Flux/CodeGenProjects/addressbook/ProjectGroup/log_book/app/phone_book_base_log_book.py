@@ -23,6 +23,8 @@ from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.aggregate import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_helper import (
+    be_port, basket_book_service_http_client)
 
 LOG_ANALYZER_DATA_DIR = (
         PurePath(__file__).parent.parent / "data"
@@ -416,7 +418,10 @@ class PhoneBookBaseLogBook(AppLogBook):
                 key, value = arg.split(self.key_val_sep)
                 kwargs[key] = value
 
-            executor_web_client = self._get_executor_http_client_from_pair_strat(port, host)
+            if port == be_port:
+                executor_web_client = basket_book_service_http_client
+            else:
+                executor_web_client = self._get_executor_http_client_from_pair_strat(port, host)
 
             callback_method: Callable = getattr(executor_web_client, method_name)
             callback_method(**kwargs)

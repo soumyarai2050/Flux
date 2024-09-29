@@ -56,6 +56,7 @@ python gen_cpp_web_socket_server.py
 python gen_web_socket_server_util.py
 python gen_cpp_web_socket_test.py
 python gen_cpp_get_str_from_enum_plugin.py
+python gen_cpp_shared_data_structure.py
 python gen_cpp_proto2_model.py
 cd ../../
 "$PWD"/gen_web_project.sh "$PROJECT_NAME"

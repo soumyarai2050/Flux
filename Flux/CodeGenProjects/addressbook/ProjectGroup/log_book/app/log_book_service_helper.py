@@ -2,7 +2,7 @@
 import datetime
 import time
 import queue
-from threading import Thread, current_thread
+from threading import Thread, current_thread, RLock
 import re
 
 # project imports
@@ -34,6 +34,11 @@ simulator_portfolio_alert_fail_log = f"simulator_portfolio_alert_fail_logs_{date
 class UpdateType(StrEnum):
     JOURNAL_TYPE = auto()
     SNAPSHOT_TYPE = auto()
+
+
+class AlertsCacheCont(MsgspecBaseModel, kw_only=True):
+    mutex: RLock = RLock()
+    alert_id_to_obj_dict: Dict = field(default_factory=dict)
 
 
 def create_alert(
@@ -435,7 +440,7 @@ def _alert_queue_handler_err_handler(e, pydantic_obj_list, queue_obj, err_handli
 def alert_queue_handler(run_state: bool, queue_obj: queue.Queue, bulk_transactions_counts_per_call: int,
                         bulk_transaction_timeout: int, create_web_client_callable: Callable[..., Any],
                         err_handling_callable, update_web_client_callable: Callable[..., Any] | None = None,
-                        created_alert_id_dict: Dict[int, StratAlert | PortfolioAlert] | None = None,
+                        alerts_cache_cont: AlertsCacheCont | None = None,
                         client_connection_fail_retry_secs: int | None = None):
     create_pydantic_obj_list = []
     update_pydantic_obj_list = []
@@ -456,13 +461,14 @@ def alert_queue_handler(run_state: bool, queue_obj: queue.Queue, bulk_transactio
                     logging.info(f"Exiting alert_queue_handler")
                     return
 
-                if created_alert_id_dict is not None:
-                    # if created_alert_id_dict is passed then using both update and create mechanism
-                    if created_alert_id_dict.get(pydantic_obj.id) is not None:
-                        update_pydantic_obj_list.append(pydantic_obj)
-                    else:
-                        create_pydantic_obj_list.append(pydantic_obj)
-                    created_alert_id_dict[pydantic_obj.id] = pydantic_obj
+                if alerts_cache_cont is not None:
+                    with alerts_cache_cont.mutex:
+                        # if created_alert_id_dict is passed then using both update and create mechanism
+                        if alerts_cache_cont.alert_id_to_obj_dict.get(pydantic_obj.id) is not None:
+                            update_pydantic_obj_list.append(pydantic_obj)
+                        else:
+                            create_pydantic_obj_list.append(pydantic_obj)
+                        alerts_cache_cont.alert_id_to_obj_dict[pydantic_obj.id] = pydantic_obj
                 else:
                     # if created_alert_id_dict is not passed then only creating
                     create_pydantic_obj_list.append(pydantic_obj)
@@ -479,7 +485,7 @@ def alert_queue_handler(run_state: bool, queue_obj: queue.Queue, bulk_transactio
 
         if not run_state:
             # Exiting this function if run state is turned False
-            logging.info(f"Found {run_state = } in alert_queue_handler - Exiting while loop")
+            logging.info(f"Found {run_state=} in alert_queue_handler - Exiting while loop")
             return
 
         if create_pydantic_obj_list:
@@ -544,8 +550,8 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
                            alert_queue: queue.Queue,
                            strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
                            portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
-                           severity: Severity, alert_brief: str,
-                           strat_id: int | None = None, alert_meta: AlertMeta | None = None) -> None:
+                           severity: Severity, alert_brief: str, strat_id: int | None = None,
+                           alert_meta: AlertMeta | AlertMetaBaseModel | None = None) -> None:
     """
     Handles strat alerts if strat id is passed else handles portfolio alerts
     """

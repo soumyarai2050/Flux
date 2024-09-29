@@ -22,7 +22,8 @@ import protogen
 
 # empty main import below is required for making main accessible to derived classes
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_to_camel_case, convert_to_capitalized_camel_case
+from FluxPythonUtils.scripts.utility_functions import (
+    convert_camel_case_to_specific_case, convert_to_capitalized_camel_case)
 
 
 class ModelType(StrEnum):
@@ -53,6 +54,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             raise Exception(err_str)
         self.root_message_list: List[protogen.Message] = []
         self.message_to_query_option_list_dict: Dict[protogen.Message, List[Dict]] = {}
+        self.message_to_file_query_name_dict: Dict[protogen.Message, str] = {}
         self.non_root_message_list: List[protogen.Message] = []
         self.enum_list: List[protogen.Enum] = []
         self.model_dir_name: str = "Pydentic"
@@ -85,6 +87,34 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             # messages having SetReentrantLock field as True of FluxMsgJsonRoot option
         ]
 
+    def update_root_msg_list(self, message: protogen.Message) -> None:
+        if message not in self.root_message_list:
+            self.root_message_list.append(message)
+        # else not required: avoiding repetition
+
+    def update_non_root_msg_list(self, message: protogen.Message) -> None:
+        if message not in self.non_root_message_list:
+            self.non_root_message_list.append(message)
+        # else not required: avoiding repetition
+
+    def get_file_query_name_from_message_name(self, message_name: str) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        return f"{message_name_snake_cased}_file_upload"
+
+    def update_query_data_members(self, message: protogen.Message) -> None:
+        if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_query):
+            if message not in self.message_to_query_option_list_dict:
+                self.message_to_query_option_list_dict[message] = self.get_query_option_message_values(message)
+            # else not required: avoiding repetition
+        # else not required: avoiding list append if msg is not having option for query
+
+        if self.is_bool_option_enabled(message, BaseFastapiPlugin.flux_msg_file_query):
+            if message not in self.message_to_file_query_name_dict:
+                self.message_to_file_query_name_dict[message] = (
+                    self.get_file_query_name_from_message_name(message.proto.name))
+            # else not required: avoiding repetition
+        # else not required: avoiding list append if msg is not having option for file query
+
     def load_dependency_messages_and_enums_in_dicts(self, message: protogen.Message):
         for field in message.fields:
             if field.kind.name.lower() == "enum":
@@ -94,20 +124,13 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             elif field.kind.name.lower() == "message":
                 if (self.is_option_enabled(field.message, BaseFastapiPlugin.flux_msg_json_root) or
                         self.is_option_enabled(field.message, BaseFastapiPlugin.flux_msg_json_root_time_series)):
-                    if field.message not in self.root_message_list:
-                        self.root_message_list.append(field.message)
-                    # else not required: avoiding repetition
+                    self.update_root_msg_list(field.message)
                 else:
-                    if field.message not in self.non_root_message_list:
-                        self.non_root_message_list.append(field.message)
-                    # else not required: avoiding repetition
+                    self.update_non_root_msg_list(field.message)
+
                 self.load_dependency_messages_and_enums_in_dicts(field.message)
 
-                if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_query):
-                    if message not in self.message_to_query_option_list_dict:
-                        self.message_to_query_option_list_dict[message] = self.get_query_option_message_values(message)
-                    # else not required: avoiding repetition
-                # else not required: avoiding list append if msg is not having option for query
+                self.update_query_data_members(message)
 
             # else not required: avoiding other kinds than message or enum
 
@@ -132,9 +155,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                 # else not required: If json root option don't have reentrant field then considering it requires
                 # reentrant lock as default and avoiding its append to reentrant lock non-required list
 
-                if message not in self.root_message_list:
-                    self.root_message_list.append(message)
-                # else not required: avoiding repetition
+                self.update_root_msg_list(message)
 
                 for field in message.fields:
                     if field.proto.name == BaseFastapiPlugin.default_id_field_name and \
@@ -143,15 +164,9 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                     # else enot required: If field is not id or is not type int then avoiding append
                     # in int_id_message_list
             else:
-                if message not in self.non_root_message_list:
-                    self.non_root_message_list.append(message)
-                # else not required: avoiding repetition
+                self.update_non_root_msg_list(message)
 
-            if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_query):
-                if message not in self.message_to_query_option_list_dict:
-                    self.message_to_query_option_list_dict[message] = self.get_query_option_message_values(message)
-                # else not required: avoiding repetition
-            # else not required: avoiding list append if msg is not having option for query
+            self.update_query_data_members(message)
 
             self.load_dependency_messages_and_enums_in_dicts(message)
 
@@ -274,7 +289,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         return self.handle_import_file_gen(model_import_file_name, self._import_current_http_routes)
 
     @abstractmethod
-    def handle_fastapi_initialize_file_gen(self):
+    def handle_fastapi_initialize_file_gen(self, **args):
         raise NotImplementedError
 
     def _get_if_pass_stored_obj_to_pre_post_callback(

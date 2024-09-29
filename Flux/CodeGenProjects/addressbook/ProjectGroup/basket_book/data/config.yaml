@@ -19,6 +19,9 @@ mongo_server: "mongodb://localhost:27017"
 multi_project_plugin:
   - log_book:
       - "PortfolioAlert"
+  - phone_book:
+      - "SystemControl"
+      - "ChoreLimits"
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"

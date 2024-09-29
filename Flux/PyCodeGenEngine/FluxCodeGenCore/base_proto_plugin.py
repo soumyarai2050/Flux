@@ -14,10 +14,40 @@ import protogen
 # project imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
-from FluxPythonUtils.scripts.utility_functions import parse_to_int, parse_to_float, convert_camel_case_to_specific_case
+from FluxPythonUtils.scripts.utility_functions import (
+    parse_to_int, parse_to_float, convert_camel_case_to_specific_case, YAMLConfigurationManager)
 
 # Required for accessing custom options from schema
 from Flux.PyCodeGenEngine.FluxCodeGenCore import insertion_imports
+
+
+root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+root_flux_core_config_yaml_dict = (
+    YAMLConfigurationManager.load_yaml_configurations(str(root_flux_core_config_yaml_path)))
+root_core_proto_files: List[str] = []
+option_files = root_flux_core_config_yaml_dict.get("options_files")
+core_or_util_files = root_flux_core_config_yaml_dict.get("core_or_util_files")
+if option_files is not None and option_files:
+    root_core_proto_files.extend(option_files)
+if core_or_util_files is not None and core_or_util_files:
+    root_core_proto_files.extend(core_or_util_files)
+
+project_dir = os.getenv("PROJECT_DIR")
+if project_dir is None or not project_dir:
+    err_str = f"env var PROJECT_DIR received as {project_dir}"
+    logging.exception(err_str)
+    raise Exception(err_str)
+project_grp_core_proto_files = []
+if "ProjectGroup" in project_dir:
+    project_group_flux_core_config_yaml_path = PurePath(project_dir).parent.parent / "flux_core.yaml"
+    project_group_flux_core_config_yaml_dict = (
+        YAMLConfigurationManager.load_yaml_configurations(str(project_group_flux_core_config_yaml_path)))
+    option_files = project_group_flux_core_config_yaml_dict.get("options_files")
+    core_or_util_files = project_group_flux_core_config_yaml_dict.get("core_or_util_files")
+    if option_files is not None and option_files:
+        project_grp_core_proto_files.extend(option_files)
+    if core_or_util_files is not None and core_or_util_files:
+        project_grp_core_proto_files.extend(core_or_util_files)
 
 
 class BaseProtoPlugin(ABC):
@@ -46,6 +76,7 @@ class BaseProtoPlugin(ABC):
     flux_msg_json_root: ClassVar[str] = "FluxMsgJsonRoot"
     flux_msg_json_root_time_series: ClassVar[str] = "FluxMsgJsonRootTimeSeries"
     flux_msg_json_query: ClassVar[str] = "FluxMsgJsonQuery"
+    flux_msg_file_query: ClassVar[str] = "FluxMsgFileQuery"
     flux_json_root_create_field: ClassVar[str] = "CreateOp"
     flux_json_root_create_all_field: ClassVar[str] = "CreateAllOp"
     flux_json_root_read_field: ClassVar[str] = "ReadOp"
@@ -749,6 +780,28 @@ class BaseProtoPlugin(ABC):
             err_str = f"Env var 'PLUGIN_OUTPUT_DIR' received as {output_dir_path}"
             logging.exception(err_str)
             raise Exception(err_str)
+
+    def get_dependency_file_path_list(self, file: protogen.File, root_core_proto_files: List[str],
+                                      project_grp_core_proto_files, model_file_suffix: str,
+                                      project_grp_root_dir: str) -> List[str]:
+        dependency_file_path_list = []
+        if file.dependencies:
+            for file_ in file.dependencies:
+                if file_.proto.name != "flux_options.proto":
+                    if file_.proto.name in root_core_proto_files:
+                        gen_model_import_path = (
+                            self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
+                                                          f"Pydantic.{file_.generated_filename_prefix}_{model_file_suffix}"))
+                    elif file_.proto.name in project_grp_core_proto_files:
+                        gen_model_import_path = (
+                            self.import_path_from_path_str(str(project_grp_root_dir),
+                                                           f"{file_.generated_filename_prefix}_{model_file_suffix}"))
+                    else:
+                        gen_model_import_path = (
+                            self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
+                                                          f"{file_.generated_filename_prefix}_{model_file_suffix}"))
+                    dependency_file_path_list.append(gen_model_import_path)
+        return dependency_file_path_list
 
     def _process(self, plugin: ExtendedProtogenPlugin) -> None:
         """

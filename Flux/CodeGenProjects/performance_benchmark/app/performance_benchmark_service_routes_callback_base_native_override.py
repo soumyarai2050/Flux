@@ -53,7 +53,9 @@ class PerformanceBenchmarkServiceRoutesCallbackBaseNativeOverride(PerformanceBen
                     if not self.service_ready:
                         # todo start RawPerformanceDataProcessor script once performance_benchmark service is up
                         self.service_ready = True
-                    print(f"INFO: perf benchmark service is ready: {datetime.datetime.now().time()}")
+                        # print is just to manually check if this server is ready - useful when we run
+                        # multiple servers and before running any test we want to make sure servers are up
+                        print(f"INFO: perf benchmark service is ready: {datetime.datetime.now().time()}")
 
                 if not self.service_up:
                     try:

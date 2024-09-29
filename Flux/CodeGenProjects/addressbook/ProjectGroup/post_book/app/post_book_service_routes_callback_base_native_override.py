@@ -108,8 +108,10 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                         # Running portfolio_limit_check_queue_handler
                         Thread(target=self.portfolio_limit_check_queue_handler, daemon=True).start()
                         Thread(target=self._update_portfolio_status_n_check_portfolio_limits, daemon=True).start()
-                    self.service_ready = True
-                    print(f"INFO: post barter engine service is ready: {datetime.datetime.now().time()}")
+                        self.service_ready = True
+                        # print is just to manually check if this server is ready - useful when we run
+                        # multiple servers and before running any test we want to make sure servers are up
+                        print(f"INFO: post barter engine service is ready: {datetime.datetime.now().time()}")
 
                 if not self.service_up:
                     try:

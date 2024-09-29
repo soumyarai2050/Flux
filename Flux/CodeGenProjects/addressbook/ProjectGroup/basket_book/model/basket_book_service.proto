@@ -5,6 +5,7 @@ import "projects_core.proto";
 import "street_book_n_basket_book_core.proto";
 import "mobile_book_n_street_book_n_basket_book_core.proto";
 import "dept_book_n_mobile_book_n_street_book_n_basket_book_core.proto";
+import "street_book_n_post_book_n_basket_book_core.proto";
 
 package basket_book;
 
@@ -37,7 +38,6 @@ message BasketChore{
     EnableNotifyAll: true,
     IsTopLvlModel: false,
     ExecutorKeySequence: "security.sec_id-side"
-    IsRepeated: true
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   repeated NewChore new_chores = 2 [(FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "algo:ALGO_List, force_bkr:BrokerCode_List, sec_id:CB_List, mstrat:Mstrat_List, sec_id_source=TICKER"];
@@ -48,4 +48,5 @@ message ImportWarningAvoidDummyMessage{
    optional DummyEnumP temp1 = 1;
    optional DummyEnumMSB temp2 = 2;
    optional DummyEnumDMSB temp3 = 3;
+   optional DummyEnumSPB temp4 = 4;
 }

@@ -5,6 +5,9 @@
 #include "mongo_db_codec.h"
 #include "queue_handler.h"
 #include "mongo_db_singleton.h"
+#include "mobile_book_service_shared_data_structure.h"
+#include "mobile_book_service.pb.h"
+#include "cpp_app_shared_resource.h"
 
 
 class MobileBookInterface {
@@ -14,22 +17,25 @@ public:
 	virtual void go() = 0;
 
 protected:
-	MobileBookInterface(YAML::Node &config,
-		std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db,
-		mobile_book_handler::MobileBookTopOfBookWebSocketServer<mobile_book::TopOfBook> &r_top_of_book_websocket_server,
-		mobile_book_handler::MobileBookLastBarterWebSocketServer<mobile_book::LastBarter> &r_last_barter_websocket_server,
-		mobile_book_handler::MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> &r_market_depth_websocket_server) :
-	m_config_file_(config),
-	m_sp_mongo_db_(std::move(sp_mongo_db)),  m_top_of_book_db_codec_(m_sp_mongo_db_), m_market_depth_db_codec_(m_sp_mongo_db_),
+	explicit MobileBookInterface(const std::string &kr_yaml_config_file) :
+	k_mr_config_file_(kr_yaml_config_file), m_config_file_(YAML::LoadFile(k_mr_config_file_)),
+	m_sp_mongo_db_(MongoDBHandlerSingleton::get_instance(get_db_uri(), get_db_name())),
+	m_top_of_book_db_codec_(m_sp_mongo_db_), m_market_depth_db_codec_(m_sp_mongo_db_),
 	m_last_barter_db_codec_(m_sp_mongo_db_), m_market_depth_history_db_codec_(m_sp_mongo_db_),
-	m_last_barter_history_db_codec_(m_sp_mongo_db_), mr_top_of_book_web_socket_server_(r_top_of_book_websocket_server),
-	mr_last_barter_web_socket_server_(r_last_barter_websocket_server),
-	mr_market_depth_web_socket_server_(r_market_depth_websocket_server) {
+	m_last_barter_history_db_codec_(m_sp_mongo_db_),
+	m_top_of_book_web_socket_server_(m_top_of_book_, host, get_top_of_book_ws_port(), std::chrono::seconds(mobile_book_handler::connection_timeout)),
+	m_last_barter_web_socket_server_(m_last_barter_, host, get_last_barter_ws_port(), std::chrono::seconds(mobile_book_handler::connection_timeout)),
+	m_market_depth_web_socket_server_(m_market_depth_, host, get_market_depth_ws_port(), std::chrono::seconds(mobile_book_handler::connection_timeout)) {
 		m_last_barter_history_db_codec_.get_all_data_from_collection(m_last_barter_collection_);
 		m_market_depth_history_db_codec_.get_all_data_from_collection(m_market_depth_history_collection_);
+		start_ws_thread();
 	}
 
-	YAML::Node &m_config_file_;
+	mobile_book::TopOfBook m_top_of_book_{};
+	mobile_book::LastBarter m_last_barter_{};
+	mobile_book::MarketDepth m_market_depth_{};
+	const std::string &k_mr_config_file_;
+	YAML::Node m_config_file_;
 	std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db_;
 	FluxCppCore::MongoDBCodec<mobile_book::TopOfBook, mobile_book::TopOfBookList> m_top_of_book_db_codec_;
 	FluxCppCore::MongoDBCodec<mobile_book::MarketDepth, mobile_book::MarketDepthList> m_market_depth_db_codec_;
@@ -38,11 +44,20 @@ protected:
 		m_market_depth_history_db_codec_;
 	FluxCppCore::MongoDBCodec<mobile_book::RawLastBarterHistory, mobile_book::RawLastBarterHistoryList>
 		m_last_barter_history_db_codec_;
-	mobile_book_handler::MobileBookTopOfBookWebSocketServer<mobile_book::TopOfBook> &mr_top_of_book_web_socket_server_;
-	mobile_book_handler::MobileBookLastBarterWebSocketServer<mobile_book::LastBarter> &mr_last_barter_web_socket_server_;
-	mobile_book_handler::MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> &mr_market_depth_web_socket_server_;
+	mobile_book_handler::MobileBookTopOfBookWebSocketServer<mobile_book::TopOfBook> m_top_of_book_web_socket_server_;
+	mobile_book_handler::MobileBookLastBarterWebSocketServer<mobile_book::LastBarter> m_last_barter_web_socket_server_;
+	mobile_book_handler::MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> m_market_depth_web_socket_server_;
 	mobile_book::RawLastBarterHistoryList m_last_barter_collection_;
 	mobile_book::RawMarketDepthHistoryList m_market_depth_history_collection_;
+	std::jthread m_top_of_book_ws_server_thread_;
+	std::jthread m_last_barter_ws_server_thread_;
+	std::jthread m_market_depth_ws_server_thread_;
+
+	void start_ws_thread() {
+		m_top_of_book_ws_server_thread_ = std::jthread([this]() { m_top_of_book_web_socket_server_.run(); });
+		m_last_barter_ws_server_thread_ = std::jthread([this]() { m_last_barter_web_socket_server_.run(); });
+		m_market_depth_ws_server_thread_ = std::jthread([this]() { m_market_depth_web_socket_server_.run(); });
+	}
 
 	std::string get_db_uri() const {
 		return m_config_file_["mongo_server"].as<std::string>();
@@ -73,14 +88,7 @@ protected:
 
 class MobileBookConsumer : public MobileBookInterface {
 public:
-	explicit MobileBookConsumer(YAML::Node& r_config_file,
-		std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db,
-		mobile_book_handler::MobileBookTopOfBookWebSocketServer<mobile_book::TopOfBook> &r_top_of_book_websocket_server,
-		mobile_book_handler::MobileBookLastBarterWebSocketServer<mobile_book::LastBarter> &r_last_barter_websocket_server,
-		mobile_book_handler::MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> &r_market_depth_websocket_server) :
-	MobileBookInterface(r_config_file, std::move(sp_mongo_db), r_top_of_book_websocket_server, r_last_barter_websocket_server,
-		r_market_depth_websocket_server) {
-
+	explicit MobileBookConsumer(const std::string& kr_config_file) : MobileBookInterface(kr_config_file) {
 		start_thread();
 		update_tob_db_cache();
 		update_md_db_cache();
@@ -95,12 +103,6 @@ public:
 			if (market_depth_index < m_market_depth_history_collection_.raw_market_depth_history_size() and
 				last_barter_index >= m_last_barter_collection_.raw_last_barter_history_size()) {
 
-				std::string exch_time;
-				std::string arrival_time;
-				FluxCppCore::format_time(m_market_depth_history_collection_.raw_market_depth_history(
-					market_depth_index).exch_time(), exch_time);
-				FluxCppCore::format_time(m_market_depth_history_collection_.raw_market_depth_history(
-					market_depth_index).arrival_time(), arrival_time);
 				char side;
 				if (m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).side() ==
 					mobile_book::TickType::BID) {
@@ -109,13 +111,41 @@ public:
 						side = 'A';
 					}
 
-				PyMktDepth mkt_depth{m_market_depth_history_collection_.raw_market_depth_history(
-					market_depth_index).symbol_n_exch_id().symbol().c_str(), exch_time.c_str(),
-					arrival_time.c_str(), side,
-					m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).position(),
-					static_cast<double>(m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).px()),
-					m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).qty(),
-					"", false, 0.0, 0, 0.0};
+				MarketDepth mkt_depth;
+				mkt_depth.id_ = m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).id();
+				mkt_depth.symbol_ = m_market_depth_history_collection_.raw_market_depth_history(
+					market_depth_index).symbol_n_exch_id().symbol();
+				mkt_depth.exch_time_ = m_market_depth_history_collection_.raw_market_depth_history(
+					market_depth_index).exch_time();
+				mkt_depth.arrival_time_ = m_market_depth_history_collection_.raw_market_depth_history(
+					market_depth_index).arrival_time();
+				mkt_depth.side_ = side;
+				if (m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).has_px()) {
+					mkt_depth.px_ = m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).px();
+					mkt_depth.is_px_set_ = true;
+				} else {
+					mkt_depth.px_ = 0;
+					mkt_depth.is_px_set_ = false;
+				}
+
+				if (m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).has_qty()) {
+					mkt_depth.qty_ = m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).qty();
+					mkt_depth.is_qty_set_ = true;
+				} else {
+					mkt_depth.qty_ = 0;
+					mkt_depth.is_qty_set_ = false;
+				}
+				mkt_depth.position_ = m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).position();
+				mkt_depth.market_maker_ = "";
+				mkt_depth.is_market_maker_set_ = false;
+				mkt_depth.is_smart_depth_ = false;
+				mkt_depth.is_is_smart_depth_set_ = false;
+				mkt_depth.cumulative_notional_ = 0.0;
+				mkt_depth.is_cumulative_notional_set_ = false;
+				mkt_depth.cumulative_qty_ = 0;
+				mkt_depth.is_cumulative_qty_set_ = false;
+				mkt_depth.cumulative_avg_px_ = 0;
+				mkt_depth.is_cumulative_avg_px_set_ = false;
 
 				process_market_depth(mkt_depth);
 				++market_depth_index;
@@ -123,28 +153,58 @@ public:
 			} else {
 
 				// Replay last barter
-				std::string exch_time;
-				std::string arrival_time;
-				FluxCppCore::format_time(m_last_barter_collection_.raw_last_barter_history(
-					last_barter_index).exch_time(), exch_time);
-				FluxCppCore::format_time(m_last_barter_collection_.raw_last_barter_history(
-					last_barter_index).arrival_time(), arrival_time);
 
-				PyLastBarter last_barter{{m_last_barter_collection_.raw_last_barter_history(
-					last_barter_index).symbol_n_exch_id().symbol().c_str(),
-					m_last_barter_collection_.raw_last_barter_history(
-						last_barter_index).symbol_n_exch_id().exch_id().c_str()}, exch_time.c_str(),
-					arrival_time.c_str(), static_cast<double>(
-						m_last_barter_collection_.raw_last_barter_history(last_barter_index).px()),
-					m_last_barter_collection_.raw_last_barter_history(last_barter_index).qty(),
-					m_last_barter_collection_.raw_last_barter_history(last_barter_index).premium(),
-					{m_last_barter_collection_.raw_last_barter_history(
-						last_barter_index).market_barter_volume().id().c_str(),
-						m_last_barter_collection_.raw_last_barter_history(
-							last_barter_index).market_barter_volume().participation_period_last_barter_qty_sum(),
-						m_last_barter_collection_.raw_last_barter_history(
-							last_barter_index).market_barter_volume().applicable_period_seconds()}};
+				LastBarter last_barter;
+				last_barter.id_ = m_last_barter_collection_.raw_last_barter_history(last_barter_index).id();
+				last_barter.symbol_n_exch_id_.symbol_ = m_last_barter_collection_.raw_last_barter_history(
+					last_barter_index).symbol_n_exch_id().symbol();
+				last_barter.symbol_n_exch_id_.exch_id_ = m_last_barter_collection_.raw_last_barter_history(
+					last_barter_index).symbol_n_exch_id().exch_id();
+				last_barter.exch_time_ = m_last_barter_collection_.raw_last_barter_history(last_barter_index).exch_time();
+				last_barter.arrival_time_ = m_last_barter_collection_.raw_last_barter_history(last_barter_index).arrival_time();
+				last_barter.px_ = m_last_barter_collection_.raw_last_barter_history(last_barter_index).px();
+				last_barter.qty_ = m_last_barter_collection_.raw_last_barter_history(last_barter_index).qty();
+				if (m_last_barter_collection_.raw_last_barter_history(last_barter_index).has_premium()) {
+					last_barter.premium_ = m_last_barter_collection_.raw_last_barter_history(last_barter_index).premium();
+					last_barter.is_premium_set_ = true;
+				} else {
+					last_barter.premium_ = 0;
+					last_barter.is_premium_set_ = false;
+				}
 
+				if (m_last_barter_collection_.raw_last_barter_history(last_barter_index).has_market_barter_volume()) {
+					last_barter.market_barter_volume_.id_ = m_last_barter_collection_.raw_last_barter_history(
+						last_barter_index).market_barter_volume().id();
+					if (m_last_barter_collection_.raw_last_barter_history(
+						last_barter_index).market_barter_volume().has_participation_period_last_barter_qty_sum()) {
+						last_barter.market_barter_volume_.participation_period_last_barter_qty_sum_ =
+							m_last_barter_collection_.raw_last_barter_history(
+								last_barter_index).market_barter_volume().participation_period_last_barter_qty_sum();
+						last_barter.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_ = true;
+					} else {
+						last_barter.market_barter_volume_.participation_period_last_barter_qty_sum_ = 0;
+						last_barter.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_ = false;
+					}
+
+					if (m_last_barter_collection_.raw_last_barter_history(
+						last_barter_index).market_barter_volume().has_applicable_period_seconds()) {
+						last_barter.market_barter_volume_.applicable_period_seconds_ =
+							m_last_barter_collection_.raw_last_barter_history(
+								last_barter_index).market_barter_volume().applicable_period_seconds();
+						last_barter.market_barter_volume_.is_applicable_period_seconds_set_ = true;
+					} else {
+						last_barter.market_barter_volume_.applicable_period_seconds_ = 0;
+						last_barter.market_barter_volume_.is_applicable_period_seconds_set_ = false;
+					}
+					last_barter.is_market_barter_volume_set_ = true;
+				} else {
+					last_barter.market_barter_volume_.id_ = "";
+					last_barter.market_barter_volume_.applicable_period_seconds_ = 0;
+					last_barter.market_barter_volume_.is_applicable_period_seconds_set_ = false;
+					last_barter.market_barter_volume_.participation_period_last_barter_qty_sum_ = 0;
+					last_barter.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_ = false;
+					last_barter.is_market_barter_volume_set_ = false;
+				}
 				process_last_barter(last_barter);
 
 				++last_barter_index;
@@ -152,19 +212,28 @@ public:
 		}
 	}
 
-	void process_market_depth(const PyMktDepth &md) {
-		mon_md.push({1, md.symbol_, md.exch_time_, md.arrival_time_, md.side_, md.position_,
-			md.px_, md.qty_, md.market_maker_, md.is_smart_depth_, md.cumulative_notional_,
-			md.cumulative_qty_, md.cumulative_avg_px_});
-		mkt_depth_fp(&md);
+	void process_market_depth(const MarketDepth &md) {
+		mon_md.push(md);
+		PyMarketDepth md_market_depth{md.symbol_.c_str(), md.exch_time_.c_str(),
+			md.arrival_time_.c_str(), md.side_, md.px_, md.is_px_set_, md.qty_, md.is_qty_set_,
+			md.position_, md.market_maker_.c_str(), md.is_market_maker_set_, md.is_smart_depth_,
+			md.is_is_smart_depth_set_, md.cumulative_notional_, md.is_cumulative_notional_set_, md.cumulative_qty_,
+			md.is_cumulative_qty_set_, md.cumulative_avg_px_, md.is_cumulative_avg_px_set_};
+		mkt_depth_fp(&md_market_depth);
 	}
 
-	void process_last_barter(const PyLastBarter &e) {
-		mon_lt.push({1, e.symbol_n_exch_id_.symbol_, e.symbol_n_exch_id_.exch_id_, e.exch_time_,
-			e.arrival_time_, e.px_, e.qty_, e.premium_, e.market_barter_volume_.market_barter_volume_id_,
-			e.market_barter_volume_.participation_period_last_barter_qty_sum_,
-			e.market_barter_volume_.applicable_period_seconds_});
-		last_barter_fp(&e);
+	void process_last_barter(const LastBarter &e) {
+		mon_lt.push(e);
+		PyLastBarter last_barter{{e.symbol_n_exch_id_.symbol_.c_str(),
+			e.symbol_n_exch_id_.exch_id_.c_str()}, e.exch_time_.c_str(), e.arrival_time_.c_str(),
+			e.px_, e.qty_, e.premium_, e.is_premium_set_,
+			{e.market_barter_volume_.id_.c_str(),
+				e.market_barter_volume_.participation_period_last_barter_qty_sum_,
+				e.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_,
+				e.market_barter_volume_.applicable_period_seconds_,
+				e.market_barter_volume_.is_applicable_period_seconds_set_},
+			e.is_market_barter_volume_set_};
+		last_barter_fp(&last_barter);
 	}
 
 protected:
@@ -200,41 +269,61 @@ protected:
 		while(true) {
 			auto status = mon_md.pop(md);
 			if (status == FluxCppCore::QueueStatus::DATA_CONSUMED) {
-				market_depth.set_id(1);
+				market_depth.set_id(md.id_);
 				market_depth.set_symbol(md.symbol_);
-				auto time = FluxCppCore::parse_time(md.exch_time_);
-				market_depth.set_exch_time(time);
-				market_depth.set_arrival_time(time);
-				market_depth.set_px(static_cast<float>(md.px_));
-				market_depth.set_qty(md.qty_);
+				market_depth.set_exch_time(md.exch_time_);
+				market_depth.set_arrival_time(md.arrival_time_);
 				if (md.side_ == 'B') {
 					market_depth.set_side(mobile_book::TickType::BID);
 				} else {
 					market_depth.set_side(mobile_book::TickType::ASK);
 				}
-				market_depth.set_position(md.position_);
+				if (md.is_px_set_)
+					market_depth.set_px(static_cast<float>(md.px_));
 
+				if (md.is_qty_set_) {
+					market_depth.set_qty(md.qty_);
+				}
+				market_depth.set_position(md.position_);
+				if (md.is_market_maker_set_) {
+					market_depth.set_market_maker(md.market_maker_);
+				}
+
+				if (md.is_is_smart_depth_set_) {
+					market_depth.set_is_smart_depth(md.is_smart_depth_);
+				}
+				if (md.is_cumulative_notional_set_) {
+					market_depth.set_cumulative_notional(static_cast<float>(md.cumulative_notional_));
+				}
+
+				if (md.is_cumulative_qty_set_) {
+					market_depth.set_cumulative_qty(md.cumulative_qty_);
+				}
+
+				if (md.is_cumulative_avg_px_set_) {
+					market_depth.set_cumulative_avg_px(static_cast<float>(md.cumulative_avg_px_));
+				}
 				if (md.position_ == 0) {
 					top_of_book.set_id(1);
 					top_of_book.set_symbol(md.symbol_);
-					top_of_book.set_last_update_date_time(time);
+					top_of_book.set_last_update_date_time(md.exch_time_);
 					if (md.side_ == 'B') {
 						top_of_book.mutable_bid_quote()->set_px(static_cast<float>(md.px_));
 						top_of_book.mutable_bid_quote()->set_qty(md.qty_);
-						top_of_book.mutable_bid_quote()->set_last_update_date_time(time);
+						top_of_book.mutable_bid_quote()->set_last_update_date_time(md.exch_time_);
 					} else {
 						top_of_book.mutable_ask_quote()->set_px(static_cast<float>(md.px_));
 						top_of_book.mutable_ask_quote()->set_qty(md.qty_);
-						top_of_book.mutable_ask_quote()->set_last_update_date_time(time);
+						top_of_book.mutable_ask_quote()->set_last_update_date_time(md.exch_time_);
 					}
 
 					auto tob_db_id = m_top_of_book_db_codec_.insert_or_update(top_of_book);
 					top_of_book.set_id(tob_db_id);
-					mr_top_of_book_web_socket_server_.NewClientCallBack(top_of_book, -1);
+					m_top_of_book_web_socket_server_.NewClientCallBack(top_of_book, -1);
 				}
 				[[maybe_unused]] auto db_id = m_market_depth_db_codec_.insert_or_update(market_depth);
 				market_depth.set_id(db_id);
-				mr_market_depth_web_socket_server_.NewClientCallBack(market_depth, -1);
+				m_market_depth_web_socket_server_.NewClientCallBack(market_depth, -1);
 				market_depth.Clear();
 				top_of_book.Clear();
 			}
@@ -250,22 +339,21 @@ protected:
 			auto status = mon_lt.pop(lt);
 			if (status == FluxCppCore::QueueStatus::DATA_CONSUMED)
 			{
-				last_barter.set_id(1);
-				last_barter.mutable_symbol_n_exch_id()->set_symbol(lt.symbol_n_exch_id_.sym_);
+				last_barter.set_id(lt.id_);
+				last_barter.mutable_symbol_n_exch_id()->set_symbol(lt.symbol_n_exch_id_.symbol_);
 				last_barter.mutable_symbol_n_exch_id()->set_exch_id(lt.symbol_n_exch_id_.exch_id_);
 				last_barter.set_px(static_cast<float>(lt.px_));
 				last_barter.set_qty(lt.qty_);
-				auto time = FluxCppCore::parse_time(lt.exch_time_);
-				last_barter.set_exch_time(time);
-				last_barter.set_arrival_time(time);
-				last_barter.mutable_market_barter_volume()->set_id(lt.market_barter_volume_.market_barter_volume_id_);
+				last_barter.set_exch_time(lt.exch_time_);
+				last_barter.set_arrival_time(lt.arrival_time_);
+				last_barter.mutable_market_barter_volume()->set_id(lt.market_barter_volume_.id_);
 				last_barter.mutable_market_barter_volume()->set_participation_period_last_barter_qty_sum(
 					lt.market_barter_volume_.participation_period_last_barter_qty_sum_);
 				last_barter.mutable_market_barter_volume()->set_applicable_period_seconds(
 					lt.market_barter_volume_.applicable_period_seconds_);
 
 				tob.set_id(1);
-				tob.set_symbol(lt.symbol_n_exch_id_.sym_);
+				tob.set_symbol(lt.symbol_n_exch_id_.symbol_);
 				tob.mutable_last_barter()->set_px(static_cast<float>(lt.px_));
 				tob.mutable_last_barter()->set_qty(lt.qty_);
 				tob.mutable_last_barter()->set_last_update_date_time(last_barter.exch_time());
@@ -273,10 +361,10 @@ protected:
 				tob.add_market_barter_volume()->CopyFrom(last_barter.market_barter_volume());
 				auto db_id = m_top_of_book_db_codec_.insert_or_update(tob);
 				tob.set_id(db_id);
-				mr_top_of_book_web_socket_server_.NewClientCallBack(tob, -1);
+				m_top_of_book_web_socket_server_.NewClientCallBack(tob, -1);
 				db_id  = m_last_barter_db_codec_.insert(last_barter);
 				last_barter.set_id(db_id);
-				mr_last_barter_web_socket_server_.NewClientCallBack(last_barter, -1);
+				m_last_barter_web_socket_server_.NewClientCallBack(last_barter, -1);
 				last_barter.Clear();
 				tob.Clear();
 			}

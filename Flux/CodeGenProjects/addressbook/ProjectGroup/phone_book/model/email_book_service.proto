@@ -254,7 +254,7 @@ message PairStrat {
     required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     //An int64 may or may-not be date time. A datetime field must have FluxFldValIsDateTime option set to true
     // CodeGen to handle appropriate datetime generation if the FluxFldValIsDateTime option is set
-    optional int64 last_active_date_time = 2 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 2, (FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true];
+    optional string last_active_date_time = 2 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 2, (FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true];
     optional int32  frequency = 3 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 1, (FluxFldServerPopulate) = true];
     required PairStratParams pair_strat_params = 4 [(FluxFldAutoComplete) = "mstrat:Mstrat_List"];
     optional int64 pair_strat_params_update_seq_num = 7 [(FluxFldHide) = "True"];
@@ -342,14 +342,21 @@ message SampleModel{
     PassStoredObjToPartialUpdatePostCallback: True,
     PassStoredObjToPartialUpdateAllPostCallback: True
   };
-    option (FluxMsgAggregateQueryVarName) = "sample_cum_aggregate_pipeline";
+  option (FluxMsgAggregateQueryVarName) = "sample_cum_aggregate_pipeline";
+  option (FluxMsgJsonQuery) = {
+      QueryName: "file_upload_from_sample_model",
+      QueryParams: "save_file_destination",
+      QueryParamsDataType: "str",
+      QueryType: HTTP_FILE
+  };
+  option (FluxMsgFileQuery) = true;
 
-    //Server generated unique Id
-    required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-    optional string sample = 2 [(FluxFldIndex) = true];
-    required int64 date = 3 [(FluxFldValIsDateTime) = true];
-    required int32 num = 4;
-    optional int32 cum_sum_of_num = 5;
+  //Server generated unique Id
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional string sample = 2 [(FluxFldIndex) = true];
+  required int64 date = 3 [(FluxFldValIsDateTime) = true];
+  required int32 num = 4;
+  optional int32 cum_sum_of_num = 5;
 }
 
 // Sample TimeSeries Model - used in tests to check basic api operations in time series
@@ -372,7 +379,7 @@ message SampleTSModel{
     //Server generated unique Id
     required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     optional string sample = 2  [(FluxFldValMetaField) = true];
-    required int64 date = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
+    required string date = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
 }
 
 // Sample TimeSeries Model - used in tests to check AggregateType_UpdateAggregate feature in time_series
@@ -394,7 +401,7 @@ message SampleTSModel1{
     //Server generated unique Id
     required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     optional string sample = 2  [(FluxFldValMetaField) = true];
-    required int64 date = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
+    required string date = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
     required int32 num = 4;
     optional int32 cum_sum_of_num = 5;
 }
@@ -418,7 +425,7 @@ message BarterBrief{
   required Side side = 3;
   required float px = 4;
   required int64 qty = 5;
-  optional int64 create_date_time = 7 [(FluxFldValIsDateTime) = true];
+  optional string create_date_time = 7 [(FluxFldValIsDateTime) = true];
   optional float computed_notional = 8 [(FluxFldTitle) = "computed $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHide) = "True"];
 }
 

@@ -8,16 +8,14 @@ from pathlib import PurePath
 from pendulum import DateTime
 from filelock import FileLock
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
-    Side, SecurityIdSource)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
-    ChoreBrief, ChoreEventType, ChoreStatusType, ChoreJournal, FillsJournal, Security)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link_base import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link_base import (
     BarteringLinkBase, add_to_texts)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
     executor_config_yaml_dict, EXECUTOR_PROJECT_DATA_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_symbol_side_key
 from FluxPythonUtils.scripts.utility_functions import dict_or_list_records_csv_writer
+from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_basket_book_core_msgspec_model import *
 
 
 def init_symbol_configs():
@@ -29,6 +27,7 @@ def init_symbol_configs():
 
 
 class BarterSimulator(BarteringLinkBase):
+
     int_id: ClassVar[int] = 1
     continuous_symbol_based_chores_counter: ClassVar[Dict | None] = {}
     cxl_rej_symbol_to_bool_dict: ClassVar[Dict | None] = {}
@@ -120,7 +119,7 @@ class BarterSimulator(BarteringLinkBase):
     @classmethod
     async def place_new_chore(cls, px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str,
                               symbol_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
-                              internal_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
+                              client_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
         """
         when invoked form log analyzer - all params are passed as strings
         pydantic default conversion handles conversion - any util functions called should be called with
@@ -137,7 +136,7 @@ class BarterSimulator(BarteringLinkBase):
             chore_brief = ChoreBrief(chore_id=chore_id, security=security, bartering_security=bartering_security, side=side,
                                      px=px, qty=qty,
                                      underlying_account=account, exchange=exchange,
-                                     user_data=internal_ord_id)
+                                     user_data=client_ord_id)
             msg = f"SIM: Choreing {bartering_sec_id}/{system_sec_id}, qty {qty} and px {px}"
             add_to_texts(chore_brief, msg)
 

@@ -225,6 +225,7 @@ extend google.protobuf.MessageOptions
   optional string FluxMsgUIGetAllLimit = 55258;
   optional MessageJsonRootTimeSeries FluxMsgJsonRootTimeSeries = 55259;
   optional WidgetUIOption FluxMsgWidgetUIOption = 55260; // Use this to populate ui widget data for layout messages
+  optional bool FluxMsgFileQuery = 55261;   // adds file query for message
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;

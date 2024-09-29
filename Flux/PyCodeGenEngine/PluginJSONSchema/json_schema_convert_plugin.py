@@ -1200,8 +1200,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             json_msg_str += self.__handle_json_layout_message_schema(message)
 
         # Handling json non-layout message and json enum schema
+        json_msg_str += '  "definitions": {\n'
         if self.__json_non_layout_message_list or self.__enum_list:
-            json_msg_str += '  "definitions": {\n'
 
             for message in self.__json_non_layout_message_list:
                 json_msg_str += self.__handle_json_complex_type_schema(message)
@@ -1214,7 +1214,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         if self.__add_autocomplete_dict:
             json_msg_str += self.__handle_auto_complete_output()
         else:
-            json_msg_str += '  }\n'
+            json_msg_str += '  },\n'
+            json_msg_str += '  "autocomplete": {}\n'
 
         json_msg_str += '}'
 

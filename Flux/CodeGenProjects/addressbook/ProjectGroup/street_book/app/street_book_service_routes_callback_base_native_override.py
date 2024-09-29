@@ -1,8 +1,4 @@
 # standard imports
-import logging
-import os
-import queue
-from pathlib import PurePath
 import threading
 import time
 import copy
@@ -10,33 +6,32 @@ import math
 import shutil
 import sys
 import stat
-import datetime
 import subprocess
 from typing import Set
 import ctypes
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import last_barter_callback_type, \
-    last_barter_callback, market_depth_callback_type, market_depth_callback, release_notify_semaphore
 # project imports
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import last_barter_callback_type, \
+    market_depth_callback_type
+# below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import SymbolCacheContainer
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_routes_callback_imports import (
     StreetBookServiceRoutesCallback)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
-    get_chore_journal_log_key, get_symbol_side_key, get_chore_snapshot_log_key, OTHER_TERMINAL_STATES,
-    get_symbol_side_snapshot_log_key, all_service_up_check, host, EXECUTOR_PROJECT_DATA_DIR,
-    email_book_service_http_client, get_consumable_participation_qty, chore_has_terminal_state,
-    get_strat_brief_log_key, get_fills_journal_log_key, get_new_strat_limits, get_new_strat_status,
-    log_book_service_http_client, executor_config_yaml_dict, main_config_yaml_path, NON_FILLED_TERMINAL_STATES,
-    EXECUTOR_PROJECT_SCRIPTS_DIR, post_book_service_http_client, get_default_max_notional,
-    get_default_max_open_single_leg_notional, get_default_max_net_filled_notional, get_bkr_from_underlying_account,
-    create_symbol_overview_pre_helper, update_symbol_overview_pre_helper, partial_update_symbol_overview_pre_helper,
-    MobileBookMutexManager)
+    get_symbol_side_key, get_symbol_side_snapshot_log_key, all_service_up_check,
+    email_book_service_http_client, get_consumable_participation_qty,
+    get_strat_brief_log_key, get_new_strat_limits, get_new_strat_status,
+    log_book_service_http_client, post_book_service_http_client, get_default_max_notional,
+    get_default_max_open_single_leg_notional, get_default_max_net_filled_notional)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
+    host, EXECUTOR_PROJECT_DATA_DIR, executor_config_yaml_dict, main_config_yaml_path, EXECUTOR_PROJECT_SCRIPTS_DIR)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import MobileBookMutexManager, OTHER_TERMINAL_STATES, \
+    NON_FILLED_TERMINAL_STATES
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     compute_max_single_leg_notional, get_premium)
 from FluxPythonUtils.scripts.utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger,
     handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, YAMLConfigurationManager)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecordManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
@@ -44,10 +39,9 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, is_ongoing_strat, guaranteed_call_pair_strat_client,
     pair_strat_client_call_log_str, UpdateType, CURRENT_PROJECT_DIR as PAIR_STRAT_ENGINE_DIR)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.barter_simulator import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.barter_simulator import (
     BarterSimulator, BarteringLinkBase)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import (
-    StratAlertBaseModel)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.log_barter_simulator import LogBarterSimulator
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.strat_cache import StratCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_key_handler import (
     EmailBookServiceKeyHandler)
@@ -55,9 +49,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate import (
     get_chore_total_sum_of_last_n_sec, get_symbol_side_snapshot_from_symbol_side, get_strat_brief_from_symbol,
-    get_open_chore_snapshots_for_symbol, get_symbol_side_underlying_account_cumulative_fill_qty,
-    get_symbol_overview_from_symbol, get_last_n_sec_total_barter_qty, get_market_depths,
-    get_last_n_chore_journals_from_chore_id, get_last_n_sec_first_n_last_barter)
+    get_open_chore_snapshots_for_symbol, get_symbol_overview_from_symbol, get_last_n_sec_total_barter_qty,
+    get_market_depths, get_last_n_sec_first_n_last_barter)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
     PortfolioStatusUpdatesContainer)
 from FluxPythonUtils.scripts.ws_reader import WSReader
@@ -66,8 +59,19 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book import (
-    StreetBook, BarteringDataManager, get_bartering_link, ExtendedTopOfBook, MarketDepth, MobileBookContainerCache,
-    add_container_obj_for_symbol)
+    StreetBook, BarteringDataManager, get_bartering_link, ExtendedTopOfBook, MarketDepth)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_service_routes_callback_base_native_override import BaseBookServiceRoutesCallbackBaseNativeOverride
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import StreetBookServiceKeyHandler
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import (
+    chore_has_terminal_state)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.aggregate import get_objs_from_symbol
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.Pydantic.phone_book_n_street_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.Pydantic.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.Pydantic.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
 
 
 class FirstLastBarterCont(MsgspecBaseModel):
@@ -103,9 +107,9 @@ def get_pair_strat_id_from_cmd_argv():
         raise Exception(err_str_)
 
 
-class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesCallback):
-    residual_compute_shared_lock: AsyncRLock | None = None
-    journal_shared_lock: AsyncRLock | None = None
+class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCallbackBaseNativeOverride,
+                                                           StreetBookServiceRoutesCallback):
+    KeyHandler: Type[StreetBookServiceKeyHandler] = StreetBookServiceKeyHandler
     underlying_read_strat_brief_http: Callable[..., Any] | None = None
     underlying_get_symbol_overview_from_symbol_query_http: Callable[..., Any] | None = None
     underlying_create_strat_limits_http: Callable[..., Any] | None = None
@@ -119,23 +123,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     underlying_partial_update_symbol_overview_http: Callable[..., Any] | None = None
     underlying_read_strat_limits_by_id_http: Callable[..., Any] | None = None
     underlying_read_symbol_overview_http: Callable[..., Any] | None = None
-    underlying_read_symbol_overview_by_id_http: Callable[..., Any] | None = None
-    underlying_read_top_of_book_http: Callable[..., Any] | None = None
     underlying_get_top_of_book_from_symbol_query_http: Callable[..., Any] | None = None
     underlying_read_chore_snapshot_http: Callable[..., Any] | None = None
-    underlying_read_chore_journal_http: Callable[..., Any] | None = None
     underlying_get_last_n_sec_total_barter_qty_query_http: Callable[..., Any] | None = None
-    get_underlying_account_cumulative_fill_qty_query_http: Callable[..., Any] | None = None
-    underlying_create_chore_snapshot_http: Callable[..., Any] | None = None
-    underlying_update_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_partial_update_symbol_side_snapshot_http: Callable[..., Any] | None = None
     underlying_partial_update_cancel_chore_http: Callable[..., Any] | None = None
     underlying_partial_update_strat_status_http: Callable[..., Any] | None = None
     underlying_get_open_chore_count_query_http: Callable[..., Any] | None = None
     underlying_partial_update_strat_brief_http: Callable[..., Any] | None = None
     underlying_delete_symbol_side_snapshot_http: Callable[..., Any] | None = None
-    underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http: Callable[..., Any] | None = None
-    underlying_read_fills_journal_http: Callable[..., Any] | None = None
     underlying_read_last_barter_http: Callable[..., Any] | None = None
     underlying_is_strat_ongoing_query_http: Callable[..., Any] | None = None
     underlying_delete_strat_brief_http: Callable[..., Any] | None = None
@@ -227,63 +223,34 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         cls.underlying_create_fills_journal_http = underlying_create_fills_journal_http
 
     def __init__(self):
-        super().__init__()
-        self.orig_intra_day_bot: int | None = None
-        self.orig_intra_day_sld: int | None = None
-        self.market = Market(MarketID.IN)
         pair_strat_id, is_crash_recovery = get_pair_strat_id_from_cmd_argv()
         self.pair_strat_id = pair_strat_id
         self.is_crash_recovery = is_crash_recovery
+        super().__init__()      # super init needs pair_strat_id in set_log_simulator_file_name_n_path
+        self.orig_intra_day_bot: int | None = None
+        self.orig_intra_day_sld: int | None = None
         # since this init is called before db_init
         self.db_name: str = f"street_book_{self.pair_strat_id}"
         os.environ["DB_NAME"] = self.db_name
-        self.datetime_str: Final[str] = datetime.datetime.now().strftime("%Y%m%d")
         self.strat_leg_1: StratLeg | None = None  # will be set by once all_service_up test passes
         self.strat_leg_2: StratLeg | None = None  # will be set by once all_service_up test passes
-        self.all_services_up: bool = False
-        self.service_ready: bool = False
-        self.asyncio_loop: asyncio.AbstractEventLoop | None = None
-        self.static_data: SecurityRecordManager | None = None
+        self.leg1_symbol_cache: StratCache | None = None  # will be set by once all_service_up test passes
+        self.leg2_symbol_cache: StratCache | None = None  # will be set by once all_service_up test passes
         # restricted variable: don't overuse this will be extended to multi-currency support
-        self.usd_fx_symbol: Final[str] = "USD|SGD"
-        self.fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | None] = {self.usd_fx_symbol: None}
-        self.usd_fx = None
-        self.port: int | None = None  # will be set by
+        self.port: int | None = None  # will be set by app_launch_pre
         self.web_client = None
-        self.strat_cache: StratCache | None = None
-        self.config_yaml_last_modified_timestamp = os.path.getmtime(main_config_yaml_path)
-        # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
-        self.config_key_to_data_member_name_dict: Dict[str, str] = {
-            "min_refresh_interval": "min_refresh_interval"
-        }
+        self.project_config_yaml_path = main_config_yaml_path
+        self.executor_config_yaml_dict = executor_config_yaml_dict
+        self.config_yaml_last_modified_timestamp = os.path.getmtime(self.project_config_yaml_path)
         self.total_barter_qty_by_aggregated_window_first_n_lst_barters: bool = (
             executor_config_yaml_dict.get("total_barter_qty_by_aggregated_window_first_n_lst_barters"))
         self.min_refresh_interval: int = parse_to_int(executor_config_yaml_dict.get("min_refresh_interval"))
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
-        self.bartering_data_manager: BarteringDataManager | None = None
-        self.executor_inst_id = None
-        self.simulate_config_yaml_file_path = (
-                EXECUTOR_PROJECT_DATA_DIR / f"executor_{self.pair_strat_id}_simulate_config.yaml")
-        self.log_simulator_file_name = f"log_simulator_{self.pair_strat_id}_logs_{self.datetime_str}.log"
-        self.log_simulator_file_path = (PurePath(__file__).parent.parent / "log" /
-                                        f"log_simulator_{self.pair_strat_id}_logs_{self.datetime_str}.log")
-        create_logger("log_simulator", logging.DEBUG, str(PurePath(__file__).parent.parent / "log"),
-                      self.log_simulator_file_name)
-        self.is_test_run = self.market.is_test_run
 
-        # to be populated in _app_launch_pre_thread_func
-        self.mobile_book_container_cache: MobileBookContainerCache | None = None
-
-        # Load the shared library
-        so_module_dir = PurePath(__file__).parent
-        so_module_file_name = BarteringLinkBase.pair_strat_config_dict.get("cpp_app_so_module_file_name")
-
-        os.environ["LD_LIBRARY_PATH"] = f"{so_module_dir}:$LD_LIBRARY_PATH"
-        self.mobile_book_provider = ctypes.CDLL(so_module_dir / so_module_file_name)
-        self.lt_callback = last_barter_callback_type(last_barter_callback)
+        self.lt_callback = last_barter_callback_type(SymbolCacheContainer.last_barter_callback)
         self.mobile_book_provider.register_last_barter_fp(self.lt_callback)
-        self.md_callback = market_depth_callback_type(market_depth_callback)
+        self.md_callback = market_depth_callback_type(SymbolCacheContainer.market_depth_callback)
         self.mobile_book_provider.register_mkt_depth_fp(self.md_callback)
         self.mobile_book_provider.create_or_update_md_n_tob.argtypes = [
             ctypes.c_int32,
@@ -313,36 +280,32 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             ctypes.c_int64,
             ctypes.c_int32
         ]
-        self.mobile_book_provider.cpp_app_launcher.argtypes = None
-        self.mobile_book_provider.get_tob_ws_port.argtypes = None
-        self.mobile_book_provider.get_md_ws_port.argtypes = None
-        self.mobile_book_provider.get_lt_ws_port.argtypes = None
+        self.mobile_book_provider.cpp_app_launcher.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
+        # self.mobile_book_provider.get_tob_ws_port.argtypes = None
+        # self.mobile_book_provider.get_md_ws_port.argtypes = None
+        # self.mobile_book_provider.get_lt_ws_port.argtypes = None
         self.mobile_book_provider.create_or_update_md_n_tob.restype = None
         self.mobile_book_provider.create_or_update_last_barter_n_tob.restype = None
-        self.mobile_book_provider.get_tob_ws_port.restype = ctypes.c_int32
-        self.mobile_book_provider.get_md_ws_port.restype = ctypes.c_int32
-        self.mobile_book_provider.get_lt_ws_port.restype = ctypes.c_int32
+        # self.mobile_book_provider.get_tob_ws_port.restype = ctypes.c_int32
+        # self.mobile_book_provider.get_md_ws_port.restype = ctypes.c_int32
+        # self.mobile_book_provider.get_lt_ws_port.restype = ctypes.c_int32
         self.mobile_book_provider.cpp_app_launcher.restype = None
 
-    def get_generic_read_route(self):
-        return None
+    def set_log_simulator_file_name_n_path(self):
+        self.simulate_config_yaml_file_path = (
+                EXECUTOR_PROJECT_DATA_DIR / f"executor_{self.pair_strat_id}_simulate_config.yaml")
+        self.log_dir_path = PurePath(__file__).parent.parent / "log"
+        self.log_simulator_file_name = f"log_simulator_{self.pair_strat_id}_logs_{self.datetime_fmt_str}.log"
+        self.log_simulator_file_path = (PurePath(__file__).parent.parent / "log" /
+                                        f"log_simulator_{self.pair_strat_id}_logs_{self.datetime_fmt_str}.log")
 
-    def get_usd_px(self, px: float, system_symbol: str):
-        """
-        assumes single currency strat for now - may extend to accept symbol and send revised px according to
-        underlying bartering currency
-        """
-        return px / self.usd_fx
-
-    def get_local_px_or_notional(self, px_or_notional: float, system_symbol: str):
-        return px_or_notional * self.usd_fx
+    @property
+    def derived_class_type(self):
+        return StreetBookServiceRoutesCallbackBaseNativeOverride
 
     ##################
     # Start-Up Methods
     ##################
-
-    def static_data_periodic_refresh(self):
-        pass
 
     def get_pair_strat_loaded_strat_cache(self, pair_strat):
         key_leg_1, key_leg_2 = EmailBookServiceKeyHandler.get_key_from_pair_strat(pair_strat)
@@ -423,6 +386,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
                                 simulate_config_yaml_file_data = YAMLConfigurationManager.load_yaml_configurations(
                                     self.simulate_config_yaml_file_path, load_as_str=True)
+                                top_of_book_ws_port = find_free_port()
+                                market_depth_ws_port = find_free_port()
+                                last_barter_ws_port = find_free_port()
                                 simulate_config_yaml_file_data += "\n\n"
                                 simulate_config_yaml_file_data += f"leg_1_symbol: {self.strat_leg_1.sec.sec_id}\n"
                                 simulate_config_yaml_file_data += f"leg_1_feed_code: {self.strat_leg_1.exch_id}\n"
@@ -430,19 +396,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 simulate_config_yaml_file_data += f"leg_2_feed_code: {self.strat_leg_2.exch_id}\n\n"
                                 simulate_config_yaml_file_data += f"mongo_server: {mongo_server}\n"
                                 simulate_config_yaml_file_data += f"db_name: {self.db_name}\n\n"
-                                simulate_config_yaml_file_data += f"top_of_book_ws_port: {find_free_port()}\n"
-                                simulate_config_yaml_file_data += f"market_depth_ws_port: {find_free_port()}\n"
-                                simulate_config_yaml_file_data += f"last_barter_ws_port: {find_free_port()}\n"
+                                simulate_config_yaml_file_data += f"top_of_book_ws_port: {top_of_book_ws_port}\n"
+                                simulate_config_yaml_file_data += f"market_depth_ws_port: {market_depth_ws_port}\n"
+                                simulate_config_yaml_file_data += f"last_barter_ws_port: {last_barter_ws_port}\n"
                                 simulate_config_yaml_file_data += f"websocket_timeout: 300\n"
                                 YAMLConfigurationManager.update_yaml_configurations(
                                     simulate_config_yaml_file_data, str(self.simulate_config_yaml_file_path))
                                 os.environ["simulate_config_yaml_file"] = str(self.simulate_config_yaml_file_path)
+                                simulate_config_yaml_file_str: str = str(self.simulate_config_yaml_file_path)
                                 # setting simulate_config_file_name
                                 BarteringLinkBase.simulate_config_yaml_path = self.simulate_config_yaml_file_path
-                                BarteringLinkBase.executor_port = self.port
+                                LogBarterSimulator.executor_port = self.port
                                 BarteringLinkBase.reload_executor_configs()
-                                BarteringLinkBase.chore_create_async_callable = StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_journal_http
-                                BarteringLinkBase.fill_create_async_callable = StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_fills_journal_http
 
                                 # setting partial_run to True and assigning port to pair_strat
                                 if not pair_strat.is_partially_running:
@@ -450,9 +415,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                     pair_strat.port = self.port
 
                                     # Setting MobileBookCache instances for this symbol pair
-                                    pair_strat.top_of_book_port = self.mobile_book_provider.get_tob_ws_port()
-                                    pair_strat.market_depth_port = self.mobile_book_provider.get_md_ws_port()
-                                    pair_strat.last_barter_port = self.mobile_book_provider.get_lt_ws_port()
+                                    # pair_strat.top_of_book_port = self.mobile_book_provider.get_tob_ws_port()
+                                    # pair_strat.market_depth_port = self.mobile_book_provider.get_md_ws_port()
+                                    # pair_strat.last_barter_port = self.mobile_book_provider.get_lt_ws_port()
+                                    pair_strat.top_of_book_port = top_of_book_ws_port
+                                    pair_strat.last_barter_port = last_barter_ws_port
+                                    pair_strat.market_depth_port = market_depth_ws_port
 
                                 try:
                                     updated_pair_strat = email_book_service_http_client.put_pair_strat_client(pair_strat)
@@ -461,19 +429,20 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                       f"{exp=}, {pair_strat=}")
                                     continue
                                 else:
-                                    leg_1_mobile_book_container = (
-                                        add_container_obj_for_symbol(self.strat_leg_1.sec.sec_id))
-                                    leg_2_mobile_book_container = (
-                                        add_container_obj_for_symbol(self.strat_leg_2.sec.sec_id))
-
-                                    self.mobile_book_container_cache = (
-                                        MobileBookContainerCache(
-                                            leg_1_mobile_book_container=leg_1_mobile_book_container,
-                                            leg_2_mobile_book_container=leg_2_mobile_book_container))
+                                    self.leg1_symbol_cache = (
+                                        SymbolCacheContainer.add_symbol_cache_for_symbol(self.strat_leg_1.sec.sec_id))
+                                    self.leg2_symbol_cache = (
+                                        SymbolCacheContainer.add_symbol_cache_for_symbol(self.strat_leg_2.sec.sec_id))
 
                                     # Launching CppApp which internally creates and updates
                                     # MobileBookCache in real-time
+                                    simulate_config_yaml_file_bytes: bytes = simulate_config_yaml_file_str.encode("utf-8")
+                                    simulate_config_yaml_file_len: int = len(simulate_config_yaml_file_bytes)
+                                    # self.mobile_book_provider.cpp_app_launcher(simulate_config_yaml_file_bytes)
+
                                     thread = threading.Thread(target=self.mobile_book_provider.cpp_app_launcher,
+                                                              args=(simulate_config_yaml_file_bytes,
+                                                                    simulate_config_yaml_file_len),
                                                               name="CPPAPP",
                                                               daemon=True)
                                     thread.start()
@@ -487,8 +456,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                     # StreetBook.bartering_link.asyncio_loop = self.asyncio_loop
                                     BarteringDataManager.asyncio_loop = self.asyncio_loop
                                     self.bartering_data_manager = BarteringDataManager(StreetBook.executor_trigger,
-                                                                                   self.strat_cache,
-                                                                                   self.mobile_book_container_cache)
+                                                                                   self.strat_cache)
                                     logging.debug(f"Created bartering_data_manager for {strat_key=};;;{pair_strat=}")
                                 # else not required: not updating if already is_executor_running
                                 logging.debug(f"Marked pair_strat.is_partially_running True for {strat_key=}")
@@ -508,7 +476,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         if self.usd_fx is None:
                             try:
                                 if not self.update_fx_symbol_overview_dict_from_http():
-                                    logging.error(f"Can't find any symbol_overview with {self.usd_fx_symbol=};"
+                                    logging.error(f"Can't find any symbol_overview with {StratCache.usd_fx_symbol=};"
                                                   f"for {strat_key=}, retrying in next periodic cycle")
                             except Exception as exp:
                                 logging.exception(f"update_fx_symbol_overview_dict_from_http failed for {strat_key=} "
@@ -622,6 +590,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # to be called only after logger is initialized - to prevent getting overridden
         set_package_logger_level("filelock", logging.WARNING)
         if self.market.is_test_run:
+            LogBarterSimulator.chore_create_async_callable = (
+                StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_journal_http)
+            LogBarterSimulator.fill_create_async_callable = (
+                StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_fills_journal_http)
             BarterSimulator.chore_create_async_callable = (
                 StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_journal_http)
             BarterSimulator.fill_create_async_callable = (
@@ -694,21 +666,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                instance_id=str(pair_strat.id))
         os.chmod(run_symbol_overview_file_path, stat.S_IRWXU)
         subprocess.Popen([f"{run_symbol_overview_file_path}"])
-
-    def update_fx_symbol_overview_dict_from_http(self) -> bool:
-        fx_symbol_overviews: List[FxSymbolOverviewBaseModel] = \
-            email_book_service_http_client.get_all_fx_symbol_overview_client()
-        if fx_symbol_overviews:
-            fx_symbol_overview_: FxSymbolOverviewBaseModel
-            for fx_symbol_overview_ in fx_symbol_overviews:
-                if fx_symbol_overview_.symbol in self.fx_symbol_overview_dict:
-                    # fx_symbol_overview_dict is pre initialized with supported fx pair symbols and None objects
-                    self.fx_symbol_overview_dict[fx_symbol_overview_.symbol] = fx_symbol_overview_
-                    self.usd_fx = fx_symbol_overview_.closing_px
-                    logging.debug(f"Updated {self.usd_fx=}")
-                    return True
-        # all else - return False
-        return False
 
     async def _compute_n_update_max_notionals(self, stored_strat_limits_obj: StratLimits,
                                               updated_strat_limits_obj: StratLimits,
@@ -1317,19 +1274,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                      f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
 
     async def read_all_ui_layout_pre(self):
-        # Setting asyncio_loop in ui_layout_pre since it called to check current service up
-        attempt_counts = 3
-        for _ in range(attempt_counts):
-            if not self.asyncio_loop:
-                self.asyncio_loop = asyncio.get_running_loop()
-                time.sleep(1)
-            else:
-                break
-        else:
-            err_str_ = (f"self.asyncio_loop couldn't set as asyncio.get_running_loop() returned None for "
-                        f"{attempt_counts} attempts")
-            logging.critical(err_str_)
-            raise HTTPException(detail=err_str_, status_code=500)
+        await self.read_all_ui_layout_pre_handler()
 
     ############################
     # Limit Check update methods
@@ -1401,12 +1346,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     # Get specific Data handling Methods
     ####################################
 
-    def _get_top_of_book_from_symbol(self, symbol: str) -> ExtendedTopOfBook | None:
-        if symbol == self.strat_leg_1.sec.sec_id:
-            return self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book()
-        elif symbol == self.strat_leg_2.sec.sec_id:
-            return self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book()
-
     def _get_last_barter_px_n_symbol_tuples_from_tob(
             self, current_leg_tob_obj: ExtendedTopOfBook,
             other_leg_tob_obj: ExtendedTopOfBook) -> Tuple[Tuple[float, str], Tuple[float, str]]:
@@ -1419,16 +1358,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             residual_qty = strat_brief.pair_buy_side_bartering_brief.residual_qty
             other_leg_residual_qty = strat_brief.pair_sell_side_bartering_brief.residual_qty
             top_of_book_obj = \
-                self._get_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
+                StratCache.get_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
             other_leg_top_of_book = \
-                self._get_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
+                StratCache.get_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
         else:
             residual_qty = strat_brief.pair_sell_side_bartering_brief.residual_qty
             other_leg_residual_qty = strat_brief.pair_buy_side_bartering_brief.residual_qty
             top_of_book_obj = \
-                self._get_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
+                StratCache.get_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
             other_leg_top_of_book = \
-                self._get_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
+                StratCache.get_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
 
         if top_of_book_obj is None or other_leg_top_of_book is None:
             logging.error(f"Received both leg's TOBs as {top_of_book_obj} and {other_leg_top_of_book}, "
@@ -1521,12 +1460,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
             logging.error(err_str_)
         return last_n_sec_barter_qty
-
-    async def get_list_of_underlying_account_n_cumulative_fill_qty(self, symbol: str, side: Side):
-        underlying_account_cum_fill_qty_obj_list = \
-            await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                   get_underlying_account_cumulative_fill_qty_query_http(symbol, side))
-        return underlying_account_cum_fill_qty_obj_list[0].underlying_account_n_cumulative_fill_qty
 
     ######################################
     # Strat lvl models update pre handling
@@ -1643,157 +1576,50 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     # Chore Journal Update Methods
     ##############################
 
-    async def create_chore_journal_pre(self, chore_journal_obj: ChoreJournal) -> None:
-        if not self.service_ready:
-            # raise service unavailable 503 exception, let the caller retry
-            err_str_ = f"create_chore_journal_pre not ready - service is not initialized yet, " \
-                       f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
-            logging.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
-        # updating chore notional in chore journal obj
-        if chore_journal_obj.chore_event == ChoreEventType.OE_NEW:
-            if chore_journal_obj.chore.px == 0:
-                top_of_book_obj = self._get_top_of_book_from_symbol(chore_journal_obj.chore.security.sec_id)
-                if top_of_book_obj is not None:
-                    with MobileBookMutexManager(top_of_book_obj):
-                        chore_journal_obj.chore.px = top_of_book_obj.last_barter.px
-                else:
-                    err_str_ = (f"received chore journal px 0 and to update px, received TOB also as {top_of_book_obj}"
-                                f", chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}")
-                    logging.error(err_str_)
-                    raise HTTPException(status_code=500, detail=err_str_)
-            # extract availability if this chore is not from this executor
-            if not self.executor_inst_id:
-                self.executor_inst_id = get_bartering_link().inst_id
-            if (not chore_journal_obj.chore.user_data) or (
-                    not chore_journal_obj.chore.user_data.startswith(self.executor_inst_id)):
-                # this chore is not from executor
-                chore = chore_journal_obj.chore
-                if not chore.security.inst_type:
-                    logging.error(f"unexpected chore_journal_obj with no chore.security.inst_type, assumed EQT chore "
-                                  f"for sec_id: {chore_journal_obj.chore.security.sec_id} ord_id: "
-                                  f"{chore_journal_obj.chore.chore_id};;;{chore_journal_obj=}")
+    def get_last_barter_px_from_tob(self, tob: TopOfBook | ExtendedTopOfBook):
+        with MobileBookMutexManager(tob):
+            return tob.last_barter.px
 
-                # prepare new chore to extract availability
-                force_bkr: str = get_bkr_from_underlying_account(chore.underlying_account, chore.security.inst_type)
-                new_ord: NewChoreBaseModel = NewChoreBaseModel(security=chore.bartering_security, side=chore.side,
-                                                               px=chore.px, qty=chore.qty, force_bkr=force_bkr)
-                # now extract availability and log for disable broker-position if extract availability fails
-                # TODO: allow extract from disabled position (explicit param), external chores may use disabled positions
-                # we don't use extract availability list here - assumption 1 chore, maps to 1 position + this blocks
-                # non replenishing enabled intraday positions from flowing in
-                is_available, sec_pos_extended = self.strat_cache.pos_cache.extract_availability(new_ord)
-                if not is_available:
-                    pos_disable_payload = {"symbol": chore_journal_obj.chore.bartering_security.sec_id,
-                                           "symbol_type": chore_journal_obj.chore.bartering_security.sec_id_source,
-                                           "account": chore_journal_obj.chore.underlying_account}
-                    logging.error(f"EXT: failed to extract position for external chore: {chore_journal_obj};;;"
-                                  f"sec_pos_extended: {sec_pos_extended}, pos_disable_payload: {pos_disable_payload}")
-                else:
-                    logging.info(f"extracted position for external chore: {chore_journal_obj}, extracted "
-                                 f"sec_pos_extended: {sec_pos_extended}")
-        # else If chore_journal is not new then we don't care about px, we care about event_type and if chore is new
-        # and px is not 0 then using provided px
-        if chore_journal_obj.chore.px is not None and chore_journal_obj.chore.qty is not None:
-            chore_journal_obj.chore.chore_notional = \
-                self.get_usd_px(chore_journal_obj.chore.px,
-                                chore_journal_obj.chore.security.sec_id) * chore_journal_obj.chore.qty
-        else:
-            chore_journal_obj.chore.chore_notional = 0
+    async def create_chore_journal_pre(self, chore_journal_obj: ChoreJournal) -> None:
+        await self.handle_create_chore_journal_pre(chore_journal_obj)
 
     async def create_chore_journal_post(self, chore_journal_obj: ChoreJournal):
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_chore_journal_get_all_ws(chore_journal_obj)
 
-        async with StreetBookServiceRoutesCallbackBaseNativeOverride.residual_compute_shared_lock:
+        async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
             res = await self._update_chore_snapshot_from_chore_journal(chore_journal_obj)
             is_cxl_after_cxl: bool = False
             if res is not None:
-                if len(res) == 4:
-                    strat_id, chore_snapshot, strat_brief, portfolio_status_updates = res
+                if len(res) == 3:
+                    chore_snapshot, strat_brief, portfolio_status_updates = res
                     # Updating and checking portfolio_limits in portfolio_manager
                     post_book_service_http_client.check_portfolio_limits_query_client(
-                        strat_id, chore_journal_obj, chore_snapshot, strat_brief, portfolio_status_updates)
+                        self.pair_strat_id, chore_journal_obj, chore_snapshot, strat_brief, portfolio_status_updates)
                 elif len(res) == 1:
                     is_cxl_after_cxl = res[0]
                     if not is_cxl_after_cxl:
                         logging.error(f"_update_chore_snapshot_from_chore_journal failed for key: "
-                                      f"{get_chore_journal_log_key(chore_journal_obj)};;;{chore_journal_obj=}")
+                                      f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)};;;{chore_journal_obj=}")
                     else:
                         logging.debug(f"_update_chore_snapshot_from_chore_journal detected cxl_after_cxl for key: "
-                                      f"{get_chore_journal_log_key(chore_journal_obj)};;;{chore_journal_obj=}")
+                                      f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)};;;{chore_journal_obj=}")
             else:
                 logging.error(f"_update_chore_snapshot_from_chore_journal failed for key: "
-                              f"{get_chore_journal_log_key(chore_journal_obj)};;;{chore_journal_obj=}")
+                              f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)};;;{chore_journal_obj=}")
             # signifies some unexpected exception occurred so complete update was not done,
             # therefore avoiding portfolio_limit checks too
 
     async def create_chore_snapshot_pre(self, chore_snapshot_obj: ChoreSnapshot):
-        # updating security's sec_id_source to default value if sec_id_source is None
-        if chore_snapshot_obj.chore_brief.security.sec_id_source is None:
-            chore_snapshot_obj.chore_brief.security.sec_id_source = SecurityIdSource.TICKER
+        await self.handle_create_chore_snapshot_pre(chore_snapshot_obj)
 
     async def create_symbol_side_snapshot_pre(self, symbol_side_snapshot_obj: SymbolSideSnapshot):
         # updating security's sec_id_source to default value if sec_id_source is None
         if symbol_side_snapshot_obj.security.sec_id_source is None:
             symbol_side_snapshot_obj.security.sec_id_source = SecurityIdSource.TICKER
 
-    @staticmethod
-    def is_cxled_event(event: ChoreEventType) -> bool:
-        if event in [ChoreEventType.OE_CXL_ACK, ChoreEventType.OE_UNSOL_CXL]:
-            return True
-        return False
-
-    async def _handle_chore_dod(self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot,
-                                pair_strat_id: int, is_lapse_call: bool = False):
-        prior_chore_status = chore_snapshot.chore_status
-        # When CXL_ACK arrived after chore got fully filled, since nothing is left to cxl - ignoring
-        # this chore_journal's chore_snapshot update
-        if chore_snapshot.chore_status == ChoreStatusType.OE_FILLED:
-            logging.info("Received chore_journal with event CXL_ACK after ChoreSnapshot is fully "
-                         f"filled - ignoring this CXL_ACK, chore_journal_key: "
-                         f"{get_chore_journal_log_key(chore_journal_obj)};;; "
-                         f"{chore_journal_obj=}, {chore_snapshot=}")
-        else:
-            # If chore_event is OE_UNSOL_CXL, that is treated as unsolicited cxl
-            # If CXL_ACK comes after OE_CXL_UNACK, that means cxl_ack came after cxl request
-            # chore_brief = ChoreBriefOptional(**chore_snapshot.chore_brief.model_dump())
-            chore_brief = chore_snapshot.chore_brief
-            if chore_journal_obj.chore.text:  # put update
-                if chore_brief.text is None:
-                    chore_brief.text = []
-                # else not required: text is already set
-                chore_brief.text.extend(chore_journal_obj.chore.text)
-            # else not required: If no text is present in chore_journal then updating
-            # chore snapshot with same obj
-
-            if ChoreStatusType.OE_DOD == prior_chore_status:
-                # CXL after CXL: no further processing needed
-                chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                        underlying_update_chore_snapshot_http(chore_snapshot))
-                return (True, )
-
-            unfilled_qty = self.get_open_qty(chore_snapshot)
-            if is_lapse_call:
-                chore_snapshot.last_lapsed_qty = unfilled_qty
-                chore_snapshot.total_lapsed_qty += unfilled_qty
-
-            cxled_qty = unfilled_qty
-            cxled_notional = cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                         chore_snapshot.chore_brief.security.sec_id)
-            chore_snapshot.cxled_qty += cxled_qty
-            chore_snapshot.cxled_notional += cxled_notional
-            chore_snapshot.avg_cxled_px = \
-                (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
-                                               chore_snapshot.chore_brief.security.sec_id) /
-                 chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0
-
-            chore_snapshot.chore_brief = chore_brief
-            chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-            chore_snapshot.chore_status = ChoreStatusType.OE_DOD
-            chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                    underlying_update_chore_snapshot_http(chore_snapshot))
-
+    async def _handle_post_chore_snapshot_update_tasks_in_chore_dod(self, chore_journal_obj: ChoreJournal,
+                                                                    chore_snapshot: ChoreSnapshot):
         if chore_snapshot.chore_status != ChoreStatusType.OE_FILLED:
             symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_chore_journal(
                 chore_journal_obj, chore_snapshot)
@@ -1810,7 +1636,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     await self._update_portfolio_status_from_chore_journal(
                         chore_journal_obj, chore_snapshot))
 
-                return pair_strat_id, chore_snapshot, updated_strat_brief, portfolio_status_updates
+                return chore_snapshot, updated_strat_brief, portfolio_status_updates
 
             # else not required: if symbol_side_snapshot is None then it means some error occurred in
             # _create_update_symbol_side_snapshot_from_chore_journal which would have got added to
@@ -1819,47 +1645,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # else not required: If CXL_ACK arrived after chore is fully filled then since we ignore
         # any update for this chore journal object, returns None to not update post barter engine too
 
-    @staticmethod
-    def get_valid_available_fill_qty(chore_snapshot: ChoreSnapshot) -> int:
-        """
-        qty which is available to be filled after amend downs and qty lapses in chore
-        :param chore_snapshot:
-        :return: int qty
-        """
-        valid_available_fill_qty = (chore_snapshot.chore_brief.qty - chore_snapshot.total_amend_dn_qty -
-                                    chore_snapshot.total_lapsed_qty)
-        return valid_available_fill_qty
-
-    @staticmethod
-    def get_residual_qty_post_chore_dod(chore_snapshot: ChoreSnapshot) -> int:
-        open_qty = (chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty - chore_snapshot.total_amend_dn_qty -
-                    chore_snapshot.total_lapsed_qty)
-        return open_qty
-
-    @staticmethod
-    def get_open_qty(chore_snapshot: ChoreSnapshot) -> int:
-        open_qty = chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty - chore_snapshot.cxled_qty
-        return open_qty
-
-    async def handle_model_updates_post_chore_journal_amend_applied(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
-            is_amend_rej_call: bool = False):
-        last_chore_status = chore_snapshot.chore_status
-        if is_amend_rej_call:
-            chore_status = self.get_chore_status_post_amend_rej(chore_journal_obj,
-                                                                chore_snapshot, amend_direction,
-                                                                last_chore_status)
-        else:
-            chore_status = self.get_chore_status_post_amend_applied(chore_journal_obj,
-                                                                    chore_snapshot, amend_direction,
-                                                                    last_chore_status)
-        if chore_status is not None:
-            chore_snapshot.chore_status = chore_status
-        # else not required: if something went wrong then not updating status and issue must be logged already
-
-        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-        chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                underlying_update_chore_snapshot_http(chore_snapshot))
+    async def _handle_post_chore_snapshot_update_tasks_after_chore_journal_amend_applied(
+            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
         symbol_side_snapshot = \
             await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
                                                                               chore_snapshot)
@@ -1880,917 +1667,107 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             return chore_snapshot, updated_strat_brief, portfolio_status_updates
         return None, None, None
 
-    def set_default_values_to_pend_amend_fields(self, chore_snapshot: ChoreSnapshot):
-        chore_snapshot.pending_amend_dn_qty = 0
-        chore_snapshot.pending_amend_up_qty = 0
-        chore_snapshot.pending_amend_dn_px = 0
-        chore_snapshot.pending_amend_up_px = 0
-
-    async def _update_chore_snapshot_from_chore_journal(
-            self, chore_journal_obj: ChoreJournal) -> Tuple[int, ChoreSnapshot, StratBrief | None,
-                                                            PortfolioStatusUpdatesContainer | None] | None:
+    def update_chore_snapshot_pre_checks(self) -> bool:
         pair_strat = self.strat_cache.get_pair_strat_obj()
 
         if not is_ongoing_strat(pair_strat):
             # avoiding any update if strat is non-ongoing
-            return None
-
-        match chore_journal_obj.chore_event:
-            case ChoreEventType.OE_NEW:
-                # importing routes here otherwise at the time of launch callback's set instance is called by
-                # routes call before set_instance file call and set_instance file throws error that
-                # 'set instance is called more than once in one session'
-                if not chore_journal_obj.chore.px:  # market chore
-                    chore_journal_obj.chore.px = self.strat_cache.get_close_px(chore_journal_obj.chore.security.sec_id)
-                    if not chore_journal_obj.chore.px:
-                        logging.error("ChoreEventType.OE_NEW came with no px, get_close_px failed unable to apply px")
-                chore_snapshot = ChoreSnapshot(id=ChoreSnapshot.next_id(),
-                                               chore_brief=chore_journal_obj.chore,
-                                               filled_qty=0, avg_fill_px=0,
-                                               fill_notional=0,
-                                               cxled_qty=0,
-                                               avg_cxled_px=0,
-                                               cxled_notional=0,
-                                               pending_amend_dn_px=0,
-                                               pending_amend_dn_qty=0,
-                                               pending_amend_up_px=0,
-                                               pending_amend_up_qty=0,
-                                               last_update_fill_qty=0,
-                                               last_update_fill_px=0,
-                                               total_amend_dn_qty=0,
-                                               total_amend_up_qty=0,
-                                               last_lapsed_qty=0,
-                                               total_lapsed_qty=0,
-                                               create_date_time=chore_journal_obj.chore_event_date_time,
-                                               last_update_date_time=chore_journal_obj.chore_event_date_time,
-                                               chore_status=ChoreStatusType.OE_UNACK)
-                chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                        underlying_create_chore_snapshot_http(chore_snapshot))
-                symbol_side_snapshot = \
-                    await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
-                                                                                      chore_snapshot)
-                if symbol_side_snapshot is not None:
-                    updated_strat_brief = await self._update_strat_brief_from_chore_or_fill(chore_journal_obj,
-                                                                                            chore_snapshot,
-                                                                                            symbol_side_snapshot)
-                    if updated_strat_brief is not None:
-                        await self._update_strat_status_from_chore_journal(chore_journal_obj, chore_snapshot,
-                                                                           symbol_side_snapshot, updated_strat_brief)
-                    # else not required: if updated_strat_brief is None then it means some error occurred in
-                    # _update_strat_brief_from_chore which would have got added to alert already
-                    portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
-                        await self._update_portfolio_status_from_chore_journal(
-                            chore_journal_obj, chore_snapshot))
-
-                    return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
-                # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
-                # is None then it means some error occurred in _create_update_symbol_side_snapshot_from_chore_journal
-                # which would have got added to alert already
-
-            case ChoreEventType.OE_ACK:
-                async with ChoreSnapshot.reentrant_lock:
-                    chore_snapshot = \
-                        await self._check_state_and_get_chore_snapshot_obj(chore_journal_obj,
-                                                                           [ChoreStatusType.OE_UNACK])
-                    if chore_snapshot is not None:
-                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-                        chore_snapshot.chore_status = ChoreStatusType.OE_ACKED
-                        updated_chore_snapshot = (
-                            await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                            underlying_update_chore_snapshot_http(chore_snapshot))
-
-                        return pair_strat.id, updated_chore_snapshot, None, None
-
-                    # else not required: none returned object signifies there was something wrong in
-                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
-            case ChoreEventType.OE_CXL:
-                async with ChoreSnapshot.reentrant_lock:
-                    chore_snapshot = await self._check_state_and_get_chore_snapshot_obj(
-                        chore_journal_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
-                                            ChoreStatusType.OE_AMD_DN_UNACKED,
-                                            ChoreStatusType.OE_AMD_UP_UNACKED])
-                    if chore_snapshot is not None:
-                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-                        chore_snapshot.chore_status = ChoreStatusType.OE_CXL_UNACK
-                        updated_chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                                        underlying_update_chore_snapshot_http(chore_snapshot))
-
-                        return pair_strat.id, updated_chore_snapshot, None, None
-
-                    # else not required: none returned object signifies there was something wrong in
-                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
-            case ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL:
-                async with ChoreSnapshot.reentrant_lock:
-                    chore_snapshot = \
-                        await self._check_state_and_get_chore_snapshot_obj(
-                            chore_journal_obj, [ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_ACKED,
-                                                ChoreStatusType.OE_UNACK, ChoreStatusType.OE_FILLED,
-                                                ChoreStatusType.OE_AMD_DN_UNACKED,
-                                                ChoreStatusType.OE_AMD_UP_UNACKED])
-                    if chore_snapshot is not None:
-                        return await self._handle_chore_dod(chore_journal_obj, chore_snapshot, pair_strat.id)
-
-                    # else not required: none returned object signifies there was something wrong in
-                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
-
-            case ChoreEventType.OE_CXL_INT_REJ | ChoreEventType.OE_CXL_BRK_REJ | ChoreEventType.OE_CXL_EXH_REJ:
-                # reverting the state of chore_snapshot after receiving cxl reject
-
-                async with ChoreSnapshot.reentrant_lock:
-                    chore_snapshot = await self._check_state_and_get_chore_snapshot_obj(
-                        chore_journal_obj, [ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_FILLED])
-                    if chore_snapshot is not None:
-                        if chore_snapshot.chore_brief.qty > chore_snapshot.filled_qty:
-                            last_3_chore_journals_from_chore_id = \
-                                await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                underlying_read_chore_journal_http(
-                                    get_last_n_chore_journals_from_chore_id(
-                                        chore_journal_obj.chore.chore_id, 3),
-                                    self.get_generic_read_route()))
-                            if last_3_chore_journals_from_chore_id:
-                                if (last_3_chore_journals_from_chore_id[0].chore_event in
-                                        [ChoreEventType.OE_CXL_INT_REJ,
-                                         ChoreEventType.OE_CXL_BRK_REJ,
-                                         ChoreEventType.OE_CXL_EXH_REJ]):
-                                    if last_3_chore_journals_from_chore_id[-1].chore_event == ChoreEventType.OE_NEW:
-                                        chore_status = ChoreStatusType.OE_UNACK
-                                    elif last_3_chore_journals_from_chore_id[-1].chore_event == ChoreEventType.OE_ACK:
-                                        chore_status = ChoreStatusType.OE_ACKED
-                                    else:
-                                        err_str_ = ("3rd chore journal from chore_journal of status OE_CXL_INT_REJ "
-                                                    "or OE_CXL_BRK_REJ or OE_CXL_EXH_REJ, must be"
-                                                    "of status OE_ACK or OE_UNACK, received last 3 chore_journals "
-                                                    f"{last_3_chore_journals_from_chore_id = }, "
-                                                    f"chore_journal_key: "
-                                                    f"{get_chore_journal_log_key(chore_journal_obj)}")
-                                        logging.error(err_str_)
-                                        return None
-                                else:
-                                    err_str_ = ("Recent chore journal must be of status OE_CXL_INT_REJ "
-                                                "or OE_CXL_BRK_REJ or OE_CXL_EXH_REJ, received last 3 "
-                                                "chore_journals {last_3_chore_journals_from_chore_id}, "
-                                                f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}")
-                                    logging.error(err_str_)
-                                    return None
-                            else:
-                                err_str_ = f"Received empty list while fetching last 3 chore_journals for " \
-                                           f"{chore_journal_obj.chore.chore_id = }, " \
-                                           f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
-                                logging.error(err_str_)
-                                return None
-                        elif chore_snapshot.chore_brief.qty < chore_snapshot.filled_qty:
-                            chore_status = ChoreStatusType.OE_OVER_FILLED
-                        else:
-                            chore_status = ChoreStatusType.OE_FILLED
-
-                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-                        chore_snapshot.chore_status = chore_status
-                        updated_chore_snapshot = \
-                            await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                   underlying_update_chore_snapshot_http(chore_snapshot))
-
-                        return pair_strat.id, updated_chore_snapshot, None, None
-                    # else not required: none returned object signifies there was something wrong in
-                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
-
-            case ChoreEventType.OE_INT_REJ | ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ:
-                async with ChoreSnapshot.reentrant_lock:
-                    chore_snapshot = \
-                        await self._check_state_and_get_chore_snapshot_obj(
-                            chore_journal_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED])
-                    if chore_snapshot is not None:
-                        chore_brief = chore_snapshot.chore_brief
-                        if chore_brief.text:
-                            chore_brief.text.extend(chore_journal_obj.chore.text)
-                        else:
-                            chore_brief.text = chore_journal_obj.chore.text
-                        cxled_qty = int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
-                        cxled_notional = \
-                            chore_snapshot.cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                                       chore_snapshot.chore_brief.security.sec_id)
-                        avg_cxled_px = \
-                            (self.get_local_px_or_notional(cxled_notional, chore_snapshot.chore_brief.security.sec_id) /
-                             cxled_qty) if cxled_qty != 0 else 0
-
-                        chore_snapshot.chore_brief = chore_brief
-                        chore_snapshot.cxled_qty = cxled_qty
-                        chore_snapshot.cxled_notional = cxled_notional
-                        chore_snapshot.avg_cxled_px = avg_cxled_px
-                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-                        chore_snapshot.chore_status = ChoreStatusType.OE_DOD
-                        chore_snapshot = \
-                            await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                   underlying_update_chore_snapshot_http(chore_snapshot))
-                        symbol_side_snapshot = \
-                            await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
-                                                                                              chore_snapshot)
-                        if symbol_side_snapshot is not None:
-                            updated_strat_brief = (
-                                await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
-                                                                                  symbol_side_snapshot))
-                            if updated_strat_brief is not None:
-                                await self._update_strat_status_from_chore_journal(
-                                    chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
-                            # else not required: if updated_strat_brief is None then it means some error occurred in
-                            # _update_strat_brief_from_chore which would have got added to alert already
-                            portfolio_status_updates: PortfolioStatusUpdatesContainer = (
-                                await self._update_portfolio_status_from_chore_journal(
-                                    chore_journal_obj, chore_snapshot))
-
-                            return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
-                        # else not require_create_update_symbol_side_snapshot_from_chore_journald:
-                        # if symbol_side_snapshot is None then it means some error occurred in
-                        # _create_update_symbol_side_snapshot_from_chore_journal which would have
-                        # got added to alert already
-                    # else not required: none returned object signifies there was something wrong in
-                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
-
-            case ChoreEventType.OE_LAPSE:
-                async with ChoreSnapshot.reentrant_lock:
-                    chore_snapshot = await self._check_state_and_get_chore_snapshot_obj(
-                        chore_journal_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
-                                            ChoreStatusType.OE_AMD_DN_UNACKED,
-                                            ChoreStatusType.OE_AMD_UP_UNACKED, ChoreStatusType.OE_CXL_UNACK])
-                    if chore_snapshot is not None:
-                        lapsed_qty = chore_journal_obj.chore.qty
-                        # if no qty is specified then canceling remaining complete qty for chore
-                        if not lapsed_qty:
-                            return await self._handle_chore_dod(chore_journal_obj, chore_snapshot, pair_strat.id,
-                                                                is_lapse_call=True)
-                        else:
-                            # avoiding any lapse qty greater than chore qty
-                            if lapsed_qty > chore_snapshot.chore_brief.qty:
-                                logging.critical(f"Unexpected: Lapse qty can't be greater than chore_qty - putting "
-                                                 f"strat to DOD state, {chore_journal_obj.chore.chore_id=}, "
-                                                 f"lapse_qty: {chore_journal_obj.chore.qty}, "
-                                                 f"chore_qty: {chore_snapshot.chore_brief.qty}")
-                                # Passing chore_journal with passing OE_CXL_ACK as event so that all models
-                                # later are handled as DOD handling
-                                chore_journal_obj.chore_event = ChoreEventType.OE_CXL_ACK
-                                return await self._handle_chore_dod(chore_journal_obj, chore_snapshot, pair_strat.id)
-
-                            # avoiding any lapse qty greater than unfilled qty
-                            unfilled_qty = self.get_open_qty(chore_snapshot)
-                            if lapsed_qty > unfilled_qty:
-                                logging.critical("Unexpected: Lapse qty can't be greater than unfilled qty - putting "
-                                                 f"strat to DOD state, {chore_journal_obj.chore.chore_id=}, "
-                                                 f"lapse_qty: {chore_journal_obj.chore.qty}, "
-                                                 f"unfilled_qty: {unfilled_qty}")
-                                # Passing chore_journal with passing OE_CXL_ACK as event so that all models
-                                # later are handled as DOD handling
-                                chore_journal_obj.chore_event = ChoreEventType.OE_CXL_ACK
-                                return await self._handle_chore_dod(chore_journal_obj, chore_snapshot, pair_strat.id)
-
-                            # handling partial cxl that got lapsed
-                            if chore_snapshot.total_lapsed_qty is None:
-                                chore_snapshot.total_lapsed_qty = 0
-                            chore_snapshot.total_lapsed_qty += lapsed_qty
-                            chore_snapshot.last_lapsed_qty = lapsed_qty
-
-                            chore_snapshot.cxled_qty += lapsed_qty
-                            removed_notional = (lapsed_qty *
-                                                self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                                chore_snapshot.chore_brief.security.sec_id))
-                            chore_snapshot.cxled_notional += removed_notional
-                            chore_snapshot.avg_cxled_px = (
-                                (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
-                                                               chore_snapshot.chore_brief.security.sec_id) /
-                                 chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
-
-                            # computing unfilled_qty post chore_snapshot obj values update to find status
-                            unfilled_qty = self.get_open_qty(chore_snapshot)
-                            if unfilled_qty == 0:
-                                chore_snapshot.chore_status = ChoreStatusType.OE_DOD
-                            # else not required: keeping same status
-
-                            chore_snapshot.last_update_date_time = DateTime.utcnow()
-                            chore_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                                    underlying_update_chore_snapshot_http(chore_snapshot))
-                            symbol_side_snapshot = \
-                                await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
-                                                                                                  chore_snapshot)
-                            if symbol_side_snapshot is not None:
-                                updated_strat_brief = (
-                                    await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
-                                                                                      symbol_side_snapshot))
-                                if updated_strat_brief is not None:
-                                    await self._update_strat_status_from_chore_journal(
-                                        chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
-                                # else not required: if updated_strat_brief is None then it means some error occurred in
-                                # _update_strat_brief_from_chore which would have got added to alert already
-                                portfolio_status_updates: PortfolioStatusUpdatesContainer = (
-                                    await self._update_portfolio_status_from_chore_journal(
-                                        chore_journal_obj, chore_snapshot))
-                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
-                            # else not require_create_update_symbol_side_snapshot_from_chore_journald:
-                            # if symbol_side_snapshot is None then it means some error occurred in
-                            # _create_update_symbol_side_snapshot_from_chore_journal which would have
-                            # got added to alert already
-
-                    # else not required: none returned object signifies there was something wrong in
-                    # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
-
-            case ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK:
-                if not chore_journal_obj.chore.qty and not chore_journal_obj.chore.px:
-                    logging.error("Unexpected: no amend qty or px found in requested amend chore_journal - "
-                                  f"ignoring this amend request, amend_qty: {chore_journal_obj.chore.qty}, "
-                                  f"amend_px: {chore_journal_obj.chore.px};;; {chore_journal_obj=}")
-                    return
-
-                # amend changes are applied to chore in unack state immediately if chore is risky and if chore
-                # is non-risky then changes are applied on amend_ack
-                # For BUY: chore is risky if chore qty or px is increased to higher value else it is non-risky
-                # For SELL: chore is risky if chore qty or px is decreased to lower value else it is non-risky
-                async with ChoreSnapshot.reentrant_lock:
-                    chore_snapshot = \
-                        await self._check_state_and_get_chore_snapshot_obj(
-                            chore_journal_obj, [ChoreStatusType.OE_ACKED])
-
-                    if chore_snapshot is not None:
-                        if chore_journal_obj.chore_event == ChoreEventType.OE_AMD_DN_UNACK:
-                            amend_dn_qty = chore_journal_obj.chore.qty
-                            amend_dn_px = chore_journal_obj.chore.px
-
-                            open_qty = self.get_open_qty(chore_snapshot)
-                            if amend_dn_qty is not None:
-                                if open_qty < amend_dn_qty:
-                                    logging.error("Unexpected: Amend qty is higher than open qty - ignoring is "
-                                                  f"amend request, amend_qty: {chore_journal_obj.chore.qty}, "
-                                                  f"open_qty: {open_qty};;; "
-                                                  f"amend_dn_unack chore_journal: {chore_journal_obj}, "
-                                                  f"chore_snapshot {chore_snapshot}")
-                                    return
-
-                            # amend dn is risky in SELL side and non-risky in BUY
-                            # Risky side will be amended right away and non-risky side will be amended on AMD_ACK
-                            if chore_snapshot.chore_brief.side == Side.SELL:
-                                # AMD: when qty is amended down then, qty that is amended dn gets cxled and
-                                # chore qty stays same
-                                if amend_dn_qty:
-                                    chore_snapshot.total_amend_dn_qty += amend_dn_qty
-
-                                    removed_notional = (amend_dn_qty *
-                                                        self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                                        chore_snapshot.chore_brief.security.sec_id))
-
-                                    chore_snapshot.cxled_qty += amend_dn_qty
-                                    chore_snapshot.cxled_notional += removed_notional
-                                    chore_snapshot.avg_cxled_px = (
-                                        (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
-                                                                       chore_snapshot.chore_brief.security.sec_id) /
-                                         chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
-
-                                if amend_dn_px:
-                                    chore_snapshot.chore_brief.px -= amend_dn_px
-
-                                    chore_snapshot.chore_brief.chore_notional = (
-                                            chore_snapshot.chore_brief.qty *
-                                            self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                            chore_snapshot.chore_brief.security.sec_id))
-
-                                # updating all pending amend fields to 0
-                                self.set_default_values_to_pend_amend_fields(chore_snapshot)
-                                # updating fields required to other models to be updated once chore_snapshot is updated
-                                if amend_dn_px:
-                                    chore_snapshot.pending_amend_dn_px = amend_dn_px
-                                if amend_dn_qty:
-                                    chore_snapshot.pending_amend_dn_qty = amend_dn_qty
-
-                                chore_snapshot, updated_strat_brief, portfolio_status_updates = (
-                                    await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, chore_journal_obj.chore_event))
-                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
-
-                            else:
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-                                # updating all pending amend fields to 0
-                                self.set_default_values_to_pend_amend_fields(chore_snapshot)
-                                # updating fields required to other models to be updated once chore_snapshot is updated
-                                if amend_dn_px:
-                                    chore_snapshot.pending_amend_dn_px = amend_dn_px
-                                if amend_dn_qty:
-                                    chore_snapshot.pending_amend_dn_qty = amend_dn_qty
-                                chore_snapshot.chore_status = ChoreStatusType.OE_AMD_DN_UNACKED
-                                updated_chore_snapshot = (
-                                    await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                    underlying_update_chore_snapshot_http(chore_snapshot))
-                                return pair_strat.id, updated_chore_snapshot, None, None
-
-                        else:
-                            amend_up_qty = chore_journal_obj.chore.qty
-                            amend_up_px = chore_journal_obj.chore.px
-
-                            # amend up is risky in BUY side and non-risky in SELL
-                            # Risky side will be amended right away and non-risky side will be amended on AMD_ACK
-                            if chore_snapshot.chore_brief.side == Side.BUY:
-                                # AMD: when qty is amended up then, amend_qty is increased to chore qty
-                                if amend_up_qty:
-                                    chore_snapshot.chore_brief.qty += amend_up_qty
-                                    chore_snapshot.total_amend_up_qty += amend_up_qty
-                                if amend_up_px:
-                                    chore_snapshot.chore_brief.px += amend_up_px
-
-                                chore_snapshot.chore_brief.chore_notional = (
-                                        chore_snapshot.chore_brief.qty *
-                                        self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                        chore_snapshot.chore_brief.security.sec_id))
-
-                                # updating all pending amend fields to 0
-                                self.set_default_values_to_pend_amend_fields(chore_snapshot)
-                                # updating fields required to other models to be updated once chore_snapshot is updated
-                                if amend_up_px:
-                                    chore_snapshot.pending_amend_up_px = amend_up_px
-                                if amend_up_qty:
-                                    chore_snapshot.pending_amend_up_qty = amend_up_qty
-
-                                chore_snapshot, updated_strat_brief, portfolio_status_updates = (
-                                    await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, chore_journal_obj.chore_event))
-                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
-
-                            else:
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-                                # updating all pending amend fields to 0
-                                self.set_default_values_to_pend_amend_fields(chore_snapshot)
-                                # updating fields required to other models to be updated once chore_snapshot is updated
-                                if amend_up_px:
-                                    chore_snapshot.pending_amend_up_px = amend_up_px
-                                if amend_up_qty:
-                                    chore_snapshot.pending_amend_up_qty = amend_up_qty
-                                chore_snapshot.chore_status = ChoreStatusType.OE_AMD_UP_UNACKED
-                                updated_chore_snapshot = (
-                                    await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                    underlying_update_chore_snapshot_http(chore_snapshot))
-                                return pair_strat.id, updated_chore_snapshot, None, None
-                    # else not required: Ignoring this update since none returned object signifies
-                    # there was something wrong in _check_state_and_get_chore_snapshot_obj and
-                    # hence would have been added to alert already
-
-            case ChoreEventType.OE_AMD_ACK:
-                async with ChoreSnapshot.reentrant_lock:
-                    chore_snapshot: ChoreSnapshot = \
-                        await self._check_state_and_get_chore_snapshot_obj(
-                            chore_journal_obj, [ChoreStatusType.OE_AMD_DN_UNACKED,
-                                                ChoreStatusType.OE_AMD_UP_UNACKED,
-                                                ChoreStatusType.OE_FILLED,
-                                                ChoreStatusType.OE_OVER_FILLED,
-                                                ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_DOD])
-
-                    # Non-risky amend cases will be updated in AMD_ACK
-                    # Risky cases already get updated at amend unack event only
-                    if chore_snapshot is not None:
-                        pending_amend_event = self.pending_amend_type(chore_journal_obj, chore_snapshot)
-                        if pending_amend_event == ChoreEventType.OE_AMD_DN_UNACK:
-                            amend_dn_qty = chore_snapshot.pending_amend_dn_qty
-                            amend_dn_px = chore_snapshot.pending_amend_dn_px
-
-                            # amend dn is risky in SELL side and non-risky in BUY
-                            if chore_snapshot.chore_brief.side == Side.BUY:
-                                # AMD: when qty is amended down then, qty that is amended dn gets cxled and
-                                # chore qty stays same
-                                if amend_dn_qty:
-                                    chore_snapshot.total_amend_dn_qty += amend_dn_qty
-
-                                    removed_notional = (amend_dn_qty *
-                                                        self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                                        chore_snapshot.chore_brief.security.sec_id))
-
-                                    chore_snapshot.cxled_qty += amend_dn_qty
-                                    chore_snapshot.cxled_notional += removed_notional
-                                    chore_snapshot.avg_cxled_px = (
-                                        (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
-                                                                       chore_snapshot.chore_brief.security.sec_id) /
-                                         chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
-
-                                if amend_dn_px:
-                                    chore_snapshot.chore_brief.px -= amend_dn_px
-
-                                    chore_snapshot.chore_brief.chore_notional = (
-                                            chore_snapshot.chore_brief.qty *
-                                            self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                            chore_snapshot.chore_brief.security.sec_id))
-                                chore_snapshot, updated_strat_brief, portfolio_status_updates = (
-                                    await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, pending_amend_event))
-                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
-
-                            else:
-                                # since if amend was already applied in amend unack event only for risky case - no
-                                # further compute updates are required
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-                                # updating all pending amend fields to 0
-                                self.set_default_values_to_pend_amend_fields(chore_snapshot)
-                                if (not chore_has_terminal_state(chore_snapshot) and
-                                        chore_snapshot.chore_status != ChoreStatusType.OE_CXL_UNACK):
-                                    chore_snapshot.chore_status = ChoreStatusType.OE_ACKED
-                                # else not required: if chore has terminal state or has cxl_unack state then
-                                # keeping same state
-                                updated_chore_snapshot = (
-                                    await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                    underlying_update_chore_snapshot_http(chore_snapshot))
-                                return pair_strat.id, updated_chore_snapshot, None, None
-
-                        else:
-                            amend_up_qty = chore_snapshot.pending_amend_up_qty
-                            amend_up_px = chore_snapshot.pending_amend_up_px
-
-                            # amend up is risky in BUY side and non-risky in SELL
-                            if chore_snapshot.chore_brief.side == Side.SELL:
-                                # AMD: when qty is amended up then, amend_qty is increased to chore qty
-                                if amend_up_qty:
-                                    chore_snapshot.chore_brief.qty += amend_up_qty
-                                    chore_snapshot.total_amend_up_qty += amend_up_qty
-
-                                    # If chore is already DOD or OVER_CXLED at the time of AMD_ACK event - chore
-                                    # cannot be reverted to non-terminal state so putting any amended up qty which
-                                    # is added to chore_qty to cxled_qty
-                                    if chore_snapshot.chore_status in [ChoreStatusType.OE_DOD,
-                                                                       ChoreStatusType.OE_OVER_CXLED]:
-                                        # putting any qty amended up post terminal state to over_cxled
-                                        chore_snapshot.cxled_qty += amend_up_qty
-                                        removed_notional = (amend_up_qty *
-                                                            self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                                            chore_snapshot.chore_brief.security.sec_id))
-                                        chore_snapshot.cxled_notional += removed_notional
-                                        chore_snapshot.avg_cxled_px = (
-                                            (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
-                                                                           chore_snapshot.chore_brief.security.sec_id) /
-                                             chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
-
-                                if amend_up_px:
-                                    chore_snapshot.chore_brief.px += amend_up_px
-
-                                chore_snapshot.chore_brief.chore_notional = (
-                                        chore_snapshot.chore_brief.qty *
-                                        self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                        chore_snapshot.chore_brief.security.sec_id))
-
-                                chore_snapshot, updated_strat_brief, portfolio_status_updates = (
-                                    await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, pending_amend_event))
-                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
-
-                            else:
-                                # since if amend was already applied in amend unack event only for risky case - no
-                                # further compute updates are required
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-                                # updating all pending amend fields to 0
-                                self.set_default_values_to_pend_amend_fields(chore_snapshot)
-                                if (not chore_has_terminal_state(chore_snapshot) and
-                                        chore_snapshot.chore_status != ChoreStatusType.OE_CXL_UNACK):
-                                    chore_snapshot.chore_status = ChoreStatusType.OE_ACKED
-                                # else not required: if chore has terminal state or has cxl_unack state then
-                                # keeping same state
-                                updated_chore_snapshot = (
-                                    await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                    underlying_update_chore_snapshot_http(chore_snapshot))
-                                return pair_strat.id, updated_chore_snapshot, None, None
-                    # else not required: Ignoring this update since none returned object signifies
-                    # there was something wrong in _check_state_and_get_chore_snapshot_obj and
-                    # hence would have been added to alert already
-
-            case ChoreEventType.OE_AMD_REJ:
-                async with ChoreSnapshot.reentrant_lock:
-                    chore_snapshot: ChoreSnapshot = \
-                        await self._check_state_and_get_chore_snapshot_obj(
-                            chore_journal_obj, [ChoreStatusType.OE_AMD_DN_UNACKED,
-                                                ChoreStatusType.OE_AMD_UP_UNACKED, ChoreStatusType.OE_FILLED,
-                                                ChoreStatusType.OE_OVER_FILLED,
-                                                ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_DOD])
-                    if chore_snapshot is not None:
-                        if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
-                            logging.error(f"Received AMD_REJ post chore DOD on chore_id: "
-                                          f"{chore_snapshot.chore_brief.chore_id} - ignoring this amend chore_journal "
-                                          f"and chore will stay unchanged;;; amd_rej {chore_journal_obj=}, "
-                                          f"{chore_snapshot=}")
-                            return
-
-                        pending_amend_event = self.pending_amend_type(chore_journal_obj, chore_snapshot)
-                        if pending_amend_event == ChoreEventType.OE_AMD_DN_UNACK:
-                            amend_dn_qty = chore_snapshot.pending_amend_dn_qty
-                            amend_dn_px = chore_snapshot.pending_amend_dn_px
-
-                            # amend dn is risky in SELL side and non-risky in BUY
-                            if chore_snapshot.chore_brief.side == Side.SELL:
-
-                                # AMD: when qty is amended down then, qty that is amended dn gets cxled and
-                                # chore qty stays same
-
-                                if amend_dn_qty:
-                                    chore_snapshot.total_amend_dn_qty -= amend_dn_qty
-
-                                    removed_notional = (amend_dn_qty *
-                                                        self.get_usd_px(chore_snapshot.chore_brief.px+amend_dn_px,
-                                                                        chore_snapshot.chore_brief.security.sec_id))
-
-                                    chore_snapshot.cxled_qty -= amend_dn_qty
-                                    chore_snapshot.cxled_notional -= removed_notional
-                                    chore_snapshot.avg_cxled_px = (
-                                        (self.get_local_px_or_notional(chore_snapshot.cxled_notional,
-                                                                       chore_snapshot.chore_brief.security.sec_id) /
-                                         chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0)
-
-                                if amend_dn_px:
-                                    chore_snapshot.chore_brief.px += amend_dn_px
-
-                                    chore_snapshot.chore_brief.chore_notional = (
-                                            chore_snapshot.chore_brief.qty *
-                                            self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                            chore_snapshot.chore_brief.security.sec_id))
-
-                                chore_snapshot, updated_strat_brief, portfolio_status_updates = (
-                                    await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, pending_amend_event,
-                                        is_amend_rej_call=True))
-                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
-
-                            else:
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-                                # updating all pending amend fields to 0
-                                self.set_default_values_to_pend_amend_fields(chore_snapshot)
-                                if (not chore_has_terminal_state(chore_snapshot) and
-                                        chore_snapshot.chore_status != ChoreStatusType.OE_CXL_UNACK):
-                                    chore_snapshot.chore_status = ChoreStatusType.OE_ACKED
-                                # else not required: if chore has terminal state or has cxl_unack state then
-                                # keeping same state
-                                updated_chore_snapshot = (
-                                    await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                    underlying_update_chore_snapshot_http(chore_snapshot))
-                                return pair_strat.id, updated_chore_snapshot, None, None
-
-                        else:
-                            amend_up_qty = chore_snapshot.pending_amend_up_qty
-                            amend_up_px = chore_snapshot.pending_amend_up_px
-
-                            # amend up is risky in BUY side and non-risky in SELL
-                            if chore_snapshot.chore_brief.side == Side.BUY:
-
-                                # AMD: when qty is amended up then, chore qty is updated to amended qty
-                                if amend_up_qty:
-                                    chore_snapshot.chore_brief.qty -= amend_up_qty
-                                    chore_snapshot.total_amend_up_qty -= amend_up_qty
-
-                                if amend_up_px:
-                                    chore_snapshot.chore_brief.px -= amend_up_px
-
-                                chore_snapshot.chore_brief.chore_notional = (
-                                        chore_snapshot.chore_brief.qty *
-                                        self.get_usd_px(chore_snapshot.chore_brief.px,
-                                                        chore_snapshot.chore_brief.security.sec_id))
-
-                                chore_snapshot, updated_strat_brief, portfolio_status_updates = (
-                                    await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, pending_amend_event,
-                                        is_amend_rej_call=True))
-                                return pair_strat.id, chore_snapshot, updated_strat_brief, portfolio_status_updates
-
-                            else:
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
-                                # updating all pending amend fields to 0
-                                self.set_default_values_to_pend_amend_fields(chore_snapshot)
-                                if (not chore_has_terminal_state(chore_snapshot) and
-                                        chore_snapshot.chore_status != ChoreStatusType.OE_CXL_UNACK):
-                                    chore_snapshot.chore_status = ChoreStatusType.OE_ACKED
-                                # else not required: if chore has terminal state or has cxl_unack state then
-                                # keeping same state
-                                updated_chore_snapshot = (
-                                    await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                    underlying_update_chore_snapshot_http(chore_snapshot))
-                                return pair_strat.id, updated_chore_snapshot, None, None
-
-                    # else not required: Ignoring this update since none returned object signifies
-                    # there was something wrong in _check_state_and_get_chore_snapshot_obj and
-                    # hence would have been added to alert already
-            case other_:
-                err_str_ = f"Unsupported Chore event - {other_} in chore_journal_key: " \
-                           f"{get_chore_journal_log_key(chore_journal_obj)}, {chore_journal_obj = }"
-                logging.error(err_str_)
-        # avoiding any update for all cases that end up here
-        return None
-
-    def get_chore_status_post_amend_applied(
-            self, chore_journal: ChoreJournal, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
-            last_chore_status: ChoreStatusType) -> ChoreStatusType | None:
-        # risky
-        # * dn
-        # - open > 0 -> OE_AMD_DN_UNACKED
-        # - open = 0 -> DOD
-        # - open < 0 -> not possible
-        # * up
-        # - open > 0 -> OE_AMD_UP_UNACKED
-        # - open = 0 -> not possible
-        # - open < 0 -> not possible
-        # non-risky
-        # * dn
-        # - open > 0 -> ACK
-        # - open = 0 -> DOD
-        # - open < 0 -> OVER_CXL
-        # * up
-        # - open > 0 -> ACK
-        # - open = 0 -> DOD
-        # - open < 0 -> if over-filled then ovr-filled else over-cxl
-
-        chore_event = chore_journal.chore_event
-        open_qty = StreetBookServiceRoutesCallbackBaseNativeOverride.get_open_qty(chore_snapshot)
-        if chore_event != ChoreEventType.OE_AMD_ACK:
-            # risky case
-            if amend_direction == ChoreEventType.OE_AMD_DN_UNACK:
-                # Amend DN
-                if open_qty > 0:
-                    return ChoreStatusType.OE_AMD_DN_UNACKED
-                elif open_qty == 0:
-                    # If chore qty becomes zero post amend dn then chore is considered DOD
-                    logging.warning(
-                        f"Received {chore_event} for amend qty which makes chore DOD, before status was "
-                        f"{last_chore_status} - applying amend and putting "
-                        f"chore as DOD, chore_journal_key: {get_chore_journal_log_key(chore_journal)};;; "
-                        f"{chore_journal=}, {chore_snapshot=}")
-                    return ChoreStatusType.OE_DOD
-                else:
-                    logging.error("Can't find chore_status, keeping last status - open_qty can't be negative post "
-                                  "risky amend dn since we don't amend dn any qty lower than available, likely bug "
-                                  f"in blocking logic;;; {chore_snapshot=}")
-                    return None
-            else:
-                # Amend UP
-                if open_qty > 0:
-                    return ChoreStatusType.OE_AMD_UP_UNACKED
-                elif open_qty == 0:
-                    logging.error("Can't find chore_status, keeping last status - open_qty can't be zero post risky "
-                                  "amend up since chore status must always be ACK before risky amend up and open_qty "
-                                  f"can never be zero by adding any qty;;; {chore_snapshot=}")
-                    return None
-                else:
-                    logging.error("Can't find chore_status, keeping last status - open_qty can't be negative post "
-                                  "risky amend up since chore status must always be ACK before risky amend up and "
-                                  f"open_qty can never be negative by adding any qty;;; {chore_snapshot=}")
-                    return None
-        else:
-            # non risky case
-            if amend_direction == ChoreEventType.OE_AMD_DN_UNACK:
-                # Amend DN
-                if open_qty > 0:
-                    if last_chore_status == ChoreStatusType.OE_CXL_UNACK:
-                        return ChoreStatusType.OE_CXL_UNACK
-                    else:
-                        return ChoreStatusType.OE_ACKED
-                elif open_qty == 0:
-                    # If chore qty becomes zero post amend dn then chore is considered DOD
-                    logging.warning(
-                        f"Received {chore_event} for amend qty which makes chore DOD, before status was "
-                        f"{last_chore_status} - applying amend and putting "
-                        f"chore as DOD, chore_journal_key: {get_chore_journal_log_key(chore_journal)};;; "
-                        f"{chore_journal=}, {chore_snapshot=}")
-                    return ChoreStatusType.OE_DOD
-                else:
-                    # If chore qty becomes negative post amend dn then chore must be in terminal state already before
-                    # non-risky amend dn - any further amend dn will be added to extra cxled
-                    logging.warning(f"Received {chore_event} for amend qty which makes chore OVER_CXLED to "
-                                    f"chore which was {last_chore_status} before - amend applied and "
-                                    f"putting strat to PAUSE , chore_journal_key: "
-                                    f"{get_chore_journal_log_key(chore_journal)};;; "
-                                    f"{chore_journal=}, {chore_snapshot=}")
-                    self.pause_strat()
-                    return ChoreStatusType.OE_OVER_CXLED
-            else:
-                # Amend UP
-                if open_qty > 0:
-                    if last_chore_status == ChoreStatusType.OE_CXL_UNACK:
-                        return ChoreStatusType.OE_CXL_UNACK
-                    else:
-                        if last_chore_status == ChoreStatusType.OE_FILLED:
-                            logging.warning(f"Received {chore_event} for amend qty which makes chore back to ACKED "
-                                            f"which was FILLED before amend, "
-                                            f"chore_id: {chore_snapshot.chore_brief.chore_id}, "
-                                            f"chore_journal_key: {get_chore_journal_log_key(chore_journal)};;; "
-                                            f"{chore_journal=}, {chore_snapshot=}")
-                        elif last_chore_status == ChoreStatusType.OE_OVER_FILLED:
-                            logging.warning(f"Received {chore_event} for amend qty which makes chore back to ACKED "
-                                            f"which was OVER_FILLED before amend, chore_id: "
-                                            f"{chore_snapshot.chore_brief.chore_id} - setting strat back to ACTIVE"
-                                            f" and applying amend, also ignore OVERFILLED ALERT for this chore"
-                                            f"chore_journal_key: {get_chore_journal_log_key(chore_journal)};;; "
-                                            f"{chore_journal=}, {chore_snapshot=}")
-                            self.unpause_strat()
-                        return ChoreStatusType.OE_ACKED
-                elif open_qty == 0:
-                    # chore qty can be zero in below chore status cases
-                    # if status was DOD - whatever qty is amended up is also put in cxled qty so overall no impact
-                    # if status was OVER_CXLED - whatever qty was over-cxled got
-                    #                            compensated by amending up chore qty so chore became DOD
-                    # if status was OVER_FILLED - whatever qty was over-filled got
-                    #                             compensated by amending up chore qty so chore became FILLED
-                    if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
-                        logging.warning(f"Received {chore_event} for amend qty which makes chore FILLED "
-                                        f"which was OVER_FILLED before amend, chore_id: "
-                                        f"{chore_snapshot.chore_brief.chore_id} - setting strat back to ACTIVE"
-                                        f" and applying amend, also ignore OVERFILLED ALERT for this chore"
-                                        f"chore_journal_key: {get_chore_journal_log_key(chore_journal)};;; "
-                                        f"{chore_journal=}, {chore_snapshot=}")
-                        self.unpause_strat()
-                        return ChoreStatusType.OE_FILLED
-                    else:
-                        logging.warning(
-                            f"Received {chore_event} for amend qty which makes chore DOD, before status was "
-                            f"{last_chore_status} - applying amend and putting "
-                            f"chore as DOD, chore_journal_key: {get_chore_journal_log_key(chore_journal)};;; "
-                            f"{chore_journal=}, {chore_snapshot=}")
-                        return ChoreStatusType.OE_DOD
-                else:
-                    # amend up also couldn't make open_qty non-negative so keeping same status on chore
-                    return last_chore_status
-
-    def get_chore_status_post_amend_rej(
-            self, chore_journal: ChoreJournal, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
-            last_chore_status: ChoreStatusType) -> ChoreStatusType:
-        # * dn
-        # - open > 0 -> ACK
-        # - open = 0 -> if dod: dod else filled
-        # - open < 0 -> OVER_FILLED
-        # * up
-        # - open > 0 -> ACK
-        # - open = 0 -> if dod: dod else filled
-        # - open < 0 -> OVER_FILLED
-
-        open_qty = StreetBookServiceRoutesCallbackBaseNativeOverride.get_open_qty(chore_snapshot)
-        if amend_direction == ChoreEventType.OE_AMD_DN_UNACK:
-            # Amend DN
-            if open_qty > 0:
-                if last_chore_status == ChoreStatusType.OE_CXL_UNACK:
-                    return ChoreStatusType.OE_CXL_UNACK
-                else:
-                    log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
-                               f"{last_chore_status} before amend applied - status post amd_rej applied: "
-                               f"{ChoreStatusType.OE_ACKED}")
-                    if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
-                        log_str += (" - UNPAUSING strat and applying amend rollback, "
-                                    f"chore_journal_key: {get_chore_journal_log_key(chore_journal)};;; "
-                                    f"{chore_journal=}, {chore_snapshot=}")
-                        logging.warning(log_str)
-                        self.unpause_strat()
-                    elif last_chore_status == ChoreStatusType.OE_FILLED:
-                        log_str += (f"chore_journal_key: {get_chore_journal_log_key(chore_journal)};;; "
-                                    f"{chore_journal=}, {chore_snapshot=}")
-                        logging.warning(log_str)
-                    # else not required: if chore was already acked then no need to notify as alert
-
-                    return ChoreStatusType.OE_ACKED
-            elif open_qty == 0:
-                if last_chore_status == ChoreStatusType.OE_DOD:
-                    return ChoreStatusType.OE_DOD
-                else:
-                    if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
-                        log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
-                                   f"{last_chore_status} before amend applied - status post amd_rej applied: "
-                                   f"{ChoreStatusType.OE_ACKED}")
-                        log_str += (" - UNPAUSING strat and applying amend rollback, "
-                                    f"chore_journal_key: {get_chore_journal_log_key(chore_journal)};;; "
-                                    f"{chore_journal=}, {chore_snapshot=}")
-                        logging.warning(log_str)
-                        self.unpause_strat()
-                    else:
-                        log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
-                                   f"{last_chore_status} before amend applied - status post amd_rej applied: "
-                                   f"{ChoreStatusType.OE_FILLED}, chore_journal_key: "
-                                   f"{get_chore_journal_log_key(chore_journal)};;; {chore_journal=}, {chore_snapshot=}")
-                        logging.warning(log_str)
-                    return ChoreStatusType.OE_FILLED
-            else:
-                return last_chore_status
-        else:
-            # Amend UP
-            if open_qty > 0:
-                if last_chore_status == ChoreStatusType.OE_CXL_UNACK:
-                    return ChoreStatusType.OE_CXL_UNACK
-                else:
-                    return ChoreStatusType.OE_ACKED
-            elif open_qty == 0:
-                if last_chore_status == ChoreStatusType.OE_DOD:
-                    return ChoreStatusType.OE_DOD
-                else:
-                    log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
-                               f"{last_chore_status} before amend applied - status post amd_rej applied: "
-                               f"{ChoreStatusType.OE_FILLED}, chore_journal_key: "
-                               f"{get_chore_journal_log_key(chore_journal)};;; {chore_journal=}, {chore_snapshot=}")
-                    logging.warning(log_str)
-                    return ChoreStatusType.OE_FILLED
-            else:
-                log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
-                           f"{last_chore_status} before amend applied - status post amd_rej applied: "
-                           f"{ChoreStatusType.OE_OVER_FILLED}")
-                if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
-                    log_str += (" - strat must be at PAUSE already and "
-                                f"applying amend rollback, chore_journal_key: "
-                                f"{get_chore_journal_log_key(chore_journal)};;; "
-                                f"{chore_journal=}, {chore_snapshot=}")
-                    logging.warning(log_str)
-                else:
-                    log_str += (" - putting strat to pause and applying amend rollback, chore_journal_key: "
-                                f"{get_chore_journal_log_key(chore_journal)};;; "
-                                f"{chore_journal=}, {chore_snapshot=}")
-                    logging.warning(log_str)
-                    self.pause_strat()
-                return ChoreStatusType.OE_OVER_FILLED
+            return False
+        return True
+
+    async def handle_post_chore_snapshot_update_tasks_for_new_chore_journal(
+            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+        symbol_side_snapshot = \
+            await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+                                                                              chore_snapshot)
+        if symbol_side_snapshot is not None:
+            updated_strat_brief = await self._update_strat_brief_from_chore_or_fill(chore_journal_obj,
+                                                                                    chore_snapshot,
+                                                                                    symbol_side_snapshot)
+            if updated_strat_brief is not None:
+                await self._update_strat_status_from_chore_journal(chore_journal_obj, chore_snapshot,
+                                                                   symbol_side_snapshot, updated_strat_brief)
+            # else not required: if updated_strat_brief is None then it means some error occurred in
+            # _update_strat_brief_from_chore which would have got added to alert already
+            portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
+                await self._update_portfolio_status_from_chore_journal(
+                    chore_journal_obj, chore_snapshot))
+
+            return chore_snapshot, updated_strat_brief, portfolio_status_updates
+        # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
+        # is None then it means some error occurred in _create_update_symbol_side_snapshot_from_chore_journal
+        # which would have got added to alert already
+
+    async def handle_post_chore_snapshot_update_tasks_for_ack_chore_journal(
+            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+        return chore_snapshot, None, None
+
+    async def handle_post_chore_snapshot_update_tasks_for_cxl_unack_chore_journal(
+            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+        return chore_snapshot, None, None
+
+    async def handle_post_chore_snapshot_update_tasks_for_cxl_rej_chore_journal(
+            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+        return chore_snapshot, None, None
+
+    async def handle_post_chore_snapshot_update_tasks_for_int_rej_chore_journal(
+            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+        symbol_side_snapshot = \
+            await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+                                                                              chore_snapshot)
+        if symbol_side_snapshot is not None:
+            updated_strat_brief = (
+                await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+                                                                  symbol_side_snapshot))
+            if updated_strat_brief is not None:
+                await self._update_strat_status_from_chore_journal(
+                    chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
+            # else not required: if updated_strat_brief is None then it means some error occurred in
+            # _update_strat_brief_from_chore which would have got added to alert already
+            portfolio_status_updates: PortfolioStatusUpdatesContainer = (
+                await self._update_portfolio_status_from_chore_journal(
+                    chore_journal_obj, chore_snapshot))
+
+            return chore_snapshot, updated_strat_brief, portfolio_status_updates
+        # else not require_create_update_symbol_side_snapshot_from_chore_journald:
+        # if symbol_side_snapshot is None then it means some error occurred in
+        # _create_update_symbol_side_snapshot_from_chore_journal which would have
+        # got added to alert already
+
+    async def handle_post_chore_snapshot_update_tasks_for_lapse_chore_journal(
+            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+        symbol_side_snapshot = \
+            await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+                                                                              chore_snapshot)
+        if symbol_side_snapshot is not None:
+            updated_strat_brief = (
+                await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+                                                                  symbol_side_snapshot))
+            if updated_strat_brief is not None:
+                await self._update_strat_status_from_chore_journal(
+                    chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
+            # else not required: if updated_strat_brief is None then it means some error occurred in
+            # _update_strat_brief_from_chore which would have got added to alert already
+            portfolio_status_updates: PortfolioStatusUpdatesContainer = (
+                await self._update_portfolio_status_from_chore_journal(
+                    chore_journal_obj, chore_snapshot))
+            return chore_snapshot, updated_strat_brief, portfolio_status_updates
+        # else not require_create_update_symbol_side_snapshot_from_chore_journald:
+        # if symbol_side_snapshot is None then it means some error occurred in
+        # _create_update_symbol_side_snapshot_from_chore_journal which would have
+        # got added to alert already
+
+    async def handle_post_chore_snapshot_update_tasks_for_non_risky_amend_unack_chore_journal(
+            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+        return chore_snapshot, None, None
+
+    async def handle_post_chore_snapshot_update_tasks_for_risky_amend_ack_chore_journal(
+            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+        return chore_snapshot, None, None
+
+    async def handle_post_chore_snapshot_update_tasks_for_non_risky_amend_rej_chore_journal(
+            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+        return chore_snapshot, None, None
 
     async def _create_symbol_side_snapshot_for_new_chore(self,
                                                          new_chore_journal_obj: ChoreJournal) -> SymbolSideSnapshot:
@@ -2864,28 +1841,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 updated_symbol_side_snapshot_obj.total_cxled_qty) \
             if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0
 
-    def pending_amend_type(self, chore_journal: ChoreJournal, chore_snapshot: ChoreSnapshot) -> ChoreEventType | None:
-        if chore_journal.chore_event == ChoreEventType.OE_AMD_DN_UNACK:
-            chore_event = ChoreEventType.OE_AMD_DN_UNACK
-        elif chore_journal.chore_event == ChoreEventType.OE_AMD_UP_UNACK:
-            chore_event = ChoreEventType.OE_AMD_UP_UNACK
-        else:
-            # if event is AMD_ACK then checking what all fields are updated by amend unack event - for
-            # amend dn only fields related to amend_dn will be updated rest will stay 0 by default and same goes
-            # for amend up case
-            if ((chore_snapshot.pending_amend_dn_qty or chore_snapshot.pending_amend_dn_px) and
-                    not chore_snapshot.pending_amend_up_qty and not chore_snapshot.pending_amend_up_px):
-                return ChoreEventType.OE_AMD_DN_UNACK
-            elif (not chore_snapshot.pending_amend_dn_qty and not chore_snapshot.pending_amend_dn_px and
-                  (chore_snapshot.pending_amend_up_qty or chore_snapshot.pending_amend_up_px)):
-                return ChoreEventType.OE_AMD_UP_UNACK
-            else:
-                logging.error("Unexpected: Found both dn and up pending amend fields in chore_snapshot having values, "
-                              "ideally either dn is updated or up is updated - can't find which type of amend is it, "
-                              f"ignoring all computes post chore_snapshot update;;; {chore_snapshot=}")
-                return None
-        return chore_event
-
     def update_symbol_side_snapshot_avg_px_post_amend(
             self, updated_symbol_side_snapshot_obj: SymbolSideSnapshotBaseModel,
             symbol_side_snapshot_obj: SymbolSideSnapshot,
@@ -2922,7 +1877,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     return created_symbol_side_snapshot
                 else:
                     err_str_: str = (f"No OE_NEW detected for chore_journal_key: "
-                                     f"{get_chore_journal_log_key(chore_journal)} "
+                                     f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal)} "
                                      f"failed to create symbol_side_snapshot ;;; {chore_journal=}")
                     logging.error(err_str_)
                     return
@@ -3086,7 +2041,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
                     case other_:
                         err_str_ = f"Unsupported StratEventType for symbol_side_snapshot update {other_} " \
-                                   f"{get_chore_journal_log_key(chore_journal)}"
+                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal)}"
                         logging.error(err_str_)
                         return
 
@@ -3095,32 +2050,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                            underlying_partial_update_symbol_side_snapshot_http(updated_symbol_side_snapshot_obj_dict))
                 return updated_symbol_side_snapshot_obj
-
-    async def _check_state_and_get_chore_snapshot_obj(self, chore_journal_obj: ChoreJournal,
-                                                      expected_status_list: List[str]) -> ChoreSnapshot | None:
-        """
-        Checks if chore_snapshot holding chore_id of passed chore_journal has expected status
-        from provided statuses list and then returns that chore_snapshot
-        """
-        chore_snapshot_obj = self.strat_cache.get_chore_snapshot_from_chore_id(chore_journal_obj.chore.chore_id)
-
-        if chore_snapshot_obj is not None:
-            if chore_snapshot_obj.chore_status in expected_status_list:
-                return chore_snapshot_obj
-            else:
-                ord_journal_key: str = get_chore_journal_log_key(chore_journal_obj)
-                ord_snapshot_key: str = get_chore_snapshot_log_key(chore_snapshot_obj)
-                err_str_: str = (f"Unexpected: Received chore_journal of event: {chore_journal_obj.chore_event} on "
-                                 f"chore of chore_snapshot status: {chore_snapshot_obj.chore_status}, expected "
-                                 f"chore_statuses for chore_journal event {chore_journal_obj.chore_event} is "
-                                 f"{expected_status_list=}, {ord_journal_key=}, {ord_snapshot_key=};;; "
-                                 f"{chore_journal_obj=}, {chore_snapshot_obj=}")
-                logging.error(err_str_)
-                return None
-        else:
-            logging.error(f"unexpected: _check_state_and_get_chore_snapshot_obj got chore_snapshot_obj as None;;;"
-                          f"{get_chore_journal_log_key(chore_journal_obj)}; {chore_journal_obj=}")
-            return None
 
     def _handle_cxl_qty_in_strat_status_buy_side(
             self, update_strat_status_obj: StratStatus, chore_snapshot: ChoreSnapshot,
@@ -3403,7 +2332,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                 new_open_notional)
                             case other_:
                                 err_str_ = f"Unsupported Chore Event type {other_}, " \
-                                           f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
+                                           f"chore_journal_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)}"
                                 logging.error(err_str_)
                                 return
                         if update_strat_status_obj.total_open_buy_qty == 0:
@@ -3668,7 +2597,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                 new_open_notional)
                             case other_:
                                 err_str_ = f"Unsupported Chore Event type {other_} " \
-                                           f"chore_journal_key: {get_chore_journal_log_key(chore_journal_obj)}"
+                                           f"chore_journal_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)}"
                                 logging.error(err_str_)
                                 return
                         if update_strat_status_obj.total_open_sell_qty == 0:
@@ -3680,7 +2609,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 update_strat_status_obj.total_open_sell_qty
                     case other_:
                         err_str_ = f"Unsupported Side Type {other_} received in chore_journal_key: " \
-                                   f"{get_chore_journal_log_key(chore_journal_obj)} while updating strat_status;;; " \
+                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)} while updating strat_status;;; " \
                                    f"{chore_journal_obj = }"
                         logging.error(err_str_)
                         return
@@ -4063,8 +2992,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         other_leg_residual_qty = strat_brief_obj.pair_buy_side_bartering_brief.residual_qty
                         stored_pair_strat_bartering_brief = strat_brief_obj.pair_sell_side_bartering_brief
                         other_leg_symbol = strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id
-                    top_of_book_obj = self._get_top_of_book_from_symbol(symbol)
-                    other_leg_top_of_book = self._get_top_of_book_from_symbol(other_leg_symbol)
+                    top_of_book_obj = StratCache.get_top_of_book_from_symbol(symbol)
+                    other_leg_top_of_book = StratCache.get_top_of_book_from_symbol(other_leg_symbol)
                     if top_of_book_obj is not None and other_leg_top_of_book is not None:
 
                         # same residual_qty will be used if no match found below else will be replaced with
@@ -4117,7 +3046,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                              (other_leg_residual_qty * self.get_usd_px(other_leg_last_barter_px, other_leg_tob_symbol)))
                     else:
                         logging.error(f"_update_strat_brief_from_chore_or_fill failed invalid TOBs from cache for key: "
-                                      f"{get_chore_snapshot_log_key(chore_snapshot)};;;buy TOB: {top_of_book_obj}; sell"
+                                      f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot)};;;buy TOB: {top_of_book_obj}; sell"
                                       f" TOB: {other_leg_top_of_book}, {chore_snapshot=}")
                         return
 
@@ -4506,7 +3435,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 return PortfolioStatusUpdatesContainer(sell_notional_update=update_overall_sell_notional)
             case other_:
                 err_str_ = f"Unsupported Side Type {other_} received in chore_journal of key: " \
-                           f"{get_chore_journal_log_key(chore_journal_obj)} while updating strat_status;;; " \
+                           f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)} while updating strat_status;;; " \
                            f"{chore_journal_obj = } "
                 logging.error(err_str_)
                 return None
@@ -4516,29 +3445,21 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     ##############################
 
     async def create_fills_journal_pre(self, fills_journal_obj: FillsJournal):
-        if not self.service_ready:
-            # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "create_fills_journal_pre not ready - service is not initialized yet, " \
-                       f"fills_journal_key: {get_fills_journal_log_key(fills_journal_obj)}"
-            logging.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
-        # Updating notional field in fills journal
-        fills_journal_obj.fill_notional = \
-            self.get_usd_px(fills_journal_obj.fill_px, fills_journal_obj.fill_symbol) * fills_journal_obj.fill_qty
+        await self.handle_create_fills_journal_pre(fills_journal_obj)
 
     async def create_fills_journal_post(self, fills_journal_obj: FillsJournal):
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_fills_journal_get_all_ws(fills_journal_obj)
 
-        async with StreetBookServiceRoutesCallbackBaseNativeOverride.residual_compute_shared_lock:
+        async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
             res = await self._apply_fill_update_in_chore_snapshot(fills_journal_obj)
 
             if res is not None:
-                strat_id, chore_snapshot, strat_brief, portfolio_status_updates = res
+                chore_snapshot, strat_brief, portfolio_status_updates = res
 
                 # Updating and checking portfolio_limits in portfolio_manager
                 post_book_service_http_client.check_portfolio_limits_query_client(
-                    strat_id, None, chore_snapshot, strat_brief, portfolio_status_updates)
+                    self.pair_strat_id, None, chore_snapshot, strat_brief, portfolio_status_updates)
 
             # else not required: if result returned from _apply_fill_update_in_chore_snapshot is None, that
             # signifies some unexpected exception occurred so complete update was not done,
@@ -4622,7 +3543,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                        sell_fill_notional_update=update_overall_sell_fill_notional)
             case other_:
                 err_str_ = f"Unsupported Side Type {other_} received in chore snapshot of key " \
-                           f"{get_chore_snapshot_log_key(chore_snapshot_obj)} while updating strat_status;;; " \
+                           f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot_obj)} while updating strat_status;;; " \
                            f"{chore_snapshot_obj = }"
                 logging.error(err_str_)
                 return None
@@ -4685,7 +3606,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             else:
                 err_str_ = ("Received symbol_side_snapshot_tuple as None from strat_cache for symbol: "
                             f"{chore_snapshot_obj.chore_brief.security.sec_id}, "
-                            f"chore_snapshot_key: {get_chore_snapshot_log_key(chore_snapshot_obj)} - "
+                            f"chore_snapshot_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot_obj)} - "
                             f"ignoring this symbol_side_snapshot update from fills")
                 logging.error(err_str_)
 
@@ -4703,207 +3624,30 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             PairStratBaseModel, email_book_service_http_client.patch_pair_strat_client,
             _id=self.pair_strat_id, strat_state=StratState.StratState_ACTIVE.value)
 
-    async def _apply_fill_update_in_chore_snapshot(
-            self, fills_journal_obj: FillsJournal) -> Tuple[int, ChoreSnapshot, StratBrief,
-                                                            PortfolioStatusUpdatesContainer | None] | None:
-        pair_strat = self.strat_cache.get_pair_strat_obj()
+    async def handle_post_chore_snapshot_tasks_for_fills(
+            self, fills_journal_obj: FillsJournal, chore_snapshot_obj: ChoreSnapshot,
+            received_fill_after_dod: bool):
+        symbol_side_snapshot = \
+            await self._update_symbol_side_snapshot_from_fill_applied_chore_snapshot(
+                chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod)
+        if symbol_side_snapshot is not None:
+            updated_strat_brief = await self._update_strat_brief_from_chore_or_fill(
+                fills_journal_obj, chore_snapshot_obj, symbol_side_snapshot,
+                received_fill_after_dod=received_fill_after_dod)
+            if updated_strat_brief is not None:
+                await self._update_strat_status_from_fill_journal(
+                    chore_snapshot_obj, symbol_side_snapshot, updated_strat_brief,
+                    received_fill_after_dod=received_fill_after_dod)
+            # else not required: if updated_strat_brief is None then it means some error occurred in
+            # _update_strat_brief_from_chore which would have got added to alert already
+            portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
+                await self._update_portfolio_status_from_fill_journal(
+                    chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod))
 
-        if not is_ongoing_strat(pair_strat):
-            # avoiding any update if strat is non-ongoing
-            return
-
-        async with (ChoreSnapshot.reentrant_lock):  # for read-write atomicity
-            chore_snapshot_obj = self.strat_cache.get_chore_snapshot_from_chore_id(fills_journal_obj.chore_id)
-
-            if chore_snapshot_obj is not None:
-                if chore_snapshot_obj.chore_status in [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
-                                                       ChoreStatusType.OE_AMD_DN_UNACKED,
-                                                       ChoreStatusType.OE_AMD_UP_UNACKED,
-                                                       ChoreStatusType.OE_DOD, ChoreStatusType.OE_CXL_UNACK]:
-                    received_fill_after_dod = False
-                    if chore_snapshot_obj.chore_status == ChoreStatusType.OE_DOD:
-                        received_fill_after_dod = True
-
-                    updated_total_filled_qty: int
-                    if (total_filled_qty := chore_snapshot_obj.filled_qty) is not None:
-                        updated_total_filled_qty = int(total_filled_qty + fills_journal_obj.fill_qty)
-                    else:
-                        updated_total_filled_qty = int(fills_journal_obj.fill_qty)
-                    received_fill_notional = fills_journal_obj.fill_notional
-                    fills_before_ack = False
-                    if chore_snapshot_obj.chore_status == ChoreStatusType.OE_UNACK:
-                        fills_before_ack = True
-
-                    available_qty = self.get_valid_available_fill_qty(chore_snapshot_obj)
-                    if available_qty == updated_total_filled_qty:
-                        pause_fulfill_post_chore_dod: bool = (
-                            executor_config_yaml_dict.get("pause_fulfill_post_chore_dod"))
-                        if received_fill_after_dod and pause_fulfill_post_chore_dod:
-                            # @@@ below error log is used in specific test case for string matching - if changed here
-                            # needs to be changed in test also
-                            logging.critical("Unexpected: Received fill that makes chore_snapshot OE_FILLED which is "
-                                             "already of state OE_DOD, ignoring this fill and putting this strat to "
-                                             f"PAUSE, symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
-                                             f";;; {fills_journal_obj=}, {chore_snapshot_obj=}")
-                            self.pause_strat()
-                            return None
-                            # pause_strat = True
-                        else:
-                            if received_fill_after_dod:
-                                # @@@ below error log is used in specific test case for string matching - if changed
-                                # here needs to be changed in test also
-                                logging.warning(
-                                    "Received fill that makes chore_snapshot OE_FILLED which is "
-                                    "already of state OE_DOD, symbol_side_key: "
-                                    f"{get_chore_snapshot_log_key(chore_snapshot_obj)}"
-                                    f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
-                                chore_snapshot_obj.cxled_qty -= int(fills_journal_obj.fill_qty)
-                                chore_snapshot_obj.cxled_notional = (
-                                        chore_snapshot_obj.cxled_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                                                                       chore_snapshot_obj.chore_brief.security.sec_id))
-                                if chore_snapshot_obj.cxled_qty == 0:
-                                    chore_snapshot_obj.avg_cxled_px = 0
-                                else:
-                                    logging.error("Unexpected: Received fill that makes chore FULFILL after DOD but "
-                                                  "when fill_qty removed from cxl_qty, cxl_qty is not turning 0 ;;; "
-                                                  f"fill_journal: {fills_journal_obj}, "
-                                                  f"chore_journal: {chore_snapshot_obj}")
-
-                            chore_snapshot_obj.chore_status = ChoreStatusType.OE_FILLED
-                            if fills_before_ack:
-                                logging.warning(f"Received fill for chore that has status: {ChoreStatusType.OE_UNACK} "
-                                                f"that makes chore fulfilled, putting chore to "
-                                                f"{chore_snapshot_obj.chore_status} status and applying fill")
-                    elif available_qty < updated_total_filled_qty:  # OVER_FILLED
-                        vacant_fill_qty = int(available_qty - chore_snapshot_obj.filled_qty)
-                        non_required_received_fill_qty = fills_journal_obj.fill_qty - vacant_fill_qty
-
-                        if received_fill_after_dod:
-                            # @@@ below error log is used in specific test case for string matching - if changed
-                            # here needs to be changed in test also
-                            logging.critical(
-                                f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED which "
-                                f"is already OE_DOD, {vacant_fill_qty = }, received "
-                                f"{fills_journal_obj.fill_qty = }, {non_required_received_fill_qty = } "
-                                f"from fills_journal_key of {fills_journal_obj.chore_id = } and "
-                                f"{fills_journal_obj.id = } - putting strat to PAUSE and applying fill, "
-                                f"symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
-                                f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
-                            chore_snapshot_obj.cxled_qty -= int(fills_journal_obj.fill_qty -
-                                                                non_required_received_fill_qty)
-                            chore_snapshot_obj.cxled_notional = (
-                                    chore_snapshot_obj.cxled_qty *
-                                    self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                                    chore_snapshot_obj.chore_brief.security.sec_id))
-                            if chore_snapshot_obj.cxled_qty == 0:
-                                chore_snapshot_obj.avg_cxled_px = 0
-                            else:
-                                logging.error("Unexpected: Received fill that makes chore OVERFILL after DOD but "
-                                              "when valid fill_qty (excluding extra fill) is removed from cxl_qty, "
-                                              "cxl_qty is not turning 0 ;;; "
-                                              f"fill_journal: {fills_journal_obj}, "
-                                              f"chore_journal: {chore_snapshot_obj}")
-
-                        elif fills_before_ack:
-                            # @@@ below error log is used in specific test case for string matching - if changed
-                            # here needs to be changed in test also
-                            logging.critical(
-                                f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED to chore "
-                                f"which is still OE_UNACK, "
-                                f"{vacant_fill_qty = }, received {fills_journal_obj.fill_qty = }, "
-                                f"{non_required_received_fill_qty = } "
-                                f"from fills_journal_key of {fills_journal_obj.chore_id = } and "
-                                f"{fills_journal_obj.id = } - putting strat to PAUSE and applying fill, "
-                                f"symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
-                                f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
-                        else:
-                            # @@@ below error log is used in specific test case for string matching - if changed
-                            # here needs to be changed in test also
-                            logging.critical(
-                                f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED, "
-                                f"{vacant_fill_qty = }, received {fills_journal_obj.fill_qty = }, "
-                                f"{non_required_received_fill_qty = } "
-                                f"from fills_journal_key of {fills_journal_obj.chore_id = } and "
-                                f"{fills_journal_obj.id = } - putting strat to PAUSE and applying fill, "
-                                f"symbol_side_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}"
-                                f";;; {fills_journal_obj = }, {chore_snapshot_obj = }")
-                        chore_snapshot_obj.chore_status = ChoreStatusType.OE_OVER_FILLED
-                        self.pause_strat()
-                        # pause_strat = True
-                    else:
-                        if received_fill_after_dod:
-                            chore_snapshot_obj.cxled_qty = int(chore_snapshot_obj.cxled_qty -
-                                                               fills_journal_obj.fill_qty)
-                            chore_snapshot_obj.cxled_notional = (
-                                    chore_snapshot_obj.cxled_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
-                                                                                   chore_snapshot_obj.chore_brief.security.sec_id))
-                            chore_snapshot_obj.avg_cxled_px = \
-                                (self.get_local_px_or_notional(chore_snapshot_obj.cxled_notional,
-                                                               chore_snapshot_obj.chore_brief.security.sec_id) /
-                                 chore_snapshot_obj.cxled_qty) if chore_snapshot_obj.cxled_qty != 0 else 0
-                        elif fills_before_ack:
-                            chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
-                            logging.warning(f"Received fill for chore that has status: {ChoreStatusType.OE_UNACK}, "
-                                            f"putting chore to {chore_snapshot_obj.chore_status} "
-                                            f"status and applying fill")
-
-                    if (last_filled_notional := chore_snapshot_obj.fill_notional) is not None:
-                        updated_fill_notional = last_filled_notional + received_fill_notional
-                    else:
-                        updated_fill_notional = received_fill_notional
-                    updated_avg_fill_px = \
-                        (self.get_local_px_or_notional(updated_fill_notional,
-                                                       fills_journal_obj.fill_symbol) / updated_total_filled_qty
-                         if updated_total_filled_qty != 0 else 0)
-
-                    chore_snapshot_obj.filled_qty = updated_total_filled_qty
-                    chore_snapshot_obj.avg_fill_px = updated_avg_fill_px
-                    chore_snapshot_obj.fill_notional = updated_fill_notional
-                    chore_snapshot_obj.last_update_fill_qty = int(fills_journal_obj.fill_qty)
-                    chore_snapshot_obj.last_update_fill_px = fills_journal_obj.fill_px
-                    chore_snapshot_obj.last_update_date_time = fills_journal_obj.fill_date_time
-                    chore_snapshot_obj = \
-                        await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                               underlying_update_chore_snapshot_http(chore_snapshot_obj))
-                    symbol_side_snapshot = \
-                        await self._update_symbol_side_snapshot_from_fill_applied_chore_snapshot(
-                            chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod)
-                    if symbol_side_snapshot is not None:
-                        updated_strat_brief = await self._update_strat_brief_from_chore_or_fill(
-                            fills_journal_obj, chore_snapshot_obj, symbol_side_snapshot,
-                            received_fill_after_dod=received_fill_after_dod)
-                        if updated_strat_brief is not None:
-                            await self._update_strat_status_from_fill_journal(
-                                chore_snapshot_obj, symbol_side_snapshot, updated_strat_brief,
-                                received_fill_after_dod=received_fill_after_dod)
-                        # else not required: if updated_strat_brief is None then it means some error occurred in
-                        # _update_strat_brief_from_chore which would have got added to alert already
-                        portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
-                            await self._update_portfolio_status_from_fill_journal(
-                                chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod))
-
-                        return pair_strat.id, chore_snapshot_obj, updated_strat_brief, portfolio_status_updates
-
-                    # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
-                    # is None then it means error occurred in _create_update_symbol_side_snapshot_from_chore_journal
-                    # which would have got added to alert already
-                elif chore_snapshot_obj.chore_status == ChoreStatusType.OE_FILLED:
-                    err_str_ = (f"Unsupported - Fill received for completely filled chore_snapshot, "
-                                f"chore_snapshot_key: {get_chore_snapshot_log_key(chore_snapshot_obj)}, "
-                                f"ignoring this fill journal - putting strat to PAUSE;;; "
-                                f"{fills_journal_obj = }, {chore_snapshot_obj = }")
-                    logging.critical(err_str_)
-                    self.pause_strat()
-                else:
-                    err_str_ = f"Unsupported - Fill received for chore_snapshot having status " \
-                               f"{chore_snapshot_obj.chore_status}, chore_snapshot_key: " \
-                               f"{get_chore_snapshot_log_key(chore_snapshot_obj)};;; " \
-                               f"{fills_journal_obj = }, {chore_snapshot_obj = }"
-                    logging.error(err_str_)
-            else:
-                err_str_ = (f"Could not find any chore snapshot with {fills_journal_obj.chore_id = } in "
-                            f"strat_cache, fill_journal_key: {get_fills_journal_log_key(fills_journal_obj)}")
-                logging.error(err_str_)
+            return chore_snapshot_obj, updated_strat_brief, portfolio_status_updates
+        # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
+        # is None then it means error occurred in _create_update_symbol_side_snapshot_from_chore_journal
+        # which would have got added to alert already
 
     async def _update_strat_status_from_fill_journal(self, chore_snapshot_obj: ChoreSnapshot,
                                                      symbol_side_snapshot: SymbolSideSnapshot,
@@ -5087,7 +3831,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
                     case other_:
                         err_str_ = f"Unsupported Side Type {other_} received for chore_snapshot_key: " \
-                                   f"{get_chore_snapshot_log_key(chore_snapshot_obj)} while updating strat_status;;; " \
+                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot_obj)} while updating strat_status;;; " \
                                    f"{chore_snapshot_obj = }"
                         logging.error(err_str_)
                         return
@@ -5167,22 +3911,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     ############################
 
     async def partial_update_chore_journal_post(self, updated_chore_journal_obj_json: Dict[str, Any]):
-        updated_chore_journal_obj = ChoreJournal.from_dict(updated_chore_journal_obj_json)
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_chore_journal_get_all_ws(updated_chore_journal_obj)
+        await self.handle_partial_update_chore_journal_post(updated_chore_journal_obj_json)
 
     async def create_chore_snapshot_post(self, chore_snapshot_obj: ChoreSnapshot):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_chore_snapshot_get_all_ws(chore_snapshot_obj)
+        await self.handle_create_chore_snapshot_post(chore_snapshot_obj)
 
     async def update_chore_snapshot_post(self, updated_chore_snapshot_obj: ChoreSnapshot):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_chore_snapshot_get_all_ws(updated_chore_snapshot_obj)
+        await self.handle_update_chore_snapshot_post(updated_chore_snapshot_obj)
 
     async def partial_update_chore_snapshot_post(self, updated_chore_snapshot_obj_json: Dict[str, Any]):
-        updated_chore_snapshot_obj = ChoreSnapshot.from_dict(updated_chore_snapshot_obj_json)
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_chore_snapshot_get_all_ws(updated_chore_snapshot_obj)
+        await self.handle_partial_update_chore_snapshot_post(updated_chore_snapshot_obj_json)
 
     async def create_symbol_side_snapshot_post(self, symbol_side_snapshot_obj: SymbolSideSnapshot):
         # updating bartering_data_manager's strat_cache
@@ -5382,9 +4120,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                      f"{top_of_book_obj=}")
 
     async def partial_update_fills_journal_post(self, updated_fills_journal_obj_json: Dict[str, Any]):
-        updated_fills_journal_obj = FillsJournal.from_dict(updated_fills_journal_obj_json)
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_fills_journal_get_all_ws(updated_fills_journal_obj)
+        await self.handle_partial_update_fills_journal_post(updated_fills_journal_obj_json)
 
     async def create_strat_brief_post(self, strat_brief_obj: StratBrief):
         # updating bartering_data_manager's strat_cache
@@ -5460,75 +4196,42 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         await self._update_strat_limits_post(stored_strat_limits_obj_json, updated_strat_limits_obj)
 
     async def create_new_chore_post(self, new_chore_obj: NewChore):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_new_chore_get_all_ws(new_chore_obj)
-        release_notify_semaphore()
+        await self.handle_create_new_chore_post(new_chore_obj)
 
     async def create_cancel_chore_post(self, cancel_chore_obj: CancelChore):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_cancel_chore_get_all_ws(cancel_chore_obj)
-        release_notify_semaphore()
+        await self.handle_create_cancel_chore_post(cancel_chore_obj)
 
     async def partial_update_cancel_chore_post(self, updated_cancel_chore_obj_json: Dict[str, Any]):
-        updated_cancel_chore_obj = CancelChore.from_dict(updated_cancel_chore_obj_json)
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_cancel_chore_get_all_ws(updated_cancel_chore_obj)
-        release_notify_semaphore()
+        await self.handle_partial_update_cancel_chore_post(updated_cancel_chore_obj_json)
 
     async def create_symbol_overview_pre(self, symbol_overview_obj: SymbolOverview):
-        return create_symbol_overview_pre_helper(self.static_data, symbol_overview_obj)
+        await self.handle_create_symbol_overview_pre(symbol_overview_obj)
 
     async def update_symbol_overview_pre(self, updated_symbol_overview_obj: SymbolOverview):
-        stored_symbol_overview_obj = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                                            underlying_read_symbol_overview_by_id_http(updated_symbol_overview_obj.id))
-        return update_symbol_overview_pre_helper(self.static_data, stored_symbol_overview_obj,
-                                                 updated_symbol_overview_obj)
+        return await self.handle_update_symbol_overview_pre(updated_symbol_overview_obj)
 
     async def partial_update_symbol_overview_pre(self, stored_symbol_overview_obj_json: Dict[str, Any], 
                                                  updated_symbol_overview_obj_json: Dict[str, Any]):
-        return partial_update_symbol_overview_pre_helper(self.static_data, stored_symbol_overview_obj_json,
-                                                         updated_symbol_overview_obj_json)
+        return await self.handle_partial_update_symbol_overview_pre(stored_symbol_overview_obj_json,
+                                                                    updated_symbol_overview_obj_json)
 
     async def create_symbol_overview_post(self, symbol_overview_obj: SymbolOverview):
-        symbol_overview_obj.force_publish = False  # setting it false if at create is it True
-        # updating bartering_data_manager's strat_cache
-        if self.bartering_data_manager is not None:
-            self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-        release_notify_semaphore()
+        await self.handle_create_symbol_overview_post(symbol_overview_obj)
 
     async def update_symbol_overview_post(self, updated_symbol_overview_obj: SymbolOverview):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
-        release_notify_semaphore()
+        await self.handle_update_symbol_overview_post(updated_symbol_overview_obj)
 
     async def partial_update_symbol_overview_post(self, updated_symbol_overview_obj_json: Dict[str, Any]):
-        updated_symbol_overview_obj = SymbolOverview.from_dict(updated_symbol_overview_obj_json)
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
-        release_notify_semaphore()
+        await self.handle_partial_update_symbol_overview_post(updated_symbol_overview_obj_json)
 
     async def create_all_symbol_overview_post(self, symbol_overview_obj_list: List[SymbolOverview]):
-        # updating bartering_data_manager's strat_cache
-        for symbol_overview_obj in symbol_overview_obj_list:
-            symbol_overview_obj.force_publish = False  # setting it false if at create it is True
-            if self.bartering_data_manager:
-                self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-                release_notify_semaphore()
-            # else not required: since symbol overview is required to make executor service ready,
-            #                    will add this to strat_cache explicitly using underlying http call
+        await self.handle_create_all_symbol_overview_post(symbol_overview_obj_list)
 
     async def update_all_symbol_overview_post(self, updated_symbol_overview_obj_list: List[SymbolOverview]):
-        # updating bartering_data_manager's strat_cache
-        for symbol_overview_obj in updated_symbol_overview_obj_list:
-            self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-            release_notify_semaphore()
+        await self.handle_update_all_symbol_overview_post(updated_symbol_overview_obj_list)
 
     async def partial_update_all_symbol_overview_post(self, updated_symbol_overview_dict_list: List[Dict[str, Any]]):
-        updated_symbol_overview_obj_list = SymbolOverview.from_dict_list(updated_symbol_overview_dict_list)
-        # updating bartering_data_manager's strat_cache
-        for symbol_overview_obj in updated_symbol_overview_obj_list:
-            self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-            release_notify_semaphore()
+        await self.handle_partial_update_all_symbol_overview_post(updated_symbol_overview_dict_list)
 
     #####################
     # Query Pre/Post handling
@@ -5549,7 +4252,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
     async def update_residuals_query_pre(self, pair_strat_class_type: Type[StratStatus], security_id: str, side: Side,
                                          residual_qty: int):
-        async with (StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock):
+        async with (StreetBookServiceRoutesCallbackBaseNativeOverride.residual_compute_shared_lock):
             strat_brief_tuple = self.strat_cache.get_strat_brief()
 
             if strat_brief_tuple is not None:
@@ -5614,29 +4317,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     async def get_underlying_account_cumulative_fill_qty_query_pre(
             self, underlying_account_cum_fill_qty_class_type: Type[UnderlyingAccountCumFillQty],
             symbol: str, side: str):
-        fill_journal_obj_list = \
-            await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                   underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http(symbol, side))
-
-        underlying_accounts: Set[str] = set()
-        underlying_accounts_cum_fill_qty_obj: UnderlyingAccountCumFillQty = UnderlyingAccountCumFillQty(
-            underlying_account_n_cumulative_fill_qty=[]
-        )
-        for fill_journal_obj in fill_journal_obj_list:
-            if (underlying_acc := fill_journal_obj.underlying_account) not in underlying_accounts:
-                underlying_accounts.add(underlying_acc)
-                underlying_accounts_cum_fill_qty_obj.underlying_account_n_cumulative_fill_qty.append(
-                    UnderlyingAccountNCumFillQty(underlying_account=underlying_acc,
-                                                 cumulative_qty=fill_journal_obj.underlying_account_cumulative_fill_qty)
-                )
-        return [underlying_accounts_cum_fill_qty_obj]
+        return await self.handle_get_underlying_account_cumulative_fill_qty_query_pre(symbol, side)
 
     async def get_symbol_side_underlying_account_cumulative_fill_qty_query_pre(
             self, fills_journal_class_type: Type[FillsJournal], symbol: str, side: str):
-        return await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_fills_journal_http(
-            get_symbol_side_underlying_account_cumulative_fill_qty(symbol, side), self.get_generic_read_route())
+        return await self.handle_get_symbol_side_underlying_account_cumulative_fill_qty_query_pre(symbol, side)
 
-    async def cxl_expired_open_chores(self):
+    def get_residual_mark_secs(self):
         residual_mark_secs: int | None = None
         strat_limits_tuple = self.strat_cache.get_strat_limits()
         if strat_limits_tuple is not None:
@@ -5646,7 +4333,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 if residual_mark_secs is None or residual_mark_secs == 0:
                     # if residual_mark_secs is 0 or None check is disabled - just return - no action
                     return
-                # else proceed with check
+                else:
+                    return residual_mark_secs
             else:
                 if not strat_limits:
                     invalid_field = f"{strat_limits=}"
@@ -5659,38 +4347,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             logging.error(f"Received strat_limits_tuple as None from strat_cache, ignoring cxl expiring chore "
                           f"for this call, will retry again in {self.min_refresh_interval} secs")
             return
-
-        open_chore_snapshots_list: List[ChoreSnapshot] = self.strat_cache.get_open_chore_snapshots()
-
-        for open_chore_snapshot in open_chore_snapshots_list:
-            if not self.executor_inst_id:
-                self.executor_inst_id = get_bartering_link().inst_id
-            if (not open_chore_snapshot.chore_brief.user_data) or (
-                    not open_chore_snapshot.chore_brief.user_data.startswith(self.executor_inst_id)):
-                logging.info(f"cancel ext chore ignored: {open_chore_snapshot.chore_brief.chore_id} found in "
-                             f"expired open chores for {get_chore_snapshot_log_key(open_chore_snapshot)}")
-                continue
-            if (open_chore_snapshot.chore_status != ChoreStatusType.OE_CXL_UNACK and
-                    not chore_has_terminal_state(open_chore_snapshot)):
-                open_chore_interval = DateTime.utcnow() - open_chore_snapshot.create_date_time
-                open_chore_interval_secs = open_chore_interval.total_seconds()
-                if residual_mark_secs != 0 and open_chore_interval_secs > residual_mark_secs:
-                    logging.info(f"Triggering place_cxl_chore for expired_open_chore:  "
-                                 f"{open_chore_snapshot.chore_brief.chore_id}, {open_chore_interval_secs=};;;"
-                                 f"{residual_mark_secs=}; {open_chore_snapshot.chore_status=}")
-                    await StreetBook.bartering_link.place_cxl_chore(
-                        open_chore_snapshot.chore_brief.chore_id, open_chore_snapshot.chore_brief.side,
-                        open_chore_snapshot.chore_brief.security.sec_id,
-                        open_chore_snapshot.chore_brief.security.sec_id,
-                        open_chore_snapshot.chore_brief.underlying_account)
-                # else not required: If time-delta is still less than residual_mark_seconds then avoiding
-                # cancellation of chore
-            elif chore_has_terminal_state(open_chore_snapshot):
-                logging.warning(f"Unexpected or Rare: Received {open_chore_snapshot.chore_status=}, bug or race in "
-                                f"get_open_chore_snapshots, results should not have any non-open chore_snapshot, unless"
-                                f" under ignorable race condition [i.e. chore went DOD/Fully-Filled after queried DB "
-                                f"via get_open_chore_snapshots] for {get_chore_snapshot_log_key(open_chore_snapshot)}")
-            # else not required: avoiding cxl request if chore_snapshot already got cxl request
 
     async def get_strat_brief_from_symbol_query_pre(self, strat_brief_class_type: Type[StratBrief], security_id: str):
         return await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http(
@@ -5717,22 +4373,20 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             # if strat cache not present - there is a bigger error detected elsewhere
             if self.strat_cache:
                 if not self.market.is_non_bartering_time():
-                    logging.error(f"no executor_check_snapshot for: {get_symbol_side_key([(symbol, side)])}, as "
+                    logging.error(f"no executor_check_snapshot for: {get_symbol_side_key([(symbol, Side(side))])}, as "
                                   f"received {last_n_sec_chore_qty=}, {last_n_sec_barter_qty=}, {last_n_sec=}; "
                                   f"returning empty list []")
                 # else all good - outside bartering hours this is expected [except in simulation]
             else:
-                logging.error(f"get_executor_check_snapshot_query_pre error: {get_symbol_side_key([(symbol, side)])}, "
+                logging.error(f"get_executor_check_snapshot_query_pre error: {get_symbol_side_key([(symbol, Side(side))])}, "
                               f"invalid {self.strat_cache=}; returning empty list []")
             return []
 
     async def get_symbol_overview_from_symbol_query_pre(self, symbol_overview_class_type: Type[SymbolOverview],
                                                         symbol: str):
-        return await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_symbol_overview_http(
-            get_symbol_overview_from_symbol(symbol))
+        return await self.handle_get_top_of_book_from_symbol_query_pre(symbol)
 
     async def get_top_of_book_from_symbol_query_pre(self, top_of_book_class_type: Type[TopOfBook], symbol: str):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate import get_objs_from_symbol
         return await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_top_of_book_http(
             get_objs_from_symbol(symbol))
 
@@ -5796,7 +4450,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         return last_n_sec_trd_vol_list
 
     async def delete_symbol_overview_pre(self, obj_id: int):
-        self.strat_cache.clear_symbol_overview(obj_id)
+        await self.handle_delete_symbol_overview_pre(obj_id)
 
     async def put_strat_to_snooze_query_pre(self, strat_status_class_type: Type[StratStatus]):
         # removing current strat_status
@@ -5920,8 +4574,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # used in test case to verify cache after recovery
         tob_list = []
 
-        leg_1_tob_of_book = self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book()
-        leg_2_tob_of_book = self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book()
+        leg_1_tob_of_book = self.leg1_symbol_cache.get_top_of_book()
+        leg_2_tob_of_book = self.leg2_symbol_cache.get_top_of_book()
 
         if leg_1_tob_of_book is not None:
             with MobileBookMutexManager(leg_1_tob_of_book):
@@ -5940,69 +4594,53 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             self, barter_simulator_process_new_chore_class_type: Type[BarterSimulatorProcessNewChore],
             px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str, symbol_type: str,
             underlying_account: str, exchange: str | None = None, internal_ord_id: str | None = None):
-        if BarterSimulator.symbol_configs is None:
-            BarterSimulator.reload_symbol_configs()
-        await BarterSimulator.place_new_chore(px, qty, side, bartering_sec_id, system_sec_id, symbol_type,
-                                             underlying_account, exchange, internal_ord_id=internal_ord_id)
-        return []
+        return await self.handle_barter_simulator_place_new_chore_query_pre(
+            px, qty, side, bartering_sec_id, system_sec_id, symbol_type, underlying_account, exchange, internal_ord_id)
 
     async def barter_simulator_place_cxl_chore_query_pre(
             self, barter_simulator_process_cxl_chore_class_type: Type[BarterSimulatorProcessCxlChore],
             chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
             system_sec_id: str | None = None, underlying_account: str | None = None):
-        if BarterSimulator.symbol_configs is None:
-            BarterSimulator.reload_symbol_configs()
-        await BarterSimulator.place_cxl_chore(chore_id, side, bartering_sec_id, system_sec_id, underlying_account)
-        return []
+        return await self.handle_barter_simulator_place_cxl_chore_query_pre(chore_id, side, bartering_sec_id,
+                                                                           system_sec_id, underlying_account)
 
     async def barter_simulator_process_chore_ack_query_pre(
             self, barter_simulator_process_chore_ack_class_type: Type[BarterSimulatorProcessChoreAck], chore_id: str,
             px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
-        if BarterSimulator.symbol_configs is None:
-            BarterSimulator.reload_symbol_configs()
-        await BarterSimulator.process_chore_ack(chore_id, px, qty, side, sec_id, underlying_account)
-        return []
+        return await self.handle_barter_simulator_process_chore_ack_query_pre(chore_id, px, qty, side,
+                                                                             sec_id, underlying_account)
 
     async def barter_simulator_process_fill_query_pre(
             self, barter_simulator_process_fill_class_type: Type[BarterSimulatorProcessFill], chore_id: str,
             px: float, qty: int, side: Side, sec_id: str, underlying_account: str,
             use_exact_passed_qty: bool | None = None):
-        if BarterSimulator.symbol_configs is None:
-            BarterSimulator.reload_symbol_configs()
-        await BarterSimulator.process_fill(chore_id, px, qty, side, sec_id, underlying_account, use_exact_passed_qty)
-        return []
+        return await self.handle_barter_simulator_process_fill_query_pre(chore_id, px, qty, side, sec_id,
+                                                                        underlying_account, use_exact_passed_qty)
 
     async def barter_simulator_reload_config_query_pre(
             self, barter_simulator_reload_config_class_type: Type[BarterSimulatorReloadConfig]):
-        BarterSimulator.reload_symbol_configs()
-        return []
+        return await self.handle_barter_simulator_reload_config_query_pre()
 
     async def barter_simulator_process_amend_req_query_pre(
             self, barter_simulator_process_amend_req_class_type: Type[BarterSimulatorProcessAmendReq],
             chore_id: str, side: Side, sec_id: str, underlying_account: str, chore_event: ChoreEventType,
             px: float | None = None, qty: int | None = None):
-        if px is None and qty is None:
-            logging.error("Both Px and Qty can't be None while placing amend chore - ignoring this "
-                          "amend chore creation")
-            return
-        await BarterSimulator.place_amend_req_chore(chore_id, side, sec_id, sec_id, chore_event,
-                                                   underlying_account, px=px, qty=qty)
-        return []
+        return await self.handle_barter_simulator_process_amend_req_query_pre(chore_id, side, sec_id,
+                                                                             underlying_account, chore_event, px, qty)
 
     async def barter_simulator_process_amend_ack_query_pre(
             self, barter_simulator_process_amend_ack_class_type: Type[BarterSimulatorProcessAmendAck],
             chore_id: str, side: Side, sec_id: str, underlying_account: str):
-        await BarterSimulator.place_amend_ack_chore(chore_id, side, sec_id, sec_id, underlying_account)
-        return []
+        return await self.handle_barter_simulator_process_amend_ack_query_pre(chore_id, side, sec_id, underlying_account)
 
     async def barter_simulator_process_amend_rej_query_pre(
             self, barter_simulator_process_amend_ack_class_type: Type[BarterSimulatorProcessAmendAck],
             chore_id: str, side: Side, sec_id: str, underlying_account: str):
-        await BarterSimulator.place_amend_rej_chore(chore_id, side, sec_id, sec_id, underlying_account)
-        return []
+        return await self.handle_barter_simulator_process_amend_rej_query_pre(chore_id, side, sec_id, underlying_account)
 
     async def barter_simulator_process_lapse_query_pre(
             self, barter_simulator_process_lapse_class_type: Type[BarterSimulatorProcessLapse],
             chore_id: str, side: Side, sec_id: str, underlying_account: str, qty: int | None = None):
-        await BarterSimulator.place_lapse_chore(chore_id, side, sec_id, sec_id, underlying_account, qty)
-        return []
+        return await self.handle_barter_simulator_process_lapse_query_pre(chore_id, side, sec_id,
+                                                                         underlying_account, qty)
+

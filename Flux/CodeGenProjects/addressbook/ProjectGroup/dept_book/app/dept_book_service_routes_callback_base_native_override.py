@@ -57,7 +57,9 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                 if self.service_up:
                     if not self.service_ready:
                         self.service_ready = True
-                    print(f"INFO: dept_book service is ready: {datetime.datetime.now().time()}")
+                        # print is just to manually check if this server is ready - useful when we run
+                        # multiple servers and before running any test we want to make sure servers are up
+                        print(f"INFO: dept_book service is ready: {datetime.datetime.now().time()}")
 
                 if not self.service_up:
                     try:

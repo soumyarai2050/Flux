@@ -169,19 +169,16 @@ class PluginExecuteScript:
         run_only_once = False
         if isinstance(self.base_dir_path, list):
             run_only_once = True
-            all_proto_file_path_list = []
             for dir_path in self.base_dir_path:
-                for proto_file in os.listdir(PurePath(dir_path) / "model"):
-                    all_proto_file_path_list.append(str(PurePath(dir_path) / "model" / proto_file))
+                all_proto_file_list = os.listdir(PurePath(dir_path) / "model")
                 out_dir = str(PurePath(dir_path) / "generated")
                 # Creating pb2 files of all proto models
-                self.compile_protoc_models(all_proto_file_path_list, proto_files_dir_paths_list, out_dir)
+                self.compile_protoc_models(all_proto_file_list, proto_files_dir_paths_list, out_dir)
         else:
-            all_proto_file_path_list = [str(PurePath(self.base_dir_path) / "model" / proto_file)
-                                        for proto_file in os.listdir(PurePath(self.base_dir_path) / "model")]
             out_dir = str(PurePath(self.base_dir_path) / "generated")
+            all_proto_file_list = os.listdir(PurePath(self.base_dir_path) / "model")
             # Creating pb2 files of all proto models
-            self.compile_protoc_models(all_proto_file_path_list, proto_files_dir_paths_list, out_dir)
+            self.compile_protoc_models(all_proto_file_list, proto_files_dir_paths_list, out_dir)
 
         # Adding import of pb2 file in insertion_imports.py
         if isinstance(self.base_dir_path, list):

@@ -10,17 +10,17 @@ from pendulum import DateTime
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
     Side, Position, PositionType, InstrumentType)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
-    FillsJournalBaseModel, ChoreStatusType)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link_base import BarteringLinkBase
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link_base import BarteringLinkBase
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
     executor_config_yaml_dict, EXECUTOR_PROJECT_DATA_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_log_simulator)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import (
     get_bkr_from_underlying_account)
 from FluxPythonUtils.scripts.utility_functions import dict_or_list_records_csv_reader, transform_to_str
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
 
 
 log_simulate_logger = logging.getLogger("log_simulator")
@@ -156,7 +156,7 @@ class LogBarterSimulator(BarteringLinkBase):
     @classmethod
     async def place_new_chore(cls, px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str,
                               symbol_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
-                              internal_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
+                              client_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
         """
         return bool indicating success/fail and unique-id-str/err-description in second param
         """
@@ -167,7 +167,7 @@ class LogBarterSimulator(BarteringLinkBase):
                               f"px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}{cls.fld_sep}side{cls.val_sep}"
                               f"{side.value}{cls.fld_sep}bartering_sec_id{cls.val_sep}{bartering_sec_id}{cls.fld_sep}"
                               f"system_sec_id: {system_sec_id}{cls.fld_sep}account{cls.val_sep}{account}{exchange_str}"
-                              f"{cls.fld_sep}internal_ord_id{cls.val_sep}{internal_ord_id}")
+                              f"{cls.fld_sep}internal_ord_id{cls.val_sep}{client_ord_id}")
             log_simulate_logger.info(
                 f"{LogBarterSimulator.log_simulator_pattern}barter_simulator_place_new_chore_query_client{cls.fld_sep}"
                 f"{cls.executor_host}{cls.fld_sep}"
@@ -175,7 +175,7 @@ class LogBarterSimulator(BarteringLinkBase):
                 f"{cls.fld_sep}side{cls.val_sep}{side.value}{cls.fld_sep}bartering_sec_id{cls.val_sep}{bartering_sec_id}"
                 f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}{cls.fld_sep}"
                 f"symbol_type{cls.val_sep}{symbol_type}{cls.fld_sep}underlying_account"
-                f"{cls.val_sep}{account}{exchange_str}{cls.fld_sep}internal_ord_id{cls.val_sep}{internal_ord_id}")
+                f"{cls.val_sep}{account}{exchange_str}{cls.fld_sep}internal_ord_id{cls.val_sep}{client_ord_id}")
         cls.int_id += 1
         sync_check = kwargs.get("sync_check")
         if sync_check:

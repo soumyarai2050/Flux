@@ -62,6 +62,9 @@ def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, exp
     # deleting existing executors
     clean_executors_and_today_activated_symbol_side_lock_file()
 
+    # removing basket executor if exists
+    # clean_basket_book()
+
     # cleaning all collections
     clean_all_collections_ignoring_ui_layout()
     clear_cache_in_model()
@@ -250,9 +253,10 @@ def expected_strat_limits_():
 
 @pytest.fixture()
 def expected_chore_limits_():
-    yield ChoreLimitsBaseModel.from_kwargs(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                               max_chore_qty=500, max_chore_notional=90_000, max_basis_points_algo=1500,
-                               max_px_deviation_algo=20, max_chore_qty_algo=500, max_chore_notional_algo=90_000)
+    yield ChoreLimitsBaseModel.from_kwargs(
+        _id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
+        max_chore_qty=500, max_chore_notional=90_000, max_basis_points_algo=1500,
+        max_px_deviation_algo=20, max_chore_qty_algo=500, max_chore_notional_algo=90_000)
 
 
 @pytest.fixture()

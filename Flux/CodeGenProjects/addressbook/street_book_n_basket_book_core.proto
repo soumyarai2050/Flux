@@ -45,3 +45,259 @@ message NewChore{
   optional string ord_entry_time = 17 [(FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Chore Entry", (FluxFldHide) = "True"];
   optional string text = 18 [(FluxFldTitle) = "Text", (FluxFldAbbreviated) = "JSON", (FluxFldServerPopulate) = true];
 }
+
+message CancelChore{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+    PatchOp: AggregateType_UNSPECIFIED,
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: true,
+    IsTopLvlModel: false,
+    ExecutorKeySequence: "security.sec_id-side",
+    IsRepeated: true,
+    CacheAsDictWithKeyField: "chore_id"
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required string chore_id = 2;
+  required Security security = 3;
+  required Side side = 4;
+  optional bool cxl_confirmed = 5 [(FluxFldHide) = "True"];
+  optional bool force_cancel = 6 [(FluxFldHide) = "True", (FluxFldHelp) = "allows cancel even if strat not active"];
+}
+
+message BarterSimulatorProcessNewChore{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_place_new_chore",
+    QueryParams: "px",
+    QueryParamsDataType: "float",
+    QueryParams: "qty",
+    QueryParamsDataType: "int",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "bartering_sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "system_sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "symbol_type",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str",
+    QueryParams: "exchange",
+    QueryParamsDataType: "str | None = None",
+    QueryParams: "internal_ord_id",
+    QueryParamsDataType: "str | None = None"
+  };
+  required bool resp = 1;
+}
+
+message FillsJournal{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 58,
+    w: 18,
+    h: 16,
+    is_repeated: True,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "email_book_service.proto",
+    depending_proto_model_name: "PairStrat",
+    depends_on_other_model_for_dynamic_url: true,
+    is_read_only: true
+  };
+  option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
+  option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_symbol_side_underlying_account_cumulative_fill_qty",
+      AggregateVarName: "get_symbol_side_underlying_account_cumulative_fill_qty",
+      QueryParams: "symbol",
+      QueryParams: "side",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "str"
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_fills_journal_from_cache"
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 1,
+    ExecutorKeySequence: "fill_symbol-fill_side",
+    LogKeySequence: "fill_id"
+    IsRepeated: true
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional string chore_id = 2;
+  optional float fill_px = 3;
+  optional int64 fill_qty = 4;
+  optional float fill_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldTitle) = "Fill $", (FluxFldNumberFormat) = "$"];
+  optional string fill_symbol = 6 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true, (FluxFldHelp) = "System Symbol"];
+  optional string fill_bartering_symbol = 7 [(FluxFldIndex) = true, (FluxFldHide) = "True", (FluxFldFilterEnable) = true, (FluxFldHelp) = "System Symbol"];
+  optional Side fill_side = 8;
+  required string underlying_account = 9;
+  optional string fill_date_time = 10 [(FluxFldValIsDateTime) = true];
+  required string fill_id = 11;
+  optional int64 underlying_account_cumulative_fill_qty = 12 [(FluxFldHide) = "True"]; // used by executor query at strat start
+  optional string user_data = 13;
+}
+
+message UnderlyingAccountNCumFillQty{
+  required string underlying_account = 1;
+  required int64 cumulative_qty = 2;
+}
+
+message UnderlyingAccountCumFillQty{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_underlying_account_cumulative_fill_qty",
+      QueryParams: "symbol",
+      QueryParams: "side",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "str"
+  };
+  repeated UnderlyingAccountNCumFillQty underlying_account_n_cumulative_fill_qty = 1;
+}
+
+
+message BarterSimulatorProcessCxlChore{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_place_cxl_chore",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side | None = None",
+    QueryParams: "bartering_sec_id",
+    QueryParamsDataType: "str | None = None",
+    QueryParams: "system_sec_id",
+    QueryParamsDataType: "str | None = None",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str | None = None"
+  };
+  required bool resp = 1;
+}
+
+message BarterSimulatorProcessChoreAck{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_process_chore_ack",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
+    QueryParams: "px",
+    QueryParamsDataType: "float",
+    QueryParams: "qty",
+    QueryParamsDataType: "int",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str"
+  };
+  required bool resp = 1;
+}
+
+message BarterSimulatorProcessFill{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_process_fill",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
+    QueryParams: "px",
+    QueryParamsDataType: "float",
+    QueryParams: "qty",
+    QueryParamsDataType: "int",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str",
+    QueryParams: "use_exact_passed_qty",
+    QueryParamsDataType: "bool | None = None"
+  };
+  required bool resp = 1;
+}
+
+message BarterSimulatorProcessAmendReq{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_process_amend_req",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str",
+    QueryParams: "chore_event",
+    QueryParamsDataType: "ChoreEventType",
+    QueryParams: "px",
+    QueryParamsDataType: "float | None = None",
+    QueryParams: "qty",
+    QueryParamsDataType: "int | None = None",
+  };
+  required bool resp = 1;
+}
+
+message BarterSimulatorProcessAmendAck{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_process_amend_ack",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str"
+  };
+  required bool resp = 1;
+}
+
+message BarterSimulatorProcessAmendREJ{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_process_amend_rej",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str"
+  };
+  required bool resp = 1;
+}
+
+message BarterSimulatorProcessLapse{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_process_lapse",
+    QueryParams: "chore_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str",
+    QueryParams: "qty",
+    QueryParamsDataType: "int | None = None",
+  };
+  required bool resp = 1;
+}
+
+message BarterSimulatorReloadConfig{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "barter_simulator_reload_config"
+  };
+  required bool resp = 1;
+}

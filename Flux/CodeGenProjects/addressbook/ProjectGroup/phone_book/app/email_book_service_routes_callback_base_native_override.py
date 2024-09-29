@@ -1,28 +1,17 @@
 # python imports
 import copy
 import glob
-import json
-import logging
-import math
-import os
 import signal
 import subprocess
 import stat
 import time
-import sys
-from typing import List, Type, Tuple, Dict, FrozenSet, Set, Final, Optional
-import asyncio
-from pathlib import PurePath
-from datetime import date, datetime
+from typing import Set
+from datetime import datetime
 import threading
 import requests
-import psutil
 
 # third-party package imports
-from fastapi.encoders import jsonable_encoder
-from pendulum import DateTime, local_timezone
-from fastapi import HTTPException, UploadFile
-from pymongo.errors import DuplicateKeyError
+from fastapi import UploadFile
 from pymongo import MongoClient
 
 # project imports
@@ -31,17 +20,15 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydenti
     SymbolOverviewBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_routes_msgspec_callback import (
     EmailBookServiceRoutesCallback)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book import (
-    block_active_strat_with_restricted_security)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     is_service_up, get_symbol_side_key, config_yaml_dict, config_yaml_path,
     YAMLConfigurationManager, street_book_config_yaml_dict, ps_port, CURRENT_PROJECT_DIR,
     CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host, get_new_portfolio_status,
     get_new_portfolio_limits, get_new_chore_limits, CURRENT_PROJECT_DATA_DIR, is_ongoing_strat,
     get_strat_key_from_pair_strat, get_id_from_strat_key, get_new_strat_view_obj,
-    get_single_exact_match_strat_from_symbol_n_side, get_reset_log_book_cache_wrapper_pattern,
-    pair_strat_client_call_log_str, email_book_service_http_client, UpdateType,
-    get_matching_strat_from_symbol_n_side, get_portfolio_limits)
+    get_reset_log_book_cache_wrapper_pattern,
+    pair_strat_client_call_log_str, UpdateType,
+    get_matching_strat_from_symbol_n_side)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key, get_pair_strat_dict_log_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
     get_ongoing_pair_strat_filter, get_all_pair_strat_from_symbol_n_side, get_ongoing_or_all_pair_strats_by_sec_id)
@@ -53,7 +40,7 @@ from FluxPythonUtils.scripts.service import Service
 from FluxPythonUtils.scripts.utility_functions import (
     get_pid_from_port, except_n_log_alert, is_process_running, submit_task_with_first_completed_wait,
     handle_refresh_configurable_data_members, parse_to_int, set_package_logger_level)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link import get_bartering_link
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link import get_bartering_link
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
@@ -278,8 +265,10 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         self.recover_kill_switch_state()
                         self.recover_existing_executors()
                         self._block_active_strat_with_restricted_security()
-                    self.service_ready = True
-                    print(f"INFO: phone_book service is ready: {datetime.datetime.now().time()}")
+                        self.service_ready = True
+                        # print is just to manually check if this server is ready - useful when we run
+                        # multiple servers and before running any test we want to make sure servers are up
+                        print(f"INFO: phone_book service is ready: {datetime.datetime.now().time()}")
                 else:
                     warn: str = (f"_app_launch_pre_thread_func: service not ready yet;;;{self.service_up=}, "
                                  f"{static_data_service_state.ready=}")
@@ -1662,6 +1651,18 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         :param save_file_destination:
         :return:
         """
+        content = await upload_file.read()
+        with open(save_file_destination, "wb") as file:
+            file.write(content)
+        return []
+
+    async def sample_model_file_upload_query_pre(self, upload_file: UploadFile):
+        """
+        Used in verifying file upload functionality with http client for SampleModel based query in test
+        :param upload_file:
+        :return:
+        """
+        save_file_destination = PurePath(__file__).parent.parent / "generated" / "sample_file.txt"
         content = await upload_file.read()
         with open(save_file_destination, "wb") as file:
             file.write(content)

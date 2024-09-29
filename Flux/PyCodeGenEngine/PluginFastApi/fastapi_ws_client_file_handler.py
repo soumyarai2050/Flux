@@ -2,12 +2,16 @@
 from abc import ABC
 from typing import List, Dict
 
+# 3rd party imports
 import protogen
+from pathlib import PurePath
 
 # project imports
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin
 from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_specific_case,
                                                        convert_to_capitalized_camel_case)
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
+    project_dir, root_core_proto_files, project_grp_core_proto_files)
 
 
 class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
@@ -16,13 +20,26 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
 
-    def handle_imports_output(self) -> str:
+    def handle_imports_output(self, file: protogen.File | None = None,
+                              model_file_suffix: str| None = None) -> str:
         output_str = "# standard imports\n"
         output_str += "\n"
         output_str += "# project imports\n"
         output_str += "from FluxPythonUtils.scripts.ws_reader import WSReader\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
-        output_str += f"from {model_file_path} import *\n\n\n"
+        output_str += f"from {model_file_path} import *\n"
+
+        if file and model_file_suffix:
+            project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+            dependency_file_path_list = self.get_dependency_file_path_list(
+                file, root_core_proto_files, project_grp_core_proto_files,
+                model_file_suffix, str(project_grp_root_dir))
+
+            project_name = file.proto.package
+            for dependency_file_path in dependency_file_path_list:
+                if f"_n_{project_name}" in dependency_file_path or f"{project_name}_n_" in dependency_file_path:
+                    output_str += f'from {dependency_file_path} import *\n'
+        output_str += "\n\n"
         return output_str
 
     def _handle_client_query_ws_url(self, file: protogen.File, message: protogen.Message):
@@ -317,9 +334,10 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
 
         return output_str
 
-    def handle_ws_client_file_gen(self, file) -> str:
+    def handle_ws_client_file_gen(self, file: protogen.File,
+                                  model_file_suffix: str | None = None) -> str:
         output_str = ""
-        output_str += self.handle_imports_output()
+        output_str += self.handle_imports_output(file, model_file_suffix)
         file_name = str(file.proto.name).split(".")[0]
         file_name_camel_cased = convert_to_capitalized_camel_case(file_name)
         output_str += f"class {file_name_camel_cased}WSClient:\n"

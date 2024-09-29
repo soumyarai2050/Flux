@@ -48,13 +48,15 @@ def _place_sanity_complete_buy_sell_pair_chores_with_pair_strat(
         buy_ack_chore_id = None
         sell_ack_chore_id = None
 
-        # updating last_barter for this test
-        for last_barter_fixture in last_barter_fixture_list:
-            last_barter_fixture["qty"] = 500
-
+        leg1_last_barter: LastBarterBaseModel | None = None
+        leg2_last_barter: LastBarterBaseModel | None = None
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
-                           create_counts_per_side=10)
+            if leg1_last_barter is not None:
+                last_barter_fixture_list[0]["market_barter_volume"]["participation_period_last_barter_qty_sum"] = leg1_last_barter.market_barter_volume.participation_period_last_barter_qty_sum
+            if leg2_last_barter is not None:
+                last_barter_fixture_list[1]["market_barter_volume"]["participation_period_last_barter_qty_sum"] = leg2_last_barter.market_barter_volume.participation_period_last_barter_qty_sum
+            leg1_last_barter, leg2_last_barter = run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
+                                                              create_counts_per_side=10)
 
             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, 98, 20, executor_web_client,
                                                            buy_inst_type)

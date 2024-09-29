@@ -132,14 +132,15 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
         self.service_up: bool = False
         self.service_ready = False
-        self.strat_alert_cache_dict_by_strat_id_dict: Dict[int, Dict[str, StratAlert]] = {}
-        self.portfolio_alerts_cache_dict: Dict[str, PortfolioAlert] = {}
-        self.strat_alert_id_to_obj_dict: Dict[int, StratAlert] = {}
-        self.portfolio_alert_id_to_obj_dict: Dict[int, PortfolioAlert] = {}
-        self.pydantic_type_name_to_patch_queue_cache_dict: Dict[str, Queue] = {}
+        self.strat_alert_cache_dict_by_strat_id_dict: Dict[int, Dict[str, StratAlert]] = {}     # updates in main thread only
+        self.portfolio_alerts_cache_dict: Dict[str, PortfolioAlert] = {}    # updates in main thread only
+        self.strat_alerts_cache_cont: AlertsCacheCont = AlertsCacheCont()
+        self.portfolio_alerts_cache_cont: AlertsCacheCont = AlertsCacheCont()
         self.tail_file_multiprocess_queue: multiprocessing.Queue = multiprocessing.Queue()
         self.clear_cache_file_path_queue: multiprocessing.Queue = multiprocessing.Queue()
+        self.file_path_to_tail_executor_process_cache_mutex: RLock = RLock()
         self.file_path_to_tail_executor_process_cache_dict: Dict[str, List[multiprocessing.Process]] = {}
+        self.file_path_to_log_detail_cache_mutex: RLock = RLock()
         self.file_path_to_log_detail_cache_dict: Dict[str, List[StratLogDetail]] = {}
         self.file_watcher_process: multiprocessing.Process | None = None
         self.portfolio_alert_queue: Queue = Queue()
@@ -217,7 +218,9 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                         simulation_mode: bool = config_yaml_dict.get("simulate_log_book", False)
                         Thread(target=PhoneBookLogBook.dynamic_start_log_book_for_log_details,
                                args=(self.tail_file_multiprocess_queue,
+                                     self.file_path_to_tail_executor_process_cache_mutex,
                                      self.file_path_to_tail_executor_process_cache_dict,
+                                     self.file_path_to_log_detail_cache_mutex,
                                      self.file_path_to_log_detail_cache_dict,
                                      spawn, self.tail_executor_start_time_local_fmt,),
                                kwargs={"regex_file_dir_path": str(LOG_ANALYZER_DATA_DIR),
@@ -236,7 +239,9 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                         self.file_watcher_process = process
 
                         self.service_ready = True
-                        print(f"INFO: service is ready: {datetime.now().time()}")
+                        # print is just to manually check if this server is ready - useful when we run
+                        # multiple servers and before running any test we want to make sure servers are up
+                        print(f"INFO: Log Analyser service is ready: {datetime.now().time()}")
 
                 if not self.service_up:
                     try:
@@ -317,7 +322,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
                                                 component_file_path, source_file_name, line_num)
                 self.portfolio_alerts_cache_dict[alert_key] = portfolio_alert
-                self.portfolio_alert_id_to_obj_dict[portfolio_alert.id] = portfolio_alert
+                with self.portfolio_alerts_cache_cont.mutex:
+                    self.portfolio_alerts_cache_cont.alert_id_to_obj_dict[portfolio_alert.id] = portfolio_alert
 
         except Exception as e:
             err_str_ = f"load_portfolio_alerts_n_update_cache failed with exception: {e}"
@@ -349,7 +355,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     self.strat_alert_cache_dict_by_strat_id_dict[strat_alert.strat_id] = {alert_key: strat_alert}
                 else:
                     strat_alert_cache[alert_key] = strat_alert
-                self.strat_alert_id_to_obj_dict[strat_alert.id] = strat_alert
+                with self.strat_alerts_cache_cont.mutex:
+                    self.strat_alerts_cache_cont.alert_id_to_obj_dict[strat_alert.id] = strat_alert
 
     def put_all_portfolio_alert_client_with_asyncio_loop(self, portfolio_alerts: List[PortfolioAlert]):
         try:
@@ -426,7 +433,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             self.create_all_portfolio_alert_client_with_asyncio_loop,
             self._handle_portfolio_alert_queue_err_handler,
             self.put_all_portfolio_alert_client_with_asyncio_loop,
-            self.portfolio_alert_id_to_obj_dict)
+            self.portfolio_alerts_cache_cont)
 
     def _handle_strat_alert_queue_err_handler(self, *args):
         try:
@@ -460,7 +467,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             self.create_all_strat_alert_client_with_asyncio_loop,
             self._handle_strat_alert_queue_err_handler,
             self.put_all_strat_alert_client_with_asyncio_loop,
-            self.strat_alert_id_to_obj_dict)
+            self.strat_alerts_cache_cont)
 
     def run_queue_handler(self):
         portfolio_alert_handler_thread = Thread(target=self._handle_portfolio_alert_queue, daemon=True)
@@ -655,7 +662,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 background_log_prefix_regex_pattern_to_callable_name_dict,
                 log_file_path_is_regex=False),
             StratLogDetail(
-                service="log_simulator",
+                service="street_book_log_simulator",
                 log_file_path=str(street_book_log_dir / f"log_simulator_*_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=
@@ -690,6 +697,13 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
                 log_file_path_is_regex=False),
+            StratLogDetail(
+                service="basket_book_log_simulator",
+                log_file_path=str(basket_book_log_dir / f"log_simulator_*_{datetime_str}.log"),
+                critical=True,
+                log_prefix_regex_pattern_to_callable_name_dict=
+                log_simulator_prefix_regex_pattern_to_callable_name_dict,
+                log_file_path_is_regex=True),
             StratLogDetail(
                 service="photo_book_background",
                 log_file_path=str(
@@ -835,38 +849,43 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             raise HTTPException(status_code=503, detail=err_str_)
 
     async def delete_portfolio_alert_post(self, delete_web_response):
-        portfolio_alert = self.portfolio_alert_id_to_obj_dict.get(delete_web_response.id)
-        component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(portfolio_alert)
-        alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
-                                        component_file_path, source_file_name, line_num)
-        self.portfolio_alerts_cache_dict.pop(alert_key, None)
-        self.portfolio_alert_id_to_obj_dict.pop(delete_web_response.id, None)
+        with self.portfolio_alerts_cache_cont.mutex:
+            portfolio_alert = self.portfolio_alerts_cache_cont.alert_id_to_obj_dict.get(delete_web_response.id)
+            component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(portfolio_alert)
+            alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
+                                            component_file_path, source_file_name, line_num)
+            self.portfolio_alerts_cache_dict.pop(alert_key, None)
+            self.portfolio_alerts_cache_cont.alert_id_to_obj_dict.pop(delete_web_response.id, None)
 
     async def delete_strat_alert_post(self, delete_web_response):
-        strat_alert = self.strat_alert_id_to_obj_dict.get(delete_web_response.id)
-        strat_alert_cache_dict = self.strat_alert_cache_dict_by_strat_id_dict.get(strat_alert.strat_id)
-        component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(strat_alert)
-        alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
-                                        component_file_path, source_file_name, line_num)
-        strat_alert_cache_dict.pop(alert_key, None)
-        self.strat_alert_id_to_obj_dict.pop(delete_web_response.id, None)
+        with self.strat_alerts_cache_cont.mutex:
+            strat_alert = self.strat_alerts_cache_cont.alert_id_to_obj_dict.get(delete_web_response.id)
+            strat_alert_cache_dict = self.strat_alert_cache_dict_by_strat_id_dict.get(strat_alert.strat_id)
+            component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(strat_alert)
+            alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
+                                            component_file_path, source_file_name, line_num)
+            strat_alert_cache_dict.pop(alert_key, None)
+            self.strat_alerts_cache_cont.alert_id_to_obj_dict.pop(delete_web_response.id, None)
 
     async def delete_all_strat_alert_post(self, delete_web_response):
         self.strat_alert_cache_dict_by_strat_id_dict.clear()
-        self.strat_alert_id_to_obj_dict.clear()
+        with self.strat_alerts_cache_cont.mutex:
+            self.strat_alerts_cache_cont.alert_id_to_obj_dict.clear()
         # updating strat_view fields
         photo_book_service_http_client.reset_all_strat_view_count_n_severity_query_client()
 
     async def verify_strat_alert_id_in_strat_alert_id_to_obj_cache_dict_query_pre(
             self, strat_alert_id_to_obj_cache_class_type: Type[StratAlertIdToObjCache], strat_alert_id: int):
-        is_id_present = strat_alert_id in self.strat_alert_id_to_obj_dict
-        return [StratAlertIdToObjCache(is_id_present=is_id_present)]
+        with self.strat_alerts_cache_cont.mutex:
+            is_id_present = strat_alert_id in self.strat_alerts_cache_cont.alert_id_to_obj_dict
+            return [StratAlertIdToObjCache(is_id_present=is_id_present)]
 
     async def verify_portfolio_alert_id_in_get_portfolio_alert_id_to_obj_cache_dict_query_pre(
             self, portfolio_alert_id_to_obj_cache_class_type: Type[PortfolioAlertIdToObjCache],
             portfolio_alert_id: int):
-        is_id_present = portfolio_alert_id in self.portfolio_alert_id_to_obj_dict
-        return [PortfolioAlertIdToObjCache(is_id_present=is_id_present)]
+        with self.portfolio_alerts_cache_cont.mutex:
+            is_id_present = portfolio_alert_id in self.portfolio_alerts_cache_cont.alert_id_to_obj_dict
+            return [PortfolioAlertIdToObjCache(is_id_present=is_id_present)]
 
     async def verify_strat_id_in_strat_alert_cache_dict_by_strat_id_dict_query_pre(
             self, _: Type[StratIdInStratAlertCacheDictByStratIdDict], strat_id: int):
@@ -930,21 +949,22 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                underlying_log_book_force_kill_tail_executor_query_http(
                 log_file_name))
 
-        # updating multiprocess queue to again start tail executor for log detail but from specific time
-        log_details: List[StratLogDetail] = self.file_path_to_log_detail_cache_dict.get(log_file_name)
+        with self.file_path_to_log_detail_cache_mutex:
+            # updating multiprocess queue to again start tail executor for log detail but from specific time
+            log_details: List[StratLogDetail] = self.file_path_to_log_detail_cache_dict.get(log_file_name)
 
-        if log_details:
-            self.file_path_to_log_detail_cache_dict.pop(log_file_name)
+            if log_details:
+                self.file_path_to_log_detail_cache_dict.pop(log_file_name)
 
-            for log_detail in log_details:
-                # updating tail_details for this log_file to restart it from logged timestamp
-                log_detail.processed_timestamp = start_timestamp
-                log_detail.is_running = False
+                for log_detail in log_details:
+                    # updating tail_details for this log_file to restart it from logged timestamp
+                    log_detail.processed_timestamp = start_timestamp
+                    log_detail.is_running = False
 
-                self.tail_file_multiprocess_queue.put(log_detail)
-        else:
-            logging.warning("Can't find log_file_name in file_path_to_log_detail_cache_dict - ignoring restart, "
-                            f"{log_file_name=}, {start_timestamp=}")
+                    self.tail_file_multiprocess_queue.put(log_detail)
+            else:
+                logging.warning("Can't find log_file_name in file_path_to_log_detail_cache_dict - ignoring restart, "
+                                f"{log_file_name=}, {start_timestamp=}")
         return []
 
     async def log_book_force_kill_tail_executor_query_pre(
@@ -952,20 +972,21 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             log_file_path: str):
         """terminates all tail executors running for passed file_path"""
 
-        tail_executor_process_list: List[multiprocessing.Process] = (
-            self.file_path_to_tail_executor_process_cache_dict.get(log_file_path))
+        with self.file_path_to_tail_executor_process_cache_mutex:  # mutex for file_path_to_tail_executor_process_cache_dict
+            tail_executor_process_list: List[multiprocessing.Process] = (
+                self.file_path_to_tail_executor_process_cache_dict.get(log_file_path))
 
-        if tail_executor_process_list:
-            for tail_executor_process in tail_executor_process_list:
-                tail_executor_process.terminate()
-                tail_executor_process.join()
-            self.file_path_to_tail_executor_process_cache_dict.pop(log_file_path)
-        else:
-            # keeping log as info since from tests this query is used in clean_n_set_limits - it's expected
-            # to call this with no tail executor running with passed log_file_path
-            logging.info(f"Ignoring Force Kill tail executor - Can't find any tail_executor proces for "
-                         f"file: {log_file_path} in {self.file_path_to_tail_executor_process_cache_dict=}")
-        return []
+            if tail_executor_process_list:
+                for tail_executor_process in tail_executor_process_list:
+                    tail_executor_process.terminate()
+                    tail_executor_process.join()
+                self.file_path_to_tail_executor_process_cache_dict.pop(log_file_path)
+            else:
+                # keeping log as info since from tests this query is used in clean_n_set_limits - it's expected
+                # to call this with no tail executor running with passed log_file_path
+                logging.info(f"Ignoring Force Kill tail executor - Can't find any tail_executor proces for "
+                             f"file: {log_file_path} in {self.file_path_to_tail_executor_process_cache_dict=}")
+            return []
 
     async def dismiss_strat_alert_by_brief_str_query_pre(
             self, dismiss_strat_alert_by_brief_str_class_type: Type[DismissStratAlertByBriefStr],
@@ -984,14 +1005,15 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def log_book_remove_file_from_created_cache_query_pre(
             self, log_book_remove_file_from_created_cache_class_type: Type[LogBookRemoveFileFromCreatedCache],
             log_file_path_list: List[str]):
-        for log_file_path in log_file_path_list:
-            # consumer of this queue handles task to release cache for this file entry - logs error if file
-            # not found in cache
-            self.clear_cache_file_path_queue.put(log_file_path)
+        with self.file_path_to_log_detail_cache_mutex:
+            for log_file_path in log_file_path_list:
+                # consumer of this queue handles task to release cache for this file entry - logs error if file
+                # not found in cache
+                self.clear_cache_file_path_queue.put(log_file_path)
 
-            # clearing file_path_to_log_detail_cache_dict so that if next tail_executor starts with same file_path
-            # it doesn't already have entries for file_path
-            self.file_path_to_log_detail_cache_dict.pop(log_file_path, None)
+                # clearing file_path_to_log_detail_cache_dict so that if next tail_executor starts with same file_path
+                # it doesn't already have entries for file_path
+                self.file_path_to_log_detail_cache_dict.pop(log_file_path, None)
 
         return []
 
@@ -1021,9 +1043,10 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
         # todo: introduce bulk delete with id list and replace looped deletion here
         strat_alert: StratAlert
-        for strat_alert in strat_alerts:
-            await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_alert_http(strat_alert.id)
-            self.strat_alert_id_to_obj_dict.pop(strat_alert.id, None)
+        with self.strat_alerts_cache_cont.mutex:
+            for strat_alert in strat_alerts:
+                await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_alert_http(strat_alert.id)
+                self.strat_alerts_cache_cont.alert_id_to_obj_dict.pop(strat_alert.id, None)
 
         # releasing cache for strat id
         self.strat_alert_cache_dict_by_strat_id_dict.pop(strat_id, None)

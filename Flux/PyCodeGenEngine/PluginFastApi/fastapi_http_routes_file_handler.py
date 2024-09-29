@@ -3765,20 +3765,23 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             raise Exception(err_str)
         return output_str
 
-    def _handle_http_file_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
-                                    query_params_with_type_str: str, return_type_str: str | None = None,
+    def _handle_http_file_query_str(self, message: protogen.Message, query_name: str, query_params_str: str | None = None,
+                                    query_params_with_type_str: str | None = None, return_type_str: str | None = None,
                                     model_type: ModelType = ModelType.Beanie) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if return_type_str is None:
             return_type_str = message.proto.name
         output_str = f"@perf_benchmark\n"
         if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
-            output_str += (f"async def underlying_{query_name}_query_http(upload_file: UploadFile, "
-                           f"{query_params_with_type_str}):\n")
+            output_str += f"async def underlying_{query_name}_query_http(upload_file: UploadFile"
+            if query_params_with_type_str:
+                output_str += f", {query_params_with_type_str}"
+            output_str += "):\n"
         else:
-            output_str += f"async def underlying_{query_name}_query_http(upload_file: UploadFile, " \
-                          f"{query_params_with_type_str}) -> " \
-                          f"List[{return_type_str}]:\n"
+            output_str += f"async def underlying_{query_name}_query_http(upload_file: UploadFile"
+            if query_params_with_type_str:
+                output_str += f", {query_params_with_type_str}"
+            output_str += f") -> List[{return_type_str}]:\n"
         if query_params_str:
             output_str += f"    return_val = await " \
                           f"callback_class.{query_name}_query_pre(upload_file, {query_params_str})\n"
@@ -3791,10 +3794,15 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f"    return return_val\n\n\n"
 
         if model_type == ModelType.Msgspec:
-            output_str += (f"async def underlying_{query_name}_query_http_bytes(upload_file: UploadFile, "
-                           f"{query_params_with_type_str}):\n")
+            output_str += f"async def underlying_{query_name}_query_http_bytes(upload_file: UploadFile"
+            if query_params_with_type_str:
+                output_str += f", {query_params_with_type_str}"
+            output_str += "):\n"
             output_str += (f"    return_val = await underlying_{query_name}_query_http("
-                           f"upload_file, {query_params_str})\n")
+                           f"upload_file")
+            if query_params_str:
+                output_str += f", {query_params_str}"
+            output_str += f")\n"
             output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
             output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=201)\n\n\n"
         # else not required: if model_type is not Msgspec then no bytes type underlying variant is created
@@ -3802,20 +3810,32 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
             output_str += f'@{self.api_router_app_name}.post("/query-{query_name}' + \
                           f'", status_code=201)\n'
-            output_str += f"async def {query_name}_query_http(upload_file: UploadFile, {query_params_with_type_str}):\n"
+            output_str += f"async def {query_name}_query_http(upload_file: UploadFile"
+            if query_params_with_type_str:
+                output_str += f", {query_params_with_type_str}"
+            output_str += "):\n"
         else:
             output_str += f'@{self.api_router_app_name}.post("/query-{query_name}' + \
                           f'", response_model=List[{return_type_str}], status_code=201)\n'
-            output_str += (f"async def {query_name}_query_http(upload_file: UploadFile, "
-                           f"{query_params_with_type_str}) -> List[{return_type_str}]:\n")
+            output_str += f"async def {query_name}_query_http(upload_file: UploadFile"
+            if query_params_with_type_str:
+                output_str += f", {query_params_with_type_str}"
+            output_str += f") -> List[{return_type_str}]:\n"
         output_str += f'    """\n'
         output_str += f'    File Upload Query of {message.proto.name} - {query_name}\n'
         output_str += f'    """\n'
         if model_type == ModelType.Msgspec:
-            output_str += f"    return await underlying_{query_name}_query_http_bytes(upload_file, {query_params_str})"
+            output_str += f"    return await underlying_{query_name}_query_http_bytes(upload_file"
+            if query_params_str:
+                output_str += f", {query_params_str}"
+            output_str += f")"
         else:
-            output_str += f"    return await underlying_{query_name}_query_http(upload_file, {query_params_str})"
+            output_str += f"    return await underlying_{query_name}_query_http(upload_file"
+            if query_params_str:
+                output_str += f", {query_params_str}"
+            output_str += f")"
         output_str += "\n\n\n"
+
         return output_str
 
     def _handle_query_methods(self, message: protogen.Message, model_type: ModelType = ModelType.Beanie) -> str:
@@ -3857,6 +3877,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += self._handle_http_file_query_str(message, query_name, query_params_str,
                                                                query_params_with_type_str,
                                                                model_type=model_type)
+
         return output_str
 
     def _handle_get_max_id_query_generation(self, message: protogen.Message, model_type: ModelType):
@@ -3956,6 +3977,10 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         for message in self.message_to_query_option_list_dict:
             output_str += self._handle_query_methods(message)
 
+        for message, query_name in self.message_to_file_query_name_dict.items():
+            query_name = self.get_file_query_name_from_message_name(message.proto.name)
+            output_str += self._handle_http_file_query_str(message, query_name)
+
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
                 output_str += self._handle_projection_query_methods(message)
@@ -3972,6 +3997,10 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         for message in self.message_to_query_option_list_dict:
             output_str += self._handle_query_methods(message, model_type=ModelType.Dataclass)
 
+        for message, query_name in self.message_to_file_query_name_dict.items():
+            query_name = self.get_file_query_name_from_message_name(message.proto.name)
+            output_str += self._handle_http_file_query_str(message, query_name, model_type=ModelType.Dataclass)
+
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
                 output_str += self._handle_projection_query_methods(message, model_type=ModelType.Dataclass)
@@ -3987,6 +4016,10 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         for message in self.message_to_query_option_list_dict:
             output_str += self._handle_query_methods(message, model_type=ModelType.Msgspec)
+
+        for message, query_name in self.message_to_file_query_name_dict.items():
+            query_name = self.get_file_query_name_from_message_name(message.proto.name)
+            output_str += self._handle_http_file_query_str(message, query_name, model_type=ModelType.Msgspec)
 
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):

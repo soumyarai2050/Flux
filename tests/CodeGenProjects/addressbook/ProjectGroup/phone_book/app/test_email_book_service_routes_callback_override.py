@@ -560,9 +560,30 @@ def test_verify_stored_n_update_obj_are_diff_in_post_callback_in_patch_all_http(
             raise e
 
 
-# sanity test to create and activate pair_strat
+def test_max_id_updates_if_db_create_obj_has_greater_id(static_data_, clean_and_set_limits):
+    max_id = email_book_service_native_web_client.get_sample_model_max_id_client()
+    max_id_val = max_id.max_id_val
+
+    # creating obj with id bigger than current max_id_val
+    new_max_id = max_id_val + 5
+    sample_model = SampleModelBaseModel.from_kwargs(_id=new_max_id, sample="sample", date=DateTime.utcnow(), num=1)
+    email_book_service_native_web_client.create_sample_model_client(sample_model)
+    check_max_id = email_book_service_native_web_client.get_sample_model_max_id_client()
+    assert check_max_id.max_id_val == new_max_id, \
+        f"Mismatch: max_id must be updated to {new_max_id} but found {check_max_id.max_id_val}"
+
+    # checking same for create-all case
+    new_max_id += 5
+    sample_model = SampleModelBaseModel.from_kwargs(_id=new_max_id, sample="sample", date=DateTime.utcnow(), num=1)
+    email_book_service_native_web_client.create_all_sample_model_client([sample_model])
+    check_max_id = email_book_service_native_web_client.get_sample_model_max_id_client()
+    assert check_max_id.max_id_val == new_max_id, \
+        f"Mismatch: max_id must be updated to {new_max_id} but found {check_max_id.max_id_val}"
+
+
 @pytest.mark.nightly
 def test_file_upload_n_save_query():
+    """test to verify query to upload and save file"""
     test_file_path = PurePath(__file__).parent.parent / "data" / "sample.txt"
     destination_file_path = PurePath(__file__).parent / "check.txt"
     try:
@@ -572,6 +593,27 @@ def test_file_upload_n_save_query():
         # saving file at destination from test_file_path
         email_book_service_native_web_client.sample_file_upload_query_client(test_file_path,
                                                                                 str(destination_file_path))
+        # verifying file exists at destination
+        assert os.path.exists(destination_file_path), \
+            f"Unexpected: file must have been created by file query at {destination_file_path}"
+    except Exception as e:
+        raise e
+    finally:
+        if os.path.exists(destination_file_path):
+            os.remove(destination_file_path)
+
+
+@pytest.mark.nightly
+def test_sample_model_file_upload_query():
+    """test to verify file upload query on json model, SampleModel for this test"""
+    test_file_path = PurePath(__file__).parent.parent / "data" / "sample.txt"
+    destination_file_path = PAIR_STRAT_ENGINE_DIR / "generated" / "sample_file.txt"
+    try:
+        if os.path.exists(destination_file_path):   # removing file if exists pre check
+            os.remove(destination_file_path)
+
+        # saving file at destination from test_file_path
+        email_book_service_native_web_client.sample_model_file_upload_query_client(test_file_path)
         # verifying file exists at destination
         assert os.path.exists(destination_file_path), \
             f"Unexpected: file must have been created by file query at {destination_file_path}"
@@ -593,6 +635,94 @@ def test_create_pair_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_
         create_n_activate_strat(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                 expected_strat_status_, symbol_overview_obj_list,
                                 market_depth_basemodel_list)
+
+
+def test_place_chores_with_manual_executor_port(
+        leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        market_depth_basemodel_list, last_barter_fixture_list, refresh_sec_update_fixture):
+    buy_symbol, sell_symbol = leg1_leg2_symbol_list[0]
+    max_loop_count_per_side = 1
+    expected_strat_limits_.max_open_chores_per_side = 10
+    expected_strat_limits_.residual_restriction.max_residual = 111360
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    port = 0    # <<<<<< manually replace thi with running executor port to place chores
+    executor_web_client = StreetBookServiceHttpClient(host='127.0.0.1', port=port)
+    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_web_client)
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_1_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path), load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        executor_web_client.barter_simulator_reload_config_query_client()
+
+        total_chore_count_for_each_side = max_loop_count_per_side
+
+        bid_buy_top_market_depth = None
+        ask_sell_top_market_depth = None
+        stored_market_depth = executor_web_client.get_all_market_depth_client()
+        for market_depth in stored_market_depth:
+            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+                bid_buy_top_market_depth = market_depth
+            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+                ask_sell_top_market_depth = market_depth
+
+        # Placing buy chores
+        buy_ack_chore_id = None
+        for loop_count in range(total_chore_count_for_each_side):
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+
+            time.sleep(1)
+            # update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+            #                                                    ask_sell_top_market_depth)
+            place_new_chore(buy_symbol, Side.BUY, 98, 95, executor_web_client, InstrumentType.CB)
+            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+                                                                               buy_symbol, executor_web_client,
+                                                                               last_chore_id=buy_ack_chore_id)
+            buy_ack_chore_id = ack_chore_journal.chore.chore_id
+
+            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+                # Sleeping to let the chore get cxlled
+                time.sleep(residual_wait_sec)
+
+        # Placing sell chores
+        sell_ack_chore_id = None
+        for loop_count in range(total_chore_count_for_each_side):
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+            # required to make buy side tob latest
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+
+            # update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+            #                                                     bid_buy_top_market_depth)
+            place_new_chore(sell_symbol, Side.SELL, 98, 95, executor_web_client, InstrumentType.EQT)
+
+            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+                                                                               sell_symbol, executor_web_client,
+                                                                               last_chore_id=sell_ack_chore_id)
+            sell_ack_chore_id = ack_chore_journal.chore.chore_id
+
+            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+                # Sleeping to let the chore get cxlled
+                time.sleep(residual_wait_sec)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
 
 
 # sanity test to create chores
@@ -5900,7 +6030,7 @@ def test_strat_pause_on_sell_negative_consumable_cxl_qty_due_to_waived_min_rolli
 
 
 @pytest.mark.nightly
-def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
+def test_alert_agg_sequence_in_portfolio_alerts(clean_and_set_limits, sample_alert):
     portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
 
     sev = [Severity.Severity_CRITICAL, Severity.Severity_ERROR, Severity.Severity_WARNING,
@@ -5935,6 +6065,75 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
     for alert in agg_sorted_alerts:
         alert.last_update_analyzer_time = pendulum.parse(str(alert.last_update_analyzer_time)).in_timezone("utc")
     for alert in portfolio_alerts:
+        alert.last_update_analyzer_time = \
+            alert.last_update_analyzer_time.replace(microsecond=
+                                                int(str(alert.last_update_analyzer_time.microsecond)[:3] + "000"))
+
+    for sorted_alert, expected_alert in zip(agg_sorted_alerts, sorted_alert_list):
+        assert sorted_alert.alert_brief == expected_alert.alert_brief, \
+            (f"Alert ID mismatch: expected alert_brief {expected_alert.alert_brief!r}, "
+             f"received {sorted_alert.alert_brief!r}")
+
+
+@pytest.mark.nightly
+def test_alert_agg_sequence_in_strat_alert(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+                                           expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+                                           market_depth_basemodel_list, sample_alert):
+    leg1_symbol, leg2_symbol = leg1_leg2_symbol_list[0]
+    active_pair_strat, executor_http_client = (
+        create_n_activate_strat(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                expected_strat_status_, symbol_overview_obj_list,
+                                market_depth_basemodel_list))
+
+    new_strat_alerts = []
+
+    sev = [Severity.Severity_CRITICAL, Severity.Severity_ERROR, Severity.Severity_WARNING,
+           Severity.Severity_INFO, Severity.Severity_DEBUG]
+    counter = 0
+    for i in range(5):
+        alert = StratAlertBaseModel()
+        alert.last_update_analyzer_time = DateTime.utcnow()
+        alert.alert_brief = f"Sample Alert: {i + 1}"
+        alert.severity = sev[counter]
+        counter += 1
+        if counter > 4:
+            counter = 0
+
+        new_strat_alerts.append(alert)
+        log_book_web_client.handle_strat_alerts_from_tail_executor_query_client(
+            generic_encoder([{"strat_id": active_pair_strat.id, "severity": alert.severity, "alert_brief": alert.alert_brief,
+                                           "alert_meta": AlertMetaBaseModel(first_detail="Sample detail")}],
+                                         exclude_none=True))
+
+    time.sleep(5)
+
+    agg_sorted_alerts: List[StratAlertBaseModel] = log_book_web_client.filtered_strat_alert_by_strat_id_query_client(active_pair_strat.id)
+
+    # putting all alerts apart from newly added alerts
+    already_existing_alerts = []
+    for stored_alert in agg_sorted_alerts:
+        for new_alert in new_strat_alerts:
+            if stored_alert.alert_brief == new_alert.alert_brief:
+                break
+        else:
+            already_existing_alerts.append(stored_alert)
+
+    # putting already_existing_alerts with newly_added alerts before sorting
+    new_strat_alerts.extend(already_existing_alerts)
+
+    # sorting alert list for this test comparison
+    new_strat_alerts.sort(key=lambda x: x.last_update_analyzer_time, reverse=False)
+
+    sorted_alert_list: List[StratAlertBaseModel] = []
+    for sev in Severity:
+        if sev.value != Severity.Severity_UNSPECIFIED:
+            for alert in new_strat_alerts:
+                if alert.severity == sev.value:
+                    sorted_alert_list.append(alert)
+    time.sleep(5)
+    for alert in agg_sorted_alerts:
+        alert.last_update_analyzer_time = pendulum.parse(str(alert.last_update_analyzer_time)).in_timezone("utc")
+    for alert in new_strat_alerts:
         alert.last_update_analyzer_time = \
             alert.last_update_analyzer_time.replace(microsecond=
                                                 int(str(alert.last_update_analyzer_time.microsecond)[:3] + "000"))

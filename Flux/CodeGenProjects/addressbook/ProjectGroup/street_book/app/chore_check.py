@@ -1,7 +1,4 @@
 import math
-from enum import Enum
-from typing import Final
-import logging
 import random
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
@@ -9,9 +6,9 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydenti
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     get_symbol_side_key)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
-    MobileBookMutexManager, executor_config_yaml_dict)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.mobile_book_cache import ExtendedTopOfBook
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
+    executor_config_yaml_dict)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import ExtendedTopOfBook
 
 
 class ChoreControl:
@@ -330,15 +327,16 @@ class ChoreControl:
 
     @staticmethod
     def _get_px_by_max_level(system_symbol: str, side: Side, chore_limits: ChoreLimitsBaseModel,
-                             mobile_book_container) -> float | None:
+                             symbol_cache) -> float | None:
         px_by_max_level: float = 0
+        market_depths = []
 
         if chore_limits.max_px_levels == 0:
-            if mobile_book_container:
+            if symbol_cache:
                 if side == Side.SELL:
-                    market_depths = mobile_book_container.get_ask_market_depths()
+                    market_depths = symbol_cache.get_ask_market_depths()
                 else:
-                    market_depths = mobile_book_container.get_bid_market_depths()
+                    market_depths = symbol_cache.get_bid_market_depths()
 
                 market_depth = market_depths[0]
                 if market_depth is not None:
@@ -354,11 +352,11 @@ class ChoreControl:
                 max_px_level = abs(max_px_level)
 
             # getting aggressive market depth
-            if mobile_book_container:
+            if symbol_cache:
                 if aggressive_side == Side.SELL:
-                    market_depths = mobile_book_container.get_ask_market_depths()
+                    market_depths = symbol_cache.get_ask_market_depths()
                 else:
-                    market_depths = mobile_book_container.get_bid_market_depths()
+                    market_depths = symbol_cache.get_bid_market_depths()
 
                 for lvl in range(max_px_level - 1, -1, -1):
                     # lvl reducing from max_px_level to 0
@@ -378,7 +376,8 @@ class ChoreControl:
         return px_by_max_level
 
     @staticmethod
-    def _get_tob_bid_n_ask_quote_px(tob: ExtendedTopOfBook, side: Side, system_symbol: str) -> Tuple[int, int] | None:
+    def _get_tob_bid_n_ask_quote_px(tob: ExtendedTopOfBook, side: Side,
+                                    system_symbol: str) -> Tuple[float, float] | None:
         if not (tob.ask_quote and tob.ask_quote.px and tob.bid_quote and tob.bid_quote.px):
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
@@ -392,7 +391,7 @@ class ChoreControl:
     @staticmethod
     def get_breach_threshold_px(tob: ExtendedTopOfBook, sym_ovrw_getter: Callable,
                                 chore_limits: ChoreLimitsBaseModel, side: Side, system_symbol: str,
-                                mobile_book_container=None, is_algo: bool = False) -> float | None:
+                                symbol_cache=None, is_algo: bool = False) -> float | None:
         """
         Args:
             tob:
@@ -400,14 +399,14 @@ class ChoreControl:
             chore_limits:
             side:
             system_symbol:
-            mobile_book_container:
+            symbol_cache:
             is_algo:
         Returns:
             min breach threshold and max breach threshold
         """
         breach_threshold_px: float | None = None  # None if returned blocks the chore from going further
-        if mobile_book_container:
-            px_by_max_level = ChoreControl._get_px_by_max_level(system_symbol, side, chore_limits, mobile_book_container)
+        if symbol_cache:
+            px_by_max_level = ChoreControl._get_px_by_max_level(system_symbol, side, chore_limits, symbol_cache)
             if px_by_max_level is None:
                 # _get_px_by_max_level logs error internally
                 return None
@@ -451,7 +450,7 @@ class ChoreControl:
             # below same as: aggressive_quote.px * (1 + (max_basis_points / 10000))
             max_px_by_bbbo_basis_point: float = aggressive_quote_px + (aggressive_quote_px * max_basis_points / 10000)
 
-            if mobile_book_container:
+            if symbol_cache:
                 breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation, px_by_max_level)
             else:
                 breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation)
@@ -478,7 +477,7 @@ class ChoreControl:
             # below same as: aggressive_quote.px * (1 - (max_basis_points / 10000))
             min_px_by_bbbo_basis_point: float = aggressive_quote_px - (aggressive_quote_px * max_basis_points / 10000)
 
-            if mobile_book_container:
+            if symbol_cache:
                 breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation, px_by_max_level)
             else:
                 breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation)
@@ -513,7 +512,7 @@ class ChoreControl:
     @staticmethod
     def get_breach_threshold_px_ext(top_of_book: ExtendedTopOfBook | TopOfBook, sym_ovrw_getter: Callable,
                                     chore_limits: ChoreLimits | ChoreLimitsBaseModel, side: Side, system_symbol: str,
-                                    mobile_book_container = None, is_algo: bool = False) -> float | None:
+                                    symbol_cache=None, is_algo: bool = False) -> float | None:
         # TODO important - check and change reference px in cases where last px is not available
         last_barter_px = ChoreControl._get_tob_last_barter_px(top_of_book, side)
         if last_barter_px is None:
@@ -527,19 +526,19 @@ class ChoreControl:
             return None  # None return blocks the chore from going further
 
         breach_threshold_px = ChoreControl.get_breach_threshold_px(top_of_book, sym_ovrw_getter, chore_limits, side,
-                                                                   system_symbol, mobile_book_container, is_algo)
+                                                                   system_symbol, symbol_cache, is_algo)
         return breach_threshold_px
 
     @staticmethod
     def check_px(tob: ExtendedTopOfBook, sym_ovrw_getter: Callable, chore_limits: ChoreLimitsBaseModel,
                  px: float, usd_px: float, qty: int, side: Side, system_symbol: str,
-                 mobile_book_container = None, is_algo: bool = False) -> int:
+                 symbol_cache=None, is_algo: bool = False) -> int:
         checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS
         if tob:
             high_breach_px: float | None = ChoreControl.get_breach_threshold_px_ext(
-                tob, sym_ovrw_getter, chore_limits, Side.BUY, system_symbol, mobile_book_container, is_algo)
+                tob, sym_ovrw_getter, chore_limits, Side.BUY, system_symbol, symbol_cache, is_algo)
             low_breach_px: float | None = ChoreControl.get_breach_threshold_px_ext(
-                tob, sym_ovrw_getter, chore_limits, Side.SELL, system_symbol, mobile_book_container, is_algo)
+                tob, sym_ovrw_getter, chore_limits, Side.SELL, system_symbol, symbol_cache, is_algo)
 
             if high_breach_px is not None and low_breach_px is not None:
                 high_breach: bool = ChoreControl.px_breached(high_breach_px, px, Side.BUY, system_symbol)

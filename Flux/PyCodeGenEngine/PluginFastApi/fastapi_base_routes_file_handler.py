@@ -4,6 +4,9 @@ from abc import ABC
 from typing import List, Dict, Tuple, Set
 import logging
 
+# 3rd party imports
+from pathlib import PurePath
+
 # project imports
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
@@ -15,6 +18,8 @@ import protogen
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, \
     parse_string_to_original_types, convert_to_capitalized_camel_case
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin, ModelType
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
+    root_core_proto_files, project_grp_core_proto_files, project_dir)
 
 
 class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
@@ -74,9 +79,22 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
             if linked_messages:
                 self.message_to_link_messages_dict[message] = list(linked_messages)
 
-    def _handle_model_imports(self) -> str:
+    def _handle_model_imports(self, file: protogen.File | None = None, model_file_suffix: str | None = None) -> str:
+        # model imports
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str = f"from {model_file_path} import *\n"
+
+        if file and model_file_suffix:
+            project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+            dependency_file_path_list = self.get_dependency_file_path_list(
+                file, root_core_proto_files, project_grp_core_proto_files,
+                model_file_suffix, str(project_grp_root_dir))
+
+            project_name = file.proto.package
+            for dependency_file_path in dependency_file_path_list:
+                if f"_n_{project_name}" in dependency_file_path or f"{project_name}_n_" in dependency_file_path:
+                    output_str += f'from {dependency_file_path} import *\n'
+        output_str += "\n\n"
         return output_str
 
     def _get_filter_agg_projection_model(self, message: protogen.Message) -> str | None:
@@ -226,7 +244,7 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
             output_str += f"{lock_name} = AsyncRLock()\n"
         return output_str
 
-    def handle_base_routes_file_gen(self) -> str:
+    def handle_base_routes_file_gen(self, file: protogen.File | None = None, model_suffix: str | None = None) -> str:
         # running pre-requisite method to set shared lock option info
         self._get_messages_having_links()
         self._set_shared_lock_name_to_pydentic_class_dict()
@@ -244,7 +262,7 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += "\n"
         output_str += "# project imports\n"
         output_str += self._handle_routes_callback_import()
-        output_str += self._handle_model_imports()
+        output_str += self._handle_model_imports(file, model_suffix)
         if self.response_field_case_style.lower() == "camel":
             output_str += f"from FluxPythonUtils.scripts.model_base_utils import to_camel\n"
         output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n"

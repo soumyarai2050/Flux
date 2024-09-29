@@ -858,11 +858,6 @@ def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits,
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # Negative Check: currently no market_depth exists so default px_by_max_level=0 will be used
-        market_depth_list = executor_http_client.get_all_market_depth_client()
-        for market_depth in market_depth_list:
-            if market_depth.symbol == buy_symbol:
-                market_depth.px = 0
-                executor_http_client.put_market_depth_client(market_depth.to_dict(exclude_none=True))
 
         # placing new non-systematic new_chore
         time.sleep(5)

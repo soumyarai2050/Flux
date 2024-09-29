@@ -1,6 +1,6 @@
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.bartering_link_base import BarteringLinkBase
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link_base import BarteringLinkBase
 # from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.barter_simulator import BarterSimulator
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.log_barter_simulator import LogBarterSimulator
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.log_barter_simulator import LogBarterSimulator
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 
 config_dict = BarteringLinkBase.pair_strat_config_dict

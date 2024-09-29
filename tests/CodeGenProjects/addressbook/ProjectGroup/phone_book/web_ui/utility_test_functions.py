@@ -1,10 +1,7 @@
-import time
-# from asyncio import exceptions
+# third par
 from typing import Optional
-
 from selenium import webdriver
 from selenium.webdriver import ChromeOptions, EdgeOptions, FirefoxOptions
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver import ActionChains
 from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from selenium.webdriver.support.wait import WebDriverWait
@@ -12,7 +9,8 @@ from selenium.common import NoSuchElementException, ElementNotInteractableExcept
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-# from .tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
+
+# project import
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import test_config_file_path, \
@@ -137,6 +135,20 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     time.sleep(10)
 
 
+def generate_xpath(data: dict, search_key: str, base_xpath: str = "") -> str:
+    for key, value in data.items():
+        current_xpath = f"{base_xpath}.{key}" if base_xpath else key
+        if key == search_key:
+            return current_xpath
+        elif isinstance(value, dict):
+            # Recurse into the nested dictionary
+            result = generate_xpath(value, search_key, current_xpath)
+            if result:
+                return result
+    return ""  # Return an empty string if the key is not found
+
+
+
 def verify_supported_search_type(search_type: SearchType = SearchType.NAME) -> bool:
     if not hasattr(By, search_type):
         raise Exception(f"unsupported search type: {search_type}")
@@ -158,9 +170,9 @@ def get_tree_input_field_xpath(xpath: str, data_add: bool = False) -> str:
 def set_tree_input_field(widget: WebElement, xpath: str, name: str, value: str,
                          search_type: SearchType = SearchType.NAME,  autocomplete: bool = False) -> None:
     if verify_supported_search_type(search_type):
-        input_div_xpath: str = get_tree_input_field_xpath(xpath=xpath)
-        input_div_element = widget.find_element(By.XPATH, input_div_xpath)
-        input_element = input_div_element.find_element(getattr(By, search_type), name)
+        xpath: str = get_tree_input_field_xpath(xpath=xpath)
+        xpath_element = widget.find_element(By.XPATH, xpath)
+        input_element = xpath_element.find_element(getattr(By, search_type), name)
         input_element.click()
         input_element.send_keys(Keys.CONTROL + "a")
         input_element.send_keys(Keys.BACK_SPACE)
@@ -170,22 +182,35 @@ def set_tree_input_field(widget: WebElement, xpath: str, name: str, value: str,
         # else not required
     # else not required
 
-
-def get_table_input_field_xpath(xpath: str) -> str:
-    return f"//td[@data-xpath='{xpath}']"
-
-
 def set_table_input_field(widget: webdriver, xpath: str, value: str,
                           search_type: SearchType = SearchType.TAG_NAME) -> None:
     if verify_supported_search_type(search_type):
-        input_td_xpath: str = get_table_input_field_xpath(xpath=xpath)
-        input_td_element = widget.find_element(By.XPATH, input_td_xpath)
-        input_td_element.click()
-        set_input = input_td_element.find_element(By.TAG_NAME, "input")
+        xpath: str = get_table_input_field_xpath(xpath=xpath)
+        xpath_element = widget.find_element(By.XPATH, xpath)
+        xpath_element.click()
+        set_input = xpath_element.find_element(By.TAG_NAME, "input")
         set_input.click()
         set_input.send_keys(Keys.CONTROL + "a")
         set_input.send_keys(Keys.BACK_SPACE)
         set_input.send_keys(value)
+
+
+def set_input_field_on_layout(widget, layout, xpath, field_name, value):
+    """Set input field based on layout."""
+    if layout == Layout.TABLE:
+        set_table_input_field(widget=widget, xpath=xpath, value=str(value))
+    else:
+        set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(value))
+
+
+def get_valid_n_invalid_val_max_value_from_schema(field_query, input_type) -> int:
+    """Get maximum value based on input type."""
+    val_max: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[1])
+    return val_max if input_type == InputType.MAX_VALID_VALUE else val_max + 1
+
+
+def get_table_input_field_xpath(xpath: str) -> str:
+    return f"//td[@data-xpath='{xpath}']"
 
 
 def set_autocomplete_field(widget: WebElement, xpath: str, name: str, search_type: SearchType, value: str) -> None:
@@ -249,9 +274,9 @@ def update_max_value_field_strat_limits(widget: WebElement, xpath: str, name: st
 
 
 def create_strat_limits_using_tree_view(driver: WebDriver, strat_limits: Dict, layout: Layout) -> None:
-    strat_limits_widget = driver.find_element(By.ID, "strat_limits")
+    strat_limit_widget = driver.find_element(By.ID, "strat_limits")
 
-    fields_xpath_n_fixture_value = {
+    fields_xpath_n_value = {
         "max_open_chores_per_side": strat_limits["max_open_chores_per_side"],
         "max_single_leg_notional": strat_limits["max_single_leg_notional"],
         "max_open_single_leg_notional": strat_limits["max_open_single_leg_notional"],
@@ -277,15 +302,16 @@ def create_strat_limits_using_tree_view(driver: WebDriver, strat_limits: Dict, l
         "residual_restriction.residual_mark_seconds": strat_limits["residual_restriction"]["residual_mark_seconds"],
     }
 
-    for xpath, value in fields_xpath_n_fixture_value.items():
+    for xpath, value in fields_xpath_n_value.items():
         if layout == Layout.NESTED:
             nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
-            input_residual_mark_second_element = nested_tree_dialog.find_element(By.ID, "residual_mark_seconds")
+            field_element = nested_tree_dialog.find_element(By.ID, "residual_mark_seconds")
         else:
-            input_residual_mark_second_element = strat_limits_widget.find_element(By.ID, "residual_mark_seconds")
-        scroll_into_view(driver=driver, element=input_residual_mark_second_element)
+            field_element = strat_limit_widget.find_element(By.ID, "residual_mark_seconds")
+        if layout != Layout.NESTED:
+            scroll_into_view(driver=driver, element=field_element)
         name = xpath.split('.')[-1]
-        set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(widget=strat_limit_widget, xpath=xpath, name=name, value=value)
 
 
 def validate_strat_limits(widget: WebElement, strat_limits: Dict, layout: Layout) -> None:
@@ -550,32 +576,63 @@ def confirm_save(driver: WebDriver) -> None:
     time.sleep(Delay.SHORT.value)
 
 
-def select_or_unselect_checkbox(driver: WebDriver, field_name: str) -> None:
-    settings_dropdown: WebElement = driver.find_element(By.CLASS_NAME, "MuiPopover-paper")
-    dropdown_elements = settings_dropdown.find_elements(By.TAG_NAME, "li")
-    span_element: WebElement
-    for dropdown_element in dropdown_elements:
-        dropdown_label = dropdown_element.find_element(By.CSS_SELECTOR, "label")
-        if dropdown_label.text == field_name:
-            dropdown_label.click()
-            time.sleep(Delay.DEFAULT.value)
+def hide_n_show_inside_setting(driver: WebDriver, common_keys_fields: List[str], button_state: ButtonState):
+    while True:
+        # select a random key
+        selected_fld: str = random.choice(common_keys_fields)
+        settings_dropdown_widget: WebElement = driver.find_element(By.CLASS_NAME, "MuiPopover-paper")
+        try:
+            hide_or_show_btn_element = settings_dropdown_widget.find_element(By.NAME, selected_fld)
+        except NoSuchElementException:
+            logging.warning(f"Element with name '{selected_fld}' not found. Trying with 'security.{selected_fld}'.")
+            selected_fld = f"security.{selected_fld}"
+            try:
+                hide_or_show_btn_element = settings_dropdown_widget.find_element(By.NAME, selected_fld)
+            except NoSuchElementException:
+                logging.error(f"Element with name '{selected_fld}' not found even after modifying the name.")
+                continue # Skip this iteration and retry with an another field
+
+        btn_caption = hide_or_show_btn_element.text
+        if btn_caption == button_state.value:
+            hide_or_show_btn_element.click()
+        return selected_fld
+
+
+def click_show_btn_inside_setting(driver: WebDriver, common_keys_fields: List[str]):
+    while True:
+        # select a random key
+        selected_fld: str = random.choice(common_keys_fields)
+        settings_dropdown_widget: WebElement = driver.find_element(By.CLASS_NAME, "MuiPopover-paper")
+        hide_or_show_btn_element = settings_dropdown_widget.find_element(By.NAME, selected_fld)
+        btn_captcha = hide_or_show_btn_element.text
+        if btn_captcha == "HIDE":
+            hide_or_show_btn_element.click()
             break
 
-def get_default_field_value(widget: WebElement, layout: Layout, xpath: str) -> str:
+
+def get_default_field_value_frm_widget(widget: WebElement, layout: Layout, xpath: str) -> str:
     if layout == Layout.TABLE:
-        input_td_xpath: str = get_table_input_field_xpath(xpath=xpath)
-        input_td_element = widget.find_element(By.XPATH, input_td_xpath)
-        input_td_element.click()
-        input_element = input_td_element.find_element(By.TAG_NAME, "input")
-        get_field_value = input_element.get_attribute('value')
-        input_element.send_keys(Keys.ENTER)
-        time.sleep(2)
+        xpath: str = get_table_input_field_xpath(xpath=xpath)
+        xpath_element = widget.find_element(By.XPATH, xpath)
+        xpath_element.click()
+        time.sleep(Delay.SHORT.value)
+        try:
+            input_element = xpath_element.find_element(By.TAG_NAME, "input")
+        except NoSuchElementException:
+            div_element = xpath_element.find_element(By.TAG_NAME, "div")
+            input_element = div_element.find_element(By.TAG_NAME, "span")
+        except Exception as e:
+            print(f"Error retrieving field value: {e}")
 
     else:
         input_div_xpath: str = get_tree_input_field_xpath(xpath=xpath)
         input_div_element = widget.find_element(By.XPATH, input_div_xpath)
-        get_field_value = input_div_element.find_element(By.TAG_NAME, "input").get_attribute('value')
-    return get_field_value
+        input_element = input_div_element.find_element(By.TAG_NAME, "input")
+
+    field_value = input_element.get_attribute('value')
+    input_element.send_keys(Keys.ENTER)
+    time.sleep(Delay.SHORT.value)
+    return field_value.replace(",", "")
 
 def show_hidden_fields_in_tree_layout(widget: WebElement, driver: WebDriver) -> None:
     click_button_with_name(widget=widget, button_name="Show")
@@ -756,19 +813,20 @@ def get_object_keys_from_dialog_box(widget: WebElement) -> List[str]:
     return object_keys
 
 
-def get_common_keys(widget: WebElement) -> List[str]:
-    # common_key_items = widget.find_elements(By.XPATH, '//div[@class="CommonKeyWidget_container__+Oh0d"]')
-    common_key_items = widget.find_elements(By.XPATH, ".//div")
-    common_keys_text = []
-    # common_keys_text.
-    a = len(common_key_items)
-    for key_element in common_key_items:
-        try:
-            span_element = key_element.find_element(By.TAG_NAME, "span")
-            common_keys_text.append(span_element.text.split(":")[0].split("[")[0])
-        except NoSuchElementException:
-            pass
-    return common_keys_text
+def get_common_keys_fld_names(widget) -> List[str]:
+    common_key_container = widget.find_element(By.CSS_SELECTOR, "[class*='CommonKeyWidget_container']")
+    common_key_items = common_key_container.find_elements(By.CSS_SELECTOR, "[class*=CommonKeyWidget_item")
+
+    common_keys_fields = []
+    for item in common_key_items:
+        fld_name_element = item.find_element(By.TAG_NAME, "span")
+        fld_name = fld_name_element.text.split(":")[0].split("[")[0]
+        if fld_name == "strat_leg1" or fld_name == "strat_leg2":
+            fld_name = fld_name.replace(fld_name, f"{fld_name}.side")
+        if " " in fld_name:
+            fld_name = fld_name.replace(" ", "_")
+        common_keys_fields.append(fld_name)
+    return common_keys_fields
 
 
 def get_all_keys_from_table(table: WebElement) -> List[str]:
@@ -783,11 +841,12 @@ def get_all_keys_from_table(table: WebElement) -> List[str]:
     return headings
 
 
-def get_replaced_common_keys(common_keys_list: List) -> List[str]:
+def get_replaced_common_keys(common_keys_fields: List) -> List[str]:
     list_of_common_keys = []
-    for common_key in common_keys_list:
+    for common_key in common_keys_fields:
         list_of_common_keys.append(common_key.replace("common premium", "common_premium")
-                                   .replace("hedge ratio", "hedge_ratio").replace(":", ""))
+                                   .replace("hedge ratio", "hedge_ratio").replace("strat mode", "strat_mode").
+                                   replace("strat type", "strat_type"))
     return list_of_common_keys
 
 
@@ -821,11 +880,6 @@ def get_widget_name_frm_schema(schema_dict, widget_type: WidgetType, flux_proper
         widget_name = widget_query.widget_name
         name_lst.append(widget_name)
     return name_lst
-
-
-def get_replaced_str(default_field_value: str) -> int:
-    default_field_value = default_field_value.replace(',', '')
-    return int(default_field_value)
 
 
 def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_fixture: List,
@@ -1087,7 +1141,7 @@ def flux_fld_title_in_widgets(result: List[WidgetQuery], widget_type: WidgetType
         scroll_into_view(driver=driver, element=widget)
         switch_layout(widget=widget, layout=Layout.TABLE)
         click_button_with_name(widget=widget, button_name="Show")
-        common_key_list: List[str] = get_common_keys(widget=widget)
+        # common_key_list: List[str] = get_common_keys(widget=widget)
         common_key_list = [key.replace(" ", "_") for key in common_key_list]
         print(common_key_list)
         for field_query in widget_query.fields:
@@ -1128,33 +1182,34 @@ def validate_unpressed_n_pressed_btn_txt(driver: WebDriver, widget: WebElement,
     btn_td_elements: [WebElement] = widget.find_elements(By.CLASS_NAME, "MuiToggleButton-sizeMedium")
     unpressed_btn_txt = btn_td_elements[index_no].text
     btn_td_elements[index_no].click()
-    confirm_save(driver=driver)
+    confirm_save(driver)
     pressed_btn_txt = btn_td_elements[index_no].text
     assert unpressed_caption.upper() == unpressed_btn_txt
     assert pressed_caption.upper() == pressed_btn_txt
 
 
-def validate_hide_n_show_in_common_key(widget: WebElement, field_name: str, key_type: str):
-    common_keys: List[str] = get_common_keys(widget=widget)
-    replaced_common_keys: List[str] = get_replaced_common_keys(common_keys_list=common_keys)
-    if key_type == "selected_checkbox":
-        assert field_name in replaced_common_keys, \
-            f"{field_name} field is not visible in common keys, expected to be visible"
+def validate_hide_n_show_in_common_key(widget, hide_n_show_fld: str, button_state: ButtonState):
+    try:
+        common_keys_fields: List[str] = get_common_keys_fld_names(widget=widget)
+    except NoSuchElementException:
+        common_keys_fields: List[str] = get_table_headers(widget=widget)
+
+    if button_state == button_state.HIDE:
+        assert hide_n_show_fld not in common_keys_fields, f"{hide_n_show_fld} is showing inside pair strat common key but it must be hidden"
     else:
-        assert field_name not in replaced_common_keys, \
-            f"{field_name} field is visible in common keys, expected to be hidden"
+        assert hide_n_show_fld in common_keys_fields, f"{hide_n_show_fld} is hidden inside pair strat common key but it must be show"
 
 
-def validate_flux_fld_val_max_in_widget(driver: WebDriver, widget: WebElement, widget_name: str, input_type: str, xpath_n_field_names: Dict):
+def validate_val_max_fields_in_widget(driver: WebDriver, widget: WebElement, widget_name: str, input_type: InputType, xpath_n_field_names: Dict):
     click_button_with_name(widget=widget, button_name="Save")
     expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
     object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
     for field_name, xpath in xpath_n_field_names.items():
-        if widget_name == "strat_limits" and input_type == "invalid":
-            assert xpath in object_keys
+        if widget_name == "strat_limits" and input_type == InputType.INVALID_VALUE:
+            assert xpath in object_keys, f"expected {xpath} in {object_keys}, but got {object_keys}"
         else:
-            assert field_name in object_keys
-    if input_type == "valid":
+            assert field_name in object_keys, f"Field '{field_name}' was expected but is missing in {object_keys}. (XPath used: {xpath})"
+    if input_type == InputType.MAX_VALID_VALUE:
         confirm_save(driver=driver)
     else:
         discard_changes(widget=widget)
@@ -1205,10 +1260,12 @@ def validate_val_min_n_default_fld_value_equal_or_not(val_min: int, replaced_def
     return False
 
 
-def validate_val_max_n_default_fld_value_equal_or_not(val_max: int, replaced_default_field_value: int) -> bool:
-    if val_max == replaced_default_field_value:
-        return True
-    return False
+def validate_val_max_n_default_fld_value_equal_or_not(widget, val_max: int, layout: Layout, xpath: str) -> bool:
+    """function to validate the ui val_max and schema val_max is equals or not"""
+    default_field_value: str = get_default_field_value_frm_widget(widget=widget, layout=layout, xpath=xpath)
+    if default_field_value:
+        return val_max == int(default_field_value)
+
 
 def show_nested_fld_in_tree_layout(widget: WebElement, fld_xpath):
     xpath = get_tree_input_field_xpath(fld_xpath)
@@ -1257,7 +1314,7 @@ def update_schema_json(schema_dict: Dict[str, any], update_widget_name: str, upd
     for widget_name, widget_data in schema_dict.items():
         update_field_name_properties = widget_data.get(update_field_name)
         widget_properties = widget_data.get("properties")
-        if (widget_name == update_widget_name and widget_properties is not \
+        if (widget_name == update_widget_name and widget_properties is not
                 None and update_field_name_properties is None):
             widget_properties[update_field_name][extend_field_name] = value
         elif widget_name == update_widget_name and update_field_name_properties is not None:
@@ -1342,12 +1399,14 @@ def input_n_validate_progress_bar(driver: WebDriver, widget: WebElement, field_n
         # for val max
         assert progress_level == "0"
 
-def set_val_max_input_fld(driver: WebDriver, layout: Layout, input_type: str, schema_dict: Dict[str, any]):
+def set_val_max_input_fld(driver: WebDriver, layout: Layout, input_type: InputType, schema_dict: Dict[str, any]):
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                           flux_property="val_max")
+    """"""
     assert result[0]
+    print(result)
 
-    xpath_n_field_names: Dict[str] = {}
+    xpath_n_field_names: Dict[str, str] = {}
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         # in strat_status balance notional fld contain progress bar in table layout
@@ -1362,30 +1421,19 @@ def set_val_max_input_fld(driver: WebDriver, layout: Layout, input_type: str, sc
 
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            xpath = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict),widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,field_name=field_name)
+            xpath = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict),
+                                widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,field_name=field_name)
 
             xpath_n_field_names[field_name] = xpath
-            if input_type == "valid":
-                val_max: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[1])
-            else:
-                # val_max += 1
-                val_max: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[1]) + 1
-            if layout == Layout.TABLE:
-                default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TABLE, xpath=xpath)
-            else:
-                default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TREE, xpath=xpath)
-            if default_field_value:
-                replaced_default_field_value: int = get_replaced_str(default_field_value=default_field_value)
-                is_equal: bool = validate_val_max_n_default_fld_value_equal_or_not(
-                    val_max=val_max,replaced_default_field_value=replaced_default_field_value)
+            val_max: int = get_valid_n_invalid_val_max_value_from_schema(field_query, input_type)
+            is_equal: bool = validate_val_max_n_default_fld_value_equal_or_not(widget=widget,
+                                                        val_max=val_max, layout=layout,  xpath=xpath)
             if is_equal:
                 val_max = val_max - 1
-            if layout == Layout.TABLE:
-                set_table_input_field(widget=widget, xpath=xpath, value=str(val_max))
-            elif layout == Layout.TREE:
-                set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_max))
-        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, widget_name=widget_name,input_type=input_type,
+            set_input_field_on_layout(widget=widget, layout=layout, xpath=xpath,  field_name=field_name, value=str(val_max))
+        validate_val_max_fields_in_widget(driver=driver, widget=widget, widget_name=widget_name, input_type=input_type,
           xpath_n_field_names=xpath_n_field_names)
+
 
 def set_val_min_input_fld(driver: WebDriver, layout: Layout, input_type: str, schema_dict: Dict[str, any]):
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,

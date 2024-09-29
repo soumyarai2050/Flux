@@ -8,6 +8,7 @@ from fastapi.encoders import jsonable_encoder
 # third party imports
 from selenium.webdriver.support import expected_conditions as EC  # noqa
 
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.conftest import pair_strat_edit
 # project specific imports
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
@@ -114,53 +115,49 @@ def test_update_strat_limits_n_activate_using_table_view(clean_and_set_limits, d
 
 
 def test_field_hide_n_show_in_common_key(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict):
+    # WidgetType: REPEATED_INDEPENDENT
 
     pair_strat_widget = driver.find_element(By.ID, "pair_strat_params")
     switch_layout(widget=pair_strat_widget, layout=Layout.TABLE)
+    common_keys_fields: List[str] = get_common_keys_fld_names(widget=pair_strat_widget)
 
-    common_keys: List[str] = get_common_keys(widget=pair_strat_widget)
-    replaced_str_common_keys: List[str] = get_replaced_common_keys(common_keys_list=common_keys)
-    # select a random key
-    selected_fld: str = random.choice(replaced_str_common_keys)
-
-    # searching the random key in setting and unselecting checkbox
+    # searching the random key in setting and hide the fld
     click_button_with_name(widget=pair_strat_widget, button_name="Settings")
-    select_or_unselect_checkbox(driver=driver, field_name=selected_fld)
+    hidden_fld = hide_n_show_inside_setting(driver=driver, common_keys_fields=common_keys_fields, button_state=ButtonState.HIDE)
 
-    # validating that unselected key is not visible in table view
-    validate_hide_n_show_in_common_key(widget=pair_strat_widget, field_name=selected_fld, key_type="unselected_checkbox")
+    # validating that hidden fld is not visible in table view
+    validate_hide_n_show_in_common_key(widget=pair_strat_widget, hide_n_show_fld=hidden_fld, button_state=ButtonState.HIDE)
 
-    # searching the random key in setting and selecting checkbox
-    select_or_unselect_checkbox(driver=driver, field_name=selected_fld)
+    # searching the random key in setting and show the fld
+    showing_fld = hide_n_show_inside_setting(driver=driver, common_keys_fields=common_keys_fields, button_state=ButtonState.SHOW)
 
-    # validating that selected checkbox is visible in table view
-    validate_hide_n_show_in_common_key(widget=pair_strat_widget, field_name=selected_fld, key_type="selected_checkbox")
+    # validating that showing fld is visible in table view
+    validate_hide_n_show_in_common_key(widget=pair_strat_widget, hide_n_show_fld=showing_fld, button_state=ButtonState.SHOW)
 
 
 def test_hide_n_show_in_table_layout(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict):
+    # WidgetType: REPEATED
+
+    widget = driver.find_element(By.ID, "symbol_side_snapshot")
+    scroll_into_view(driver=driver, element=widget)
+    table_headers: List[str] = get_table_headers(widget=widget)
+
+    # searching the random table text in setting dropdown and hiding the fld
+    click_button_with_name(widget=widget, button_name="Settings")
+    hidden_fld = hide_n_show_inside_setting(driver=driver, common_keys_fields=table_headers,
+                                            button_state=ButtonState.HIDE)
+
+    # validating that hidden fld is not visible in table view
+    validate_hide_n_show_in_common_key(widget=widget, hide_n_show_fld=hidden_fld, button_state=ButtonState.HIDE)
 
 
-    symbol_side_snapshot_widget = driver.find_element(By.ID, "symbol_side_snapshot")
-    scroll_into_view(driver=driver, element=symbol_side_snapshot_widget)
+    # searching the random table text in setting dropdown and showing the fld
+    showing_fld = hide_n_show_inside_setting(driver=driver, common_keys_fields=table_headers,
+                                            button_state=ButtonState.SHOW)
 
-    # getting lst of fld names, selecting a random fld from lst
-    table_headers: List[str] = get_table_headers(widget=symbol_side_snapshot_widget)
-    selected_fld: str = random.choice(table_headers)
+    # validating that showing fld is visible in table view
+    validate_hide_n_show_in_common_key(widget=widget, hide_n_show_fld=showing_fld, button_state=ButtonState.SHOW)
 
-    # searching the random table text in setting dropdown and selecting checkbox
-    click_button_with_name(widget=symbol_side_snapshot_widget, button_name="Settings")
-    select_or_unselect_checkbox(driver=driver, field_name=selected_fld)
-
-    # validating that unselected text is not visible in the table view
-    table_headers: List[str] = get_table_headers(widget=symbol_side_snapshot_widget)
-    assert selected_fld not in table_headers
-
-    # searching the random table text in setting dropdown and selecting checkbox
-    select_or_unselect_checkbox(driver=driver, field_name=selected_fld)
-
-    # validating that selected check is visible in the table view
-    table_headers: List[str] = get_table_headers(widget=symbol_side_snapshot_widget)
-    assert selected_fld in table_headers
 
 
 def test_nested_pair_strat_n_strat_limits(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict,
@@ -176,38 +173,30 @@ def test_nested_pair_strat_n_strat_limits(clean_and_set_limits, driver_type, web
     xpath: str = "pair_strat_params.common_premium"
     is_enabled = is_table_cell_enabled(widget=pair_strat_params_widget, xpath=xpath)
     if is_enabled:
-        # double-click on table layout to get nested tree layout
+        # double-click in table layout to get nested tree layout
         double_click(driver=driver, element=pair_strat_td_elements[6])
 
-
-    # update_value_in_nested_tree_layout
+    # update value in nested tree layout inside pair strat widget
     nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
-    xpath = "pair_strat_params.common_premium"
-    value = pair_strat["pair_strat_params"]["common_premium"]
-    name: str = "common_premium"
-    set_tree_input_field(widget=nested_tree_dialog, xpath=xpath, name=name, value=value)
+    for field_name, value in pair_strat_edit["pair_strat_params"].items():
+        xpath = "pair_strat_params." + field_name
+        set_tree_input_field(widget=nested_tree_dialog, xpath=xpath, name=field_name, value=value)
 
-
-    xpath = "pair_strat_params.hedge_ratio"
-    value = pair_strat_edit["pair_strat_params"]["hedge_ratio"]
-    name: str = "hedge_ratio"
-    set_tree_input_field(widget=nested_tree_dialog, xpath=xpath, name=name, value=value)
-
-    save_nested_strat(driver=driver)
+    save_nested_strat(driver)
 
     # open nested tree layout in strat limit
     click_button_with_name(widget=strat_limits_widget, button_name="Edit")
-    strat_limits_td_elements = strat_limits_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
+    strat_limit_td_elements = strat_limits_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
 
     xpath: str = "max_open_chores_per_side"
     is_enabled = is_table_cell_enabled(widget=pair_strat_params_widget, xpath=xpath)
     if is_enabled:
-        double_click(driver=driver, element=strat_limits_td_elements[0])
+        double_click(driver=driver, element=strat_limit_td_elements[0])
 
     create_strat_limits_using_tree_view(driver=driver, strat_limits=strat_limits, layout=Layout.NESTED)
-    save_nested_strat(driver=driver)
+    save_nested_strat(driver)
 
-    double_click(driver=driver, element=strat_limits_td_elements[0])
+    double_click(driver=driver, element=strat_limit_td_elements[0])
     validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TREE)
 
 
@@ -217,19 +206,19 @@ def test_widget_type(driver_type, schema_dict: Dict[str, any]):
                                           flux_property="FluxFldButton")
     print(result)
     assert result[0]
-    # # print(result)
-    # for widget_query in result[1]:
-    #     widget_name = widget_query.widget_name
-    #     # print("widget name:- ",widget_name)
-    #
-    #     for field_query in widget_query.fields:
-    #         field_name: str = field_query.field_name
-    #         print("field_name is:-", field_name)
-    #         # field_name: str = field_query.field_name
-    #         xpath: str = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict),
-    #                                            widget_type=WidgetType.INDEPENDENT,
-    #                                            widget_name=widget_name, field_name=field_name)
-    #         print("xpath is:-", xpath)
+    # print(result)
+    for widget_query in result[1]:
+        widget_name = widget_query.widget_name
+        # print("widget name:- ",widget_name)
+
+        for field_query in widget_query.fields:
+            field_name: str = field_query.field_name
+            print("field_name is:-", field_name)
+            # field_name: str = field_query.field_name
+            xpath: str = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict),
+                                               widget_type=WidgetType.INDEPENDENT,
+                                               widget_name=widget_name, field_name=field_name)
+
 
 
 
@@ -239,18 +228,19 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type = WidgetType.INDEPENDENT, flux_property = "val_max")
     assert result[0]
     print(result)
+    # WidgetType: REPEATED_INDEPENDENT
 
     # chore_limits_n_portfolio_limits_table_layout_val_max_for_valid_scenario
-    set_val_max_input_fld(driver=driver,layout=Layout.TABLE, input_type="valid", schema_dict=copy.deepcopy(schema_dict))
+    set_val_max_input_fld(driver=driver,layout=Layout.TABLE, input_type=InputType.MAX_VALID_VALUE, schema_dict=copy.deepcopy(schema_dict))
 
     # chore_limits_n_portfolio_limits_tree_layout_val_max_for_valid_scenario
-    set_val_max_input_fld(driver=driver,layout=Layout.TREE, input_type="valid", schema_dict=copy.deepcopy(schema_dict))
+    set_val_max_input_fld(driver=driver,layout=Layout.TREE, input_type=InputType.MAX_VALID_VALUE, schema_dict=copy.deepcopy(schema_dict))
 
     # chore_limits_n_portfolio_limits_table_layout_above_val_max_for_invalid_scenario
-    set_val_max_input_fld(driver=driver,layout=Layout.TABLE, input_type="invalid", schema_dict=copy.deepcopy(schema_dict))
+    set_val_max_input_fld(driver=driver,layout=Layout.TABLE, input_type=InputType.MAX_VALID_VALUE, schema_dict=copy.deepcopy(schema_dict))
 
     # chore_limits_n_portfolio_limits_tree_layout_above_val_max_for_invalid_scenario
-    set_val_max_input_fld(driver=driver, layout=Layout.TREE, input_type="invalid", schema_dict=copy.deepcopy(schema_dict))
+    set_val_max_input_fld(driver=driver, layout=Layout.TREE, input_type=InputType.MAX_VALID_VALUE, schema_dict=copy.deepcopy(schema_dict))
 
 
     result = get_widgets_by_flux_property(schema_dict, WidgetType.DEPENDENT, flux_property = "val_max")

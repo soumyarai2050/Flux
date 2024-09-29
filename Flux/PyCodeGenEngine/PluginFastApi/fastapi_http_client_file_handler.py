@@ -7,6 +7,7 @@ from typing import List, Dict
 
 # 3rd party imports
 import protogen
+from pathlib import PurePath
 
 # project imports
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
@@ -18,6 +19,8 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, \
     convert_to_capitalized_camel_case
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
+    project_dir, root_core_proto_files, project_grp_core_proto_files)
 
 
 class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
@@ -132,9 +135,22 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                       f"{message_name_snake_cased}_client_url, {message_name}BaseModel, limit_obj_count)\n\n"
         return output_str
 
-    def _import_model_in_client_file(self) -> str:
+    def _import_model_in_client_file(self, file: protogen.File | None = None, model_file_suffix: str | None = None) -> str:
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str = f"from {model_file_path} import *\n"
+
+        if file is not None and model_file_suffix is not None:
+            project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+            dependency_file_path_list = self.get_dependency_file_path_list(
+                file, root_core_proto_files, project_grp_core_proto_files,
+                model_file_suffix, str(project_grp_root_dir))
+
+            project_name = file.proto.package
+            for dependency_file_path in dependency_file_path_list:
+                if f"_n_{project_name}" in dependency_file_path or f"{project_name}_n_" in dependency_file_path:
+                    output_str += f'from {dependency_file_path} import *\n'
+        output_str += "\n\n"
+
         return output_str
 
     def _handle_client_routes_url(self, message: protogen.Message, message_name_snake_cased: str) -> str:
@@ -240,10 +256,16 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                 if aggregate_value[FastapiHttpClientFileHandler.query_type_key] is not None else None
 
             if query_type is None or query_type == "http" or query_type == "both" or query_type == "http_file":
-                url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
-                      f"{self.proto_file_package}/" + f"query-{query_name}'"
-                output_str += " " * 8 + f"{url}\n"
+                output_str += self._get_url_set_str_for_output(query_name)
             # else not required: ws handling is done by ws client plugin
+
+        return output_str
+
+    def _get_url_set_str_for_output(self, query_name: str):
+        output_str = ""
+        url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
+              f"{self.proto_file_package}/" + f"query-{query_name}'"
+        output_str += " " * 8 + f"{url}\n"
 
         return output_str
 
@@ -257,6 +279,10 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
 
         if message in self.message_to_query_option_list_dict:
             output_str += self._handle_client_query_url(message)
+
+        query_name = self.message_to_file_query_name_dict.get(message)
+        if query_name is not None:
+            output_str += self._get_url_set_str_for_output(query_name)
 
         return output_str
 
@@ -301,8 +327,9 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                                     "{}, " + f"{container_model_name})\n\n"
         return output_str
 
-    def _handle_client_http_file_query_output(self, message_name: str, query_name: str, query_params: List[str],
-                                              params_str: str, route_type: str | None = None):
+    def _handle_client_http_file_query_output(self, message_name: str, query_name: str,
+                                              query_params: List[str] | None = None,
+                                              params_str: str | None = None):
         container_model_name = message_name + "BaseModel"
         if query_params:
             output_str = " " * 4 + (f"def {query_name}_query_client(self, file_path: str | PurePath, {params_str}) "
@@ -315,7 +342,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             output_str += " " * 4 + f"    return generic_http_file_query_client(self.query_{query_name}_url, " \
                                     f"file_path, query_params_data, {container_model_name})\n\n"
         else:
-            output_str = " " * 4 + f"def {query_name}_query_client(self) -> " \
+            output_str = " " * 4 + f"def {query_name}_query_client(self, file_path: str | PurePath) -> " \
                                    f"List[{message_name}]:\n"
             output_str += " " * 4 + f"    return generic_http_file_query_client(self.query_{query_name}_url, " \
                                     "file_path, {}, " + f"{container_model_name})\n\n"
@@ -345,6 +372,12 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             elif query_type == "http_file":
                 output_str += self._handle_client_http_file_query_output(message_name, query_name, query_params, params_str)
             # else not required: ws handling is done by ws client plugin
+        return output_str
+
+    def _handle_client_file_query_method(self, message: protogen.Message, query_name: str) -> str:
+        output_str = ""
+        message_name = message.proto.name
+        output_str += self._handle_client_http_file_query_output(message_name, query_name)
         return output_str
 
     def _handle_client_projection_query_methods(self, message: protogen.Message):
@@ -455,9 +488,13 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         if message in self.message_to_query_option_list_dict:
             output_str += self._handle_client_query_methods(message)
 
+        query_name = self.message_to_file_query_name_dict.get(message)
+        if query_name is not None:
+            output_str += self._handle_client_file_query_method(message, query_name)
+
         return output_str
 
-    def handle_client_file_gen(self, file) -> str:
+    def handle_client_file_gen(self, file: protogen.File, model_file_suffix: str) -> str:
         if self.is_option_enabled(file, FastapiHttpClientFileHandler.flux_file_crud_host):
             host = self.get_simple_option_value_from_proto(file, FastapiHttpClientFileHandler.flux_file_crud_host)
         else:
@@ -479,7 +516,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'# project imports\n'
         generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client")
         output_str += f'from {generic_web_client_path} import *\n'
-        output_str += self._import_model_in_client_file()
+        output_str += self._import_model_in_client_file(file, model_file_suffix)
         output_str += "\n\n"
         class_name = convert_to_capitalized_camel_case(self.client_file_name)
         output_str += f"class {class_name}:\n"

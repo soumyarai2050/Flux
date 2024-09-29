@@ -1,0 +1,165 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+import "barter_core.proto";
+
+
+enum DummyEnumSPB {
+  DUMMY_S_P_B = 0;
+}
+
+
+enum ChoreEventType {
+  OE_UNSPECIFIED = 0;
+  OE_NEW = 1;
+  OE_ACK = 2;
+  OE_CXL = 3;
+  OE_CXL_ACK = 4;
+  OE_UNSOL_CXL = 5;
+  OE_CXL_INT_REJ = 6;
+  OE_CXL_BRK_REJ = 7;
+  OE_CXL_EXH_REJ = 8;
+  OE_INT_REJ = 9;
+  OE_BRK_REJ = 10;
+  OE_EXH_REJ = 11;
+  OE_AMD_DN_UNACK = 12;
+  OE_AMD_UP_UNACK = 13;
+  OE_AMD_ACK = 14;
+  OE_AMD_REJ = 15;
+  OE_LAPSE = 16;
+}
+
+enum ChoreStatusType {
+  OE_UNACK = 0;
+  OE_ACKED = 1;
+  OE_CXL_UNACK = 2;
+  OE_DOD = 3;
+  OE_FILLED = 4;
+  OE_OVER_FILLED = 5;
+  OE_AMD_DN_UNACKED = 6;
+  OE_AMD_UP_UNACKED = 7;
+  OE_OVER_CXLED = 8;
+}
+
+
+message ChoreJournal {
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 91,
+    w: 18,
+    h: 17,
+    is_repeated: True,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "email_book_service.proto",
+    depending_proto_model_name: "PairStrat",
+    depends_on_other_model_for_dynamic_url: true,
+    is_read_only: true
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_last_n_sec_chores_by_events",
+      AggregateVarName: "get_last_n_sec_chores_by_event",
+      QueryParams: "last_n_sec",
+      QueryParams: "chore_event_list",
+      QueryParamsDataType: "int",
+      QueryParamsDataType: "List[str]"
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_chore_journals_from_cache"
+  };
+  option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
+  option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 1,
+    ExecutorKeySequence: "chore.security.sec_id-chore.side",
+    LogKeySequence: "chore.chore_id",
+    IsRepeated: true
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional ChoreBrief chore = 2 [(FluxFldPk) = "chore_id"];
+  optional string chore_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
+  optional ChoreEventType chore_event = 4 [(FluxFldPk) = "true"];
+  optional int32 current_period_chore_count = 8 [ (FluxFldHelp) = "total new chore count within chore_rate(s) applicable_period_seconds"];
+}
+
+message ChoreJournalList {
+    repeated ChoreJournal chore_journal = 1 [(FluxFldPk) = "true"];
+}
+
+message ChoreSnapshot {
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 74,
+    w: 18,
+    h: 17,
+    is_repeated: True,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "email_book_service.proto",
+    depending_proto_model_name: "PairStrat",
+    depends_on_other_model_for_dynamic_url: true,
+    is_read_only: true
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_chore_snapshots_from_cache"
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 1,
+    ExecutorKeySequence: "chore_brief.security.sec_id-chore_brief.side",
+    LogKeySequence: "chore_brief.chore_id-chore_status",
+    IsRepeated: true,
+    CacheAsDictWithKeyField: "chore_brief.chore_id"
+  };
+  option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
+  option (FluxMsgUIGetAllLimit) = "-100";
+
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional ChoreStatusType chore_status = 2 [(FluxFldNoCommonKey) = true];
+  optional ChoreBrief chore_brief = 3;
+  optional int64 filled_qty = 4;
+  optional float avg_fill_px = 5;
+  optional float fill_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldTitle) = "fill $", (FluxFldNumberFormat) = "$"];
+  optional int64 last_update_fill_qty = 7;
+  optional float last_update_fill_px = 8;
+  optional int64 pending_amend_dn_qty = 9;
+  optional int64 pending_amend_up_qty = 10;
+  optional float pending_amend_dn_px = 11;
+  optional float pending_amend_up_px = 12;
+  optional int64 total_amend_dn_qty = 13;
+  optional int64 total_amend_up_qty = 14;
+  optional int64 last_lapsed_qty = 15;
+  optional int64 total_lapsed_qty = 16;
+  optional int64 total_amd_rej_qty = 17;
+  optional int64 cxled_qty = 18;
+  optional float avg_cxled_px = 19;
+  optional float cxled_notional = 20 [(FluxFldDisplayType) = "int", (FluxFldTitle) = "cxled $", (FluxFldNumberFormat) = "$"];
+  optional string create_date_time = 21 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
+  optional string last_update_date_time = 22 [(FluxFldValIsDateTime) = true];
+  optional int64 last_n_sec_total_qty = 23 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec chore qty
+}

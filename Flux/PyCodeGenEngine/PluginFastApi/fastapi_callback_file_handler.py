@@ -4,6 +4,9 @@ from abc import ABC
 import logging
 from typing import List, Tuple, Dict
 
+# 3rd party imports
+from pathlib import PurePath
+
 # project imports
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
@@ -14,7 +17,8 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 import protogen
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin, ModelType
-
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
+    project_dir, root_core_proto_files, project_grp_core_proto_files)
 
 class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
@@ -442,7 +446,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_callback_http_file_query_method_output(
             self, message: protogen.Message, query_name: str,
-            agg_params_with_type_str: str, route_type: str | None = None) -> str:
+            agg_params_with_type_str: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if agg_params_with_type_str is not None:
             output_str = f"    async def {query_name}_query_pre(self, " \
@@ -513,12 +517,14 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                     msg_name_n_ws_query_name_tuple_list.append((message.proto.name, query_name))
                 elif query_type == "http_file":
                     output_str += self._handle_callback_http_file_query_method_output(message, query_name,
-                                                                                      agg_params_with_type_str,
-                                                                                      query_route_type)
+                                                                                      agg_params_with_type_str)
                 else:
                     err_str = f"Unsupported Query type for query base callback code generation {query_type}"
                     logging.exception(err_str)
                     raise Exception(err_str)
+
+        for message, file_query_name in self.message_to_file_query_name_dict.items():
+            output_str += self._handle_callback_http_file_query_method_output(message, file_query_name)
 
         output_str += "\n"
 
@@ -610,7 +616,8 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
         return output_str
 
-    def handle_msgspec_callback_class_file_gen(self) -> str:
+    def handle_msgspec_callback_class_file_gen(self, file: protogen.File | None = None,
+                                               model_file_suffix: str | None = None) -> str:
         output_str = "import threading\n"
         output_str += "import logging\n"
         output_str += "from abc import abstractmethod\n"
@@ -619,6 +626,17 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'\n\n'
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f"from {model_file_path} import *\n"
+
+        if file and model_file_suffix:
+            project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+            dependency_file_path_list = self.get_dependency_file_path_list(
+                file, root_core_proto_files, project_grp_core_proto_files,
+                model_file_suffix, str(project_grp_root_dir))
+
+            project_name = file.proto.package
+            for dependency_file_path in dependency_file_path_list:
+                if f"_n_{project_name}" in dependency_file_path or f"{project_name}_n_" in dependency_file_path:
+                    output_str += f'from {dependency_file_path} import *\n'
         output_str += self.handle_get_set_instance()
 
         # Adding app pre- and post-launch methods
