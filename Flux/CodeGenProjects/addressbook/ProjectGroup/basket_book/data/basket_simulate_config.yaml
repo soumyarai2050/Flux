@@ -1,0 +1,140 @@
+symbol_configs:
+  ^CB_Sec_[1,3-9][0-9]?$:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+    force_fill_full: False
+
+    # to simulate rej functionality
+    simulate_new_to_reject_chores: False   # to simulate chores with new and reject chore_event
+    simulate_ack_to_reject_chores: False   # to simulate chores with ack and reject chore_event
+
+    # to simulate cxl-rej functionality
+    simulate_new_to_cxl_rej_chores: False
+    simulate_ack_to_cxl_rej_chores: False
+
+    # to avoid cxl ack after cxl req, if not True cxl req itself will trigger cxl ack
+    avoid_cxl_ack_after_cxl_req: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_chores: False
+    simulate_new_unsolicited_cxl_chores: False
+
+    # to simulate fills before chore ack
+    simulate_fills_pre_chore_ack: False
+
+    # to avoid fills after ack chore
+    simulate_avoid_fill_after_ack: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal chores following continuous special chores
+    continues_chore_count: 3
+    continues_special_chore_count: 1
+
+  ^CB_Sec_2$:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+    force_fill_full: False
+
+    # to simulate rej functionality
+    simulate_new_to_reject_chores: False   # to simulate chores with new and reject chore_event
+    simulate_ack_to_reject_chores: False   # to simulate chores with ack and reject chore_event
+
+    # to simulate cxl-rej functionality
+    simulate_new_to_cxl_rej_chores: False
+    simulate_ack_to_cxl_rej_chores: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_chores: False
+    simulate_new_unsolicited_cxl_chores: False
+
+    # to simulate fills before chore ack
+    simulate_fills_pre_chore_ack: False
+
+    # to avoid fills after ack chore
+    simulate_avoid_fill_after_ack: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal chores following continuous special chores
+    continues_chore_count: 3
+    continues_special_chore_count: 2
+
+  ^EQT_Sec_1[0-9]?$:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+    force_fill_full: False
+
+    # to simulate rej functionality
+    simulate_new_to_reject_chores: False   # to simulate chores with new and reject chore_event
+    simulate_ack_to_reject_chores: False   # to simulate chores with ack and reject chore_event
+
+    # to simulate cxl-rej functionality
+    simulate_new_to_cxl_rej_chores: False
+    simulate_ack_to_cxl_rej_chores: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_chores: False
+    simulate_new_unsolicited_cxl_chores: False
+
+    # to simulate fills before chore ack
+    simulate_fills_pre_chore_ack: False
+
+    # to avoid fills after ack chore
+    simulate_avoid_fill_after_ack: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal chores following continuous special chores
+    continues_chore_count: 3
+    continues_special_chore_count: 2
+
+  ^EQT_Sec_[2-9][0-9]?$:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+    force_fill_full: False
+
+    # to simulate rej functionality
+    simulate_new_to_reject_chores: False   # to simulate chores with new and reject chore_event
+    simulate_ack_to_reject_chores: False   # to simulate chores with ack and reject chore_event
+
+    # to simulate cxl-rej functionality
+    simulate_new_to_cxl_rej_chores: False
+    simulate_ack_to_cxl_rej_chores: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_chores: False
+    simulate_new_unsolicited_cxl_chores: False
+
+    # to simulate fills before chore ack
+    simulate_fills_pre_chore_ack: False
+
+    # to avoid fills after ack chore
+    simulate_avoid_fill_after_ack: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal chores following continuous special chores
+    continues_chore_count: 3
+    continues_special_chore_count: 1
+
+  default:
+    simulate_reverse_path: True
+    fill_percent: 100
+    # total_fill_count: 1
+    # ack_percent: 100
+
+    # to simulate rej functionality
+    # simulate_new_to_reject_chores: False   # to simulate chores with new and reject chore_event
+    # simulate_ack_to_reject_chores: False   # to simulate chores with ack and reject chore_event
+
+    # to simulate cxl-rej functionality
+    # simulate_cxl_rej_chores: False
+
+    # to simulate unsolicited cxl functionality
+    # simulate_ack_unsolicited_cxl_chores: False
+    # simulate_new_unsolicited_cxl_chores: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal chores following continuous special chores
+    # continues_chore_count: 3
+    # continues_special_chore_count: 1

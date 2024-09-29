@@ -1,0 +1,56 @@
+ui_coordinates:
+  BasketChore:
+    x: 0
+    y: 0
+    w: 18
+    h: 20
+  ChoreLimits:
+    x: 0
+    y: 20
+    w: 6
+    h: 10
+  SystemControl:
+    x: 6
+    y: 20
+    w: 12
+    h: 10
+  PortfolioAlert:
+    x: 0
+    y: 30
+    w: 18
+    h: 10
+  SymbolOverview:
+    x: 0
+    y: 40
+    w: 18
+    h: 10
+  TopOfBook:
+    x: 0
+    y: 50
+    w: 18
+    h: 10
+  FillsJournal:
+    x: 0
+    y: 60
+    w: 18
+    h: 20
+  ChoreSnapshot:
+    x: 0
+    y: 80
+    w: 18
+    h: 20
+  ChoreJournal:
+    x: 0
+    y: 100
+    w: 18
+    h: 20
+  MarketDepth:
+    x: 0
+    y: 120
+    w: 18
+    h: 20
+  LastBarter:
+    x: 0
+    y: 140
+    w: 18
+    h: 20
