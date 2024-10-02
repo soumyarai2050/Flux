@@ -7,6 +7,7 @@ from multiprocessing import current_process
 from queue import Queue
 import sys
 import signal
+import threading
 
 # 3rd party modules
 import pendulum
@@ -134,13 +135,13 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         self.service_ready = False
         self.strat_alert_cache_dict_by_strat_id_dict: Dict[int, Dict[str, StratAlert]] = {}     # updates in main thread only
         self.portfolio_alerts_cache_dict: Dict[str, PortfolioAlert] = {}    # updates in main thread only
-        self.strat_alerts_cache_cont: AlertsCacheCont = AlertsCacheCont()
-        self.portfolio_alerts_cache_cont: AlertsCacheCont = AlertsCacheCont()
+        self.strat_alerts_cache_cont: AlertsCacheCont = AlertsCacheCont(name="strat")
+        self.portfolio_alerts_cache_cont: AlertsCacheCont = AlertsCacheCont(name="portfolio")
         self.tail_file_multiprocess_queue: multiprocessing.Queue = multiprocessing.Queue()
         self.clear_cache_file_path_queue: multiprocessing.Queue = multiprocessing.Queue()
-        self.file_path_to_tail_executor_process_cache_mutex: RLock = RLock()
+        self.file_path_to_tail_executor_process_cache_mutex: threading.RLock = threading.RLock()
         self.file_path_to_tail_executor_process_cache_dict: Dict[str, List[multiprocessing.Process]] = {}
-        self.file_path_to_log_detail_cache_mutex: RLock = RLock()
+        self.file_path_to_log_detail_cache_mutex: threading.RLock = threading.RLock()
         self.file_path_to_log_detail_cache_dict: Dict[str, List[StratLogDetail]] = {}
         self.file_watcher_process: multiprocessing.Process | None = None
         self.portfolio_alert_queue: Queue = Queue()
@@ -203,11 +204,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 # validate essential services are up, if so, set service ready state to true
                 if self.service_up:
                     if not self.service_ready:
-                        # updating portfolio alert cache
-                        self.load_portfolio_alerts_n_update_cache()
-                        # updating strat alert cache
-                        self.load_strat_alerts_n_update_cache()
-
                         self.run_queue_handler()
 
                         # creating tail_executor log dir if not exists
@@ -225,7 +221,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                                      spawn, self.tail_executor_start_time_local_fmt,),
                                kwargs={"regex_file_dir_path": str(LOG_ANALYZER_DATA_DIR),
                                        "simulation_mode": simulation_mode},
-                               daemon=True).start()
+                               daemon=True, name="tail_file_multiprocess_queue").start()
 
                         # running watcher process
                         process = (
@@ -248,6 +244,16 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                         if is_log_book_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
                             self.service_up = True
                             should_sleep = False
+
+                            # updating alert cache
+                            run_coro = self.load_alerts_n_update_cache()
+                            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                            # block to finish task
+                            try:
+                                future.result()
+                            except Exception as e:
+                                logging.exception(f"load_alerts_n_update_cache failed with exception: {e}")
+
                         else:
                             should_sleep = True
                             service_up_no_error_retry_count -= 1
@@ -268,6 +274,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                                                                  str(config_yaml_path))
             else:
                 should_sleep = True
+
+    async def load_alerts_n_update_cache(self):
+        # updating portfolio alert cache
+        await self.load_portfolio_alerts_n_update_cache()
+        # updating strat alert cache
+        await self.load_strat_alerts_n_update_cache()
 
     def get_generic_read_route(self):
         pass
@@ -306,23 +318,15 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         err_str_ = f"_handle_portfolio_alert_queue_err_handler called, passed args: {args}"
         self.portfolio_alert_fail_logger.exception(err_str_)
 
-    def load_portfolio_alerts_n_update_cache(self):
+    async def load_portfolio_alerts_n_update_cache(self):
         try:
-            if self.asyncio_loop is not None:
-                run_coro = LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_alert_http()
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-            else:
-                err_str_ = f"cant find asyncio_loop, cant submit task of underlying_read_portfolio_alert_http"
-                logging.error(err_str_)
-                raise Exception(err_str_)
-
-            portfolio_alerts: List[PortfolioAlert] = submitted_task_result(future)
-            for portfolio_alert in portfolio_alerts:
-                component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(portfolio_alert)
-                alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
-                                                component_file_path, source_file_name, line_num)
-                self.portfolio_alerts_cache_dict[alert_key] = portfolio_alert
-                with self.portfolio_alerts_cache_cont.mutex:
+            portfolio_alerts: List[PortfolioAlert] = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_alert_http()
+            async with self.portfolio_alerts_cache_cont.re_mutex:
+                for portfolio_alert in portfolio_alerts:
+                    component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(portfolio_alert)
+                    alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
+                                                    component_file_path, source_file_name, line_num)
+                    self.portfolio_alerts_cache_dict[alert_key] = portfolio_alert
                     self.portfolio_alerts_cache_cont.alert_id_to_obj_dict[portfolio_alert.id] = portfolio_alert
 
         except Exception as e:
@@ -330,22 +334,9 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             logging.error(err_str_)
             raise Exception(err_str_)
 
-    def load_strat_alerts_n_update_cache(self):
-        try:
-            if self.asyncio_loop is not None:
-                run_coro = LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_alert_http()
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-            else:
-                err_str_ = f"cant find asyncio_loop, cant submit task of underlying_read_strat_alert_http"
-                logging.error(err_str_)
-                raise Exception(err_str_)
-
-            strat_alerts: List[StratAlert] = submitted_task_result(future)
-        except Exception as e:
-            err_str_ = f"load_portfolio_alerts_n_update_cache failed with exception: {e}"
-            logging.error(err_str_)
-            raise Exception(err_str_)
-        else:
+    async def load_strat_alerts_n_update_cache(self):
+        strat_alerts: List[StratAlert] = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_alert_http()
+        async with self.strat_alerts_cache_cont.re_mutex:
             for strat_alert in strat_alerts:
                 strat_alert_cache = self.strat_alert_cache_dict_by_strat_id_dict.get(strat_alert.strat_id)
                 component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(strat_alert)
@@ -355,85 +346,33 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     self.strat_alert_cache_dict_by_strat_id_dict[strat_alert.strat_id] = {alert_key: strat_alert}
                 else:
                     strat_alert_cache[alert_key] = strat_alert
-                with self.strat_alerts_cache_cont.mutex:
-                    self.strat_alerts_cache_cont.alert_id_to_obj_dict[strat_alert.id] = strat_alert
+                self.strat_alerts_cache_cont.alert_id_to_obj_dict[strat_alert.id] = strat_alert
 
-    def put_all_portfolio_alert_client_with_asyncio_loop(self, portfolio_alerts: List[PortfolioAlert]):
-        try:
-            if self.asyncio_loop is not None:
-                run_coro = LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_portfolio_alert_http(
-                    portfolio_alerts)
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-            else:
-                err_str_ = f"cant find asyncio_loop, cant submit task of underlying_update_all_portfolio_alert_http"
-                logging.error(err_str_)
-                raise Exception(err_str_)
+    async def strat_alert_create_n_update_using_async_submit_callable(
+            self, alerts_cache_cont, queue_obj, err_handling_callable,
+            client_connection_fail_retry_secs):
+        await handle_alert_create_n_update_using_async_submit(
+            alerts_cache_cont,
+            LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_strat_alert_http,
+            LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_strat_alert_http,
+            queue_obj, err_handling_callable, StratAlert, client_connection_fail_retry_secs)
 
-            return submitted_task_result(future)
-        except Exception as e:
-            err_str_ = f"put_all_portfolio_alert_client_with_asyncio_loop failed with exception: {e}"
-            logging.error(err_str_)
-            raise Exception(err_str_)
-
-    def create_all_portfolio_alert_client_with_asyncio_loop(self, portfolio_alerts: List[PortfolioAlert]):
-        try:
-            if self.asyncio_loop is not None:
-                run_coro = LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_portfolio_alert_http(
-                    portfolio_alerts)
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-            else:
-                err_str_ = f"cant find asyncio_loop, cant submit task of underlying_create_all_portfolio_alert_http"
-                logging.error(err_str_)
-                raise Exception(err_str_)
-
-            return submitted_task_result(future)
-        except Exception as e:
-            err_str_ = f"create_all_portfolio_alert_client_with_asyncio_loop failed with exception: {e}"
-            logging.error(err_str_)
-            raise Exception(err_str_)
-
-    def put_all_strat_alert_client_with_asyncio_loop(self, strat_alerts: List[StratAlert]):
-        try:
-            if self.asyncio_loop is not None:
-                run_coro = LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_strat_alert_http(
-                    strat_alerts)
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-            else:
-                err_str_ = f"cant find asyncio_loop, cant submit task of underlying_create_all_portfolio_alert_http"
-                logging.error(err_str_)
-                raise Exception(err_str_)
-
-            return submitted_task_result(future)
-        except Exception as e:
-            err_str_ = f"put_all_strat_alert_client_with_asyncio_loop failed with exception: {e}"
-            logging.error(err_str_)
-            raise Exception(err_str_)
-
-    def create_all_strat_alert_client_with_asyncio_loop(self, strat_alerts: List[StratAlert]):
-        try:
-            if self.asyncio_loop is not None:
-                run_coro = LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_strat_alert_http(
-                    strat_alerts)
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-            else:
-                err_str_ = f"cant find asyncio_loop, cant submit task of underlying_create_all_portfolio_alert_http"
-                logging.error(err_str_)
-                raise Exception(err_str_)
-
-            return submitted_task_result(future)
-        except Exception as e:
-            err_str_ = f"create_all_strat_alert_client_with_asyncio_loop failed with exception: {e}"
-            logging.error(err_str_)
-            raise Exception(err_str_)
+    async def portfolio_alert_create_n_update_using_async_submit_callable(
+            self, alerts_cache_cont, queue_obj, err_handling_callable,
+            client_connection_fail_retry_secs):
+        await handle_alert_create_n_update_using_async_submit(
+            alerts_cache_cont,
+            LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_portfolio_alert_http,
+            LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_portfolio_alert_http,
+            queue_obj, err_handling_callable, PortfolioAlert, client_connection_fail_retry_secs)
 
     def _handle_portfolio_alert_queue(self):
-        alert_queue_handler(
+        alert_queue_handler_for_create_n_update(
             self.asyncio_loop, self.portfolio_alert_queue, portfolio_alert_bulk_update_counts_per_call,
             portfolio_alert_bulk_update_timeout,
-            self.create_all_portfolio_alert_client_with_asyncio_loop,
+            self.portfolio_alert_create_n_update_using_async_submit_callable,
             self._handle_portfolio_alert_queue_err_handler,
-            self.put_all_portfolio_alert_client_with_asyncio_loop,
-            self.portfolio_alerts_cache_cont)
+            self.portfolio_alerts_cache_cont, asyncio_loop=self.asyncio_loop)
 
     def _handle_strat_alert_queue_err_handler(self, *args):
         try:
@@ -461,13 +400,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             self.portfolio_alert_fail_logger.exception(err_str_)
 
     def _handle_strat_alert_queue(self):
-        alert_queue_handler(
+        alert_queue_handler_for_create_n_update(
             self.asyncio_loop, self.strat_alert_queue, strat_alert_bulk_update_counts_per_call,
             strat_alert_bulk_update_timeout,
-            self.create_all_strat_alert_client_with_asyncio_loop,
+            self.strat_alert_create_n_update_using_async_submit_callable,
             self._handle_strat_alert_queue_err_handler,
-            self.put_all_strat_alert_client_with_asyncio_loop,
-            self.strat_alerts_cache_cont)
+            self.strat_alerts_cache_cont, asyncio_loop=self.asyncio_loop)
 
     def run_queue_handler(self):
         portfolio_alert_handler_thread = Thread(target=self._handle_portfolio_alert_queue, daemon=True)
@@ -477,7 +415,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
     def send_portfolio_alerts(self, severity: str, alert_brief: str,
                               alert_meta: AlertMeta | None = None) -> None:
-        logging.debug(f"sending alert with {severity=}, {alert_brief=}")
+        logging.debug(f"sending portfolio alert with {severity=}, {alert_brief=}")
         try:
             severity: Severity = get_severity_type_from_severity_str(severity_str=severity)
             create_or_update_alert(self.portfolio_alerts_cache_dict, self.portfolio_alert_queue,
@@ -849,7 +787,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             raise HTTPException(status_code=503, detail=err_str_)
 
     async def delete_portfolio_alert_post(self, delete_web_response):
-        with self.portfolio_alerts_cache_cont.mutex:
+        async with self.portfolio_alerts_cache_cont.re_mutex:
             portfolio_alert = self.portfolio_alerts_cache_cont.alert_id_to_obj_dict.get(delete_web_response.id)
             component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(portfolio_alert)
             alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
@@ -857,8 +795,13 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             self.portfolio_alerts_cache_dict.pop(alert_key, None)
             self.portfolio_alerts_cache_cont.alert_id_to_obj_dict.pop(delete_web_response.id, None)
 
+            # Below pops are required to avoid race_condition with alert_queue_handler_for_create_n_update
+            # running for portfolio_alerts in separate thread
+            self.portfolio_alerts_cache_cont.update_alert_obj_dict.pop(delete_web_response.id, None)
+            self.portfolio_alerts_cache_cont.create_alert_obj_dict.pop(delete_web_response.id, None)
+
     async def delete_strat_alert_post(self, delete_web_response):
-        with self.strat_alerts_cache_cont.mutex:
+        async with self.strat_alerts_cache_cont.re_mutex:
             strat_alert = self.strat_alerts_cache_cont.alert_id_to_obj_dict.get(delete_web_response.id)
             strat_alert_cache_dict = self.strat_alert_cache_dict_by_strat_id_dict.get(strat_alert.strat_id)
             component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(strat_alert)
@@ -867,23 +810,34 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             strat_alert_cache_dict.pop(alert_key, None)
             self.strat_alerts_cache_cont.alert_id_to_obj_dict.pop(delete_web_response.id, None)
 
+            # Below pops are required to avoid race_condition with alert_queue_handler_for_create_n_update
+            # running for strat_alerts in separate thread
+            self.strat_alerts_cache_cont.update_alert_obj_dict.pop(delete_web_response.id, None)
+            self.strat_alerts_cache_cont.create_alert_obj_dict.pop(delete_web_response.id, None)
+
     async def delete_all_strat_alert_post(self, delete_web_response):
         self.strat_alert_cache_dict_by_strat_id_dict.clear()
-        with self.strat_alerts_cache_cont.mutex:
+        async with self.strat_alerts_cache_cont.re_mutex:
             self.strat_alerts_cache_cont.alert_id_to_obj_dict.clear()
+
+            # Below pops are required to avoid race_condition with alert_queue_handler_for_create_n_update
+            # running for strat_alerts in separate thread
+            self.strat_alerts_cache_cont.update_alert_obj_dict.clear()
+            self.strat_alerts_cache_cont.create_alert_obj_dict.clear()
+
         # updating strat_view fields
         photo_book_service_http_client.reset_all_strat_view_count_n_severity_query_client()
 
     async def verify_strat_alert_id_in_strat_alert_id_to_obj_cache_dict_query_pre(
             self, strat_alert_id_to_obj_cache_class_type: Type[StratAlertIdToObjCache], strat_alert_id: int):
-        with self.strat_alerts_cache_cont.mutex:
+        async with self.strat_alerts_cache_cont.re_mutex:
             is_id_present = strat_alert_id in self.strat_alerts_cache_cont.alert_id_to_obj_dict
             return [StratAlertIdToObjCache(is_id_present=is_id_present)]
 
     async def verify_portfolio_alert_id_in_get_portfolio_alert_id_to_obj_cache_dict_query_pre(
             self, portfolio_alert_id_to_obj_cache_class_type: Type[PortfolioAlertIdToObjCache],
             portfolio_alert_id: int):
-        with self.portfolio_alerts_cache_cont.mutex:
+        async with self.portfolio_alerts_cache_cont.re_mutex:
             is_id_present = portfolio_alert_id in self.portfolio_alerts_cache_cont.alert_id_to_obj_dict
             return [PortfolioAlertIdToObjCache(is_id_present=is_id_present)]
 
@@ -917,7 +871,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     get_total_strat_alert_count_n_highest_severity(updated_strat_id),
                     projection_read_http, StratViewUpdateCont)
 
-            if strat_view_update_cont is not None:
+            if strat_view_update_cont:
                 strat_alert_aggregated_severity = strat_view_update_cont.highest_priority_severity
                 strat_alert_count = strat_view_update_cont.total_objects
 
@@ -1037,16 +991,16 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
     async def remove_strat_alerts_for_strat_id_query_pre(
             self, remove_strat_alerts_for_strat_id_class_type: Type[RemoveStratAlertsForStratId], strat_id: int):
-        strat_alerts = \
-            await (LogBookServiceRoutesCallbackBaseNativeOverride.
-                   underlying_filtered_strat_alert_by_strat_id_query_http(strat_id))
+        async with StratAlert.reentrant_lock:
+            strat_alerts = \
+                await (LogBookServiceRoutesCallbackBaseNativeOverride.
+                       underlying_filtered_strat_alert_by_strat_id_query_http(strat_id))
 
-        # todo: introduce bulk delete with id list and replace looped deletion here
-        strat_alert: StratAlert
-        with self.strat_alerts_cache_cont.mutex:
+            # todo: introduce bulk delete with id list and replace looped deletion here
+            strat_alert: StratAlert
             for strat_alert in strat_alerts:
+                # cache is also cleaned in delete post call
                 await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_alert_http(strat_alert.id)
-                self.strat_alerts_cache_cont.alert_id_to_obj_dict.pop(strat_alert.id, None)
 
         # releasing cache for strat id
         self.strat_alert_cache_dict_by_strat_id_dict.pop(strat_id, None)

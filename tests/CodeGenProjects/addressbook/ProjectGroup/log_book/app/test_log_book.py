@@ -107,6 +107,40 @@ def check_alert_doesnt_exist_in_portfolio_alert(expected_alert_brief: str, log_f
                                f"{expected_alert_brief}, found {portfolio_alert=}, {log_file_path=}")
 
 
+@pytest.mark.log_book
+def test_filtered_strat_alert_by_strat_id_query_covers_all_strats(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        market_depth_basemodel_list):
+    # manually creating multiple strat_alerts with random id(s)
+    strat_alert_dict: Dict = {}
+    all_strat_alert_list: List = []
+    for i in range(100):
+        random_strat_id = random.randint(1, 5)
+        random_severity = random.choice(list(Severity))
+        strat_alert = StratAlertBaseModel(strat_id=random_strat_id, severity=random_severity, alert_brief=f"Sample-{i}")
+        if strat_alert_dict.get(strat_alert.strat_id) is None:
+            strat_alert_dict[strat_alert.strat_id] = [strat_alert]
+        else:
+            strat_alert_dict[strat_alert.strat_id].append(strat_alert)
+        all_strat_alert_list.append(strat_alert)
+
+    log_book_web_client.create_all_strat_alert_client(all_strat_alert_list)
+
+    for strat_id, strat_alerts in strat_alert_dict.items():
+        filtered_strat_alerts = log_book_web_client.filtered_strat_alert_by_strat_id_query_client(strat_id)
+
+        assert len(filtered_strat_alerts) == len(strat_alerts), \
+            f"Mismatched: {len(filtered_strat_alerts)=} != {len(strat_alerts)=}"
+        for strat_alert in strat_alerts:
+            for fetched_strat_alert in filtered_strat_alerts:
+                if fetched_strat_alert.alert_brief == strat_alert.alert_brief:
+                    break
+            else:
+                assert False, (f"Unexpected: Can't find strat_alert with {strat_alert.alert_brief=} in "
+                               f"filtered_strat_alerts: {filtered_strat_alerts}")
+
+
 def check_alert_exists_in_strat_alert(active_strat: PairStratBaseModel, expected_alert_brief: str,
                                       log_file_path: str, expected_alert_detail_first: str,
                                       expected_alert_detail_latest: str | None = None) -> StratAlertBaseModel:

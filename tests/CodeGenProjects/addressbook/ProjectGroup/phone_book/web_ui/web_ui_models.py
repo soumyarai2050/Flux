@@ -29,7 +29,15 @@ class DataType(StrEnum):
 
 
 class FluxPropertyType(StrEnum):
+    FluxFldValMin = "val_min"
     FluxFldValMax = "val_max"
+    FluxFldServerPopulate = "server_populate"
+    FluxFldDisplayType = "display_type"
+    FluxFldNumberFormat = "number_format"
+    FluxFldDisplayZero = "display_zero"
+    FluxFldButton = "button"
+    FluxFldHelp = "help"
+    FluxFldProgressBar = "progress_bar"
 
 
 class InputType(StrEnum):
@@ -71,8 +79,21 @@ class WidgetType(StrEnum):
 class Delay(Enum):
     SHORT = 2
     DEFAULT = 5
+    MEDIUM = 10
     LONG = 20
 
+class WidgetName(StrEnum):
+    PairStratParams = "pair_strat_params"
+    StratLimits = "strat_limits"
+    StratCollection = "strat_collection"
+    PortFolioLimits = "portfolio_limits"
+    ChoreLimits = "chore_limits"
+    PortFolioStatus = "portfolio_status"
+    StratStatus = "strat_status"
+    PortfolioAlert = "portfolio_alert"
+    FxSymbolOverview = "fx_symbol_overview"
+    BasketChore = "basket_chore"
+    SymbolSideSnapShot = "symbol_side_snapshot"
 
 class ColorType(StrEnum):
     # ERROR = (156, 0, 6)

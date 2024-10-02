@@ -1,16 +1,7 @@
 #pragma once
 
 #include "mobile_book_consumer.h"
-#include "mongo_db_singleton.h"
 
-extern MobileBookTopOfBookWebSocketServer<mobile_book::TopOfBook> top_of_book_websocket_server;
-extern MobileBookLastBarterWebSocketServer<mobile_book::LastBarter> last_barter_websocket_server;
-extern MobileBookMarketDepthWebSocketServer<mobile_book::MarketDepth> market_depth_websocket_server;
-extern std::thread top_of_book_ws_thread;
-extern std::thread last_barter_ws_thread;
-extern std::thread market_depth_ws_thread;
-
-extern "C" void websocket_cleanup();
 
 extern "C" void initialize_database(const char* db_uri, const char* db_name);
 

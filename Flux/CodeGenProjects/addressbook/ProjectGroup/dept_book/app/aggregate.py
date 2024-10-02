@@ -1,5 +1,5 @@
 from pendulum import DateTime
-from typing import List
+from typing import List, Dict
 
 # below import is required in routes
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
@@ -552,3 +552,51 @@ def get_premium_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_i
         }
     return {'aggregate': agg_pipeline}
 
+
+def get_bar_data_from_symbol_n_start_n_end_datetime(symbol: str, start_datetime: DateTime, end_datetime: DateTime):
+    agg_pipeline: List[Dict] = [
+        {
+            '$match': {
+                "symbol_n_exch_id.symbol": symbol
+            }
+        },
+        {
+            '$match': {},
+        }
+    ]
+    if start_datetime and not end_datetime:
+        agg_pipeline[1]['$match'] = {
+            '$expr': {
+                '$gt': [
+                    '$start_time', start_datetime
+                ]
+            }
+        }
+    elif not start_datetime and end_datetime:
+        agg_pipeline[1]['$match'] = {
+            '$expr': {
+                '$lt': [
+                    '$start_time', end_datetime
+                ]
+            }
+        }
+    elif start_datetime and end_datetime:
+        agg_pipeline[1]['$match'] = {
+            '$and': [
+                {
+                    '$expr': {
+                        '$gt': [
+                            '$start_time', start_datetime
+                        ]
+                    }
+                },
+                {
+                    '$expr': {
+                        '$lt': [
+                            '$start_time', end_datetime
+                        ]
+                    }
+                }
+            ]
+        }
+    return {'aggregate': agg_pipeline}

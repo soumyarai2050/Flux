@@ -2,8 +2,9 @@
 import datetime
 import time
 import queue
-from threading import Thread, current_thread, RLock
+from threading import Thread, current_thread
 import re
+import threading
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
@@ -37,8 +38,11 @@ class UpdateType(StrEnum):
 
 
 class AlertsCacheCont(MsgspecBaseModel, kw_only=True):
-    mutex: RLock = RLock()
+    name: str | None = None
+    re_mutex: AsyncRLock = field(default_factory=AsyncRLock)
     alert_id_to_obj_dict: Dict = field(default_factory=dict)
+    create_alert_obj_dict: Dict = field(default_factory=dict)   # temporary field: used in alert_queue_handler
+    update_alert_obj_dict: Dict = field(default_factory=dict)   # temporary field: used in alert_queue_handler
 
 
 def create_alert(
@@ -437,17 +441,15 @@ def _alert_queue_handler_err_handler(e, pydantic_obj_list, queue_obj, err_handli
         err_handling_callable(pydantic_obj_list)
 
 
-def alert_queue_handler(run_state: bool, queue_obj: queue.Queue, bulk_transactions_counts_per_call: int,
-                        bulk_transaction_timeout: int, create_web_client_callable: Callable[..., Any],
-                        err_handling_callable, update_web_client_callable: Callable[..., Any] | None = None,
-                        alerts_cache_cont: AlertsCacheCont | None = None,
-                        client_connection_fail_retry_secs: int | None = None):
+def alert_queue_handler_for_create_only(
+        run_state: bool, queue_obj: queue.Queue, bulk_transactions_counts_per_call: int,
+        bulk_transaction_timeout: int, create_web_client_callable: Callable[..., Any],
+        err_handling_callable, client_connection_fail_retry_secs: int | None = None):
     create_pydantic_obj_list = []
-    update_pydantic_obj_list = []
     queue_fetch_counts: int = 0
     oldest_entry_time: DateTime = DateTime.utcnow()
     while True:
-        if not create_pydantic_obj_list and not update_pydantic_obj_list:
+        if not create_pydantic_obj_list:
             remaining_timeout_secs = bulk_transaction_timeout
         else:
             remaining_timeout_secs = (
@@ -455,24 +457,13 @@ def alert_queue_handler(run_state: bool, queue_obj: queue.Queue, bulk_transactio
 
         if not remaining_timeout_secs < 1:
             try:
-                pydantic_obj = queue_obj.get(timeout=remaining_timeout_secs)  # timeout based blocking call
+                alert_obj = queue_obj.get(timeout=remaining_timeout_secs)  # timeout based blocking call
 
-                if pydantic_obj == "EXIT":
+                if alert_obj == "EXIT":
                     logging.info(f"Exiting alert_queue_handler")
                     return
 
-                if alerts_cache_cont is not None:
-                    with alerts_cache_cont.mutex:
-                        # if created_alert_id_dict is passed then using both update and create mechanism
-                        if alerts_cache_cont.alert_id_to_obj_dict.get(pydantic_obj.id) is not None:
-                            update_pydantic_obj_list.append(pydantic_obj)
-                        else:
-                            create_pydantic_obj_list.append(pydantic_obj)
-                        alerts_cache_cont.alert_id_to_obj_dict[pydantic_obj.id] = pydantic_obj
-                else:
-                    # if created_alert_id_dict is not passed then only creating
-                    create_pydantic_obj_list.append(pydantic_obj)
-
+                create_pydantic_obj_list.append(alert_obj)
                 queue_fetch_counts += 1
             except queue.Empty:
                 # since bulk update timeout limit has breached, will call update
@@ -502,18 +493,129 @@ def alert_queue_handler(run_state: bool, queue_obj: queue.Queue, bulk_transactio
                                                  create_web_client_callable, client_connection_fail_retry_secs)
             create_pydantic_obj_list.clear()  # cleaning list to start fresh cycle
 
-        if update_pydantic_obj_list:
-            # handling update list
+        queue_fetch_counts = 0
+        oldest_entry_time = DateTime.utcnow()
+        # else not required since even after timeout no data found
+
+
+async def handle_alert_create_n_update_using_async_submit(
+        alerts_cache_cont: AlertsCacheCont, underlying_create_all_web_client_callable,
+        underlying_update_all_web_client_callable, queue_obj:
+        queue.Queue, err_handling_callable, model_class_type: Type[StratAlert | PortfolioAlert],
+        client_connection_fail_retry_secs: int | None = None):
+    async with model_class_type.reentrant_lock:
+        async with alerts_cache_cont.re_mutex:
+            if alerts_cache_cont.create_alert_obj_dict:
+
+                # handling create list
+                try:
+                    create_pydantic_obj_list = list(alerts_cache_cont.create_alert_obj_dict.values())
+                    res = await underlying_create_all_web_client_callable(create_pydantic_obj_list)
+                except HTTPException as http_e:
+                    _alert_queue_handler_err_handler(http_e.detail, create_pydantic_obj_list, queue_obj,
+                                                     err_handling_callable,
+                                                     underlying_create_all_web_client_callable, client_connection_fail_retry_secs)
+                except Exception as e:
+                    _alert_queue_handler_err_handler(e, create_pydantic_obj_list, queue_obj, err_handling_callable,
+                                                     underlying_create_all_web_client_callable, client_connection_fail_retry_secs)
+                alerts_cache_cont.create_alert_obj_dict.clear()  # cleaning dict to start fresh cycle
+
+        async with alerts_cache_cont.re_mutex:
+            if alerts_cache_cont.update_alert_obj_dict:
+                # handling update list
+                try:
+                    update_pydantic_obj_list = list(alerts_cache_cont.update_alert_obj_dict.values())
+                    res = await underlying_update_all_web_client_callable(update_pydantic_obj_list)
+                except HTTPException as http_e:
+                    _alert_queue_handler_err_handler(http_e.detail, update_pydantic_obj_list, queue_obj,
+                                                     err_handling_callable,
+                                                     underlying_update_all_web_client_callable, client_connection_fail_retry_secs)
+                except Exception as e:
+                    _alert_queue_handler_err_handler(e, update_pydantic_obj_list, queue_obj, err_handling_callable,
+                                                     underlying_update_all_web_client_callable, client_connection_fail_retry_secs)
+                alerts_cache_cont.update_alert_obj_dict.clear()  # cleaning list to start fresh cycle
+
+
+async def get_remaining_timeout_secs(alerts_cache_cont: AlertsCacheCont, bulk_transaction_timeout: int,
+                                     oldest_entry_time: DateTime.utcnow()) -> int:
+    async with alerts_cache_cont.re_mutex:
+        if not alerts_cache_cont.create_alert_obj_dict and not alerts_cache_cont.update_alert_obj_dict:
+            remaining_timeout_secs = bulk_transaction_timeout
+        else:
+            remaining_timeout_secs = (
+                    bulk_transaction_timeout - (DateTime.utcnow() - oldest_entry_time).total_seconds())
+        return remaining_timeout_secs
+
+
+async def update_alert_caches(alerts_cache_cont: AlertsCacheCont, alert_obj: StratAlert | PortfolioAlert) -> None:
+    async with alerts_cache_cont.re_mutex:
+        if alerts_cache_cont.alert_id_to_obj_dict.get(alert_obj.id) is not None:
+            alerts_cache_cont.update_alert_obj_dict[alert_obj.id] = alert_obj
+        else:
+            alerts_cache_cont.create_alert_obj_dict[alert_obj.id] = alert_obj
+        alerts_cache_cont.alert_id_to_obj_dict[alert_obj.id] = alert_obj
+
+
+def alert_queue_handler_for_create_n_update(
+        run_state: bool, queue_obj: queue.Queue, bulk_transactions_counts_per_call: int,
+        bulk_transaction_timeout: int, alert_create_n_update_using_async_submit_callable: Callable[..., Any],
+        err_handling_callable, alerts_cache_cont: AlertsCacheCont, asyncio_loop: asyncio.AbstractEventLoop,
+        client_connection_fail_retry_secs: int | None = None):
+    queue_fetch_counts: int = 0
+    oldest_entry_time: DateTime = DateTime.utcnow()
+    while True:
+        run_coro = get_remaining_timeout_secs(alerts_cache_cont, bulk_transaction_timeout, oldest_entry_time)
+        future = asyncio.run_coroutine_threadsafe(run_coro, asyncio_loop)
+        # block for task to finish
+        try:
+            remaining_timeout_secs = future.result()
+        except Exception as e_:
+            logging.exception(f"get_remaining_timeout_secs failed with exception: {e_}")
+            continue
+
+        if not remaining_timeout_secs < 1:
             try:
-                res = update_web_client_callable(update_pydantic_obj_list)
-            except HTTPException as http_e:
-                _alert_queue_handler_err_handler(http_e.detail, update_pydantic_obj_list, queue_obj,
-                                                 err_handling_callable,
-                                                 update_web_client_callable, client_connection_fail_retry_secs)
-            except Exception as e:
-                _alert_queue_handler_err_handler(e, update_pydantic_obj_list, queue_obj, err_handling_callable,
-                                                 update_web_client_callable, client_connection_fail_retry_secs)
-            update_pydantic_obj_list.clear()  # cleaning list to start fresh cycle
+                alert_obj = queue_obj.get(timeout=remaining_timeout_secs)  # timeout based blocking call
+
+                if alert_obj == "EXIT":
+                    logging.info(f"Exiting alert_queue_handler")
+                    return
+
+                logging.info(f"taking {alerts_cache_cont.name} lock in alert_queue_handler_for_create_n_update -2  - {threading.current_thread().name}")
+                run_coro = update_alert_caches(alerts_cache_cont, alert_obj)
+                future = asyncio.run_coroutine_threadsafe(run_coro, asyncio_loop)
+                # block for task to finish
+                try:
+                    future.result()
+                except Exception as e_:
+                    logging.exception(f"update_alert_caches failed with exception: {e_}")
+                    continue
+
+                queue_fetch_counts += 1
+            except queue.Empty:
+                # since bulk update timeout limit has breached, will call update
+                pass
+            else:
+                if queue_fetch_counts < bulk_transactions_counts_per_call:
+                    continue
+                # else, since bulk update count limit has breached, will call update
+        # since bulk update remaining timeout limit <= 0, will call update
+
+        if not run_state:
+            # Exiting this function if run state is turned False
+            logging.info(f"Found {run_state=} in alert_queue_handler - Exiting while loop")
+            return
+
+        run_coro = alert_create_n_update_using_async_submit_callable(
+                       alerts_cache_cont, queue_obj, err_handling_callable,
+                       client_connection_fail_retry_secs)
+        future = asyncio.run_coroutine_threadsafe(run_coro, asyncio_loop)
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e_:
+            logging.exception(f"alert_create_n_update_using_async_submit_callable failed with exception: {e_}")
+            continue
 
         queue_fetch_counts = 0
         oldest_entry_time = DateTime.utcnow()

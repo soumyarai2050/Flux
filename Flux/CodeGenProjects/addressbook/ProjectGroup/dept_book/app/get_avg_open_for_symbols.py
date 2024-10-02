@@ -1,9 +1,7 @@
-import pendulum
-
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.yahoo_finance_base import *
+from ProjectGroup.dept_book.app.yahoo_finance_base import *
 from FluxPythonUtils.scripts.utility_functions import configure_logger, read_mongo_collection_as_dataframe
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.aggregate import get_bar_data_from_symbol_n_start_n_end_datetime
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import get_bar_data_from_symbol_n_start_n_end_datetime
 
 
 class GetAvgOpenForSymbols(YahooFinanceBase):
@@ -48,10 +46,10 @@ class GetAvgOpenForSymbols(YahooFinanceBase):
             agg_pipeline_dict = \
                 get_bar_data_from_symbol_n_start_n_end_datetime(symbol_with_suffix, start_datetime, end_datetime)
             # Read the MongoDB collection as a DataFrame
-            df: pd.DataFrame = \
+            df: pl.DataFrame = \
                 read_mongo_collection_as_dataframe(db, collection, agg_pipeline=agg_pipeline_dict["aggregate"])
 
-            if not df.empty:
+            if not df.is_empty():
                 # Calculate the average open price
                 avg_open_price = df['open'].mean()
                 logging.debug(f"Average Open Price of symbol {symbol_with_suffix}: {avg_open_price}")

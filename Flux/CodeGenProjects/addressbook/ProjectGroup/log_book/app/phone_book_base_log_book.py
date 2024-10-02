@@ -116,7 +116,7 @@ class PhoneBookBaseLogBook(AppLogBook):
         return portfolio_alerts
 
     def _handle_portfolio_alert_queue(self):
-        alert_queue_handler(
+        alert_queue_handler_for_create_only(
             self.is_running, self.portfolio_alert_queue, portfolio_alert_bulk_update_counts_per_call,
             portfolio_alert_bulk_update_timeout,
             self._handle_portfolio_alert_query_call_from_alert_queue_handler,
@@ -131,7 +131,7 @@ class PhoneBookBaseLogBook(AppLogBook):
         client_connection_fail_retry_secs = self.config_yaml_dict.get("perf_bench_client_connection_fail_retry_secs")
         if client_connection_fail_retry_secs:
             client_connection_fail_retry_secs = parse_to_int(client_connection_fail_retry_secs)
-        alert_queue_handler(
+        alert_queue_handler_for_create_only(
             self.is_running, self.raw_performance_data_queue, raw_performance_data_bulk_create_counts_per_call,
             raw_perf_data_bulk_create_timeout,
             performance_benchmark_service_http_client.create_all_raw_performance_data_client,

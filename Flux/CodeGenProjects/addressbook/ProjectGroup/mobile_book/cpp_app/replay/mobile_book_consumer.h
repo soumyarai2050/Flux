@@ -4,10 +4,10 @@
 #include "mobile_book_web_socket_server.h"
 #include "mongo_db_codec.h"
 #include "queue_handler.h"
-#include "mongo_db_singleton.h"
 #include "mobile_book_service_shared_data_structure.h"
 #include "mobile_book_service.pb.h"
 #include "cpp_app_shared_resource.h"
+#include "mongo_db_handler.h"
 
 
 class MobileBookInterface {
@@ -19,7 +19,7 @@ public:
 protected:
 	explicit MobileBookInterface(const std::string &kr_yaml_config_file) :
 	k_mr_config_file_(kr_yaml_config_file), m_config_file_(YAML::LoadFile(k_mr_config_file_)),
-	m_sp_mongo_db_(MongoDBHandlerSingleton::get_instance(get_db_uri(), get_db_name())),
+	m_sp_mongo_db_(std::make_shared<FluxCppCore::MongoDBHandler>(get_db_uri(), get_db_name())),
 	m_top_of_book_db_codec_(m_sp_mongo_db_), m_market_depth_db_codec_(m_sp_mongo_db_),
 	m_last_barter_db_codec_(m_sp_mongo_db_), m_market_depth_history_db_codec_(m_sp_mongo_db_),
 	m_last_barter_history_db_codec_(m_sp_mongo_db_),
@@ -213,13 +213,16 @@ public:
 	}
 
 	void process_market_depth(const MarketDepth &md) {
+		LOG_INFO(GetLogger(), "inside: {}: {}", __func__, md.symbol_);
 		mon_md.push(md);
 		PyMarketDepth md_market_depth{md.symbol_.c_str(), md.exch_time_.c_str(),
 			md.arrival_time_.c_str(), md.side_, md.px_, md.is_px_set_, md.qty_, md.is_qty_set_,
 			md.position_, md.market_maker_.c_str(), md.is_market_maker_set_, md.is_smart_depth_,
 			md.is_is_smart_depth_set_, md.cumulative_notional_, md.is_cumulative_notional_set_, md.cumulative_qty_,
 			md.is_cumulative_qty_set_, md.cumulative_avg_px_, md.is_cumulative_avg_px_set_};
+		LOG_INFO(GetLogger(), "process_market_depth cache: {}", md.symbol_);
 		mkt_depth_fp(&md_market_depth);
+		LOG_INFO(GetLogger(), "exit: {}: {}", __func__, md.symbol_);
 	}
 
 	void process_last_barter(const LastBarter &e) {

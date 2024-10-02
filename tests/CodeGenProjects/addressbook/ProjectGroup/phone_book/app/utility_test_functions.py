@@ -131,7 +131,7 @@ def clean_all_collections_ignoring_ui_layout() -> None:
     for db_name in get_mongo_db_list(mongo_server_uri):
         if "log_book" == db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
-                                    ignore_collections=["UILayout", "PortfolioAlert",
+                                    ignore_collections=["UILayout", "PortfolioAlert", "StratAlert",
                                                         "RawPerformanceData", "ProcessedPerformanceAnalysis"])
         elif "phone_book" == db_name or "post_book" == db_name or "photo_book" == db_name:
             ignore_collections = ["UILayout"]
@@ -2878,6 +2878,9 @@ def wait_for_get_new_chore_placed_from_tob(wait_stop_px: int | float, symbol_to_
 
 
 def clean_log_book_alerts():
+    # removing all strat_alerts
+    log_book_web_client.delete_all_strat_alert_client()
+
     portfolio_alert_list = log_book_web_client.get_all_portfolio_alert_client()
     for alert in portfolio_alert_list:
         if "Log analyzer running in simulation mode" not in alert.alert_brief:

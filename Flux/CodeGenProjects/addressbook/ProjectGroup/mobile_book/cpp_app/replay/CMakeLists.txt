@@ -115,7 +115,6 @@ set(SRC_FILES
 message(SRC_FILES ${SRC_FILES})
 # Create shared library including dependencies
 add_library(marketdataprovider SHARED ${SRC_FILES} cpp_app_launcher.cpp
-        mongo_db_singleton.cpp
         cpp_app_shared_resource.cpp
         mock_mobile_book_cache.cpp
         mobile_book_interface.cpp

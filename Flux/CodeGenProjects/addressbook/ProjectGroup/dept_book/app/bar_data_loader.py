@@ -1,7 +1,12 @@
+# standard imports
 import asyncio
+from typing import Set
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.yahoo_finance_base import *
+# project imports
+from ProjectGroup.dept_book.app.yahoo_finance_base import *
 from FluxPythonUtils.scripts.utility_functions import configure_logger
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import dashboard_service_http_client
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.Pydentic.dept_book_service_msgspec_model import *
 
 
 # This class is used to create objects that represent the concept of getting historical data.
@@ -13,11 +18,13 @@ class BarDataLoader(YahooFinanceBase):
     def __init__(self, file_path: str | None = None):
         super().__init__(file_path)
         self.bar_data_symbol_n_last_update_date_time_list: List[BarDataNLatestUpdateDateTime] = \
-            mobile_book_service_web_client.get_bar_data_all_symbols_n_last_update_time_query_client()
-        self.symbol_to_last_update_datetime_dict: Dict[str, DateTime] = {
-            bar_data_symbol_n_datetime.symbol: bar_data_symbol_n_datetime.last_update_datetime
-            for bar_data_symbol_n_datetime in self.bar_data_symbol_n_last_update_date_time_list[0].symbol_n_last_update_datetime
-        }
+            dashboard_service_http_client.get_bar_data_all_symbols_n_last_update_time_query_client()
+        self.symbol_to_last_update_datetime_dict: Dict[str, DateTime] = {}
+        if self.bar_data_symbol_n_last_update_date_time_list:
+            self.symbol_to_last_update_datetime_dict: Dict[str, DateTime] = {
+                bar_data_symbol_n_datetime.symbol: bar_data_symbol_n_datetime.last_update_datetime
+                for bar_data_symbol_n_datetime in self.bar_data_symbol_n_last_update_date_time_list[0].symbol_n_last_update_datetime
+            }
 
     async def _create_update_bar_data_from_source(self, ticker: yf.Ticker, symbol: str) -> None:
         interval = config_yaml_dict["bar_data_fetch_interval"]
@@ -26,9 +33,9 @@ class BarDataLoader(YahooFinanceBase):
             start_datetime = self.symbol_to_last_update_datetime_dict[symbol]
             start_date = pendulum.parse(str(start_datetime)).add(days=1)
             start_date_str = start_date.format("YYYY-MM-DD")
-            symbol_history_df: pd.Dataframe = ticker.history(period=period, interval=interval, start=start_date_str)
+            symbol_history_df: pl.Dataframe = ticker.history(period=period, interval=interval, start=start_date_str)
         else:
-            symbol_history_df: pd.Dataframe = ticker.history(period=period, interval=interval)
+            symbol_history_df: pl.Dataframe = ticker.history(period=period, interval=interval)
         if not symbol_history_df.empty:
             bar_data_list = []
             for timestamp, row in symbol_history_df.iterrows():
@@ -49,7 +56,7 @@ class BarDataLoader(YahooFinanceBase):
                     dividends=row['Dividends'],
                     stock_splits=row['Stock Splits'])
                 bar_data_list.append(bar_data)
-            mobile_book_service_web_client.create_all_bar_data_client(bar_data_list)
+            dashboard_service_http_client.create_all_bar_data_client(bar_data_list)
         else:
             add_symbol_to_invalid_cache(symbol)
 

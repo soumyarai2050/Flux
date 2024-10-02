@@ -133,7 +133,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
         return strat_alerts
 
     def _handle_strat_alert_queue(self):
-        alert_queue_handler(
+        alert_queue_handler_for_create_only(
             self.is_running, self.strat_alert_queue, strat_alert_bulk_update_counts_per_call,
             strat_alert_bulk_update_timeout,
             self._handle_strat_alert_query_call_from_alert_queue_handler,

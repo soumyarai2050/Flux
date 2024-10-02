@@ -10,6 +10,8 @@ import subprocess
 from typing import Set
 import ctypes
 
+from sqlalchemy.testing.plugin.plugin_base import logging
+
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import last_barter_callback_type, \
     market_depth_callback_type
@@ -281,14 +283,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             ctypes.c_int32
         ]
         self.mobile_book_provider.cpp_app_launcher.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
-        # self.mobile_book_provider.get_tob_ws_port.argtypes = None
-        # self.mobile_book_provider.get_md_ws_port.argtypes = None
-        # self.mobile_book_provider.get_lt_ws_port.argtypes = None
         self.mobile_book_provider.create_or_update_md_n_tob.restype = None
         self.mobile_book_provider.create_or_update_last_barter_n_tob.restype = None
-        # self.mobile_book_provider.get_tob_ws_port.restype = ctypes.c_int32
-        # self.mobile_book_provider.get_md_ws_port.restype = ctypes.c_int32
-        # self.mobile_book_provider.get_lt_ws_port.restype = ctypes.c_int32
         self.mobile_book_provider.cpp_app_launcher.restype = None
 
     def set_log_simulator_file_name_n_path(self):
@@ -415,9 +411,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     pair_strat.port = self.port
 
                                     # Setting MobileBookCache instances for this symbol pair
-                                    # pair_strat.top_of_book_port = self.mobile_book_provider.get_tob_ws_port()
-                                    # pair_strat.market_depth_port = self.mobile_book_provider.get_md_ws_port()
-                                    # pair_strat.last_barter_port = self.mobile_book_provider.get_lt_ws_port()
                                     pair_strat.top_of_book_port = top_of_book_ws_port
                                     pair_strat.last_barter_port = last_barter_ws_port
                                     pair_strat.market_depth_port = market_depth_ws_port
@@ -438,7 +431,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     # MobileBookCache in real-time
                                     simulate_config_yaml_file_bytes: bytes = simulate_config_yaml_file_str.encode("utf-8")
                                     simulate_config_yaml_file_len: int = len(simulate_config_yaml_file_bytes)
-                                    # self.mobile_book_provider.cpp_app_launcher(simulate_config_yaml_file_bytes)
 
                                     thread = threading.Thread(target=self.mobile_book_provider.cpp_app_launcher,
                                                               args=(simulate_config_yaml_file_bytes,
@@ -3985,12 +3977,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
         # Call the C++ function
         self.mobile_book_provider.create_or_update_md_n_tob(
-            market_depth.id, symbol, exch_time_bytes, arrival_date_time, ctypes.c_char(side),
-            market_depth.position,
-            ctypes.c_double(market_depth.px), market_depth.qty,
+            ctypes.c_int32(market_depth.id), symbol, exch_time_bytes, arrival_date_time, ctypes.c_char(side),
+            ctypes.c_int32(market_depth.position),
+            ctypes.c_double(market_depth.px), ctypes.c_int64(market_depth.qty),
             market_maker, is_smart_depth,
-            cumulative_notional, cumulative_qty,
+            cumulative_notional, ctypes.c_int64(cumulative_qty),
             cumulative_avg_px)
+
 
     def _call_cpp_mobile_book_updater_from_market_depth_json(self, market_depth_json: Dict):
         # Convert string to bytes (for char* arguments)
@@ -4028,11 +4021,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
         # Call the C++ function
         self.mobile_book_provider.create_or_update_md_n_tob(
-            market_depth_json.get("_id"), symbol, exch_time_bytes, arrival_date_time,
-            ctypes.c_char(side), market_depth_json.get("position"),
-            ctypes.c_double(market_depth_json.get("px")), market_depth_json.get("qty"),
+            ctypes.c_int32(market_depth_json.get("_id")), symbol, exch_time_bytes, arrival_date_time,
+            ctypes.c_char(side), ctypes.c_int32(market_depth_json.get("position")),
+            ctypes.c_double(market_depth_json.get("px")), ctypes.c_int64(market_depth_json.get("qty")),
             market_maker, is_smart_depth,
-            cumulative_notional, cumulative_qty, cumulative_avg_px)
+            cumulative_notional, ctypes.c_int64(cumulative_qty), cumulative_avg_px)
 
     def _call_cpp_mobile_book_updater_from_last_barter(self, last_barter: LastBarter):
         # Convert string to bytes (for char* arguments)

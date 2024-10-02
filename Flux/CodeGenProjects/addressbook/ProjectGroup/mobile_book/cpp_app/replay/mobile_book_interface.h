@@ -2,4 +2,6 @@
 
 #include "mobile_book_consumer.h"
 
-extern MobileBookConsumer* mobile_book_consumer;
+#include <memory>
+
+extern std::shared_ptr<MobileBookConsumer> mobile_book_consumer;

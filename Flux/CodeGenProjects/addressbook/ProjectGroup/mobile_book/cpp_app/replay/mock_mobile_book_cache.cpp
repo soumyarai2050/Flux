@@ -35,6 +35,10 @@ extern "C" void create_or_update_md_n_tob([[maybe_unused]] const int32_t id, con
 		is_smart_depth, true, cumulative_notional, true,
 		cumulative_qty, true, cumulative_avg_px, true};
 
-	mobile_book_consumer->process_market_depth(mkt_depth);
+	if (mobile_book_consumer) {
+		mobile_book_consumer->process_market_depth(mkt_depth);
+	} else {
+		LOG_ERROR(GetLogger(), "mobile_book_consumer is null");
+	}
 }
 

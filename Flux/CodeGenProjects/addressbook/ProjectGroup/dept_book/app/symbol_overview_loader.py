@@ -1,7 +1,6 @@
-from typing import Dict
-
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.yahoo_finance_base import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from ProjectGroup.dept_book.app.yahoo_finance_base import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import dashboard_service_http_client
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.Pydentic.dept_book_service_msgspec_model import *
 from FluxPythonUtils.scripts.utility_functions import configure_logger
 
 
@@ -14,7 +13,7 @@ class SymbolOverviewLoader(YahooFinanceBase):
     def __init__(self, file_path: str | None = None):
         super().__init__(file_path)
         self.fetched_symbol_overviews: List[SymbolOverviewBaseModel] = \
-            mobile_book_service_web_client.get_all_symbol_overview_client()
+            dashboard_service_http_client.get_all_symbol_overview_client()
         self.symbol_to_symbol_overview_dict: Dict[str, SymbolOverviewBaseModel] = \
             {fetched_symbol_overview.symbol: fetched_symbol_overview
              for fetched_symbol_overview in self.fetched_symbol_overviews}
@@ -48,9 +47,9 @@ class SymbolOverviewLoader(YahooFinanceBase):
 
                 if symbol in self.symbol_to_symbol_overview_dict:
                     # instead of create this time use put_symbol_overview_client
-                    updated_symbol_overview = mobile_book_service_web_client.put_symbol_overview_client(symbol_overview)
+                    updated_symbol_overview = dashboard_service_http_client.put_symbol_overview_client(symbol_overview)
                 else:
-                    created_symbol_overview = mobile_book_service_web_client.create_symbol_overview_client(
+                    created_symbol_overview = dashboard_service_http_client.create_symbol_overview_client(
                         symbol_overview)
                     # updating symbol_to_symbol_overview_dict with new created symbol_overview
                     self.symbol_to_symbol_overview_dict[created_symbol_overview.symbol] = created_symbol_overview
