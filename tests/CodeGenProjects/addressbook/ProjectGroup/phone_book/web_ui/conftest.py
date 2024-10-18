@@ -8,7 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC  # noqa
 
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import get_driver, wait, \
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import wait, \
     get_web_project_url, create_pair_strat, override_default_limits
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
@@ -101,6 +101,35 @@ def fills_journal_basemodel_fixture() -> List[FillsJournalBaseModel]:
             )
     yield input_data
 
+@pytest.fixture()
+def symbol_side_snapshot_fixture():
+    yield SymbolSideSnapshotBaseModel(
+        id=1,
+        security=None,
+        side=Side.BUY,
+        avg_px=12.6,
+        total_qty=100,
+        total_filled_qty=100,
+        avg_fill_px= 7.5,
+    total_fill_notional= 8.5,
+    last_update_fill_qty= 10,
+    last_update_fill_px= 10.5,
+    total_cxled_qty= 100,
+    avg_cxled_px= 1.1,
+    total_cxled_notional= 56.6,
+    last_update_date_time= pendulum.DateTime,
+    chore_count= 1,
+    )
+
+
+@pytest.fixture()
+def strat_limits_fixture(expected_brokers_) -> List[StratLimitsBaseModel]:
+    input_data: List[StratLimitsBaseModel] = []
+    # Create StratLimitsBaseModel with eligible_brokers and append to input_data
+    strat_limit_obj = StratLimitsBaseModel(eligible_brokers=expected_brokers_)
+    input_data.append(strat_limit_obj)
+    yield input_data
+
 
 @pytest.fixture()
 def chore_journal_basemodel_fixture() -> List[ChoreJournalBaseModel]:
@@ -116,9 +145,9 @@ def chore_journal_basemodel_fixture() -> List[ChoreJournalBaseModel]:
                     chore=ChoreBriefBaseModel(
                         chore_id=f"Chore_{id_counter}",
                         security=SecurityBaseModel(
-                            sec_id=symbol, sec_id_source=SecurityIdSource.RIC, inst_type=InstrumentType.EQT),
+                            sec_id=symbol, sec_id_source=SecurityIdSource.SEC_ID_SOURCE_UNSPECIFIED, inst_type=InstrumentType.INSTRUMENT_TYPE_UNSPECIFIED),
                         bartering_security=SecurityBaseModel(
-                            sec_id=symbol, sec_id_source=SecurityIdSource.RIC, inst_type=InstrumentType.EQT),
+                            sec_id=symbol, sec_id_source=SecurityIdSource.SEC_ID_SOURCE_UNSPECIFIED, inst_type=InstrumentType.INSTRUMENT_TYPE_UNSPECIFIED),
                         side=Side.BUY,
                         px=120.5 + id_counter,
                         qty=100 + id_counter,
@@ -159,7 +188,7 @@ def chore_snapshot_basemodel_fixture() -> list[ChoreSnapshotBaseModel]:
                     user_data="none",
                     security=SecurityBaseModel(
                         sec_id=str(id_counter),
-                        sec_id_source=SecurityIdSource.RIC,
+                        sec_id_source=SecurityIdSource.SEC_ID_SOURCE_UNSPECIFIED,
                         inst_type=InstrumentType.EQT),
                     bartering_security=SecurityBaseModel(
                             sec_id=str(id_counter),
@@ -169,7 +198,7 @@ def chore_snapshot_basemodel_fixture() -> list[ChoreSnapshotBaseModel]:
 
                 filled_qty=50,
                 avg_fill_px=50.0,
-                fill_notional=0.0,
+                fill_notional=10,
                 last_update_fill_qty=100,
                 last_update_fill_px=10.0,
                 pending_amend_dn_qty=150,
@@ -204,18 +233,21 @@ def top_of_book_fixture() -> List:
                 "id": id,
                 "symbol": symbol,
                 "bid_quote": {
-                    "px": 110,
+                    "px": 1.11,
                     "qty": 20,
+                    "premium": 5.22,
                     "last_update_date_time": "2023-02-13T20:30:33.165Z"
                 },
                 "ask_quote": {
-                    "px": 120,
+                    "px": 1.22,
                     "qty": 40,
+                    "premium": 9.23,
                     "last_update_date_time": "2023-02-13T20:30:31.165Z"
                 },
                 "last_barter": {
-                    "px": 116,
+                    "px": 1.16,
                     "qty": 150,
+                    "premium": 44.23,
                     "last_update_date_time": "2023-02-13T20:30:35.165Z"
                 },
                 "total_bartering_security_size": 100,
@@ -246,11 +278,25 @@ def expected_portfolio_limits_(expected_brokers_) -> PortfolioLimitsBaseModel:
     rolling_max_chore_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
 
-    portfolio_limits_obj = PortfolioLimitsBaseModel(id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
-                                                    max_gross_n_open_notional=2_400_000,
-                                                    rolling_max_chore_count=rolling_max_chore_count,
-                                                    rolling_max_reject_count=rolling_max_reject_count,
-                                                    eligible_brokers=expected_brokers_)
+    # max_accounts_nett_notional = PortfolioLimitsBaseModel(accounts_nett_notional=44.3)
+    # max_accounts_nett_notional_list = [max_accounts_nett_notional]
+
+    portfolio_limits_obj = PortfolioLimitsBaseModel(
+        id=1,
+        max_accounts_nett_notional=[
+            AccountsNettNotionalBaseModel(
+                accounts_nett_notional=44.6,
+                chore_accounts=[ChoreAccountBaseModel(chore_account="chore_acc")]
+            )
+        ],
+        max_open_baskets=20,
+        max_open_notional_per_side=100_000,
+        max_gross_n_open_notional=2_400_000,
+        rolling_max_chore_count=rolling_max_chore_count,
+        rolling_max_reject_count=rolling_max_reject_count,
+        eligible_brokers=expected_brokers_,
+    )
+
     yield portfolio_limits_obj
 
 
@@ -281,7 +327,7 @@ def db_names_list(buy_sell_symbol_list) -> List:
 def expected_brokers_(buy_sell_symbol_list) -> List[Broker]:
     sec_positions: List[SecPosition] = []
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
-        cb_sec_position: SecPosition = SecPosition(security=Security(sec_id=buy_symbol, sec_id_source=SecurityIdSource.SEDOL))
+        cb_sec_position: SecPosition = SecPosition(security=Security(sec_id=buy_symbol, sec_id_source=SecurityIdSource.SEDOL), figi="figi1")
         cb_positions: List[Position] = [Position(type=PositionType.SOD, priority=0, available_size=10_000,
                                                  allocated_size=10_000, consumed_size=0)]
         cb_sec_position.positions = cb_positions
@@ -383,7 +429,9 @@ def web_project(driver: WebDriver, pair_strat: Dict, expected_chore_limits_: Cho
                 last_barter_basemodel_fixture: List[LastBarterBaseModel],
                 fills_journal_basemodel_fixture: List[FillsJournalBaseModel],
                 chore_snapshot_basemodel_fixture: List[ChoreSnapshotBaseModel],
-                chore_journal_basemodel_fixture: List[ChoreJournalBaseModel]):
+                chore_journal_basemodel_fixture: List[ChoreJournalBaseModel],
+                symbol_side_snapshot_fixture: SymbolSideSnapshotBaseModel,
+                strat_limits_fixture: StratLimitsBaseModel):
 
     host: str = "127.0.0.1"
     port: int = 8020
@@ -404,11 +452,11 @@ def web_project(driver: WebDriver, pair_strat: Dict, expected_chore_limits_: Cho
     # kill_switch_btn = portfolio_status_widget.find_element(By.NAME, "kill_switch")
 
 
-    wait(driver).until(EC.presence_of_element_located((By.ID, "system_control")))
+    wait(driver, Delay.LONG.value).until(EC.presence_of_element_located((By.ID, "system_control")))
     system_control_widget = driver.find_element(By.ID, "system_control")
     scroll_into_view(driver=driver, element=system_control_widget)
     click_button_with_name(system_control_widget, "Create")
-    wait(driver).until(EC.presence_of_element_located((By.NAME, "kill_switch")))
+    wait(driver, Delay.LONG.value).until(EC.presence_of_element_located((By.NAME, "kill_switch")))
     kill_switch_btn = system_control_widget.find_element(By.NAME, "kill_switch")
     assert kill_switch_btn.is_displayed(), "failed to load web project, kill switch button not found"
     create_pair_strat(driver=driver, pair_strat=pair_strat)
@@ -417,7 +465,8 @@ def web_project(driver: WebDriver, pair_strat: Dict, expected_chore_limits_: Cho
                               last_barter_basemodel_fixture=last_barter_basemodel_fixture,
                               fills_journal_basemodel_fixture=fills_journal_basemodel_fixture,
                               chore_snapshot_basemodel_fixture=chore_snapshot_basemodel_fixture,
-                              chore_journal_basemodel_fixture=chore_journal_basemodel_fixture)
+                              chore_journal_basemodel_fixture=chore_journal_basemodel_fixture,
+                              strat_limits_fixture=strat_limits_fixture)
 
 
 @pytest.fixture()
@@ -440,6 +489,17 @@ def pair_strat() -> Dict[str, any]:
         }
     }
     yield pair_strat
+
+
+@pytest.fixture()
+def strat_brief_fixture() -> Dict[str, any]:
+    pair_strat_edit = {
+        "pair_strat_params": {
+            "common_premium": 55,
+            "hedge_ratio": 60
+        }
+    }
+    yield pair_strat_edit
 
 
 @pytest.fixture()
@@ -502,15 +562,16 @@ def set_micro_seperator_and_clean(schema_dict: Dict[str, any]):
 
 @pytest.fixture
 def ui_layout_list_(schema_dict) -> UILayoutBaseModel:
-    ui_layout: UILayoutBaseModel = UILayoutBaseModel()
-    ui_layout.id = 1
-    ui_layout.profile_id = "test"
-    widget_ui_data_elements: List[WidgetUIDataElementOptional] = []
+    # Initialize variables for x, y, w, h
+    x = 2
+    y = 3
+    w = 4
+    h = 5
 
-    x: int = 10
-    y: int = 7
-    w: int = 4
-    h: int = 3
+    # List to store widget data elements
+    widget_ui_data_elements = []
+
+    # Iterate over schema_dict and create WidgetUIDataElementBaseModel instances
     for widget_name, widget_schema in schema_dict.items():
         x += 5
         y += 3
@@ -518,28 +579,124 @@ def ui_layout_list_(schema_dict) -> UILayoutBaseModel:
         h += 2
         if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element"]:
             continue
-        widget_ui_data_element: WidgetUIDataElementOptional = WidgetUIDataElementOptional()
-        widget_ui_data_element.i = widget_name
-        widget_ui_data_element.x = x
-        widget_ui_data_element.y = y
-        widget_ui_data_element.w = w
-        widget_ui_data_element.h = h
 
-        widget_ui_data = widget_schema.get("widget_ui_data_element").get("widget_ui_data")
-        ui_data_list: List[WidgetUIDataOptional] = []
-        ui_data: WidgetUIDataOptional = WidgetUIDataOptional()
-        ui_data_list.append(ui_data)
-    #     ui_data.
-    #     if widget_ui_data is not None:
-    #         ui_data: List[WidgetUIDataOptional] = []
-    #         for _ in widget_ui_data:
-    #             ui_data.append(WidgetUIDataOptional(**_))
-    #         widget_ui_data_element.widget_ui_data = ui_data
-    #
-    #     widget_ui_data_elements.append(widget_ui_data_element)
-    # ui_layout.widget_ui_data_elements = widget_ui_data_elements
+        sort_chores=SortChoreBaseModel(
+            chore_by="chore",
+            sort_type="sort",
+        )
+        sort_chore_list = [sort_chores]
+        column_chores = ColumnChoreBaseModel(
+            column_name="222",
+            sequence=1
+        )
+        column_chores_list = [column_chores]
+        widget_ui_data = WidgetUIDataBaseModel(
+            view_layout=Layout.TABLE,
+            enable_override=["demo1", "demo2"],
+            disable_override=["demo3", "demo4"],
+            highlight_update=False,
+            edit_layout=UILayouts.UI_TABLE,
+            truncate_date_time=False,
+            bind_id_val="123",
+            column_chores=column_chores_list,
+            sort_chores=sort_chore_list,
+            join_by="join",
+            joined_at_center=False,
+            flip=False,
+            show_less=["showless1", "showless2"],
+            data_source_colors=["datasource1, datasource2"]
 
-    yield ui_layout
+        )
+        widget_ui_data_list = [widget_ui_data]
+
+
+        filters = UIFilterBaseModel(
+            fld_name="fld",
+            fld_value="123",
+        )
+        filters_list = [filters]
+
+        series = ChartSeriesBaseModel(
+            id=None,
+            type=ChartType.CHART_TYPE_UNSPECIFIED,
+            y_min=22.3,
+            y_max=33.3,
+        )
+        chart_series_list = [series]
+        chart_data=ChartDataBaseModel(
+            id=None,
+            chart_name=widget_name,
+            time_series=False,
+            filters=filters_list,
+            partition_fld="partition_fld",
+            series=chart_series_list,
+        )
+        chart_data_list = [chart_data]
+
+        filters = UIFilterBaseModel(
+            fld_name="fld",
+            fld_value="123",
+        )
+        filters_list = [filters]
+
+        ui_query_params=UIQueryParamBaseModel(
+            query_param_field="query_param_field",
+            query_param_field_src="query_param_field_src",
+        )
+        ui_query_params_list = [ui_query_params]
+        override_default_crud = OverrideDefaultCRUDBaseModel(
+            ui_crud_type=UICRUDType.GET_,
+            query_name="query_name",
+            query_src_model_name="model",
+            ui_query_params=ui_query_params_list
+        )
+        override_default_crud_list = [override_default_crud]
+
+        sort_chore = SortChoreBaseModel(
+            chore_by="chore",
+            sort_type="sort_type"
+        )
+        sort_chore_list = [sort_chore]
+
+        join_sort = JoinSortBaseModel(
+            sort_chore=sort_chore_list,
+            placeholders=["placeholder1", "placeholder2"],
+        )
+        join_sort_list = List[join_sort]
+        widget_ui_data_elements.append(WidgetUIDataElementBaseModel(
+            i=widget_name,
+            x=x,
+            y=y,
+            w=w,
+            h=h,
+            is_repeated=False,
+            alert_bubble_source="bubble",
+            alert_bubble_color="red",
+            disable_ws_on_edit=True,
+            bind_id_fld="bind_123",
+            dynamic_widget_title_fld="Dynamic Widget",
+            widget_ui_data=widget_ui_data_list,
+            chart_data=chart_data_list,
+            filters=filters_list,
+            depending_proto_file_name="proto_file",
+            depending_proto_model_name="proto_model",
+            depends_on_other_model_for_id=False,
+            depends_on_other_model_for_dynamic_url=False,
+            depends_on_model_name_for_port=False,
+            override_default_crud=override_default_crud_list,
+            is_model_alert_type=False,
+            join_sort=join_sort_list,
+            is_read_only=True,
+        ))
+
+        ui_layout_list_ = UILayoutBaseModel(
+            id=1,
+            profile_id="test",
+            widget_ui_data_elements=widget_ui_data_elements,
+            theme=Theme.THEME_DARK
+        )
+
+    yield ui_layout_list_
 
 
 @pytest.fixture
@@ -549,6 +706,8 @@ def set_disable_ws_on_edit_and_clean(schema_dict: Dict[str, any]):
                        extend_field_name="disable_ws_on_edit", value=True)
     yield
 
-    schema_path: PurePath = code_gen_projects_dir_path / "phone_book" / "web-ui" / "public" / "schema.json"
+    schema_path: PurePath = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup"/ "phone_book" / "web-ui" / "public" / "schema.json"
     with open(str(schema_path), "w") as file:
         json.dump(schema_dict, file, indent=2)
+
+

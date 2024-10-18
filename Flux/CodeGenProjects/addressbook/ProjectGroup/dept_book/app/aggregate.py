@@ -3,9 +3,26 @@ from typing import List, Dict
 
 # below import is required in routes
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.Pydentic.dept_book_service_msgspec_model import *
 
 
-def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, start_date_time: DateTime | None = None, end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+def get_dict_list_for_bar_meta_data_match(symbol: str, exch_id: str, bar_type: BarType) -> List[Dict[str, Any]]:
+    return [
+        {
+            'bar_meta_data.symbol': symbol
+        },
+        {
+            'bar_meta_data.exch_id': exch_id
+        },
+        {
+            'bar_meta_data.bar_type': bar_type.value
+        }
+    ]
+
+def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, bar_type: BarType,
+                                                   start_date_time: DateTime | None = None,
+                                                   end_date_time: DateTime | None = None,
+                                                   id_list: List[int] | None = None):
     # Code generated function
     agg_pipeline = [
         {
@@ -13,14 +30,7 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, st
         },
         {
             '$match': {
-                '$and': [
-                    {
-                        'symbol_n_exch_id.symbol': symbol
-                    },
-                    {
-                        'symbol_n_exch_id.exch_id': exch_id
-                    }
-                ]
+                '$and': get_dict_list_for_bar_meta_data_match(symbol, exch_id, bar_type)
             }
         },
         {
@@ -96,7 +106,9 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, st
     return {'aggregate': agg_pipeline}
 
 
-def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, start_date_time: DateTime | None = None, end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(
+        symbol: str, exch_id: str, bar_type: BarType, start_date_time: DateTime | None = None,
+        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # Code generated function
     agg_pipeline = [
         {
@@ -104,14 +116,7 @@ def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(symbol: str, ex
         },
         {
             '$match': {
-                '$and': [
-                    {
-                        'symbol_n_exch_id.symbol': symbol
-                    },
-                    {
-                        'symbol_n_exch_id.exch_id': exch_id
-                    }
-                ]
+                '$and': get_dict_list_for_bar_meta_data_match(symbol, exch_id, bar_type)
             }
         },
         {
@@ -188,7 +193,9 @@ def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(symbol: str, ex
     return {'aggregate': agg_pipeline}
 
 
-def get_vwap_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, start_date_time: DateTime | None = None, end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+def get_vwap_change_projection_from_bar_data_agg_pipeline(
+        symbol: str, exch_id: str, bar_type: BarType, start_date_time: DateTime | None = None,
+        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # Code generated function
     agg_pipeline = [
         {
@@ -196,14 +203,7 @@ def get_vwap_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: 
         },
         {
             '$match': {
-                '$and': [
-                    {
-                        'symbol_n_exch_id.symbol': symbol
-                    },
-                    {
-                        'symbol_n_exch_id.exch_id': exch_id
-                    }
-                ]
+                '$and': get_dict_list_for_bar_meta_data_match(symbol, exch_id, bar_type)
             }
         },
         {
@@ -279,7 +279,9 @@ def get_vwap_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: 
     return {'aggregate': agg_pipeline}
 
 
-def get_premium_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, start_date_time: DateTime | None = None, end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+def get_premium_projection_from_bar_data_agg_pipeline(
+        symbol: str, exch_id: str, bar_type: BarType, start_date_time: DateTime | None = None,
+        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # shift this function to aggregate.py file of project and remove this comment afterward
     agg_pipeline = [
         {
@@ -287,14 +289,7 @@ def get_premium_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str,
         },
         {
             '$match': {
-                '$and': [
-                    {
-                        'symbol_n_exch_id.symbol': symbol
-                    },
-                    {
-                        'symbol_n_exch_id.exch_id': exch_id
-                    }
-                ]
+                '$and': get_dict_list_for_bar_meta_data_match(symbol, exch_id, bar_type)
             }
         },
         {
@@ -370,7 +365,9 @@ def get_premium_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str,
     return {'aggregate': agg_pipeline}
 
 
-def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, start_date_time: DateTime | None = None, end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(
+        symbol: str, exch_id: str, bar_type: BarType, start_date_time: DateTime | None = None,
+        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # shift this function to aggregate.py file of project and remove this comment afterward
     agg_pipeline = [
         {
@@ -378,14 +375,7 @@ def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(symbol: s
         },
         {
             '$match': {
-                '$and': [
-                    {
-                        'symbol_n_exch_id.symbol': symbol
-                    },
-                    {
-                        'symbol_n_exch_id.exch_id': exch_id
-                    }
-                ]
+                '$and': get_dict_list_for_bar_meta_data_match(symbol, exch_id, bar_type)
             }
         },
         {
@@ -462,7 +452,9 @@ def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(symbol: s
     return {'aggregate': agg_pipeline}
 
 
-def get_premium_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, start_date_time: DateTime | None = None, end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+def get_premium_change_projection_from_bar_data_agg_pipeline(
+        symbol: str, exch_id: str, bar_type: BarType, start_date_time: DateTime | None = None,
+        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # shift this function to aggregate.py file of project and remove this comment afterward
     agg_pipeline = [
         {
@@ -470,14 +462,7 @@ def get_premium_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_i
         },
         {
             '$match': {
-                '$and': [
-                    {
-                        'symbol_n_exch_id.symbol': symbol
-                    },
-                    {
-                        'symbol_n_exch_id.exch_id': exch_id
-                    }
-                ]
+                '$and': get_dict_list_for_bar_meta_data_match(symbol, exch_id, bar_type)
             }
         },
         {
@@ -553,11 +538,12 @@ def get_premium_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_i
     return {'aggregate': agg_pipeline}
 
 
-def get_bar_data_from_symbol_n_start_n_end_datetime(symbol: str, start_datetime: DateTime, end_datetime: DateTime):
+def get_bar_data_from_symbol_n_start_n_end_datetime(
+        symbol: str, exch_id: str, bar_type: BarType, start_datetime: DateTime, end_datetime: DateTime):
     agg_pipeline: List[Dict] = [
         {
             '$match': {
-                "symbol_n_exch_id.symbol": symbol
+                '$and': get_dict_list_for_bar_meta_data_match(symbol, exch_id, bar_type)
             }
         },
         {

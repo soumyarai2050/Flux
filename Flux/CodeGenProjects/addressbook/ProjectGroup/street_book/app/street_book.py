@@ -624,11 +624,11 @@ class StreetBook(BaseBook):
             bartering_brief = strat_brief.pair_sell_side_bartering_brief
             # Sell - not allowed less than limit dn px
             # limit down - TODO : Important : Upgrade this to support bartering at Limit Dn within the limit Dn limit
-            if new_ord.px <= symbol_overview.limit_dn_px:
+            if new_ord.px < symbol_overview.limit_dn_px:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated SELL chore, limit down bartering not allowed on day-1, px "
-                              f"expected higher than limit-dn px: {symbol_overview.limit_dn_px}, found {new_ord.px} for "
+                logging.error(f"blocked generated SELL chore, px expected higher than limit-dn px: "
+                              f"{symbol_overview.limit_dn_px}, found {new_ord.px} for "
                               f"strat_cache: {self.strat_cache.get_key()}, strat_brief_log_key: "
                               f"{get_strat_brief_log_key(strat_brief)}")
                 checks_passed |= ChoreControl.ORDER_CONTROL_LIMIT_DOWN_FAIL
@@ -636,11 +636,11 @@ class StreetBook(BaseBook):
             bartering_brief = strat_brief.pair_buy_side_bartering_brief
             # Buy - not allowed more than limit up px
             # limit up - TODO : Important : Upgrade this to support bartering at Limit Up within the limit Up limit
-            if new_ord.px >= symbol_overview.limit_up_px:
+            if new_ord.px > symbol_overview.limit_up_px:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated BUY chore, limit up bartering not allowed on day-1, px "
-                              f"expected lower than limit-up px: {symbol_overview.limit_up_px}, found {new_ord.px} for "
+                logging.error(f"blocked generated BUY chore, px expected lower than limit-up px: "
+                              f"{symbol_overview.limit_up_px}, found {new_ord.px} for "
                               f"strat_cache: {self.strat_cache.get_key()}, strat_brief: "
                               f"{get_strat_brief_log_key(strat_brief)}")
                 checks_passed |= ChoreControl.ORDER_CONTROL_LIMIT_UP_FAIL

@@ -332,15 +332,14 @@ class ChoreControl:
         market_depths = []
 
         if chore_limits.max_px_levels == 0:
-            if symbol_cache:
-                if side == Side.SELL:
-                    market_depths = symbol_cache.get_ask_market_depths()
-                else:
-                    market_depths = symbol_cache.get_bid_market_depths()
+            if side == Side.SELL:
+                market_depths = symbol_cache.get_ask_market_depths()
+            else:
+                market_depths = symbol_cache.get_bid_market_depths()
 
-                market_depth = market_depths[0]
-                if market_depth is not None:
-                    px_by_max_level = market_depth.px
+            market_depth = market_depths[0]
+            if market_depth is not None:
+                px_by_max_level = market_depth.px
 
         else:
             max_px_level: int = chore_limits.max_px_levels
@@ -352,18 +351,17 @@ class ChoreControl:
                 max_px_level = abs(max_px_level)
 
             # getting aggressive market depth
-            if symbol_cache:
-                if aggressive_side == Side.SELL:
-                    market_depths = symbol_cache.get_ask_market_depths()
-                else:
-                    market_depths = symbol_cache.get_bid_market_depths()
+            if aggressive_side == Side.SELL:
+                market_depths = symbol_cache.get_ask_market_depths()
+            else:
+                market_depths = symbol_cache.get_bid_market_depths()
 
-                for lvl in range(max_px_level - 1, -1, -1):
-                    # lvl reducing from max_px_level to 0
-                    market_depth = market_depths[lvl]
-                    if market_depth is not None:
-                        px_by_max_level = market_depth.px
-                        break
+            for lvl in range(max_px_level - 1, -1, -1):
+                # lvl reducing from max_px_level to 0
+                market_depth = market_depths[lvl]
+                if market_depth is not None:
+                    px_by_max_level = market_depth.px
+                    break
 
         if math.isclose(px_by_max_level, 0):
             # @@@ below error log is used in specific test case for string matching - if changed here
@@ -377,42 +375,51 @@ class ChoreControl:
 
     @staticmethod
     def _get_tob_bid_n_ask_quote_px(tob: ExtendedTopOfBook, side: Side,
-                                    system_symbol: str) -> Tuple[float, float] | None:
+                                    system_symbol: str, is_limit_up: bool = False,
+                                    is_limit_dn: bool = True) -> Tuple[float | None, float | None] | None:
         if not (tob.ask_quote and tob.ask_quote.px and tob.bid_quote and tob.bid_quote.px):
-            # @@@ below error log is used in specific test case for string matching - if changed here
-            # needs to be changed in test also
-            logging.error(f"blocked generated {str(side)} chore, symbol: {system_symbol}, side: {side} as tob"
-                          f" has incomplete data, symbol_side_key: "
-                          f"{get_symbol_side_key([(system_symbol, side)])};;;TOB: {tob}")
-            return None     # None return blocks the chore from going further
+
+            if is_limit_up and tob.bid_quote is not None and tob.bid_quote.px is not None:
+                return tob.bid_quote.px, None
+            elif is_limit_dn and tob.ask_quote is not None and tob.ask_quote.px is not None:
+                return None, tob.ask_quote.px
+            else:
+                # @@@ below error log is used in specific test case for string matching - if changed here
+                # needs to be changed in test also
+                logging.error(f"blocked generated {str(side)} chore, symbol: {system_symbol}, side: {side} as tob"
+                              f" has incomplete data, symbol_side_key: "
+                              f"{get_symbol_side_key([(system_symbol, side)])};;;TOB: {tob}")
+                return None     # None return blocks the chore from going further
         else:
             return tob.bid_quote.px, tob.ask_quote.px
 
     @staticmethod
-    def get_breach_threshold_px(tob: ExtendedTopOfBook, sym_ovrw_getter: Callable,
+    def get_breach_threshold_px(tob: ExtendedTopOfBook, sym_ovrw: SymbolOverviewBaseModel,
                                 chore_limits: ChoreLimitsBaseModel, side: Side, system_symbol: str,
-                                symbol_cache=None, is_algo: bool = False) -> float | None:
+                                symbol_cache=None, is_algo: bool = False, is_limit_up: bool = False,
+                                is_limit_dn: bool = False) -> float | None:
         """
         Args:
             tob:
-            sym_ovrw_getter:
+            sym_ovrw:
             chore_limits:
             side:
             system_symbol:
             symbol_cache:
             is_algo:
+            is_limit_up:
+            is_limit_dn:
         Returns:
             min breach threshold and max breach threshold
         """
-        breach_threshold_px: float | None = None  # None if returned blocks the chore from going further
-        if symbol_cache:
+        if symbol_cache and not is_limit_up and not is_limit_dn:
             px_by_max_level = ChoreControl._get_px_by_max_level(system_symbol, side, chore_limits, symbol_cache)
             if px_by_max_level is None:
                 # _get_px_by_max_level logs error internally
                 return None
         else:
             px_by_max_level = None
-        sym_ovrw = sym_ovrw_getter(system_symbol)
+
         last_barter_reference_px: float | None = ChoreControl.get_last_barter_reference_px(tob, side, system_symbol,
                                                                                          sym_ovrw)
 
@@ -422,12 +429,15 @@ class ChoreControl:
                           f"{get_symbol_side_key([(system_symbol, side)])}")
             return None
 
-        tob_quote_px_tuple = ChoreControl._get_tob_bid_n_ask_quote_px(tob, side, system_symbol)
+        tob_quote_px_tuple = ChoreControl._get_tob_bid_n_ask_quote_px(tob, side, system_symbol,
+                                                                      is_limit_up, is_limit_dn)
         if tob_quote_px_tuple is None:
             return None     # error logged in _get_tob_bid_n_ask_quote_px
         bid_quote_px, ask_quote_px = tob_quote_px_tuple
 
-        spread_in_bips: int | None = ChoreControl.get_spread_in_bips(ask_quote_px, bid_quote_px)
+        spread_in_bips = None
+        if not is_limit_dn and not is_limit_up:
+            spread_in_bips: int | None = ChoreControl.get_spread_in_bips(ask_quote_px, bid_quote_px)
 
         if is_algo:
             if (not chore_limits.max_px_deviation_algo) or (not chore_limits.max_basis_points_algo):
@@ -441,19 +451,23 @@ class ChoreControl:
         max_basis_points = chore_limits.max_basis_points if not is_algo else chore_limits.max_basis_points_algo
         if side == Side.BUY:
             aggressive_quote_px: float | None = ask_quote_px
-            if not aggressive_quote_px:
-                return None  # error logged in _get_aggressive_tob_ask_quote_px
+            if not aggressive_quote_px and not is_limit_dn and not is_limit_up:
+                return None  # error logged in _get_tob_bid_n_ask_quote_px
             max_px_by_lt_deviation: float = last_barter_reference_px + (last_barter_reference_px / 100 * max_px_deviation)
 
-            # BBBO is the Best Bid or Best Offer price, depending on which side of the market you're analyzing
-            # 1 + (bps / 10,000): This factor adjusts the BBBO price by the given number of basis points
-            # below same as: aggressive_quote.px * (1 + (max_basis_points / 10000))
-            max_px_by_bbbo_basis_point: float = aggressive_quote_px + (aggressive_quote_px * max_basis_points / 10000)
-
-            if symbol_cache:
-                breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation, px_by_max_level)
+            if is_limit_dn or is_limit_up:
+                breach_threshold_px = max_px_by_lt_deviation
             else:
-                breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation)
+                # BBBO is the Best Bid or Best Offer price, depending on which side of the market you're analyzing
+                # 1 + (bps / 10,000): This factor adjusts the BBBO price by the given number of basis points
+                # below same as: aggressive_quote.px * (1 + (max_basis_points / 10000))
+                max_px_by_bbbo_basis_point: float = aggressive_quote_px + (
+                            aggressive_quote_px * max_basis_points / 10000)
+
+                if symbol_cache and not is_limit_up and not is_limit_dn:
+                    breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation, px_by_max_level)
+                else:
+                    breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation)
             # breach_threshold_px = min(max_px_by_bbbo_basis_point, max_px_by_lt_deviation)
             # implies don't fail price check if target price is within last_barter + 1 tick OR aggressive BBBO + 1 tick
             breach_threshold_px_tick_size_check_applied: float
@@ -464,23 +478,33 @@ class ChoreControl:
                 breach_threshold_px_tick_size_check_applied: float = max(min_px_by_tick_size, breach_threshold_px)
             else:
                 breach_threshold_px_tick_size_check_applied = breach_threshold_px
-            logging.debug(f"BUY {system_symbol} get_breach_threshold_px: {breach_threshold_px=:.3f}, "
-                          f"{last_barter_reference_px=:.3f}, {spread_in_bips=}, {is_algo=}, "
-                          f"{max_px_by_lt_deviation=:.3f}, {max_px_by_bbbo_basis_point=:.3f}, "
-                          f"{breach_threshold_px_tick_size_check_applied=:.3f};;;{aggressive_quote_px=}(ask_quote)")
+            if not is_limit_up and not is_limit_dn:
+                logging.debug(f"BUY {system_symbol} get_breach_threshold_px: {breach_threshold_px=:.3f}, "
+                              f"{last_barter_reference_px=:.3f}, {spread_in_bips=}, {is_algo=}, "
+                              f"{max_px_by_lt_deviation=:.3f}, {max_px_by_bbbo_basis_point=:.3f}, "
+                              f"{breach_threshold_px_tick_size_check_applied=:.3f};;;{aggressive_quote_px=}(ask_quote)")
+            else:
+                logging.debug(f"BUY {system_symbol} get_breach_threshold_px: {breach_threshold_px=:.3f}, "
+                              f"{last_barter_reference_px=:.3f}, {spread_in_bips=}, {is_algo=}, "
+                              f"{max_px_by_lt_deviation=:.3f}, "
+                              f"{breach_threshold_px_tick_size_check_applied=:.3f};;;{aggressive_quote_px=}(ask_quote)")
 
         else:  # side == Side.SELL
             aggressive_quote_px: float | None = bid_quote_px
-            if not aggressive_quote_px:
-                return None  # error logged in _get_aggressive_tob_ask_quote_px
+            if not aggressive_quote_px and not is_limit_dn and not is_limit_up:
+                return None  # error logged in _get_tob_bid_n_ask_quote_px
             min_px_by_lt_deviation: float = last_barter_reference_px - (last_barter_reference_px / 100 * max_px_deviation)
-            # below same as: aggressive_quote.px * (1 - (max_basis_points / 10000))
-            min_px_by_bbbo_basis_point: float = aggressive_quote_px - (aggressive_quote_px * max_basis_points / 10000)
 
-            if symbol_cache:
-                breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation, px_by_max_level)
+            if is_limit_dn or is_limit_up:
+                breach_threshold_px = min_px_by_lt_deviation
             else:
-                breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation)
+                # below same as: aggressive_quote.px * (1 - (max_basis_points / 10000))
+                min_px_by_bbbo_basis_point: float = aggressive_quote_px - (
+                            aggressive_quote_px * max_basis_points / 10000)
+                if symbol_cache and not is_limit_up and not is_limit_dn:
+                    breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation, px_by_max_level)
+                else:
+                    breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation)
 
             # breach_threshold_px = max(min_px_by_bbbo_basis_point, min_px_by_lt_deviation)
             # implies don't fail price check if target price is within last_barter - 1 tick OR aggressive BBBO - 1 tick
@@ -492,10 +516,16 @@ class ChoreControl:
                 breach_threshold_px_tick_size_check_applied: float = min(max_px_by_tick_size, breach_threshold_px)
             else:
                 breach_threshold_px_tick_size_check_applied = breach_threshold_px
-            logging.debug(f"SELL {system_symbol} get_breach_threshold_px: {breach_threshold_px=:.3f}, "
-                          f"{last_barter_reference_px=:.3f}, {spread_in_bips=}, {is_algo=}, "
-                          f"{min_px_by_lt_deviation=:.3f}, {min_px_by_bbbo_basis_point=:.3f}, "
-                          f"{breach_threshold_px_tick_size_check_applied=:.3f};;;{aggressive_quote_px=}(bid_quote)")
+            if not is_limit_up and not is_limit_dn:
+                logging.debug(f"SELL {system_symbol} get_breach_threshold_px: {breach_threshold_px=:.3f}, "
+                              f"{last_barter_reference_px=:.3f}, {spread_in_bips=}, {is_algo=}, "
+                              f"{min_px_by_lt_deviation=:.3f}, {min_px_by_bbbo_basis_point=:.3f}, "
+                              f"{breach_threshold_px_tick_size_check_applied=:.3f};;;{aggressive_quote_px=}(bid_quote)")
+            else:
+                logging.debug(f"SELL {system_symbol} get_breach_threshold_px: {breach_threshold_px=:.3f}, "
+                              f"{last_barter_reference_px=:.3f}, {spread_in_bips=}, {is_algo=}, "
+                              f"{min_px_by_lt_deviation=:.3f}, "
+                              f"{breach_threshold_px_tick_size_check_applied=:.3f};;;{aggressive_quote_px=}(bid_quote)")
         return breach_threshold_px_tick_size_check_applied
 
     @staticmethod
@@ -510,9 +540,10 @@ class ChoreControl:
         return top_of_book.last_barter.px
 
     @staticmethod
-    def get_breach_threshold_px_ext(top_of_book: ExtendedTopOfBook | TopOfBook, sym_ovrw_getter: Callable,
+    def get_breach_threshold_px_ext(top_of_book: ExtendedTopOfBook | TopOfBook, sym_ovrw: SymbolOverviewBaseModel,
                                     chore_limits: ChoreLimits | ChoreLimitsBaseModel, side: Side, system_symbol: str,
-                                    symbol_cache=None, is_algo: bool = False) -> float | None:
+                                    symbol_cache=None, is_algo: bool = False, is_limit_up: bool = False,
+                                    is_limit_dn: bool = False) -> float | None:
         # TODO important - check and change reference px in cases where last px is not available
         last_barter_px = ChoreControl._get_tob_last_barter_px(top_of_book, side)
         if last_barter_px is None:
@@ -525,8 +556,9 @@ class ChoreControl:
                           f"{get_symbol_side_key([(system_symbol, side)])}")
             return None  # None return blocks the chore from going further
 
-        breach_threshold_px = ChoreControl.get_breach_threshold_px(top_of_book, sym_ovrw_getter, chore_limits, side,
-                                                                   system_symbol, symbol_cache, is_algo)
+        breach_threshold_px = ChoreControl.get_breach_threshold_px(top_of_book, sym_ovrw, chore_limits, side,
+                                                                   system_symbol, symbol_cache, is_algo,
+                                                                   is_limit_up=is_limit_up, is_limit_dn=is_limit_dn)
         return breach_threshold_px
 
     @staticmethod
@@ -535,10 +567,19 @@ class ChoreControl:
                  symbol_cache=None, is_algo: bool = False) -> int:
         checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS
         if tob:
+            sym_ovrw: SymbolOverviewBaseModel = sym_ovrw_getter(system_symbol)
+
+            is_limit_up: bool = False
+            if side == Side.BUY and px == sym_ovrw.limit_up_px:
+                is_limit_up = True
+            is_limit_dn: bool = False
+            if side == Side.SELL and px == sym_ovrw.limit_dn_px:
+                is_limit_dn = True
+
             high_breach_px: float | None = ChoreControl.get_breach_threshold_px_ext(
-                tob, sym_ovrw_getter, chore_limits, Side.BUY, system_symbol, symbol_cache, is_algo)
+                tob, sym_ovrw, chore_limits, Side.BUY, system_symbol, symbol_cache, is_algo, is_limit_up, is_limit_dn)
             low_breach_px: float | None = ChoreControl.get_breach_threshold_px_ext(
-                tob, sym_ovrw_getter, chore_limits, Side.SELL, system_symbol, symbol_cache, is_algo)
+                tob, sym_ovrw, chore_limits, Side.SELL, system_symbol, symbol_cache, is_algo, is_limit_up, is_limit_dn)
 
             if high_breach_px is not None and low_breach_px is not None:
                 high_breach: bool = ChoreControl.px_breached(high_breach_px, px, Side.BUY, system_symbol)

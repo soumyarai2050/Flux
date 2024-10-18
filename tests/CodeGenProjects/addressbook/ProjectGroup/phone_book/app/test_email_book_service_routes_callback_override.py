@@ -613,7 +613,7 @@ def test_sample_model_file_upload_query():
             os.remove(destination_file_path)
 
         # saving file at destination from test_file_path
-        email_book_service_native_web_client.sample_model_file_upload_query_client(test_file_path)
+        email_book_service_native_web_client.sample_file_upload_button_query_client(test_file_path, "sample")
         # verifying file exists at destination
         assert os.path.exists(destination_file_path), \
             f"Unexpected: file must have been created by file query at {destination_file_path}"
@@ -6731,6 +6731,44 @@ def test_unload_strat_from_strat_view_unload_ui_button(
 
 
 @pytest.mark.nightly
+def test_unload_multiple_strats_from_strat_view_unload_ui_button(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:10]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
+        results = [executor.submit(create_n_activate_strat, leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
+                                   copy.deepcopy(expected_strat_limits_),
+                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(symbol_overview_obj_list),
+                                   copy.deepcopy(market_depth_basemodel_list), None, None, None)
+                   for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
+
+    pair_strats = email_book_service_beanie_web_client.get_all_pair_strat_client()
+    for pair_strat in pair_strats:
+        strat_view_dict = {'_id': pair_strat.id, 'unload_strat': True}
+        strat_view = photo_book_web_client.patch_strat_view_client(strat_view_dict)
+        
+    time.sleep(15)
+    # checking if all strats are shifted to unloaded keys in strat_collection and are not active anymore
+    strat_collection = email_book_service_native_web_client.get_strat_collection_client(strat_collection_id=1)
+    pair_strats = email_book_service_beanie_web_client.get_all_pair_strat_client()
+    for pair_strat in pair_strats:
+        strat_key = get_strat_key_from_pair_strat(pair_strat)
+        assert strat_key not in strat_collection.loaded_strat_keys, \
+            f"Mismatch: {strat_key=} must not be in {strat_collection.loaded_strat_keys=}"
+        assert strat_key in strat_collection.buffered_strat_keys, \
+            f"Mismatch: {strat_key=} must be in {strat_collection.buffered_strat_keys=}"
+        assert pair_strat.strat_state == StratState.StratState_SNOOZED, \
+            f"Mismatch: strat_state must be {StratState.StratState_SNOOZED}, found {pair_strat.strat_state=}"
+        assert pair_strat.port is None, \
+            f"Mismatch: pair_strat.port must be None, found {pair_strat.port=}"
+        
+
+@pytest.mark.nightly
 def test_recycle_strat_from_strat_view_recycle_ui_button(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
@@ -6841,6 +6879,45 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
         raise Exception(e)
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_recycle_multiple_strats_from_strat_view_recycle_ui_button(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:10]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
+        results = [executor.submit(create_n_activate_strat, leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
+                                   copy.deepcopy(expected_strat_limits_),
+                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(symbol_overview_obj_list),
+                                   copy.deepcopy(market_depth_basemodel_list), None, None, None)
+                   for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
+
+    pair_strats = email_book_service_beanie_web_client.get_all_pair_strat_client()
+    for pair_strat in pair_strats:
+        strat_view_dict = {'_id': pair_strat.id, 'recycle_strat': True}
+        strat_view = photo_book_web_client.patch_strat_view_client(strat_view_dict)
+
+    time.sleep(10 * refresh_sec_update_fixture)  # waiting for strat to get loaded completely
+
+    # checking if all strats are shifted to unloaded keys in strat_collection and are not active anymore
+    strat_collection = email_book_service_native_web_client.get_strat_collection_client(strat_collection_id=1)
+    pair_strats = email_book_service_beanie_web_client.get_all_pair_strat_client()
+    for pair_strat in pair_strats:
+        strat_key = get_strat_key_from_pair_strat(pair_strat)
+        assert strat_key in strat_collection.loaded_strat_keys, \
+            f"Mismatch: {strat_key=} must be in {strat_collection.loaded_strat_keys=}"
+        assert strat_key not in strat_collection.buffered_strat_keys, \
+            f"Mismatch: {strat_key=} must not be in {strat_collection.buffered_strat_keys=}"
+        assert pair_strat.strat_state == StratState.StratState_READY, \
+            f"Mismatch: strat_state must be {StratState.StratState_READY}, found {pair_strat.strat_state=}"
+        assert pair_strat.port is not None, \
+            f"Mismatch: pair_strat.port must not be None, found {pair_strat.port=}"
 
 
 def _check_all_strat_pause_by_system_control_ui_button_update(

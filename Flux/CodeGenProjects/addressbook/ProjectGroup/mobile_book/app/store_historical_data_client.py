@@ -1,15 +1,20 @@
 import logging
 import os
+import threading
 from typing import Dict
 from datetime import datetime
 from pathlib import PurePath
+
 from ibapi.common import BarData, TickerId
+
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
+from Flux.CodeGenProjects.AddressBook.Pydantic.barter_core_msgspec_model import SymbolNExchIdBaseModel
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.Pydentic.dept_book_service_msgspec_model import (
+    BarDataBaseModel)
+
 
 os.environ["DBType"] = "beanie"
-from Flux.CodeGenProjects.mobile_book.generated.mobile_book_service_web_client import MobileBookServiceWebClient
-from Flux.CodeGenProjects.mobile_book.generated.mobile_book_service_model_imports import BarDataBaseModel
 
 
 class StoreHistoricalDataClient(IbApiClient):
@@ -73,22 +78,9 @@ class StoreHistoricalDataClient(IbApiClient):
         self.use_RTH: int = config_yaml[required_config_data_keys[3]]    # sample: 1
         self.format_date: int = config_yaml[required_config_data_keys[4]]    # sample: 1
         self.keep_up_to_date: bool = config_yaml[required_config_data_keys[5]]    # sample: False
-        self.mobile_book_service_web_client: MobileBookServiceWebClient = MobileBookServiceWebClient()
         self.bar_date_format: str = "%Y%m%d"
-        self.last_bar_data_date_time: datetime | None = self._get_last_db_obj_date_time()
+        self.last_bar_data_date_time: datetime | None = None
 
-    def _get_last_db_obj_date_time(self) -> datetime | None:
-        try:
-            db_max_id_obj = self.mobile_book_service_web_client.get_bar_data_query_client()
-            return db_max_id_obj.date
-        except Exception as e:
-            if '{"detail":"No Data available for query in BarData"}' in str(e):
-                # when db is empty
-                return None
-            else:
-                err_str = f"Error occurred while fetching last dat from db: {e}"
-                logging.exception(err_str)
-                raise Exception(err_str)
 
     def nextValidId(self, req_id: TickerId):
 
@@ -116,20 +108,23 @@ class StoreHistoricalDataClient(IbApiClient):
             # avoiding data insertion to db
 
         if do_add_to_db:
-            bar_data_base_model: BarDataBaseModel = BarDataBaseModel(symbol=self.contracts[ticker_id].symbol,
-                                                                     date=bar.date, open=bar.open, high=bar.high,
+            symbol: str = self.contracts[ticker_id].symbol
+            print(self.contracts[ticker_id].symbol)
+            bar_data_base_model: BarDataBaseModel = BarDataBaseModel(symbol_n_exch_id=SymbolNExchIdBaseModel(
+                symbol=self.contracts[ticker_id].symbol, exch_id=self.contracts[ticker_id].exchange),
+                                                                     start_time=bar.date, end_time=bar.date, open=bar.open, high=bar.high,
                                                                      low=bar.low, close=bar.close, volume=bar.volume,
-                                                                     barCount=bar.barCount)
-            logging.debug(f"Adding {bar_data_base_model} in BarData Collection")
-            self.mobile_book_service_web_client.create_bar_data_client(bar_data_base_model)
+                                                                     bar_count=bar.barCount)
+            print(bar_data_base_model.to_dict())
+            # self.mobile_book_db[bar] = bar_data_base_model
+            # logging.debug(f"Adding {bar_data_base_model} in BarData Collection")
         # else not required: avoiding data insertion to db if above requirements doesn't met
 
-    def historicalDataEnd(self, req_id: int, start: str, end: str):
-        super().historicalDataEnd(req_id, start, end)
-        logging.debug(f"HistoricalDataEnd. ReqId: {req_id} from {start} to {end}")
+    def historicalDataUpdate(self, reqId: int, bar: BarData):
+        print("HistoricalDataUpdate. ReqId:", reqId, "BarData.", bar)
 
-    def historicalDataUpdate(self, req_id: int, bar: BarData):
-        logging.debug(f"HistoricalDataUpdate. ReqId: {req_id} BarData. {bar}")
+    def historicalDataEnd(self, reqId: int, start: str, end: str):
+        print("HistoricalDataEnd. ReqId:", reqId, "from", start, "to", end)
 
 
 if __name__ == "__main__":
@@ -147,6 +142,7 @@ if __name__ == "__main__":
         port = config_yaml["port"]
         client_id = config_yaml["client_id"]
         ib_client.connect(host, port, client_id)
-        ib_client.run()
-
+        con_thread = threading.Thread(target=ib_client.run, daemon=True)
+        con_thread.start()
+        ib_client.nextValidId(2)
     main()

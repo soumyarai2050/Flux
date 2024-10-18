@@ -305,6 +305,16 @@ message StratCollection {
       placeholders: "BUY"
     }
   };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "unload_strat_from_strat_id",
+    QueryParams: "strat_id",
+    QueryParamsDataType: "int"
+  };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "reload_strat_from_strat_id",
+    QueryParams: "strat_id",
+    QueryParamsDataType: "int"
+  };
   option (FluxMsgSmallSizedCollection) = true;
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -349,7 +359,42 @@ message SampleModel{
       QueryParamsDataType: "str",
       QueryType: HTTP_FILE
   };
-  option (FluxMsgFileQuery) = true;
+  option (FluxMsgButtonQuery) = {
+    query_data: {
+      QueryName: "sample_http_button"
+      QueryParams: 'sample_param'
+      QueryParamsDataType: 'str'
+      QueryType: HTTP
+    };
+    ui_button: {
+      unpressed_caption: "dismiss",
+      pressed_caption: "undo",
+      value_color_map: "true=DEBUG,false=INFO"
+      button_type: BUTTON_TYPE_RECTANGLE,
+      button_size: BUTTON_SIZE_MEDIUM,
+      action: "flux_toggle",
+      pressed_value_as_text: "true",
+      allow_force_update: true
+    }
+  };
+  option (FluxMsgButtonQuery) = {
+    query_data: {
+      QueryName: "sample_file_upload_button"
+      QueryParams: 'sample_param'
+      QueryParamsDataType: 'str'
+      QueryType: HTTP_FILE
+    };
+    ui_button: {
+      unpressed_caption: "dismiss",
+      pressed_caption: "undo",
+      value_color_map: "true=DEBUG,false=INFO"
+      button_type: BUTTON_TYPE_RECTANGLE,
+      button_size: BUTTON_SIZE_MEDIUM,
+      action: "flux_toggle",
+      pressed_value_as_text: "true",
+      allow_force_update: true
+    }
+  };
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];

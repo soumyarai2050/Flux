@@ -578,7 +578,7 @@ class BasketBook(BaseBook):
         tick_threshold = tick_size * tick_size_distance_threshold
 
         breach_px = ChoreControl.get_breach_threshold_px_ext(
-            tob, symbol_cache.get_so, chore_limits, chore.side, chore.security.sec_id,
+            tob, symbol_cache.so, chore_limits, chore.side, chore.security.sec_id,
             None, is_algo=True)
         if breach_px is not None:
             if chore.side == Side.BUY:
@@ -890,14 +890,14 @@ class BasketBook(BaseBook):
                             # chore has px, check if it is within the range and fire if so, otherwise re-evaluate in the
                             # next cycle and retry [refer ORDER_SUBMIT_DONE handling]
                             high_breach_px: float | None = ChoreControl.get_breach_threshold_px_ext(
-                                tob, symbol_cache.get_so, chore_limits, Side.BUY, chore.security.sec_id,
+                                tob, symbol_cache.so, chore_limits, Side.BUY, chore.security.sec_id,
                                 None, is_algo)
                             if high_breach_px is None:
                                 continue  # error logged internally
                             # else move forward - so far all good
 
                             low_breach_px: float | None = ChoreControl.get_breach_threshold_px_ext(
-                                tob, symbol_cache.get_so, chore_limits, Side.SELL, chore.security.sec_id,
+                                tob, symbol_cache.so, chore_limits, Side.SELL, chore.security.sec_id,
                                 None, is_algo)
                             if low_breach_px is None:
                                 continue  # error logged internally

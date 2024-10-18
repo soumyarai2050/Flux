@@ -10,6 +10,12 @@ import "dept_book_core.proto";
 
 package dept_book;
 
+
+enum BarType {
+  OneDay = 1;
+  OneHour = 2;
+}
+
 message RTDash {
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
@@ -23,8 +29,8 @@ message RTDash {
     }
   };
 
-  optional DashLeg leg1 = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "cb", (FluxFldAutoComplete) = "sec_id:CB_List, sec_id_source=TICKER", (FluxFldHelp) = "CB Tickers", (FluxFldMappingUnderlyingMetaField) = "sec.sec_id:BarData.symbol_n_exch_id.symbol",  (FluxFldMappingUnderlyingMetaField) = "exch_id:BarData.symbol_n_exch_id.exch_id", (FluxFldMappingSrc) = "vwap:BarData.vwap", (FluxFldMappingSrc) = "vwap_change:BarData.vwap_change"]; // wont be set for non CB strat
-  optional DashLeg leg2 = 2 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "A", (FluxFldAutoComplete) = "sec.sec_id:EQT_List, sec.sec_id_source=TICKER", (FluxFldHelp) = "A Shares Tickers", (FluxFldMappingUnderlyingMetaField) = "sec.sec_id:BarData.symbol_n_exch_id.symbol",  (FluxFldMappingUnderlyingMetaField) = "exch_id:BarData.symbol_n_exch_id.exch_id", (FluxFldMappingSrc) = "vwap:BarData.vwap", (FluxFldMappingSrc) = "vwap_change:BarData.vwap_change"];
+  optional DashLeg leg1 = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "cb", (FluxFldAutoComplete) = "sec_id:CB_List, sec_id_source=TICKER", (FluxFldHelp) = "CB Tickers", (FluxFldMappingUnderlyingMetaField) = "sec.sec_id:BarData.bar_meta_data.symbol",  (FluxFldMappingUnderlyingMetaField) = "exch_id:BarData.bar_meta_data.exch_id", (FluxFldMappingSrc) = "vwap:BarData.vwap", (FluxFldMappingSrc) = "vwap_change:BarData.vwap_change"]; // wont be set for non CB strat
+  optional DashLeg leg2 = 2 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "A", (FluxFldAutoComplete) = "sec.sec_id:EQT_List, sec.sec_id_source=TICKER", (FluxFldHelp) = "A Shares Tickers", (FluxFldMappingUnderlyingMetaField) = "sec.sec_id:BarData.bar_meta_data.symbol",  (FluxFldMappingUnderlyingMetaField) = "exch_id:BarData.bar_meta_data.exch_id", (FluxFldMappingSrc) = "vwap:BarData.vwap", (FluxFldMappingSrc) = "vwap_change:BarData.vwap_change"];
   optional DashLeg leg3 = 3 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "H", (FluxFldHelp) = "H Shares Tickers"]; // wont be set for non AH/HA strat
   optional float max_buy_notional = 4 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "max buy $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int"];
   optional float max_sell_notional = 5 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "max sell $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int"];
@@ -165,6 +171,12 @@ message DashFiltersCollection {
   repeated string buffered_dash_filters = 3 [(FluxFldHide) = "True"];
 }
 
+message BarMetaData {
+  required string symbol = 1;
+  required string exch_id = 2;
+  required BarType bar_type = 3;
+}
+
 message BarData {
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 7.0,
@@ -177,7 +189,7 @@ message BarData {
     ExpireAfterSeconds: 31536000  // one year worth of seconds
   };
   required int32 id = 1;
-  required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
+  required BarMetaData bar_meta_data = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
   required string start_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
   required string end_time = 4 [(FluxFldValIsDateTime) = true];
   optional float vwap = 5 [(FluxFldProjections) = "1", (FluxFldProjections) = "3"];
@@ -193,6 +205,34 @@ message BarData {
   optional int32 volume = 15;
   optional int32 cum_volume = 16 [(FluxFldHelp) = "Bar`s day`s cumulative volume"];
   optional int32 bar_count = 17;
+  optional string source = 18;
+}
+
+message ErrorBarData {
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED
+  };
+  required int32 id = 1;
+  required BarMetaData bar_meta_data = 2 [(FluxFldPk) = "symbol"];
+  required string start_time = 3 [(FluxFldValIsDateTime) = true];
+  required string end_time = 4 [(FluxFldValIsDateTime) = true];
+  optional float vwap = 5;
+  optional float vwap_change = 6 [(FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against previous-day close px"];
+  optional float premium = 7;
+  optional float premium_change = 8 [(FluxFldNumberFormat) = "%"];
+  optional float iv = 9;
+  optional float iv_change = 10 [(FluxFldNumberFormat) = "%"];
+  optional float open = 11;
+  optional float high = 12;
+  optional float low = 13;
+  optional float close = 14;
+  optional int32 volume = 15;
+  optional int32 cum_volume = 16 [(FluxFldHelp) = "Bar`s day`s cumulative volume"];
+  optional int32 bar_count = 17;
+  optional string source = 18;
+  optional string error_source = 19;
+  optional string current_timestamp = 20 [(FluxFldValIsDateTime) = true];
 }
 
 message ImpliedVolData {

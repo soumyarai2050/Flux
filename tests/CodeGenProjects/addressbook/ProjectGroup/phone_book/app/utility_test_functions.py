@@ -2215,6 +2215,7 @@ def create_tob(leg1_symbol: str, leg2_symbol: str, top_of_book_json_list: List[D
             top_of_book_basemodel.symbol = leg1_symbol
         else:
             top_of_book_basemodel.symbol = leg2_symbol
+        print(top_of_book_basemodel.to_dict())
 
         top_of_book_basemodel.last_update_date_time = DateTime.utcnow()
         stored_top_of_book_basemodel = \

@@ -8,9 +8,9 @@ extern "C" void create_or_update_last_barter_n_tob([[maybe_unused]] const int32_
 	const int64_t participation_period_last_barter_qty_sum, const int32_t applicable_period_seconds) {
 
 	auto int_ts = FluxCppCore::get_utc_time_microseconds();
-	std::string time_str;
-	FluxCppCore::format_time(int_ts, time_str);
-	LastBarter last_barter{id, {symbol, exch_id}, time_str, time_str,
+	// std::string time_str;
+	// FluxCppCore::format_time(int_ts, time_str);
+	LastBarter last_barter{id, {symbol, exch_id}, int_ts, int_ts,
 		px, qty, premium,
 		true, {
 			market_barter_volume_id, participation_period_last_barter_qty_sum,
@@ -27,10 +27,8 @@ extern "C" void create_or_update_md_n_tob([[maybe_unused]] const int32_t id, con
 	const double cumulative_notional, const int64_t cumulative_qty, const double cumulative_avg_px) {
 
 	auto int_ts = FluxCppCore::get_utc_time_microseconds();
-	std::string time_str;
-	FluxCppCore::format_time(int_ts, time_str);
 
-	MarketDepth mkt_depth{id, symbol, time_str, time_str, side, px,
+	MarketDepth mkt_depth{id, symbol, int_ts, int_ts, side, px,
 		true, qty, true, position, market_maker, true,
 		is_smart_depth, true, cumulative_notional, true,
 		cumulative_qty, true, cumulative_avg_px, true};
@@ -38,7 +36,8 @@ extern "C" void create_or_update_md_n_tob([[maybe_unused]] const int32_t id, con
 	if (mobile_book_consumer) {
 		mobile_book_consumer->process_market_depth(mkt_depth);
 	} else {
-		LOG_ERROR(GetLogger(), "mobile_book_consumer is null");
+		LOG_ERROR_IMPL(GetCppAppLogger(), "mobile_book_consumer is null");
 	}
 }
 
+                                    

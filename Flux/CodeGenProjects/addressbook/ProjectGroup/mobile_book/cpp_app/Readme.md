@@ -64,6 +64,7 @@ sudo cmake --build . --target install
 ### Quill is a C++ logging library.
 ```
 `git clone https://github.com/odygrd/quill.git
+git checkout v3
 cd quill
 mkdir cmake_build
 cd cmake_build
@@ -79,9 +80,9 @@ cd protobuf
 mkdir cmake-out
 git checkout v25.2
 cmake -S. -Bcmake-out -DCMAKE_INSTALL_PREFIX=/home/$USER/cpp_libs/libs_13/protobuf_25.2 -DCMAKE_CXX_STANDARD=17 -Dprotobuf_ABSL_PROVIDER=module -DCMAKE_PREFIX_PATH=/home/$USER/cpp_libs/libs_13/protobuf_25.2 -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-`cd cmake-out
+cd cmake-out
 make -j8
-sudo make install`
+sudo make install
 ```
 
 ## yaml-cpp Installation

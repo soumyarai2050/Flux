@@ -9,8 +9,6 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_hel
     photo_book_service_http_client)
 
 def main():
-    datetime_str: str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    configure_logger(logging.DEBUG, str(PAIR_STRAT_ENGINE_LOG_DIR), f"recycle_strat_{datetime_str}.log")
 
     # read strat_id from args
     args: List[str] = sys.argv[1:]
@@ -20,6 +18,10 @@ def main():
         raise Exception(err_str_)
 
     strat_id: int = int(args[0])
+
+    datetime_str: str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    configure_logger(logging.DEBUG, str(PAIR_STRAT_ENGINE_LOG_DIR), f"recycle_strat_{strat_id}_{datetime_str}.log")
+
     force_flag: bool = False
     if len(args) >= 2 and args[1] == "--force":
         force_flag = True

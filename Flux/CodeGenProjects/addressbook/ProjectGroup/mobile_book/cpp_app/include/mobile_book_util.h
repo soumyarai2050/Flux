@@ -35,7 +35,7 @@ namespace mobile_book_handler {
 
     void get_bar_data_update() {
         using CallbackType = decltype(call_back)*;  // Define the callback type
-        auto logger = GetLogger();
+        auto logger = GetCppAppLogger();
         const std::string host = "127.0.0.1";
         const int32_t port = 8040;
         const int32_t read_time_out = 120;

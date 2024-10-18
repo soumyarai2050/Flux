@@ -38,11 +38,22 @@ class FluxPropertyType(StrEnum):
     FluxFldButton = "button"
     FluxFldHelp = "help"
     FluxFldProgressBar = "progress_bar"
+    FluxFldDefault = "default"
+    FluxFldNoCommonKey = "no_common_key"
+    FluxFldElaborateTitle = "elaborate_title"
+    FluxFldUiUpdateOnly = "ui_update_only"
+    FluxFldSequenceNumber = "sequence_number"
+    FluxFldFilterEnabled = "filter_enable"
+    FluxFldTitle = "title"
+    FluxFldAutoComplete = "auto_complete"
+    FluxFldAbbreviate = "abbreviate"
 
 
 class InputType(StrEnum):
     MAX_VALID_VALUE = auto()
     INVALID_VALUE = auto()
+    MIN_VALID_VALUE = auto()
+    MIN_INVALID_VALUE = auto()
 
 
 class DriverType(StrEnum):
@@ -94,6 +105,8 @@ class WidgetName(StrEnum):
     FxSymbolOverview = "fx_symbol_overview"
     BasketChore = "basket_chore"
     SymbolSideSnapShot = "symbol_side_snapshot"
+    StratBrief = "strat_brief"
+    SymbolOverview = "symbol_overview"
 
 class ColorType(StrEnum):
     # ERROR = (156, 0, 6)

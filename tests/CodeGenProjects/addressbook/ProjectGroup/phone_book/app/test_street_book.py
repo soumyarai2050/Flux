@@ -2723,7 +2723,7 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
         # placing new non-systematic new_chore
         px = 160
         qty = 90
-        check_str = "blocked generated BUY chore, limit up bartering not allowed on day-1"
+        check_str = "blocked generated BUY chore, px expected lower than limit-up px"
         assert_fail_message = "Could not find any alert containing message to block chores due to chore_px higher " \
                               "than symbol_overview's limit_up_px"
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
@@ -2734,7 +2734,7 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
         # placing new non-systematic new_chore
         px = 40
         qty = 90
-        check_str = "blocked generated SELL chore, limit down bartering not allowed on day-1"
+        check_str = "blocked generated SELL chore, px expected higher than limit-dn px"
         assert_fail_message = "Could not find any alert containing message to block chores due to chore_px higher " \
                               "than symbol_overview's limit_up_px"
         handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
@@ -4176,6 +4176,128 @@ def test_all_strat_pause_for_max_reject_limit_breach(
     for pair_strat in pair_strat_list:
         assert pair_strat.strat_state == StratState.StratState_PAUSED, \
             f"Unexpected, strat_state must be paused, received {pair_strat.strat_state}, pair_strat: {pair_strat}"
+
+
+@pytest.mark.nightly
+def test_place_chore_at_limit_up(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    # removing any ask side depth for CB_Sec_1 - limit up don't have any ask side depth or quote
+    market_depth_basemodel_list = market_depth_basemodel_list[:5] + market_depth_basemodel_list[10:]
+
+    buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
+        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+                                                 expected_strat_status_, symbol_overview_obj_list,
+                                                 last_barter_fixture_list, []))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    buy_inst_type: InstrumentType = InstrumentType.CB if (
+            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
+    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # Positive check
+        last_barter_fixture_list[0]['px'] = 145
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        time.sleep(1)
+
+        # create market_depths
+        executor_http_client.create_all_market_depth_client(market_depth_basemodel_list)
+
+        place_new_chore(buy_symbol, Side.BUY, 150, 90, executor_http_client, buy_inst_type)
+
+        # Internally checks if chore_journal is found with OE_ACK state
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+                                                                              buy_symbol, executor_http_client)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_place_chore_at_limit_dn(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    # removing any ask side depth for CB_Sec_1 - limit up don't have any ask side depth or quote
+    market_depth_basemodel_list = market_depth_basemodel_list[5:]
+
+    sell_symbol, buy_symbol, active_pair_strat, executor_http_client = (
+        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+                                                 expected_strat_status_, symbol_overview_obj_list,
+                                                 last_barter_fixture_list, [],
+                                                 leg1_side=Side.SELL, leg2_side=Side.BUY))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    buy_inst_type: InstrumentType = InstrumentType.CB if (
+            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
+    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # Positive check
+        last_barter_fixture_list[0]['px'] = 52
+        run_last_barter(sell_symbol, buy_symbol, last_barter_fixture_list, executor_http_client)
+        time.sleep(1)
+
+        # create market_depths
+        executor_http_client.create_all_market_depth_client(market_depth_basemodel_list)
+
+        place_new_chore(sell_symbol, Side.SELL, 50, 90, executor_http_client, sell_inst_type)
+
+        # Internally checks if chore_journal is found with OE_ACK state
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+                                                                              sell_symbol, executor_http_client)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
 
 # TODO: Add test for missing strat_limits
 # > limit_up_down_volume_participation_rate

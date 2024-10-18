@@ -1,6 +1,7 @@
 # python imports
 import copy
 import glob
+import logging
 import signal
 import subprocess
 import stat
@@ -1409,6 +1410,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         # removing and updating relative models
                         try:
                             street_book_web_client.put_strat_to_snooze_query_client()
+                            logging.info(f"Strat set to Snooze state, {unloaded_strat_key=};;; {pair_strat=}")
                         except Exception as e:
                             err_str_ = (
                                 "Some error occurred in executor while setting strat to SNOOZED state, ignoring "
@@ -1488,6 +1490,64 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         await self.reload_pair_strats(stored_strat_collection_obj, updated_strat_collection_obj)
 
         return updated_strat_collection_obj
+
+    async def get_strat_collection(self) -> StratCollection:
+        strat_collections = (
+            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_collection_http())
+
+        if len(strat_collections) != 1:
+            err_str_ = (f"Unexpected: multiple strat collection obj found, expected 1;;;"
+                        f"{strat_collections=}")
+            logging.error(err_str_)
+            raise HTTPException(detail=err_str_, status_code=400)
+
+        strat_collection = strat_collections[0]
+        return strat_collection
+
+    async def unload_strat_from_strat_id_query_pre(
+            self, strat_collection_class_type: Type[StratCollection], strat_id: int):
+        async with StratCollection.reentrant_lock:
+
+            pair_strat = await (
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_by_id_http(strat_id))
+            strat_key = get_strat_key_from_pair_strat(pair_strat)
+
+            strat_collection = await self.get_strat_collection()
+            for loaded_strat_key in strat_collection.loaded_strat_keys:
+                if loaded_strat_key == strat_key:
+                    # strat found to unload
+                    strat_collection.loaded_strat_keys.remove(strat_key)
+                    strat_collection.buffered_strat_keys.append(strat_key)
+                    await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
+                        strat_collection)
+                    break
+            else:
+                err_str_ = f"No loaded strat found with {strat_id=} in strat_collection;;;{strat_collection=}"
+                logging.error(err_str_)
+                raise HTTPException(detail=err_str_, status_code=400)
+        return []
+
+    async def reload_strat_from_strat_id_query_pre(
+            self, strat_collection_class_type: Type[StratCollection], strat_id: int):
+        async with StratCollection.reentrant_lock:
+            strat_collection = await self.get_strat_collection()
+            pair_strat = await (
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_by_id_http(strat_id))
+            strat_key = get_strat_key_from_pair_strat(pair_strat)
+
+            for loaded_strat_key in strat_collection.buffered_strat_keys:
+                if loaded_strat_key == strat_key:
+                    # strat found to unload
+                    strat_collection.buffered_strat_keys.remove(strat_key)
+                    strat_collection.loaded_strat_keys.append(strat_key)
+                    await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
+                        strat_collection)
+                    break
+            else:
+                err_str_ = f"No buffered strat found with {strat_id=} in strat_collection;;;{strat_collection=}"
+                logging.error(err_str_)
+                raise HTTPException(detail=err_str_, status_code=400)
+        return []
 
     async def get_ongoing_or_single_exact_non_ongoing_pair_strat_from_symbol_side_query_pre(
             self, pair_strat_class_type: Type[PairStrat], sec_id: str, side: Side):
@@ -1656,7 +1716,8 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             file.write(content)
         return []
 
-    async def sample_model_file_upload_query_pre(self, upload_file: UploadFile):
+    async def sample_file_upload_button_query_pre(self, upload_file: UploadFile, sample_param: str,
+                                                  disallow_duplicate_file_upload: bool = False):
         """
         Used in verifying file upload functionality with http client for SampleModel based query in test
         :param upload_file:
