@@ -30,7 +30,7 @@ public:
                              const int32_t port = stoi(market_data_handler::port),
                              const int32_t k_read_timeout = market_data_handler::connection_timeout,
                              const std::string handshake_address = "/",
-                             quill::Logger *p_logger = GetLogger(), CallBackType call_back = {}) :
+                             quill::Logger *p_logger = GetCppAppLogger(), CallBackType call_back = {}) :
                              km_user_data_type_name_(UserDataType::GetDescriptor()->name()),
                              km_handshake_address_(handshake_address), km_read_timeout_(k_read_timeout),
                              m_server_address_(k_server_address), m_port_(port), m_resolver_(m_io_context_),

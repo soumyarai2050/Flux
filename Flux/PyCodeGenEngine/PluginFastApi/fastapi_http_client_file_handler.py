@@ -280,9 +280,12 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         if message in self.message_to_query_option_list_dict:
             output_str += self._handle_client_query_url(message)
 
-        query_name = self.message_to_file_query_name_dict.get(message)
-        if query_name is not None:
-            output_str += self._get_url_set_str_for_output(query_name)
+        query_data_dict_list = self.message_to_button_query_data_dict.get(message)
+        if query_data_dict_list is not None:
+            for query_data_dict in query_data_dict_list:
+                query_data = query_data_dict.get("query_data")
+                query_name = query_data.get(FastapiHttpClientFileHandler.flux_json_query_name_field)
+                output_str += self._get_url_set_str_for_output(query_name)
 
         return output_str
 
@@ -374,10 +377,51 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             # else not required: ws handling is done by ws client plugin
         return output_str
 
-    def _handle_client_file_query_method(self, message: protogen.Message, query_name: str) -> str:
+    def _handle_client_button_query_method(self, message: protogen.Message, query_data_dict: Dict) -> str:
         output_str = ""
         message_name = message.proto.name
-        output_str += self._handle_client_http_file_query_output(message_name, query_name)
+        query_data = query_data_dict.get("query_data")
+        query_name = query_data.get(FastapiHttpClientFileHandler.flux_json_query_name_field)
+        query_type_value = query_data.get(FastapiHttpClientFileHandler.flux_json_query_type_field)
+        query_type = str(query_type_value).lower() if query_type_value is not None else None
+        query_params = query_data.get(FastapiHttpClientFileHandler.flux_json_query_params_field)
+        query_params_types = query_data.get(FastapiHttpClientFileHandler.flux_json_query_params_data_type_field)
+        query_route_type_value = query_data.get(FastapiHttpClientFileHandler.flux_json_query_route_type_field)
+        query_route_type = str(query_route_type_value) if query_route_type_value is not None else \
+            FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val
+
+        params_str = ""
+        if query_params:
+            params_str = ", ".join([f"{aggregate_param}: {aggregate_params_type}"
+                                    for aggregate_param, aggregate_params_type in zip(query_params,
+                                                                                      query_params_types)])
+
+        if query_type is None or query_type == "http" or query_type == "both":
+            output_str += self._handle_client_http_query_output(message_name, query_name, query_params,
+                                                                params_str, query_route_type)
+        elif query_type == "http_file":
+            file_upload_data = query_data_dict.get(
+                FastapiHttpClientFileHandler.button_query_file_upload_options_key)
+            disallow_duplicate_file_upload = False
+            if file_upload_data:
+                disallow_duplicate_file_upload = file_upload_data.get("disallow_duplicate_file_upload")
+
+            if query_params is None:
+                query_params = ["disallow_duplicate_file_upload"]
+            else:
+                query_params.append("disallow_duplicate_file_upload")
+
+            if params_str:
+                if disallow_duplicate_file_upload:
+                    params_str += ", disallow_duplicate_file_upload: bool = True"
+                else:
+                    params_str += ", disallow_duplicate_file_upload: bool = False"
+            else:
+                if disallow_duplicate_file_upload:
+                    params_str = "disallow_duplicate_file_upload: bool = True"
+                else:
+                    params_str = "disallow_duplicate_file_upload: bool = False"
+            output_str += self._handle_client_http_file_query_output(message_name, query_name, query_params, params_str)
         return output_str
 
     def _handle_client_projection_query_methods(self, message: protogen.Message):
@@ -488,9 +532,10 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         if message in self.message_to_query_option_list_dict:
             output_str += self._handle_client_query_methods(message)
 
-        query_name = self.message_to_file_query_name_dict.get(message)
-        if query_name is not None:
-            output_str += self._handle_client_file_query_method(message, query_name)
+        query_data_dict_list = self.message_to_button_query_data_dict.get(message)
+        if query_data_dict_list is not None:
+            for query_data_dict in query_data_dict_list:
+                output_str += self._handle_client_button_query_method(message, query_data_dict)
 
         return output_str
 

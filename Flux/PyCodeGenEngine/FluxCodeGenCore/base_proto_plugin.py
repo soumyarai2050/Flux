@@ -76,7 +76,7 @@ class BaseProtoPlugin(ABC):
     flux_msg_json_root: ClassVar[str] = "FluxMsgJsonRoot"
     flux_msg_json_root_time_series: ClassVar[str] = "FluxMsgJsonRootTimeSeries"
     flux_msg_json_query: ClassVar[str] = "FluxMsgJsonQuery"
-    flux_msg_file_query: ClassVar[str] = "FluxMsgFileQuery"
+    flux_msg_button_query: ClassVar[str] = "FluxMsgButtonQuery"
     flux_json_root_create_field: ClassVar[str] = "CreateOp"
     flux_json_root_create_all_field: ClassVar[str] = "CreateAllOp"
     flux_json_root_read_field: ClassVar[str] = "ReadOp"
@@ -472,7 +472,11 @@ class BaseProtoPlugin(ABC):
                     if option_name_check_str in option_string:
                         option_string_list.append(option_string[:option_string.index(option_name_check_str)])
                     else:
-                        option_string_list.append(option_string)
+                        next_msg_option_prefix = '[FluxMsg'
+                        if next_msg_option_prefix in option_string:
+                            option_string_list.append(option_string[:option_string.index(next_msg_option_prefix)])
+                        else:
+                            option_string_list.append(option_string)
                 repeated_option_value_as_list_of_dict: List[Dict] = []
                 for option_string_ in option_string_list:
                     option_val_dict = BaseProtoPlugin._get_complex_option_value_from_proto(option_string_,

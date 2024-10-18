@@ -12,8 +12,6 @@
 
 #include "json_codec.h"
 #include "utility_functions.h"
-// #include "cpp_app_shared_resource.h"
-#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/cpp_app/replay/cpp_app_shared_resource.h"
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_constants.h"
 
 namespace beast = boost::beast;
@@ -29,25 +27,28 @@ namespace FluxCppCore {
     template <typename RootModelType, typename RootModelListType, typename UserDataType>
     class WebSocketServer {
     public:
-        explicit WebSocketServer(UserDataType &user_data, const std::string k_host = market_data_handler::host,
+        explicit WebSocketServer(UserDataType &user_data, const std::string& kr_host = market_data_handler::host,
                                  const int32_t k_web_socket_server_port = stoi(market_data_handler::port),
                                  const std::chrono::seconds k_read_timeout =
                                  std::chrono::seconds(market_data_handler::connection_timeout),
-                                 quill::Logger *p_logger = GetLogger()) :
-        m_user_data(user_data), km_host_(k_host), km_port_(k_web_socket_server_port),
-        km_read_timeout_seconds(std::chrono::duration_cast<std::chrono::seconds>(k_read_timeout).count()),
-        m_timer_(m_io_context_, km_read_timeout_seconds), mp_logger(p_logger) {
+                                 quill::Logger *p_logger = GetCppAppLogger()) :
+        m_user_data(user_data), km_host_(kr_host), km_port_(k_web_socket_server_port),
+        km_read_timeout_seconds_(std::chrono::duration_cast<std::chrono::seconds>(k_read_timeout).count()),
+        m_timer_(m_io_context_, km_read_timeout_seconds_), mp_logger_(p_logger) {
             start_connection();
         }
 
-        void start_connection() {
+        void start_connection(int32_t retry_count = 1) {
             try {
                 m_acceptor_ = std::make_unique<tcp::acceptor>(m_io_context_,
                     tcp::endpoint{asio::ip::make_address(km_host_), static_cast<port_type>(km_port_)});
             } catch (const boost::system::system_error& error) {
-                LOG_ERROR_IMPL(mp_logger, "Failed to start server: {} in function: {}", error.what(), __func__);
-                LOG_INFO_IMPL(mp_logger, "Retrying server initialization in function: {}", __func__);
-                start_connection();
+                LOG_ERROR_IMPL(mp_logger_, "Failed to start server: {} in function: {}", error.what(), __func__);
+                LOG_INFO_IMPL(mp_logger_, "Retrying server initialization in function: {}", __func__);
+                if (retry_count != m_ws_retry_count_ or m_ws_retry_count_ > retry_count) {
+                    ++retry_count;
+                    start_connection(retry_count);
+                } // else not required: Retry logic: We only attempt retries up to m_ws_retry_count_. If it's '0', we perform a single attempt.
             }
         }
 
@@ -60,15 +61,15 @@ namespace FluxCppCore {
                     // Create a new sp_socket object to be used for the next connection (old socked is moved thus sp_socket obj is free for reuse)
                     sp_socket = std::make_shared<tcp::socket>(m_io_context_);
                 }
-                m_timer_.expires_from_now(km_read_timeout_seconds); // reset the timer
+                m_timer_.expires_from_now(km_read_timeout_seconds_); // reset the timer
                 run();
             });
 
             m_timer_.async_wait([&](const boost::system::error_code &error_code) {
                 if (!error_code) {
                     shutdown();
-                    LOG_INFO_IMPL(mp_logger, "Timeout reached");
-                    if(m_shutdown)
+                    // LOG_INFO_IMPL(mp_logger_, "Timeout reached {}" __FUNCTION__);
+                    if(m_shutdown_)
                         m_io_context_.stop();
                     else
                         m_io_context_.run();
@@ -79,13 +80,13 @@ namespace FluxCppCore {
             m_io_context_.run();
         }
 
-        bool has_ws_clients_connected(){
-            return not ws_vector.empty();
+        [[nodiscard]] bool has_ws_clients_connected() const {
+            return not ws_vector_.empty();
         }
 
-        ~WebSocketServer(){
-            m_shutdown = true;
-            ws_vector.clear();
+        virtual ~WebSocketServer(){
+            m_shutdown_ = true;
+            ws_vector_.clear();
         }
 
         bool publish(const std::string &kr_send_string, const int32_t k_new_client_ws_id  = -1)
@@ -100,17 +101,17 @@ namespace FluxCppCore {
             }
 
             if(-1 == k_new_client_ws_id){
-                for(auto &ws_ptr: ws_vector){
+                for(auto &ws_ptr: ws_vector_){
                     ws_ptr->write(asio::buffer(string_to_send), error_code);
                 }
             } else{
-                ws_vector[k_new_client_ws_id]->write(asio::buffer(string_to_send), error_code);
+                ws_vector_[k_new_client_ws_id]->write(asio::buffer(string_to_send), error_code);
             }
 
             if (!error_code) {
                 return true;
             } else {
-                LOG_ERROR_IMPL(mp_logger, "Error writing data to client: {};;; Data {}", error_code.message(), kr_send_string);
+                LOG_ERROR_IMPL(mp_logger_, "Error writing data to client: {};;; Data {}", error_code.message(), kr_send_string);
                 return false;
             }
         }
@@ -136,7 +137,7 @@ namespace FluxCppCore {
         }
 
         void shutdown(){
-            m_shutdown = true;
+            m_shutdown_ = true;
         }
 
         virtual bool NewClientCallBack(UserDataType &user_data, int16_t new_client_web_socket_id) = 0;
@@ -150,30 +151,31 @@ namespace FluxCppCore {
                     ws_ptr->accept();
                 }
                 catch (std::exception const& error){
-                    LOG_ERROR_IMPL(mp_logger, "Error while accepting client: {}", error.what());
+                    LOG_ERROR_IMPL(mp_logger_, "Error while accepting client: {}", error.what());
                 }
                 // Send the HTTP response body to the WebSocket client
-                ws_vector.push_back(std::move(ws_ptr));
-                NewClientCallBack(m_user_data, ws_vector.size()-1);
+                ws_vector_.push_back(std::move(ws_ptr));
+                NewClientCallBack(m_user_data, ws_vector_.size()-1);
                 // invoke callback to let user know of this new client with index
             }
             catch (std::exception const& error) {
-                LOG_ERROR_IMPL(mp_logger, "Session error: {}", error.what());
+                LOG_ERROR_IMPL(mp_logger_, "Session error: {}", error.what());
             }
         }
 
         UserDataType m_user_data;
-        const std::string km_host_;
+        std::string km_host_;
         int32_t km_port_;
-        const boost::posix_time::seconds km_read_timeout_seconds;
+        int32_t m_ws_retry_count_{3};
+        const boost::posix_time::seconds km_read_timeout_seconds_;
         std::string json_str_;
-        std::vector<std::shared_ptr<websocket::stream<tcp::socket>>> ws_vector;
-        std::vector <std::thread> m_ws_client_threads;
-        bool m_shutdown = false;
+        std::vector<std::shared_ptr<websocket::stream<tcp::socket>>> ws_vector_;
+        std::vector <std::thread> m_ws_client_threads_;
+        bool m_shutdown_ = false;
         asio::io_context m_io_context_;
         // interval to timeout read if no data and handle any shutdown if requested
         boost::asio::deadline_timer m_timer_;
-        quill::Logger *mp_logger;
+        quill::Logger *mp_logger_;
         std::unique_ptr<tcp::acceptor> m_acceptor_;
     };
 

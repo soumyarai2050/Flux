@@ -95,6 +95,18 @@ message MessageJsonRootTimeSeries{
   optional bool PassStoredObjToUpdateAllPrePostCallback = 17 [default=false];
 }
 
+message FileUploadOptions{
+  required bool AllowFileUpload = 1 [default=true];
+  optional bool DisallowNonTodayFileUpload = 2;
+  optional bool DisallowDuplicateFileUpload = 3;
+}
+
+message MessageButtonQuery{
+  required MessageJsonQuery query_data = 1;
+  required UIButton ui_button = 2;
+  optional FileUploadOptions file_upload_options = 3;
+}
+
 enum QueryTypeEnum{
   HTTP = 0;
   WS = 1;
@@ -225,7 +237,7 @@ extend google.protobuf.MessageOptions
   optional string FluxMsgUIGetAllLimit = 55258;
   optional MessageJsonRootTimeSeries FluxMsgJsonRootTimeSeries = 55259;
   optional WidgetUIOption FluxMsgWidgetUIOption = 55260; // Use this to populate ui widget data for layout messages
-  optional bool FluxMsgFileQuery = 55261;   // adds file query for message
+  repeated MessageButtonQuery FluxMsgButtonQuery = 55261;   // adds file query for message
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;

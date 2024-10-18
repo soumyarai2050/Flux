@@ -1,6 +1,5 @@
 #pragma once
 
-#include <unordered_map>
 
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/json.hpp>
@@ -9,8 +8,6 @@
 #include <mongocxx/pool.hpp>
 
 #include "../../generated/CppUtilGen/market_data_constants.h"
-#include "logger.h"
-
 
 namespace FluxCppCore {
 

@@ -3768,7 +3768,6 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def _handle_http_file_query_str(self, message: protogen.Message, query_name: str, query_params_str: str | None = None,
                                     query_params_with_type_str: str | None = None, return_type_str: str | None = None,
                                     model_type: ModelType = ModelType.Beanie) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if return_type_str is None:
             return_type_str = message.proto.name
         output_str = f"@perf_benchmark\n"
@@ -3838,6 +3837,24 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         return output_str
 
+    def _get_query_params_str_n_query_params_with_type_str(self, query_params_option_val: str,
+                                                           query_params_data_types_option_val: str):
+        query_params_str = ""
+        query_params_with_type_str = ""
+        if query_params_option_val:
+            param_to_type_str_list = []
+            list_type_params: List[Tuple[str, str]] = []
+            for param, param_type in zip(query_params_option_val, query_params_data_types_option_val):
+                if "List" not in param_type:
+                    param_to_type_str_list.append(f"{param}: {param_type}")
+                else:
+                    list_type_params.append((param, param_type))
+            for param, param_type in list_type_params:
+                param_to_type_str_list.append(f"{param}: {param_type} = Query()")
+            query_params_with_type_str = ", ".join(param_to_type_str_list)
+            query_params_str = ", ".join(query_params_option_val)
+        return query_params_str, query_params_with_type_str
+
     def _handle_query_methods(self, message: protogen.Message, model_type: ModelType = ModelType.Beanie) -> str:
         output_str = ""
         aggregate_value_list = self.message_to_query_option_list_dict[message]
@@ -3851,23 +3868,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             query_route_value = aggregate_value[FastapiHttpRoutesFileHandler.query_route_type_key]
             query_route_type = query_route_value if query_route_value is not None else None
 
-            query_params_str = ""
-            query_params_with_type_str = ""
-            query_args_dict_str = ""
-            if query_params:
-                param_to_type_str_list = []
-                list_type_params: List[Tuple[str, str]] = []
-                for param, param_type in zip(query_params, query_params_data_types):
-                    if "List" not in param_type:
-                        param_to_type_str_list.append(f"{param}: {param_type}")
-                    else:
-                        list_type_params.append((param, param_type))
-                for param, param_type in list_type_params:
-                    param_to_type_str_list.append(f"{param}: {param_type} = Query()")
-                query_params_with_type_str = ", ".join(param_to_type_str_list)
-                query_params_str = ", ".join(query_params)
-                query_args_str = ', '.join([f'"{param}": {param}' for param in query_params])
-                query_args_dict_str = "{"+f"{query_args_str}"+"}"
+            query_params_str, query_params_with_type_str = (
+                self._get_query_params_str_n_query_params_with_type_str(query_params, query_params_data_types))
 
             if query_type is None or query_type == "http" or query_type == "both":
                 output_str += self._handle_http_query_str(message, query_name, query_params_str,
@@ -3966,6 +3968,51 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         return output_str
 
+    def handle_button_query_method(self, message: protogen.Message, query_data_dict: Dict,
+                                   model_type: ModelType | None = None):
+        output_str = ""
+        query_data = query_data_dict.get("query_data")
+        query_name = query_data.get(FastapiHttpRoutesFileHandler.flux_json_query_name_field)
+        query_type_value = query_data.get(FastapiHttpRoutesFileHandler.flux_json_query_type_field)
+        query_type = str(query_type_value).lower() if query_type_value is not None else None
+        query_params = query_data.get(FastapiHttpRoutesFileHandler.flux_json_query_params_field)
+        query_params_data_types = query_data.get(FastapiHttpRoutesFileHandler.flux_json_query_params_data_type_field)
+
+        query_params_str, query_params_with_type_str = (
+            self._get_query_params_str_n_query_params_with_type_str(query_params, query_params_data_types))
+
+        if query_type is None or query_type == "http" or query_type == "both":
+            query_route_value = query_data.get(FastapiHttpRoutesFileHandler.flux_json_query_route_type_field)
+            query_route_type = query_route_value if query_route_value is not None else None
+
+            output_str += self._handle_http_query_str(message, query_name, query_params_str,
+                                                      query_params_with_type_str, query_route_type, model_type=model_type)
+        elif query_type == "http_file":
+            file_upload_data = query_data_dict.get(
+                FastapiHttpRoutesFileHandler.button_query_file_upload_options_key)
+            disallow_duplicate_file_upload = False
+            if file_upload_data:
+                disallow_duplicate_file_upload = file_upload_data.get("disallow_duplicate_file_upload")
+
+            if query_params_str:
+                query_params_str += ', disallow_duplicate_file_upload=disallow_duplicate_file_upload'
+            else:
+                query_params_str = 'disallow_duplicate_file_upload=disallow_duplicate_file_upload'
+
+            if query_params_with_type_str:
+                if disallow_duplicate_file_upload:
+                    query_params_with_type_str += ", disallow_duplicate_file_upload: bool = True"
+                else:
+                    query_params_with_type_str += ", disallow_duplicate_file_upload: bool = False"
+            else:
+                if disallow_duplicate_file_upload:
+                    query_params_with_type_str = "disallow_duplicate_file_upload: bool = True"
+                else:
+                    query_params_with_type_str = "disallow_duplicate_file_upload: bool = False"
+            output_str += self._handle_http_file_query_str(message, query_name, query_params_str,
+                                                           query_params_with_type_str, model_type=model_type)
+        return output_str
+
     def handle_pydantic_CRUD_task(self) -> str:
         output_str = ""
         for message in self.root_message_list:
@@ -3977,9 +4024,10 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         for message in self.message_to_query_option_list_dict:
             output_str += self._handle_query_methods(message)
 
-        for message, query_name in self.message_to_file_query_name_dict.items():
-            query_name = self.get_file_query_name_from_message_name(message.proto.name)
-            output_str += self._handle_http_file_query_str(message, query_name)
+        query_data_dict_list: List[Dict]
+        for message, query_data_dict_list in self.message_to_button_query_data_dict.items():
+            for query_data_dict in query_data_dict_list:
+                output_str += self.handle_button_query_method(message, query_data_dict)
 
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
@@ -3997,9 +4045,10 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         for message in self.message_to_query_option_list_dict:
             output_str += self._handle_query_methods(message, model_type=ModelType.Dataclass)
 
-        for message, query_name in self.message_to_file_query_name_dict.items():
-            query_name = self.get_file_query_name_from_message_name(message.proto.name)
-            output_str += self._handle_http_file_query_str(message, query_name, model_type=ModelType.Dataclass)
+        query_data_dict_list: List[Dict]
+        for message, query_data_dict_list in self.message_to_button_query_data_dict.items():
+            for query_data_dict in query_data_dict_list:
+                output_str += self.handle_button_query_method(message, query_data_dict, model_type=ModelType.Dataclass)
 
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
@@ -4017,9 +4066,10 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         for message in self.message_to_query_option_list_dict:
             output_str += self._handle_query_methods(message, model_type=ModelType.Msgspec)
 
-        for message, query_name in self.message_to_file_query_name_dict.items():
-            query_name = self.get_file_query_name_from_message_name(message.proto.name)
-            output_str += self._handle_http_file_query_str(message, query_name, model_type=ModelType.Msgspec)
+        query_data_dict_list: List[Dict]
+        for message, query_data_dict_list in self.message_to_button_query_data_dict.items():
+            for query_data_dict in query_data_dict_list:
+                output_str += self.handle_button_query_method(message, query_data_dict, model_type=ModelType.Msgspec)
 
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):

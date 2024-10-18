@@ -5,8 +5,6 @@ import time
 from pathlib import PurePath
 from typing import List
 
-from Flux.CodeGenProjects.TradeEngine.Pydantic.market_data_n_strat_executor_n_basket_executor_core_msgspec_model import \
-    LastTrade, MarketDepth
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):

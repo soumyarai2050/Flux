@@ -42,6 +42,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
     query_params_data_types_key: ClassVar[str] = "query_params_data_types"
     query_type_key: ClassVar[str] = "query_type"
     query_route_type_key: ClassVar[str] = "query_route_type"
+    button_query_data_key: ClassVar[str] = "query_data"
+    button_query_file_upload_options_key: ClassVar[str] = "file_upload_options"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -54,7 +56,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             raise Exception(err_str)
         self.root_message_list: List[protogen.Message] = []
         self.message_to_query_option_list_dict: Dict[protogen.Message, List[Dict]] = {}
-        self.message_to_file_query_name_dict: Dict[protogen.Message, str] = {}
+        self.message_to_button_query_data_dict: Dict[protogen.Message, Dict] = {}
         self.non_root_message_list: List[protogen.Message] = []
         self.enum_list: List[protogen.Enum] = []
         self.model_dir_name: str = "Pydentic"
@@ -97,10 +99,6 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             self.non_root_message_list.append(message)
         # else not required: avoiding repetition
 
-    def get_file_query_name_from_message_name(self, message_name: str) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        return f"{message_name_snake_cased}_file_upload"
-
     def update_query_data_members(self, message: protogen.Message) -> None:
         if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_query):
             if message not in self.message_to_query_option_list_dict:
@@ -108,10 +106,10 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             # else not required: avoiding repetition
         # else not required: avoiding list append if msg is not having option for query
 
-        if self.is_bool_option_enabled(message, BaseFastapiPlugin.flux_msg_file_query):
-            if message not in self.message_to_file_query_name_dict:
-                self.message_to_file_query_name_dict[message] = (
-                    self.get_file_query_name_from_message_name(message.proto.name))
+        if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_button_query):
+            if message not in self.message_to_button_query_data_dict:
+                option_val_list = self.get_complex_option_value_from_proto(message, BaseFastapiPlugin.flux_msg_button_query, is_option_repeated=True)
+                self.message_to_button_query_data_dict[message] = option_val_list
             # else not required: avoiding repetition
         # else not required: avoiding list append if msg is not having option for file query
 

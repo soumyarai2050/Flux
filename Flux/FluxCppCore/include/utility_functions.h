@@ -4,7 +4,6 @@
 #include <yaml-cpp/yaml.h>
 
 #include "market_data_service.pb.h"
-#include "string_util.h"
 
 namespace FluxCppCore {
 

@@ -13,10 +13,19 @@ namespace asio = boost::asio;
 
 namespace FluxCppCore {
 
+    struct ClientConfig {
+        std::string create_client_url;
+        std::string get_client_url;
+        std::string get_max_id_client_url;
+        std::string put_client_url;
+        std::string patch_client_url;
+        std::string delete_client_url;
+    };
+
     class BaseWebClient {
     public:
-        BaseWebClient(const std::string &kr_host, const std::string &kr_port, quill::Logger* logger = quill::get_logger())
-        : km_host_(kr_host), km_port_(kr_port), mp_logger_(logger) {
+        explicit BaseWebClient(const std::string &kr_host, const std::string &kr_port)
+        : km_host_((kr_host)), km_port_(kr_port){
             static_init(km_host_, km_port_);
         }
 
@@ -29,7 +38,6 @@ namespace FluxCppCore {
         static boost::asio::ip::tcp::resolver::results_type c_result_;
         static inline bool c_static_members_initialized_ = false;
         static std::mutex c_market_data_web_client_mutex;
-        quill::Logger* mp_logger_;
 
         static void static_init(const std::string &kr_host, const std::string &kr_port) {
             const std::lock_guard<std::mutex> lock(c_market_data_web_client_mutex);
@@ -71,7 +79,7 @@ namespace FluxCppCore {
             boost::asio::connect(synchronous_socket, c_result_, connect_error);
 
             if (connect_error) {
-                LOG_ERROR_IMPL(mp_logger_, "Failed to connect: {}", connect_error.message());
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to connect: {}", connect_error.message());
                 return false;
             }
 
@@ -79,7 +87,7 @@ namespace FluxCppCore {
             boost::beast::http::write(synchronous_socket, request, write_error);
 
             if (write_error) {
-                LOG_ERROR_IMPL(mp_logger_, "Error writing request: {}", write_error.message());
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error writing request: {}", write_error.message());
                 return false;
             }
 
@@ -117,7 +125,7 @@ namespace FluxCppCore {
 
             // Check if the timer was cancelled
             if (read_error) {
-                LOG_ERROR_IMPL(mp_logger_, "Error reading response: {}", read_error.message());
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error reading response: {}", read_error.message());
                 return false;
             }
 
@@ -163,41 +171,35 @@ namespace FluxCppCore {
     };
 
 
-    template <typename RootModelType,
-            StringLiteral create_client_url,
-            StringLiteral get_client_url,
-            StringLiteral get_max_id_client_url,
-            StringLiteral put_client_url,
-            StringLiteral patch_client_url,
-            StringLiteral delete_client_url>
+    template <typename RootModelType>
     class RootModelWebClient : public BaseWebClient {
     public:
-        RootModelWebClient(const std::string &kr_host = market_data_handler::host,
-            const std::string &kr_port = market_data_handler::port) : BaseWebClient(kr_host, kr_port) {}
+        explicit RootModelWebClient(const std::string &kr_host = market_data_handler::host,
+            const std::string &kr_port = market_data_handler::port, const ClientConfig& r_client_config = {}) :
+        BaseWebClient(kr_host, kr_port), mr_client_config(r_client_config) {}
 
         [[nodiscard]] auto get_max_id_client() const {
             std::string json_out;
             int32_t new_max_id = 0;
-            std::string_view get_max_id_client_url_view = get_max_id_client_url.value;
-            bool status = send_get_request(get_max_id_client_url_view, json_out);
-            if (status) {
+            std::string_view get_max_id_client_url_view = mr_client_config.get_max_id_client_url;
+            if (send_get_request(get_max_id_client_url_view, json_out)) {
                 // Find the starting position of the `max_id_val` within the JSON string and calculate the position
                 // where the value associated with it begins. We add the length of `max_id_val_key` and 2 to skip dual-quote
                 // and the colon character in the string.
                 size_t start_pos = json_out.find(max_id_val_key) +
                         max_id_val_key.length() + 2;
-                size_t end_pos = json_out.find_first_of("}", start_pos);
+                size_t end_pos = json_out.find_first_of('}', start_pos);
                 if (start_pos != std::string::npos && end_pos != std::string::npos) {
                     std::string max_id_str = json_out.substr(start_pos, end_pos - start_pos);
                     try {
                         new_max_id = std::stoi(max_id_str);
                     } catch (const std::exception& e) {
-                        LOG_ERROR_IMPL(m_p_logger_, "Error parsing {};;; max_id_val: {}", RootModelType::GetDescriptor()->name(), e.what());
+                        LOG_ERROR_IMPL(GetCppAppLogger(), "Error parsing {};;; max_id_val: {}", RootModelType::GetDescriptor()->name(), e.what());
                     }
                 }
                 return new_max_id;
             } else {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while performing get {};;; max_id_val request: {}, url: {}",
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while performing get {};;; max_id_val request: {}, url: {}",
                           RootModelType::GetDescriptor()->name(), json_out, get_max_id_client_url_view);
                 return new_max_id;
             }
@@ -206,7 +208,7 @@ namespace FluxCppCore {
         [[nodiscard]] bool get_client(RootModelType &r_obj_out, const int32_t &kr_id) const {
             bool status = false;
             std::string json_out;
-            std::string_view get_client_url_view = get_client_url.value;
+            std::string_view get_client_url_view = mr_client_config.get_client_url;
             status = send_get_request(get_client_url_view, kr_id, json_out);
             if (status) {
                 std::string modified_json;
@@ -231,13 +233,14 @@ namespace FluxCppCore {
         [[nodiscard]] bool create_client (RootModelType &r_obj_in_n_out) {
             std::string json;
             bool status = m_codec.encode_model(r_obj_in_n_out, json, true);
+            LOG_DEBUG_IMPL(GetCppAppLogger(), "{}: {}: status: {}", __func__, json, status);
             if (status) {
                 std::string json_out;
-                std::string_view create_client_url_view = create_client_url.value;
+                std::string_view create_client_url_view = mr_client_config.create_client_url;
                 status = send_post_request(create_client_url_view, json, json_out);
                 if (status) {
                     std::string modified_json;
-                    for (int i = 0; i < json_out.size(); ++i) {
+                    for (size_t i = 0; i < json_out.size(); ++i) {
                         if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' &&
                         json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
                             // Skip the underscore if `_id` is detected
@@ -251,12 +254,12 @@ namespace FluxCppCore {
                     status =  m_codec.decode_model(r_obj_in_n_out, modified_json);
                     return status;
                 } else {
-                    LOG_ERROR_IMPL(m_p_logger_, "Error while creating {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while creating {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
                               json, create_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
@@ -270,7 +273,7 @@ namespace FluxCppCore {
                 size_t pos = json.find("id");
                 while (pos != std::string::npos) {
                     // Check if there's no underscore before `id`
-                    if (pos == 0 || json[pos - 1] != '_' && (!std::isalpha(json[pos - 1]))) {
+                    if ((pos == 0 || json[pos - 1] != '_') && (!std::isalpha(json[pos - 1]))) {
                         // Insert the underscore before `id`
                         json.insert(pos, "_");
                         // Move the search position to the end of the inserted underscore
@@ -281,11 +284,11 @@ namespace FluxCppCore {
                 }
 
                 std::string json_out;
-                std::string_view patch_client_url_view = patch_client_url.value;
+                std::string_view patch_client_url_view = mr_client_config.patch_client_url;
                 status = send_patch_request(patch_client_url_view, json, json_out);
                 if (status) {
                     std::string modified_json;
-                    for (int i = 0; i < json_out.size(); ++i) {
+                    for ( size_t i = 0; i < json_out.size(); ++i) {
                         if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' &&
                         json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
                             // Skip the underscore if `_id` is detected
@@ -299,12 +302,12 @@ namespace FluxCppCore {
                     status =  m_codec.decode_model(r_obj_in_n_out, modified_json);
                     return status;
                 } else {
-                    LOG_ERROR_IMPL(m_p_logger_, "Error while patch {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while patch {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
                     json, patch_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
@@ -328,7 +331,7 @@ namespace FluxCppCore {
                     pos = json.find("id", pos + 1);
                 }
                 std::string json_out;
-                std::string_view put_client_url_view = put_client_url.value;
+                std::string_view put_client_url_view = mr_client_config.put_client_url;
                 status = send_put_request(put_client_url_view, json, json_out);
 
                 if (status) {
@@ -345,12 +348,12 @@ namespace FluxCppCore {
                     }
                     status =  m_codec.decode_model(r_obj_in_n_out, modified_json);
                 } else {
-                    LOG_ERROR_IMPL(m_p_logger_, "Error while put {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while put {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
                               json, put_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
@@ -359,20 +362,19 @@ namespace FluxCppCore {
 
         [[nodiscard]] std::string delete_client (const int32_t &kr_id) const {
             std::string delete_response_json;
-            std::string_view delete_client_url_view = delete_client_url.value;
-            bool status = send_delete_request(delete_client_url_view, kr_id, delete_response_json);
-            if (status) {
-                return delete_response_json;
-            } else {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while delete {};;; {}, id: {}, url: {}", RootModelType::GetDescriptor()->name(),
-                delete_response_json, kr_id, delete_client_url_view);
+            std::string_view delete_client_url_view = mr_client_config.delete_client_url;
+            if (send_delete_request(delete_client_url_view, kr_id, delete_response_json)) {
                 return delete_response_json;
             }
+            LOG_ERROR_IMPL(GetCppAppLogger(), "Error while delete {};;; {}, id: {}, url: {}", RootModelType::GetDescriptor()->name(),
+            delete_response_json, kr_id, delete_client_url_view);
+            return delete_response_json;
+
         }
 
     protected:
-        quill::Logger* m_p_logger_ = quill::get_logger();
         RootModelJsonCodec<RootModelType> m_codec;
+        const ClientConfig& mr_client_config;
     };
 
     template <typename RootModelListType,
@@ -390,26 +392,25 @@ namespace FluxCppCore {
             std::string json_out;
             int32_t new_max_id = 0;
             std::string_view get_max_id_client_url_view = get_max_id_client_url.value;
-            bool status = send_get_request(get_max_id_client_url_view, json_out);
-            if (status) {
+            if (send_get_request(get_max_id_client_url_view, json_out)) {
                 // Find the starting position of the `max_id_val` within the JSON string and calculate the position
                 // where the value associated with it begins. We add the length of `max_id_val_key` and 2 to skip dual-quote
                 // and the colon character in the string.
                 size_t start_pos = json_out.find(max_id_val_key) +
                                    max_id_val_key.length() + 2;
-                size_t end_pos = json_out.find_first_of("}", start_pos);
+                size_t end_pos = json_out.find_first_of('}', start_pos);
                 if (start_pos != std::string::npos && end_pos != std::string::npos) {
                     std::string max_id_str = json_out.substr(start_pos, end_pos - start_pos);
                     try {
                         new_max_id = std::stoi(max_id_str);
                     } catch (const std::exception& e) {
-                        LOG_ERROR_IMPL(m_p_logger_, "Error parsing {};;; max_id_val: {}",
+                        LOG_ERROR_IMPL(GetCppAppLogger(), "Error parsing {};;; max_id_val: {}",
                                   RootModelListType::GetDescriptor()->name(), e.what());
                     }
                 }
                 return new_max_id;
             } else {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while performing get {};;; max_id_val request: {}, url: {}",
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while performing get {};;; max_id_val request: {}, url: {}",
                           RootModelListType::GetDescriptor()->name(), json_out, get_max_id_client_url_view);
                 return new_max_id;
             }
@@ -463,16 +464,16 @@ namespace FluxCppCore {
                     status =  m_codec.decode_model_list(r_obj_in_n_out, modified_json);
                     return status;
                 } else {
-                    LOG_ERROR_IMPL(m_p_logger_, "Error while creating {};;;url: {}, Json: {} ",
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while creating {};;;url: {}, Json: {} ",
                              RootModelListType::GetDescriptor()->name(), create_client_url_view, json);
                     return false;
                 }
             } else {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;;{}", RootModelListType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;;{}", RootModelListType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
-            LOG_ERROR_IMPL(m_p_logger_, "Error unreachable code reached {};;;{}", RootModelListType::GetDescriptor()->name(),
+            LOG_ERROR_IMPL(GetCppAppLogger(), "Error unreachable code reached {};;;{}", RootModelListType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
             return false;
         }
@@ -512,12 +513,12 @@ namespace FluxCppCore {
                     status =  m_codec.decode_model_list(r_obj_in_n_out, decode_modified_json);
                     return status;
                 } else {
-                    LOG_ERROR_IMPL(m_p_logger_, "Error while patch {};;;{} url: {}", RootModelListType::GetDescriptor()->name(),
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while patch {};;;{} url: {}", RootModelListType::GetDescriptor()->name(),
                               json, patch_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
@@ -556,12 +557,12 @@ namespace FluxCppCore {
                     }
                     status =  m_codec.decode_model_list(r_obj_in_n_out, decode_modified_json);
                 } else {
-                    LOG_ERROR_IMPL(m_p_logger_, "Error while put {};;; {} url: {}", RootModelListType::GetDescriptor()->name(),
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while put {};;; {} url: {}", RootModelListType::GetDescriptor()->name(),
                               json, put_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
@@ -571,17 +572,14 @@ namespace FluxCppCore {
         [[nodiscard]] std::string delete_client () const {
             std::string delete_response_json;
             std::string_view delete_client_url_view = delete_client_url.value;
-            bool status = send_delete_request(delete_client_url_view, delete_response_json);
-            if (status) {
-                return delete_response_json;
-            } else {
-                LOG_ERROR_IMPL(m_p_logger_, "Error while delete {};;; {}, url: {}", RootModelListType::GetDescriptor()->name(),
-                          delete_response_json, delete_client_url_view);
+            if (send_delete_request(delete_client_url_view, delete_response_json)) {
                 return delete_response_json;
             }
+            LOG_ERROR_IMPL(GetCppAppLogger(), "Error while delete {};;; {}, url: {}", RootModelListType::GetDescriptor()->name(),
+                      delete_response_json, delete_client_url_view);
+            return delete_response_json;
         }
     protected:
-        quill::Logger* m_p_logger_ = quill::get_logger();
         RootModelListJsonCodec<RootModelListType> m_codec;
     };
 

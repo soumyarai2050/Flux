@@ -447,7 +447,6 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
     def _handle_callback_http_file_query_method_output(
             self, message: protogen.Message, query_name: str,
             agg_params_with_type_str: str | None = None) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if agg_params_with_type_str is not None:
             output_str = f"    async def {query_name}_query_pre(self, " \
                           f"upload_file: UploadFile, " \
@@ -481,6 +480,34 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
             output_str += f"    return {msg_name_snake_cased}_obj_json_str\n\n\n"
         return output_str
 
+    def _handle_callback_query_methods_output(
+            self, message: protogen.Message, query_name: str, query_route_type: str,
+            agg_params_with_type_str: str | None = None, query_type: str | None = None,
+            msg_name_n_ws_query_name_tuple_list: List[Tuple[str, str]] | None = None) -> str:
+        output_str = ""
+
+        if query_type is None or query_type == "http":
+            output_str += self._handle_callback_http_query_method_output(message, query_name,
+                                                                         agg_params_with_type_str,
+                                                                         query_route_type)
+        elif query_type == "ws":
+            output_str += self._handle_callback_ws_query_method_output(query_name)
+            msg_name_n_ws_query_name_tuple_list.append((message.proto.name, query_name))
+        elif query_type == "both":
+            output_str += self._handle_callback_http_query_method_output(message, query_name,
+                                                                         agg_params_with_type_str,
+                                                                         query_route_type)
+            output_str += self._handle_callback_ws_query_method_output(query_name)
+            msg_name_n_ws_query_name_tuple_list.append((message.proto.name, query_name))
+        elif query_type == "http_file":
+            output_str += self._handle_callback_http_file_query_method_output(message, query_name,
+                                                                              agg_params_with_type_str)
+        else:
+            err_str = f"Unsupported Query type for query base callback code generation {query_type}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+        return output_str
+
     def handle_callback_query_methods_output(self, msg_name_n_ws_query_name_tuple_list: List[Tuple[str, str]]) -> str:
         output_str = ""
 
@@ -502,29 +529,47 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                                                           for param, param_type in zip(query_params,
                                                                                        query_params_data_types)])
 
-                if query_type is None or query_type == "http":
-                    output_str += self._handle_callback_http_query_method_output(message, query_name,
-                                                                                 agg_params_with_type_str,
-                                                                                 query_route_type)
-                elif query_type == "ws":
-                    output_str += self._handle_callback_ws_query_method_output(query_name)
-                    msg_name_n_ws_query_name_tuple_list.append((message.proto.name, query_name))
-                elif query_type == "both":
-                    output_str += self._handle_callback_http_query_method_output(message, query_name,
-                                                                                 agg_params_with_type_str,
-                                                                                 query_route_type)
-                    output_str += self._handle_callback_ws_query_method_output(query_name)
-                    msg_name_n_ws_query_name_tuple_list.append((message.proto.name, query_name))
-                elif query_type == "http_file":
-                    output_str += self._handle_callback_http_file_query_method_output(message, query_name,
-                                                                                      agg_params_with_type_str)
-                else:
-                    err_str = f"Unsupported Query type for query base callback code generation {query_type}"
-                    logging.exception(err_str)
-                    raise Exception(err_str)
+                output_str += self._handle_callback_query_methods_output(
+                    message, query_name, query_route_type, agg_params_with_type_str, query_type,
+                    msg_name_n_ws_query_name_tuple_list)
 
-        for message, file_query_name in self.message_to_file_query_name_dict.items():
-            output_str += self._handle_callback_http_file_query_method_output(message, file_query_name)
+        for message, query_data_dict_list in self.message_to_button_query_data_dict.items():
+            for query_data_dict in query_data_dict_list:
+                query_data = query_data_dict.get(FastapiCallbackFileHandler.button_query_data_key)
+                query_name = query_data.get(FastapiCallbackFileHandler.flux_json_query_name_field)
+                query_params = query_data.get(FastapiCallbackFileHandler.flux_json_query_params_field)
+                query_params_data_types = query_data.get(
+                    FastapiCallbackFileHandler.flux_json_query_params_data_type_field)
+                query_type_value = query_data.get(FastapiCallbackFileHandler.flux_json_query_type_field)
+                query_type = str(query_type_value).lower() if query_type_value is not None else None
+                query_route_type_value = query_data.get(FastapiCallbackFileHandler.flux_json_query_route_type_field)
+                query_route_type = str(query_route_type_value).lower() if query_route_type_value is not None else "GET"
+
+                agg_params_with_type_str = None
+                if query_params:
+                    agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
+                                                          for param, param_type in zip(query_params,
+                                                                                       query_params_data_types)])
+                if query_type == "http_file":
+                    file_upload_data = query_data_dict.get(
+                        FastapiCallbackFileHandler.button_query_file_upload_options_key)
+                    disallow_duplicate_file_upload = False
+                    if file_upload_data:
+                        disallow_duplicate_file_upload = file_upload_data.get("disallow_duplicate_file_upload")
+
+                    if agg_params_with_type_str:
+                        if disallow_duplicate_file_upload:
+                            agg_params_with_type_str += ", disallow_duplicate_file_upload: bool = True"
+                        else:
+                            agg_params_with_type_str += ", disallow_duplicate_file_upload: bool = False"
+                    else:
+                        if disallow_duplicate_file_upload:
+                            agg_params_with_type_str = "disallow_duplicate_file_upload: bool = True"
+                        else:
+                            agg_params_with_type_str = "disallow_duplicate_file_upload: bool = False"
+                output_str += self._handle_callback_query_methods_output(
+                    message, query_name, query_route_type, agg_params_with_type_str, query_type,
+                    [])
 
         output_str += "\n"
 
