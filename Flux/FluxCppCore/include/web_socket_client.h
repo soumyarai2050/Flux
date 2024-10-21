@@ -35,8 +35,7 @@ public:
                              km_handshake_address_(handshake_address), km_read_timeout_(k_read_timeout),
                              m_server_address_(k_server_address), m_port_(port), m_resolver_(m_io_context_),
                              m_ws_(m_io_context_), m_user_data_(user_data),
-                             m_call_back_(call_back ? call_back : [](UserDataType&) {}),  // Provide a default if not provided,
-                             mp_logger_(p_logger) {}
+                             m_call_back_(call_back ? call_back : [](UserDataType&) {}) {}
 
     void run() {
         auto const results = m_resolver_.resolve(m_server_address_, std::to_string(m_port_));
@@ -92,10 +91,10 @@ protected:
                     m_call_back_(m_user_data_);
                 }
                 if (status) {
-                    LOG_INFO_IMPL(mp_logger_, "Received data: {}", data);
-                    LOG_INFO_IMPL(mp_logger_, "Deserialized data: {} ", m_user_data_.DebugString());
+                    LOG_INFO_IMPL(GetCppAppLogger(), "Received data: {}", data);
+                    LOG_INFO_IMPL(GetCppAppLogger(), "Deserialized data: {} ", m_user_data_.DebugString());
                 } else {
-                    LOG_ERROR_IMPL(mp_logger_, "Failed while decoding received Data: {};;; UserDataType: {} ",
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Failed while decoding received Data: {};;; UserDataType: {} ",
                               data, km_user_data_type_name_);
                 }
 
@@ -108,7 +107,7 @@ protected:
                 // WebSocket closed or connection reset by peer, exit the loop
                 shutdown();
             } else {
-                LOG_ERROR_IMPL(mp_logger_, "Error reading from WebSocket: {}", error_code.message());
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error reading from WebSocket: {}", error_code.message());
             }
         });
 
@@ -134,6 +133,5 @@ protected:
     beast::flat_buffer m_buffer_;
     UserDataType &m_user_data_;
     CallBackType m_call_back_;
-    quill::Logger *mp_logger_;
 };
 

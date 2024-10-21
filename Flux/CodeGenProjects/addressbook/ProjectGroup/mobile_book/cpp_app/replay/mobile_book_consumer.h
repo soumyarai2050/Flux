@@ -19,30 +19,46 @@ public:
 
 protected:
 
-	explicit MobileBookInterface(const std::string &kr_yaml_config_file) :
+	explicit MobileBookInterface(
+		const std::string &kr_yaml_config_file) :
 	k_mr_config_file_(kr_yaml_config_file), m_config_file_(YAML::LoadFile(k_mr_config_file_)),
 	km_project_name_((get_project_name())), m_top_of_book_ws_port_(get_top_of_book_ws_port()),
 	m_last_barter_ws_port_(get_last_barter_ws_port()), m_market_depth_ws_port_(get_market_depth_ws_port()),
 	m_http_client_host_(get_http_ip()), m_http_client_port_(get_http_port()),
-	m_md_client_config_(km_project_name_ + create_market_depth_client_url,
-		km_project_name_ + get_market_depth_client_url,
-		km_project_name_ + get_market_depth_max_id_client_url, km_project_name_ + put_market_depth_client_url,
-		km_project_name_ + patch_market_depth_client_url, km_project_name_ + delete_market_depth_client_url),
-	m_tob_client_config_(km_project_name_ + create_top_of_book_client_url, km_project_name_ + get_top_of_book_client_url,
-		km_project_name_ + get_top_of_book_max_id_client_url, km_project_name_ + put_top_of_book_client_url,
-		km_project_name_ + patch_top_of_book_client_url, km_project_name_ + delete_top_of_book_client_url),
-	m_lt_client_config_(km_project_name_ + create_last_barter_client_url, km_project_name_ + get_last_barter_client_url,
-		km_project_name_ + get_last_barter_max_id_client_url, km_project_name_ + put_last_barter_client_url,
-		km_project_name_ + patch_last_barter_client_url, km_project_name_ + delete_last_barter_client_url),
+	m_md_client_config_(
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + create_market_depth_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + get_market_depth_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + get_market_depth_max_id_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + put_market_depth_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + patch_market_depth_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + delete_market_depth_client_url
+		),
+	m_tob_client_config_(
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + create_top_of_book_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + get_top_of_book_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + get_top_of_book_max_id_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + put_top_of_book_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + patch_top_of_book_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + delete_top_of_book_client_url
+		),
+	m_lt_client_config_(
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + create_last_barter_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + get_last_barter_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + get_last_barter_max_id_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + put_last_barter_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + patch_last_barter_client_url,
+		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + delete_last_barter_client_url
+		),
 	m_sp_mongo_db_(std::make_shared<FluxCppCore::MongoDBHandler>(get_db_uri(), get_db_name())),
 	m_top_of_book_db_codec_(m_sp_mongo_db_), m_market_depth_db_codec_(m_sp_mongo_db_),
 	m_last_barter_db_codec_(m_sp_mongo_db_), m_market_depth_history_db_codec_(m_sp_mongo_db_),
 	m_last_barter_history_db_codec_(m_sp_mongo_db_) {
-	m_last_barter_history_db_codec_.get_all_data_from_collection(m_last_barter_collection_);
-	m_market_depth_history_db_codec_.get_all_data_from_collection(m_market_depth_history_collection_);
+
+		m_last_barter_history_db_codec_.get_all_data_from_collection(m_last_barter_collection_);
+		m_market_depth_history_db_codec_.get_all_data_from_collection(m_market_depth_history_collection_);
 		initialize_websocket_servers();
-		start_ws_thread();
 		initialize_webclient();
+
 	}
 
 	void initialize_websocket_servers() {
@@ -64,9 +80,18 @@ protected:
 		if (m_http_client_host_.empty() or m_http_client_port_.empty()) {
 			return;
 		}
-		m_md_http_client_.emplace(m_http_client_host_, m_http_client_port_, m_md_client_config_);
-		m_tob_web_client_.emplace(m_http_client_host_, m_http_client_port_, m_tob_client_config_);
-		m_lt_web_client_.emplace(m_http_client_host_, m_http_client_port_, m_lt_client_config_);
+
+		if (!avoid_last_barter_http_update()) {
+			m_lt_web_client_.emplace(m_http_client_host_, m_http_client_port_, m_lt_client_config_);
+		}
+
+		if(!avoid_market_depth_http_update()) {
+			m_md_http_client_.emplace(m_http_client_host_, m_http_client_port_, m_md_client_config_);
+		}
+
+		if (!avoid_top_of_book_http_update()) {
+			m_tob_web_client_.emplace(m_http_client_host_, m_http_client_port_, m_tob_client_config_);
+		}
 	}
 
 	mobile_book::TopOfBook m_top_of_book_{};
@@ -101,33 +126,11 @@ protected:
 	std::optional<mobile_book_handler::MobileBookTopOfBookWebSocketServer<mobile_book::TopOfBook>>  m_top_of_book_web_socket_server_{std::nullopt};
 	std::optional<mobile_book_handler::MobileBookLastBarterWebSocketServer<mobile_book::LastBarter>> m_last_barter_web_socket_server_{std::nullopt};
 
-	std::jthread m_top_of_book_ws_server_thread_;
-	std::jthread m_last_barter_ws_server_thread_;
-	std::jthread m_market_depth_ws_server_thread_;
 
 	std::optional<FluxCppCore::RootModelWebClient<mobile_book::MarketDepth>> m_md_http_client_;
 	std::optional<FluxCppCore::RootModelWebClient<mobile_book::TopOfBook>> m_tob_web_client_;
 	std::optional<FluxCppCore::RootModelWebClient<mobile_book::LastBarter>> m_lt_web_client_;
 
-	void start_ws_thread() {
-		if (m_top_of_book_web_socket_server_) {
-			m_top_of_book_ws_server_thread_ = std::jthread([this]() {
-				m_top_of_book_web_socket_server_.value().run();
-			});
-		}
-
-		if (m_last_barter_web_socket_server_) {
-			m_last_barter_ws_server_thread_ = std::jthread([this]() {
-				m_last_barter_web_socket_server_.value().run();
-			});
-		}
-
-		if (m_market_depth_web_socket_server_) {
-			m_market_depth_ws_server_thread_ = std::jthread([this]() {
-				m_market_depth_web_socket_server_.value().run();
-			});
-		}
-	}
 
 	std::string get_db_uri() const {
 		return m_config_file_["mongo_server"].as<std::string>();
@@ -158,7 +161,7 @@ protected:
 		int32_t retry_count = 0;
 		try {
 			retry_count = m_config_file_["websocket_retry_count"].IsDefined() ? m_config_file_["websocket_retry_count"].as<int32_t>() : 0;
-		} catch (YAML::Exception &e) {
+		} catch (std::exception &e) {
 			std::cerr << "[" << __FILE__ << ": " << __LINE__ << "] " << e.what() << std::endl;
 		}
 		return retry_count;
@@ -174,6 +177,36 @@ protected:
 
 	std::string get_http_port() const {
 		return m_config_file_["http_port"].IsDefined() ? m_config_file_["http_port"].as<std::string>() : std::string();
+	}
+
+	bool avoid_last_barter_http_update() const {
+		return m_config_file_["avoid_last_barter_http_update"].IsDefined() ?
+			m_config_file_["avoid_last_barter_http_update"].as<bool>() : true;
+	}
+
+	bool avoid_market_depth_http_update () const {
+		return m_config_file_["avoid_market_depth_http_update"].IsDefined() ?
+			m_config_file_["avoid_market_depth_http_update"].as<bool>() : true;
+	}
+
+	bool avoid_top_of_book_http_update () const {
+		return m_config_file_["avoid_top_of_book_http_update"].IsDefined() ?
+			m_config_file_["avoid_top_of_book_http_update"].as<bool>() : true;
+	}
+
+	bool avoid_last_barter_db_update () const {
+		return m_config_file_["avoid_last_barter_db_update"].IsDefined() ?
+			m_config_file_["avoid_last_barter_db_update"].as<bool>() : true;
+	}
+
+	bool avoid_market_depth_db_update () const {
+		return m_config_file_["avoid_market_depth_db_update"].IsDefined() ?
+			m_config_file_["avoid_market_depth_db_update"].as<bool>() : true;
+	}
+
+	bool avoid_top_of_book_db_update () const {
+		return m_config_file_["avoid_top_of_book_db_update"].IsDefined() ?
+			m_config_file_["avoid_top_of_book_db_update"].as<bool>() : true;
 	}
 
 };
@@ -482,8 +515,6 @@ protected:
 				tob.mutable_last_barter()->set_qty(lt.qty_);
 				tob.mutable_last_barter()->set_last_update_date_time(last_barter.exch_time());
 				tob.set_last_update_date_time(last_barter.exch_time());
-				LOG_ERROR_IMPL(GetCppAppLogger(), "-------------------- {} ------------------- {}",
-					tob.last_barter().last_update_date_time(), tob.last_update_date_time());
 				tob.add_market_barter_volume()->CopyFrom(last_barter.market_barter_volume());
 				auto tob_db_id = m_top_of_book_db_codec_.insert_or_update(tob);
 				auto lt_db_id  = m_last_barter_db_codec_.insert(last_barter);

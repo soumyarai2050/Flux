@@ -133,5 +133,4 @@ target_link_libraries(marketdataprovider
 )
 
 # Add compile options to the shared library
-target_compile_options(marketdataprovider PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-variable -Wno-error=unused-parameter -DUSE_LOGGING)
-
+target_compile_options(marketdataprovider PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-variable -Wno-error=unused-parameter -DTEST)

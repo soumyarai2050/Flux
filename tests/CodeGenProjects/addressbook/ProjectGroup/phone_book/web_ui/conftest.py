@@ -711,3 +711,21 @@ def set_disable_ws_on_edit_and_clean(schema_dict: Dict[str, any]):
         json.dump(schema_dict, file, indent=2)
 
 
+@pytest.fixture
+def expected_chart():
+    # Directly yield the list of expected chart fields
+    yield ["dismiss", "severity", "alert_count", "alert_brief", "alert_meta", "last_update_analyzer_time"]
+
+
+@pytest.fixture
+def ui_chart(expected_chart):
+    ui_chart = {
+        "chart_name": "test",
+        "fld_name": expected_chart,  # Use the list of expected fields directly
+        "partition_fld": "alert_brief",
+        "fld_value": "123",
+        "type": ["bar", "line", "scatter"],
+        "x": expected_chart,  # Use expected_chart list for x-axis
+        "y": expected_chart,  # Use expected_chart list for y-axis
+    }
+    yield ui_chart

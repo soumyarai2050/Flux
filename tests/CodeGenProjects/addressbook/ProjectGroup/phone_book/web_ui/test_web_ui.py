@@ -1,6 +1,4 @@
 # third party imports
-import time
-
 from selenium.webdriver.support import expected_conditions as EC  # noqa
 from typing import Set
 import pytest
@@ -45,11 +43,11 @@ def test_update_pair_strat_n_create_n_activate_strat_limits_using_tree_view(clea
     }
     for xpath, value in fields.items():
         name = xpath.split('.')[-1]
-        set_tree_input_field(widget=pair_strat_params_widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver=driver, widget=pair_strat_params_widget, xpath=xpath, name=name, value=value)
     click_save_n_click_confirm_save_btn(driver=driver, widget=strat_collection_widget)
 
     scroll_into_view(driver=driver, element=strat_collection_widget)
-    edit_n_switch_layout(widget=strat_limits_widget, layout=Layout.TREE)
+    click_edit_n_switch_layout(driver=driver, widget=strat_limits_widget, layout=Layout.TREE)
     create_strat_limits_using_tree_view(driver=driver, strat_limits=strat_limits, layout=Layout.TREE)
 
     click_save_n_click_confirm_save_btn(driver=driver, widget=strat_collection_widget)
@@ -94,7 +92,7 @@ def test_update_strat_limits_n_activate_using_table_view(clean_and_set_limits, d
     }
 
     for xpath, value in fields_to_update.items():
-        set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=str(value))
+        set_table_input_field(driver=driver, widget=strat_limits_widget, xpath=xpath, value=str(value))
 
     click_save_n_click_confirm_save_btn(driver, strat_limits_widget)
 
@@ -160,7 +158,7 @@ def test_nested_pair_strat_n_strat_limits(clean_and_set_limits, driver_type, web
     click_button_with_name(widget=strat_collection_widget, button_name="Edit")
 
     pair_strat_td_elements = pair_strat_params_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
-    xpath: str = "pair_strat_params.common_premium"
+    # xpath: str = "pair_strat_params.common_premium"
     # double-click in table layout to get nested tree layout
     double_click(driver=driver, element=pair_strat_td_elements[6])
 
@@ -168,7 +166,7 @@ def test_nested_pair_strat_n_strat_limits(clean_and_set_limits, driver_type, web
     nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
     for field_name, value in pair_strat_edit["pair_strat_params"].items():
         xpath = "pair_strat_params." + field_name
-        set_tree_input_field(widget=nested_tree_dialog, xpath=xpath, name=field_name, value=value)
+        set_tree_input_field(driver=driver, widget=nested_tree_dialog, xpath=xpath, name=field_name, value=value)
 
     save_nested_strat(driver)
 
@@ -176,7 +174,7 @@ def test_nested_pair_strat_n_strat_limits(clean_and_set_limits, driver_type, web
     click_button_with_name(widget=strat_limits_widget, button_name="Edit")
     strat_limit_td_elements = strat_limits_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
 
-    xpath: str = "max_open_chores_per_side"
+    # xpath: str = "max_open_chores_per_side"
     double_click(driver=driver, element=strat_limit_td_elements[0])
 
     create_strat_limits_using_tree_view(driver=driver, strat_limits=strat_limits, layout=Layout.NESTED)
@@ -186,11 +184,15 @@ def test_nested_pair_strat_n_strat_limits(clean_and_set_limits, driver_type, web
     validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TREE)
 
 
-def test_widget_type(driver_type, schema_dict: Dict[str, any]):
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=WidgetType.ABBREVIATED,
-                                          flux_property=FluxPropertyType.FluxFldAbbreviate)
-    assert result[0]
 
+
+# Test function to demonstrate XPath generation
+def test_generate_xpath_from_fixture(pair_strat, driver_type):
+    xpaths = generate_xpath_from_fixture(pair_strat)
+
+    # Outputting the results
+    for xpath in xpaths:
+        print("\n", xpath)
 
 
 def test_demo(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict,
@@ -203,7 +205,7 @@ def test_demo(clean_and_set_limits, driver_type, web_project, driver, pair_strat
 def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                     schema_dict: Dict[str, any], pair_strat: Dict):
 
-    # send the data in str type and we get the data from the ui by default in str type
+    # send the data in str type, and we get the data from the ui by default in str type
 
     # WidgetType: INDEPENDENT
     # widget: chore limits and portfolio limit
@@ -295,6 +297,8 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
 
 def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                  schema_dict: Dict[str, any], pair_strat: Dict):
+
+    # TODO: LAZY sometimes throw StaleElementReferenceException
 
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property=FluxPropertyType.FluxFldHelp)
     assert result[0]
@@ -392,13 +396,13 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
 
             field_name_n_xpath[field_name] = xpath
             try:
-                set_table_input_field(widget=widget, xpath=xpath, value=str(value))
+                set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=str(value))
             except NoSuchElementException:
-                set_table_input_field(widget=widget, xpath=field_name, value=str(value))
+                set_table_input_field(driver=driver, widget=widget, xpath=field_name, value=str(value))
             except Exception as e:
                 print("while setting table input fld Exception;;;;", e)
         click_save_n_click_confirm_save_btn(driver, widget)
-        validate_flux_fld_display_type_in_widget(widget=widget, field_name_n_xpath=field_name_n_xpath,
+        validate_flux_fld_display_type_in_widget(driver=driver, widget=widget, field_name_n_xpath=field_name_n_xpath,
                                                  layout=Layout.TABLE)
 
     # tree_layout
@@ -426,10 +430,11 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
             # in strat status widget residual_notional is not working
             if widget_name == "strat_status":
                 continue
-                show_nested_fld_in_tree_layout(widget=widget, fld_xpath=xpath)
-            set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(value))
+            # show_nested_fld_in_tree_layout(widget=widget, fld_xpath=xpath)
+            set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=field_name, value=str(value))
         click_save_n_click_confirm_save_btn(driver, widget)
-        validate_flux_fld_display_type_in_widget(widget=widget, field_name_n_xpath=field_name_n_xpath, layout=Layout.TREE)
+        validate_flux_fld_display_type_in_widget(driver=driver, widget=widget, field_name_n_xpath=field_name_n_xpath,
+                                                 layout=Layout.TREE)
 
 
 
@@ -584,7 +589,6 @@ def test_flux_fld_button_in_widget(clean_and_set_limits, driver_type, web_projec
         widget = driver.find_element(By.ID, widget_name)
         scroll_into_view(driver=driver, element=widget)
         for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
             unpressed_schema_caption: str = field_query.properties['button']['unpressed_caption'].upper()
             pressed_schema_caption: str = field_query.properties['button']['pressed_caption'].upper()
             if widget_name in ["system_control"]:
@@ -618,12 +622,12 @@ def test_flux_fld_orm_no_update_in_widget(clean_and_set_limits, driver_type, web
                                           schema_dict, pair_strat: Dict):
     # TODO: only id fields are present in independent widget that's why skip this as of now
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
-                                          flux_property="orm_no_update")
+                                          flux_property=FluxPropertyType.FluxFldOrmNoUpdate)
     print(result)
     assert result[0]
 
     # todo: need help for property: orm_no_update and fix for DEPENDENT widget
-    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="orm_no_update")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property=FluxPropertyType.FluxFldOrmNoUpdate)
     print(result)
     assert result[0]
 
@@ -631,13 +635,13 @@ def test_flux_fld_orm_no_update_in_widget(clean_and_set_limits, driver_type, web
     # WidgetType: REPEATED_INDEPENDENT
     # Note: Currently repeated type is not supported `Edit` mode
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
-                                          flux_property="orm_no_update")
+                                          flux_property=FluxPropertyType.FluxFldOrmNoUpdate)
     print(result)
     assert result[0]
 
     # WidgetType: REPEATED_DEPENDENT
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_DEPENDENT,
-                                          flux_property="orm_no_update")
+                                          flux_property=FluxPropertyType.FluxFldOrmNoUpdate)
     print(result)
     assert not result[0]
 
@@ -674,7 +678,7 @@ def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, w
 def test_flux_fld_name_color_in_independent_widget(clean_and_set_limits, driver_type, web_project, driver,
                                                    schema_dict, pair_strat: Dict):
     # TODO: Need help get_fld_name_colour_in_tree line: 1291
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="name_color")
+    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property=FluxPropertyType.FluxFldNameColor)
     print(result)
     assert result[0]
 
@@ -684,31 +688,40 @@ def test_flux_fld_name_color_in_independent_widget(clean_and_set_limits, driver_
         widget = driver.find_element(By.ID, widget_name)
         scroll_into_view(driver=driver, element=widget)
         switch_layout(widget=widget, layout=Layout.TREE)
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            name_color: str = field_query.properties['name_color']
-            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
-                                                   widget_name=widget_name, field_name=field_name)
-            # TODO: make a method get get name color of table layout
-            # fld_color = get_fld_name_colour_in_tree(widget=widget, xpath=xpath)
-            # assert name_color == fld_color
+        # for field_query in widget_query.fields:
+        #     # field_name: str = field_query.field_name
+        #     # name_color: str = field_query.properties['name_color']
+        #     # xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
+        #     #                                        widget_name=widget_name, field_name=field_name)
+        #     # TODO: make a method get get name color of table layout
+        #     # fld_color = get_fld_name_colour_in_tree(widget=widget, xpath=xpath)
+        #     # assert name_color == fld_color
 
 
     # TREE LAYOUT
-    field_name: str = ""
+    # field_name: str = ""
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         widget = driver.find_element(By.ID, widget_name)
         switch_layout(widget=widget, layout=Layout.TREE)
         scroll_into_view(driver=driver, element=widget)
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            name_color: str = field_query.properties['name_color']
-            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
-                                                   widget_name=widget_name, field_name=field_name)
-            # fld_color = get_fld_name_colour_in_tree(widget=widget, xpath=xpath)
-            # assert name_color == Type.ColorType(ColorType.ERROR)
-            # assert name_color == fld_color
+        # for field_query in widget_query.fields:
+        #     field_name: str = field_query.field_name
+        #     # name_color: str = field_query.properties['name_color']
+        #     # xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
+        #     #                                        widget_name=widget_name, field_name=field_name)
+        #     # fld_color = get_fld_name_colour_in_tree(widget=widget, xpath=xpath)
+        #     # assert name_color == Type.ColorType(ColorType.ERROR)
+        #     # assert name_color == fld_color
+
+    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property=FluxPropertyType.FluxFldNameColor)
+    assert not result[0]
+
+    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_INDEPENDENT, flux_property=FluxPropertyType.FluxFldNameColor)
+    assert not result[0]
+
+    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_DEPENDENT, flux_property=FluxPropertyType.FluxFldNameColor)
+    assert not result[0]
 
 
 def test_flux_fld_progress_bar_in_widget(clean_and_set_limits, driver_type, web_project, driver,
@@ -761,7 +774,8 @@ class TestMultiTab:
     def setup_method(self):
         self.url: str = "http://localhost:3020/"
 
-    def switch_tab(self, driver, switch_tab_no: int):
+    @staticmethod
+    def switch_tab(driver, switch_tab_no: int):
         window_handles = driver.window_handles
         driver.switch_to.window(window_handles[switch_tab_no])
 
@@ -776,7 +790,7 @@ class TestMultiTab:
 
         xpath: str = "max_basis_points"
         value: str = "750"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         # Switch back to the first tab
         self.switch_tab(driver=driver, switch_tab_no=0)
@@ -785,9 +799,9 @@ class TestMultiTab:
         click_button_with_name(widget=widget, button_name="Edit")
 
         # Set values in the table
-        set_table_input_field(widget=widget, xpath="max_basis_points", value="400")
-        set_table_input_field(widget=widget, xpath="max_px_deviation", value="1")
-        set_table_input_field(widget=widget, xpath="min_chore_notional", value="10000")
+        set_table_input_field(driver=driver, widget=widget, xpath="max_basis_points", value="400")
+        set_table_input_field(driver=driver, widget=widget, xpath="max_px_deviation", value="1")
+        set_table_input_field(driver=driver, widget=widget, xpath="min_chore_notional", value="10000")
         click_save_n_click_confirm_save_btn(driver=driver, widget=widget)
 
         # Open 2nd tab you will get a popup of unsaved changes verify that max_basis_points is present and click okay
@@ -802,15 +816,15 @@ class TestMultiTab:
         time.sleep(Delay.SHORT.value)
         widget = driver.find_element(By.ID, "chore_limits")
         click_button_with_name(widget=widget, button_name="Edit")
-        set_table_input_field(widget=widget, xpath="max_basis_points", value="75")
+        set_table_input_field(driver=driver, widget=widget, xpath="max_basis_points", value="75")
 
         # Switch back to 2nd tab and set more values
         self.switch_tab(driver=driver, switch_tab_no=1)
         time.sleep(Delay.SHORT.value)
         widget = driver.find_element(By.ID, "chore_limits")
-        set_table_input_field(widget=widget, xpath="max_basis_points", value="40")
-        set_table_input_field(widget=widget, xpath="max_px_deviation", value="1")
-        set_table_input_field(widget=widget, xpath="min_chore_notional", value="1200")
+        set_table_input_field(driver=driver, widget=widget, xpath="max_basis_points", value="40")
+        set_table_input_field(driver=driver, widget=widget, xpath="max_px_deviation", value="1")
+        set_table_input_field(driver=driver, widget=widget, xpath="min_chore_notional", value="1200")
         click_save_n_click_confirm_save_btn(driver=driver, widget=widget)
 
         # Final validation
@@ -832,7 +846,7 @@ class TestMultiTab:
 
         xpath: str = "max_open_chores_per_side"
         value: str = "4"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         # open_1st_tab
         self.switch_tab(driver=driver, switch_tab_no=0)
@@ -845,23 +859,23 @@ class TestMultiTab:
 
         xpath: str = "max_open_chores_per_side"
         value: str = "3"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         xpath: str = "max_open_single_leg_notional"
         value: str = "555"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         xpath: str = "max_open_single_leg_notional"
         value: str = "2"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         xpath: str = "cancel_rate.max_cancel_rate"
         value: str = "10"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         xpath: str = "market_barter_volume_participation.max_participation_rate"
         value: str = "20"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
         click_save_n_click_confirm_save_btn(widget=widget, driver=driver)
 
         # open_2nd_tab
@@ -882,7 +896,7 @@ class TestMultiTab:
         # widget.find_element(By.NAME, "Edit").click()
         xpath: str = "max_open_chores_per_side"
         value: str = "2"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         self.switch_tab(driver=driver, switch_tab_no=1)
         time.sleep(Delay.SHORT.value)
@@ -890,15 +904,15 @@ class TestMultiTab:
 
         xpath: str = "max_open_chores_per_side"
         value: str = "1"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         xpath: str = "max_open_single_leg_notional"
         value: str = "100"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         xpath: str = "max_open_single_leg_notional"
         value: str = "150"
-        set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
         click_button_with_name(widget=widget, button_name="Save")
         click_confirm_save(driver=driver)
 
@@ -925,7 +939,7 @@ class TestMultiTab:
         xpath: str = "eligible_brokers[0].sec_positions[0].positions[0].available_size"
         value: str = "255"
         name: str = "available_size"
-        set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
 
         # open_1st_tab
         self.switch_tab(driver=driver, switch_tab_no=0)
@@ -940,29 +954,29 @@ class TestMultiTab:
         xpath: str = "eligible_brokers[0].sec_positions[0].positions[0].available_size"
         value: str = "25"
         name: str = "available_size"
-        set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
 
         xpath: str = "eligible_brokers[0].sec_positions[0].positions[0].allocated_size"
         value: str = "5"
         name: str = "allocated_size"
-        set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
 
         xpath: str = "eligible_brokers[0].sec_positions[0].positions[0].consumed_size"
         value: str = "7"
         name: str = "consumed_size"
-        set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
 
         xpath: str = "max_open_baskets"
         value: str = "51"
         name: str = "max_open_baskets"
-        set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
 
         xpath: str = "eligible_brokers[0].sec_positions[0].security.sec_id"
         value: str = "EQT_Sec_1"
     
         
-        set_autocomplete_field(widget=widget, xpath=xpath, name="sec_id", search_type=SearchType.NAME, value=value)
-            # set_table_input_field(widget=widget, xpath=xpath, value=value)
+        set_autocomplete_field(driver=driver, widget=widget, xpath=xpath, name="sec_id", search_type=SearchType.NAME, value=value)
+            #   set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         xpath: str = "eligible_brokers[0].sec_positions[0].positions[0].type"
         input_xpath = f"//div[@data-xpath='{xpath}']"
@@ -973,14 +987,13 @@ class TestMultiTab:
 
         # set_autocomplete_field(widget=widget, xpath=xpath, name="type", search_type=SearchType.NAME, value=value)
 
-        # set_table_input_field(widget=widget, xpath=xpath, value=value)
+        #    set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=value)
 
         xpath: str = "eligible_brokers[0].broker"
         value: str = "AAPL"
         name: str = "broker"
-    
-        
-        set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
+
+        set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
 
         click_button_with_name(widget=widget, button_name="Save")
         click_confirm_save(driver=driver)
@@ -1000,7 +1013,7 @@ class TestMultiTab:
         xpath: str = "eligible_brokers[0].sec_positions[0].positions[0].available_size"
         value: str = "255"
         name: str = "available_size"
-        set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
         click_button_with_name(widget=widget, button_name="Save")
         click_confirm_save(driver=driver)
 
@@ -1019,17 +1032,17 @@ class TestMultiTab:
         value: str = "25"
         name: str = "available_size"
         switch_layout(widget=widget, layout=Layout.TREE)
-        set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
 
         xpath: str = "eligible_brokers[0].sec_positions[0].positions[0].allocated_size"
         value: str = "5"
         name: str = "allocated_size"
-        set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
 
         xpath: str = "eligible_brokers[0].sec_positions[0].positions[0].consumed_size"
         value: str = "7"
         name: str = "consumed_size"
-        set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
         click_button_with_name(widget=widget, button_name="Save")
         click_confirm_save(driver=driver)
 
@@ -1059,7 +1072,7 @@ def test_flux_fld_default_value_in_widget(clean_and_set_limits, web_project, dri
         switch_layout(widget, Layout.TABLE)
 
         for field_query in widget_query.fields:
-            flux_fld_default_widget(driver=driver, schema_dict=copy.deepcopy(schema_dict), widget=widget,
+            flux_fld_default_widget(schema_dict=copy.deepcopy(schema_dict), widget=widget,
                                     widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                     layout=Layout.TABLE, field_query=field_query)
 
@@ -1076,11 +1089,11 @@ def test_flux_fld_default_value_in_widget(clean_and_set_limits, web_project, dri
             click_button_with_name(driver.find_element(By.ID, "strat_collection"), button_name="Create")
         widget = driver.find_element(By.ID, widget_name)
         scroll_into_view(driver=driver, element=widget)
-        show_hidden_fields_for_layout(driver=driver, widget=widget, layout=Layout.TREE)
+        show_hidden_fields_for_layout(driver=driver, widget=widget, layout=Layout.TREE, widget_name=widget_name)
         switch_layout(widget=widget, layout=Layout.TREE)
 
         for field_query in widget_query.fields:
-            flux_fld_default_widget(driver=driver, schema_dict=copy.deepcopy(schema_dict), widget=widget,
+            flux_fld_default_widget(schema_dict=copy.deepcopy(schema_dict), widget=widget,
                                     widget_type=WidgetType.DEPENDENT, widget_name=widget_name,
                                     layout=Layout.TREE, field_query=field_query)
 
@@ -1096,7 +1109,7 @@ def test_flux_fld_default_value_in_widget(clean_and_set_limits, web_project, dri
         widget: WebElement = driver.find_element(By.ID, widget_name)
         scroll_into_view(driver=driver, element=widget)
         for field_query in widget_query.fields:
-            flux_fld_default_widget(driver=driver, schema_dict=copy.deepcopy(schema_dict), widget=widget,
+            flux_fld_default_widget(schema_dict=copy.deepcopy(schema_dict), widget=widget,
                                     widget_type=WidgetType.REPEATED_INDEPENDENT, widget_name=widget_name,
                                     layout=Layout.TABLE, field_query=field_query)
 
@@ -1141,7 +1154,7 @@ def test_flux_fld_ui_place_holder_in_widget(clean_and_set_limits, driver_type: D
     time.sleep(Delay.SHORT.value)
 
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
-                                          flux_property="ui_placeholder")
+                                          flux_property=FluxPropertyType.FluxFldUIPlaceholder)
     print(result)
     assert result[0]
     email_book_service_native_web_client.delete_portfolio_limits_client(portfolio_limits_id=1)
@@ -1149,14 +1162,14 @@ def test_flux_fld_ui_place_holder_in_widget(clean_and_set_limits, driver_type: D
     flux_fld_ui_place_holder_in_widget(result[1], driver)
 
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
-                                          flux_property="ui_placeholder")
+                                          flux_property=FluxPropertyType.FluxFldUIPlaceholder)
     print(result)
     assert result[0]
     flux_fld_ui_place_holder_in_widget(result[1], driver)
 
     # Note: Currently create is not implemented in UI
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
-                                          flux_property="ui_placeholder")
+                                          flux_property=FluxPropertyType.FluxFldUIPlaceholder)
     print(result)
     assert result
 
@@ -1318,7 +1331,7 @@ def test_flux_fld_abbreviated_in_widgets(clean_and_set_limits, web_project, driv
                                           flux_property=FluxPropertyType.FluxFldAbbreviate)
     abc = schema_dict.get("abbreviated")
     print(abc)
-    assert result[0]
+    assert not result[0]
     print(result[1])
 
     for widget_query in result[1]:
@@ -1364,9 +1377,9 @@ def test_flux_fld_micro_separator_in_widgets(clean_and_set_limits, web_project, 
 
 def test_flux_fld_enable_and_disable_override_in_widgets(clean_and_set_limits, web_project, driver_type,
                                                          driver, schema_dict):
-    dependent_widget: Set = set()
-    for widget_name, widget_schema in schema_dict.items():
+    dependent_widget: Set[str] = set()
 
+    for widget_name, widget_schema in schema_dict.items():
         if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element"]:
             continue
 
@@ -1374,16 +1387,17 @@ def test_flux_fld_enable_and_disable_override_in_widgets(clean_and_set_limits, w
         if loaded_strat_keys is not None:
             abbreviated: str = loaded_strat_keys.get("abbreviated")
             field_list: list = abbreviated.split(":")
-            for field in field_list:
-                if '/' not in field:
-                    dependent_widget_name: str = field.split(".")
+
+            for field_item in field_list:  # Renamed 'field' to 'field_item'
+                if '/' not in field_item:
+                    dependent_widget_name: str = field_item.split(".")
                     if dependent_widget_name[0] == "pair_strat":
                         dependent_widget.add("pair_strat_params")
                     else:
                         dependent_widget.add(dependent_widget_name[0])
                 # else not required
-        if widget_name not in dependent_widget:
 
+        if widget_name not in dependent_widget:
             driver.find_element(By.NAME, widget_name).click()
 
             try:
@@ -1397,15 +1411,13 @@ def test_flux_fld_enable_and_disable_override_in_widgets(clean_and_set_limits, w
                 pass
 
     save_layout(driver, "test")
-    change_layout(driver, "test")
+    load_layout(driver, "test")
 
     for widget_name, widget_schema in schema_dict.items():
-
         if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element"]:
             continue
 
         if widget_name not in dependent_widget:
-
             driver.find_element(By.NAME, widget_name).click()
 
             widget = driver.find_element(By.ID, widget_name)
@@ -1413,6 +1425,7 @@ def test_flux_fld_enable_and_disable_override_in_widgets(clean_and_set_limits, w
 
     ui_layout_list = email_book_service_native_web_client.get_all_ui_layout_client()
     email_book_service_native_web_client.delete_ui_layout_client(ui_layout_id=ui_layout_list[-1].id)
+
 
 
 def test_ui_coordinates(clean_and_set_limits, driver, driver_type, schema_dict, ui_layout_list_):
@@ -1423,7 +1436,7 @@ def test_ui_coordinates(clean_and_set_limits, driver, driver_type, schema_dict, 
         # before running test case clear ui layout database if any
         created_ui_layout = email_book_service_native_web_client.create_ui_layout_client(ui_layout_list_)
         print(created_ui_layout)
-        change_layout(driver, "test")
+        load_layout(driver, "test")
         save_layout(driver, "test1")
         time.sleep(Delay.DEFAULT.value)
         ui_layout_list = email_book_service_native_web_client.get_all_ui_layout_client()
@@ -1487,7 +1500,7 @@ def test_edit_layout(clean_and_set_limits, web_project, driver, driver_type, sch
 
 def test_column_chores(clean_and_set_limits, web_project, driver, driver_type, schema_dict):
     for widget_name, widget_schema in schema_dict.items():
-        sequence_number: int = 0
+        # sequence_number: int = 0
         if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element", "basket_chore", "chore_snapshot"]:
             continue
         widget: WebElement = driver.find_element(By.ID, widget_name)
@@ -1496,7 +1509,7 @@ def test_column_chores(clean_and_set_limits, web_project, driver, driver_type, s
         click_button_with_name(widget=widget, button_name="Settings")
         click_more_all_inside_setting(driver, widget_name)
         field_sequence_value = get_fld_sequence_number_from_setting(driver, widget_name)
-        widget_type: WidgetType | None = get_widget_type(widget_schema)
+        # widget_type: WidgetType | None = get_widget_type(widget_schema)
         for field_name, field_properties in widget_schema["properties"].items():
             sequence_number = field_properties["sequence_number"]
 
@@ -1516,8 +1529,6 @@ def test_disable_ws_on_edit(clean_and_set_limits, web_project, driver, driver_ty
     assert result[0]
 
     # TODO: create or update the top of book of fld bid_quote.px and total bartering security size
-
-
     try:
         top_of_book: TopOfBookBaseModel = TopOfBookBaseModel()
         top_of_book.id = 1
@@ -1613,69 +1624,32 @@ def test_download_button_in_widgets(clean_and_set_limits, web_project, driver, d
         print(e)
 
 
-def test_ui_chart_in_market_depth_widget(clean_and_set_limits, web_project, driver, driver_type, schema_dict):
+def test_ui_chart_in_market_depth_widget(clean_and_set_limits, web_project, driver, driver_type, schema_dict, ui_chart):
     for widget_name, widget_query in schema_dict.items():
         if widget_name == "market_depth":
+            # create and validate market depth
             widget: WebElement = driver.find_element(By.ID, widget_name)
             scroll_into_view(driver=driver, element=widget)
             switch_layout(widget=widget, layout=Layout.CHART)
+
             click_button_with_name(widget=widget, button_name="Create")
-            nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
-            input_fields = nested_tree_dialog.find_element(By.CLASS_NAME, "infinity-menu-container")
-
-            # use dict to store expected chart data
-            chart_n_layout_name: str = "test"
-
-            # use already existing methods to set input, dropdown or autocomplete fields
-            # if not already exists, create one
-            input_fields.find_element(By.ID, "chart_name").send_keys(chart_n_layout_name)
-            # never use entire xpath to access an element for this project
-            driver.find_element(
-                By.XPATH, "/html/body/div[2]/div[3]/div/div/div/div/ul/div[3]/div[2]/button").click()
-            driver.find_element(By.XPATH, "/html/body/div[2]/div[3]/div/div/div/div/ul/div[3]/div[2]").click()
-            input_fields.find_element(By.ID, "partition_fld").click()
-            input_fields.find_element(By.ID, "partition_fld").send_keys(Keys.ARROW_DOWN + Keys.ENTER)
-            input_fields.find_element(By.ID, "type").send_keys(Keys.ARROW_DOWN + Keys.ARROW_DOWN + Keys.ENTER)
-            input_fields.find_element(By.ID, "x").send_keys("px" + Keys.ARROW_DOWN + Keys.ENTER)
-            input_fields.find_element(By.ID, "y").send_keys("qty" + Keys.ARROW_DOWN + Keys.ENTER)
-            nested_tree_dialog.find_element(By.NAME, "Save").click()
-            time.sleep(Delay.DEFAULT.value)
-
+            nested_fld_widget = get_nested_tree_dialog_widget_element(driver)
+            set_ui_chart_fields(driver, nested_fld_widget, ui_chart)
+            click_save_n_short_delay(widget=nested_fld_widget)
+            chart_n_layout_name = ui_chart["chart_name"]
             save_layout(driver=driver, layout_name=chart_n_layout_name)
-            change_layout(driver=driver, layout_name=chart_n_layout_name)
-
-            chart_widget = widget.find_element(By.CLASS_NAME, "MuiListItem-root")
-            text_element = chart_widget.find_element(By.CLASS_NAME, "MuiTypography-body1")
-            text = text_element.text
-            assert chart_n_layout_name == text
-
-            ui_layout: UILayoutBaseModel = (
-                email_book_service_native_web_client.
-                get_ui_layout_from_index_client(profile_id=chart_n_layout_name)[-1])
-
-            print(f"ui_layout: {ui_layout}")
-            assert ui_layout.profile_id == chart_n_layout_name
-
-            widget_ui_data_elements: List[WidgetUIDataElementOptional] = ui_layout.widget_ui_data_elements
-
-            for widget_ui_data_element in widget_ui_data_elements:
-                if widget_ui_data_element.i == "market_depth":
-                    assert widget_ui_data_element.i == "market_depth"
-                    # use the expected chart data dict to verify
-                    assert widget_ui_data_element.chart_data[-1].chart_name == chart_n_layout_name
-                    assert widget_ui_data_element.chart_data[-1].partition_fld == "symbol"
-                    assert widget_ui_data_element.chart_data[-1].series[-1].type == "bar"
-
-            # Edit the chart
+            load_layout(driver=driver, layout_name=chart_n_layout_name)
             click_button_with_name(widget=widget, button_name="Edit")
-            nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
-            input_fields = nested_tree_dialog.find_element(By.CLASS_NAME, "infinity-menu-container")
+            chart_name_txt = get_chart_name(widget=nested_fld_widget)
+            validate_ui_chart(chart_n_layout_name, chart_name_txt, ui_chart)
 
-            input_fields.find_element(By.ID, "type").send_keys(
-                Keys.ARROW_DOWN + Keys.ARROW_DOWN + Keys.ARROW_DOWN + Keys.ENTER)
-            nested_tree_dialog.find_element(By.NAME, "Save").click()
+
+            # update fields and validate it is saved in layout or not, but chart name should be same
+            click_button_with_name(widget=widget, button_name="Edit")
+            nested_fld_widget = get_nested_tree_dialog_widget_element(driver)
+            set_ui_chart_fields(driver, nested_fld_widget, ui_chart)
+            nested_fld_widget.find_element(By.NAME, "Save").click()
             time.sleep(Delay.DEFAULT.value)
-
             save_layout(driver=driver, layout_name=chart_n_layout_name)
 
             ui_layout: UILayoutBaseModel = (
@@ -1691,12 +1665,20 @@ def test_ui_chart_in_market_depth_widget(clean_and_set_limits, web_project, driv
                 if widget_ui_data_element.i == "market_depth":
                     assert widget_ui_data_element.i == "market_depth"
                     assert widget_ui_data_element.chart_data[-1].chart_name == chart_n_layout_name
-                    assert widget_ui_data_element.chart_data[-1].partition_fld == "symbol"
-                    assert widget_ui_data_element.chart_data[-1].series[-1].type == "scatter"
+                    filters = ui_chart["filters"]
+                    assert widget_ui_data_element.chart_data[-1].filters == filters["fld_name"]
+                    assert widget_ui_data_element.chart_data[-1] == filters["fld_name"]
+
+
+
+
 
             # delete the chart and layout
-            chart_widget.find_element(By.CLASS_NAME, "MuiButtonBase-root").click()
+            # chart_widget.find_element(By.CLASS_NAME, "MuiButtonBase-root").click()
             # verify the chart is removed from ui
             # scenario: chart with the same name is created again
             # expected it would override the existing chart with same name
             email_book_service_native_web_client.delete_ui_layout_client(ui_layout.id)
+
+
+

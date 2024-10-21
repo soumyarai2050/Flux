@@ -1,3 +1,5 @@
+#ifdef TEST
+
 #include "mock_mobile_book_cache.h"
 #include "mobile_book_interface.h"
 
@@ -40,4 +42,4 @@ extern "C" void create_or_update_md_n_tob([[maybe_unused]] const int32_t id, con
 	}
 }
 
-                                    
+#endif

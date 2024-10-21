@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mongocxx/exception/query_exception.hpp>
 
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppCodec/market_data_mongo_db_codec.h"
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_key_handler.h"
@@ -17,7 +16,6 @@ namespace FluxCppCore {
     public:
         explicit MongoDBCodec(std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db_) :
         m_sp_mongo_db_(std::move(sp_mongo_db_)),
-        m_mongo_db_collection_(m_sp_mongo_db_->market_data_service_db[get_root_model_name()]),
         m_max_id_(get_max_id_from_collection()) {}
 
         int32_t insert(const RootModelType &kr_root_model_type) {
@@ -26,14 +24,17 @@ namespace FluxCppCore {
             auto new_generated_id = get_next_insert_id();
             update_id_in_document(bson_doc, new_generated_id);
             try {
-                std::lock_guard<std::mutex> lock(m_mutex_);
+                auto client = m_sp_mongo_db_->get_pool_client();
+                mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                auto m_mongo_db_collection_ = db[get_root_model_name()];
                 auto insert_result = m_mongo_db_collection_.insert_one(bson_doc.view());
                 auto inserted_id = insert_result->inserted_id().get_int32().value;
                 assert( new_generated_id == inserted_id);
-            } catch (const mongocxx::v_noabi::query_exception& qe) {
+            } catch (const std::exception& qe) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error while inserting data to collection: {}, document: {}, "
-                                                  "error code: {}, reason: {}", get_root_model_name(),
-                                                  bsoncxx::to_json(bson_doc.view()), qe.code(), qe.what());
+                                                  "error reason: {}", get_root_model_name(),
+                                                  bsoncxx::to_json(bson_doc.view()), qe.what());
+                new_generated_id = -1;
             }
             return new_generated_id;
         }
@@ -41,52 +42,54 @@ namespace FluxCppCore {
 
         bool insert(bsoncxx::builder::basic::document &r_bson_doc, const std::string &kr_root_model_key,
                     int32_t &r_new_generated_id_out) {
-        r_new_generated_id_out = get_next_insert_id();
-        update_id_in_document(r_bson_doc, r_new_generated_id_out);
-        try {
-            std::lock_guard<std::mutex> lock(m_mutex_);
-            auto insert_result = m_mongo_db_collection_.insert_one(r_bson_doc.view());
-            auto inserted_id = insert_result->inserted_id().get_int32().value;
-            m_root_model_key_to_db_id[kr_root_model_key] = r_new_generated_id_out;
-            return (inserted_id == r_new_generated_id_out);
-        } catch (const mongocxx::v_noabi::query_exception& qe) {
-            LOG_ERROR_IMPL(GetCppAppLogger(), "Error while inserting data to collection: {}, document: {}, "
-                                              "error code: {}, reason: {}", get_root_model_name(),
-                                              bsoncxx::to_json(r_bson_doc.view()), qe.code(), qe.what());
+            r_new_generated_id_out = get_next_insert_id();
+            update_id_in_document(r_bson_doc, r_new_generated_id_out);
+            try {
+                auto client = m_sp_mongo_db_->get_pool_client();
+                mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                auto m_mongo_db_collection_ = db[get_root_model_name()];
+                auto insert_result = m_mongo_db_collection_.insert_one(r_bson_doc.view());
+                auto inserted_id = insert_result->inserted_id().get_int32().value;
+                m_root_model_key_to_db_id[kr_root_model_key] = r_new_generated_id_out;
+                return (inserted_id == r_new_generated_id_out);
+            } catch (const std::exception& qe) {
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while inserting data to collection: {}, document: {}, "
+                                                  "error reason: {}", get_root_model_name(),
+                                                  bsoncxx::to_json(r_bson_doc.view()), qe.what());
+                r_new_generated_id_out = -1;
+                return false;
+            }
+        }
+
+        int32_t insert_or_update(RootModelType &kr_root_model_obj) {
+    	    int32_t r_new_generated_id_out{-1};
+            std::string root_model_key;
+    	    kr_root_model_obj.set_id(r_new_generated_id_out);
+            if(CheckInitializedAndGetKey(kr_root_model_obj, root_model_key)){
+        	    insert_or_update(kr_root_model_obj, root_model_key, r_new_generated_id_out);
+            }
+            return r_new_generated_id_out; // not initialized or missing required fields
+        }
+
+        bool insert_or_update(const RootModelType &kr_root_model_obj, const std::string &r_root_model_key,
+                              int32_t &r_new_generated_id_out) {
+            bsoncxx::builder::basic::document bson_doc{};
+            auto found = m_root_model_key_to_db_id.find(r_root_model_key);
+            if (found == m_root_model_key_to_db_id.end()) {
+                // Key does not exist, so it's a new object. Insert it into the database
+                prepare_doc(kr_root_model_obj, bson_doc);
+                if (insert(bson_doc, r_root_model_key, r_new_generated_id_out)) {
+                    return true;
+                }
+            } else {
+                prepare_doc(kr_root_model_obj, bson_doc);
+                if (update_or_patch(found->second, bson_doc)) {
+                    r_new_generated_id_out = found->second;
+                    return true;
+                }
+            }
             return false;
         }
-    }
-
-    int32_t insert_or_update(RootModelType &kr_root_model_obj) {
-    	int32_t r_new_generated_id_out{0};
-        std::string root_model_key;
-    	kr_root_model_obj.set_id(r_new_generated_id_out);
-        if(CheckInitializedAndGetKey(kr_root_model_obj, root_model_key)){
-        	insert_or_update(kr_root_model_obj, root_model_key, r_new_generated_id_out);
-        }
-        return r_new_generated_id_out; // not initialized or missing required fields
-    }
-
-    bool insert_or_update(const RootModelType &kr_root_model_obj, const std::string &r_root_model_key_in_n_out,
-                          int32_t &r_new_generated_id_out) {
-        bsoncxx::builder::basic::document bson_doc{};
-        auto found = m_root_model_key_to_db_id.find(r_root_model_key_in_n_out);
-        if (found == m_root_model_key_to_db_id.end()) {
-            // Key does not exist, so it's a new object. Insert it into the database
-            prepare_doc(kr_root_model_obj, bson_doc);
-            if (insert(bson_doc, r_root_model_key_in_n_out, r_new_generated_id_out)) {
-                return true;
-            }
-        } else {
-            prepare_doc(kr_root_model_obj, bson_doc);
-            if (update_or_patch(found->second, bson_doc)) {
-                r_new_generated_id_out = found->second;
-                return true;
-            }
-        }
-        r_new_generated_id_out = -1;
-        return false;
-    }
 
         bool bulk_insert(const RootModelListType &kr_root_model_list_obj,
                          const std::vector<std::string> &kr_root_model_key_list,
@@ -102,7 +105,9 @@ namespace FluxCppCore {
             }
             mongocxx::stdx::optional<mongocxx::result::insert_many> insert_results;
             {
-                std::lock_guard<std::mutex> lock(m_mutex_);
+                auto client = m_sp_mongo_db_->get_pool_client();
+                mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                auto m_mongo_db_collection_ = db[get_root_model_name()];
                 insert_results = m_mongo_db_collection_.insert_many(bson_doc_list);
             }
 
@@ -147,10 +152,10 @@ namespace FluxCppCore {
         }
 
         bool patch(const RootModelType &kr_root_model_obj, RootModelType &r_root_model_obj_out,
-                   const std::string &r_root_model_key_in_n_out) {
-            bool status = patch(kr_root_model_obj, r_root_model_key_in_n_out);
+                   const std::string &r_root_model_key) {
+            bool status = patch(kr_root_model_obj, r_root_model_key);
             if (status) {
-                auto r_model_doc_id = m_root_model_key_to_db_id.at(r_root_model_key_in_n_out);
+                auto r_model_doc_id = m_root_model_key_to_db_id.at(r_root_model_key);
                 status = get_data_by_id_from_collection(r_root_model_obj_out, r_model_doc_id);
             }
             return status;
@@ -190,15 +195,17 @@ namespace FluxCppCore {
 
             try {
                 {
-                    std::lock_guard<std::mutex> lock(m_mutex_);
+                    auto client = m_sp_mongo_db_->get_pool_client();
+                    mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                    auto m_mongo_db_collection_ = db[get_root_model_name()];
                     auto result = m_mongo_db_collection_.update_one(
                         update_filter.view(), update_document.view());
                 }
 
-            } catch (const mongocxx::v_noabi::query_exception& qe) {
+            } catch (const std::exception& qe) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error while updating data to collection: {}, document: {}, "
-                                                  "error code: {}, message: {}", get_root_model_name(),
-                                                  bsoncxx::to_json(update_document.view()), qe.code(), qe.what());
+                                                  "error message: {}", get_root_model_name(),
+                                                  bsoncxx::to_json(update_document.view()), qe.what());
                 return false;
             }
             return true;
@@ -247,7 +254,9 @@ namespace FluxCppCore {
         bool get_all_data_from_collection(RootModelListType &r_root_model_list_obj_out) {
             try {
                 std::string all_data_from_db_json_string;
-                std::lock_guard<std::mutex> lock(m_mutex_);
+                auto client = m_sp_mongo_db_->get_pool_client();
+                mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                auto m_mongo_db_collection_ = db[get_root_model_name()];
                 auto cursor = m_mongo_db_collection_.find({});
 
                 for (const auto &bson_doc : cursor) {
@@ -277,7 +286,7 @@ namespace FluxCppCore {
                 if (!all_data_from_db_json_string.empty())
                     return FluxCppCore::RootModelListJsonCodec<RootModelListType>::decode_model_list(
                         r_root_model_list_obj_out, all_data_from_db_json_string);
-            } catch (const mongocxx::v_noabi::query_exception& e) {
+            } catch (const std::exception& e) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error {}, function{}", e.what(), __func__);
             }
             return false;
@@ -286,6 +295,9 @@ namespace FluxCppCore {
         bool
         bulk_update_or_patch_collection(const std::vector<int32_t> &kr_model_doc_ids,
                                         const std::vector<bsoncxx::builder::basic::document> &kr_bson_doc_list) {
+            auto client = m_sp_mongo_db_->get_pool_client();
+            mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+            auto m_mongo_db_collection_ = db[get_root_model_name()];
             auto bulk_write = m_mongo_db_collection_.create_bulk_write();
             for (int i = 0; i < kr_model_doc_ids.size(); ++i) {
                 auto update_filter = FluxCppCore::make_document(FluxCppCore::kvp("_id", kr_model_doc_ids[i]));
@@ -298,7 +310,6 @@ namespace FluxCppCore {
             mongocxx::stdx::optional<mongocxx::result::bulk_write> result;
 
             {
-                std::lock_guard<std::mutex> lock(m_mutex_);
                 result = bulk_write.execute();
             }
 
@@ -315,7 +326,9 @@ namespace FluxCppCore {
         bool get_data_by_id_from_collection(RootModelType &r_root_model_obj_out, const int32_t &kr_root_model_doc_id) {
             bool status = false;
             try {
-                std::lock_guard<std::mutex> lock(m_mutex_);
+                auto client = m_sp_mongo_db_->get_pool_client();
+                mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                auto m_mongo_db_collection_ = db[get_root_model_name()];
                 auto cursor = m_mongo_db_collection_.find(
                         bsoncxx::builder::stream::document{} << "_id" << kr_root_model_doc_id << bsoncxx::builder::stream::finalize);
                 if (cursor.begin() != cursor.end()) {
@@ -337,26 +350,32 @@ namespace FluxCppCore {
 
                     status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, new_bson_doc);
                 }
-            } catch (const mongocxx::v_noabi::query_exception& e) {
+            } catch (const std::exception& e) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error {}, function {}", e.what(), __func__);
             }
             return status;
         }
 
         int64_t count_data_from_collection(const bsoncxx::builder::stream::document &filter) {
-            std::lock_guard<std::mutex> lock(m_mutex_);
+            auto client = m_sp_mongo_db_->get_pool_client();
+            mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+            auto m_mongo_db_collection_ = db[get_root_model_name()];
             return m_mongo_db_collection_.count_documents({filter});
         }
 
         int64_t count_data_from_collection() {
-            std::lock_guard<std::mutex> lock(m_mutex_);
+            auto client = m_sp_mongo_db_->get_pool_client();
+            mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+            auto m_mongo_db_collection_ = db[get_root_model_name()];
             return m_mongo_db_collection_.count_documents({});
         }
 
         bool delete_all_data_from_collection() {
             mongocxx::stdx::optional<mongocxx::result::delete_result> result;
             {
-                std::lock_guard<std::mutex> lock(m_mutex_);
+                auto client = m_sp_mongo_db_->get_pool_client();
+                mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                auto m_mongo_db_collection_ = db[get_root_model_name()];
                 result = m_mongo_db_collection_.delete_many({});
             }
             return result ? true : false;
@@ -365,7 +384,9 @@ namespace FluxCppCore {
         bool delete_all_data_from_collection(const bsoncxx::builder::stream::document &filter) {
             mongocxx::stdx::optional<mongocxx::result::delete_result> result;
             {
-                std::lock_guard<std::mutex> lock(m_mutex_);
+                auto client = m_sp_mongo_db_->get_pool_client();
+                mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                auto m_mongo_db_collection_ = db[get_root_model_name()];
                 result = m_mongo_db_collection_.delete_many({filter});
             }
             return result ? true : false;
@@ -374,7 +395,9 @@ namespace FluxCppCore {
         bool delete_data_by_id_from_collection(const int32_t &kr_model_doc_id) {
             mongocxx::stdx::optional<mongocxx::result::delete_result> result;
             {
-                std::lock_guard<std::mutex> lock(m_mutex_);
+                auto client = m_sp_mongo_db_->get_pool_client();
+                mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                auto m_mongo_db_collection_ = db[get_root_model_name()];
                 result = m_mongo_db_collection_.delete_one(
                     bsoncxx::builder::stream::document{} << "_id" << kr_model_doc_id << bsoncxx::builder::stream::finalize);
             }
@@ -391,7 +414,9 @@ namespace FluxCppCore {
             mongocxx::options::find opts{};
             opts.sort(sort_doc.view());
             opts.limit(1); // Limit to only fetch one document
-            std::lock_guard<std::mutex> lock(m_mutex_);
+            auto client = m_sp_mongo_db_->get_pool_client();
+            mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+            auto m_mongo_db_collection_ = db[get_root_model_name()];
             auto cursor = m_mongo_db_collection_.find({}, opts);
             for (auto&& doc : cursor) {
                 // Get the ID of the last document
@@ -461,9 +486,7 @@ namespace FluxCppCore {
             return ++m_max_id_;
         }
 
-        std::mutex m_mutex_{};
         std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db_;
-        mongocxx::collection m_mongo_db_collection_;
         RootModelType root_model_type_;
         static inline int32_t c_cur_unused_max_id_ = 1;
         int32_t m_max_id_;

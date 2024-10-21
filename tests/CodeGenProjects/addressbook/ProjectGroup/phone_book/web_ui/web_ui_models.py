@@ -47,6 +47,9 @@ class FluxPropertyType(StrEnum):
     FluxFldTitle = "title"
     FluxFldAutoComplete = "auto_complete"
     FluxFldAbbreviate = "abbreviate"
+    FluxFldNameColor = "name_color"
+    FluxFldOrmNoUpdate = "orm_no_update"
+    FluxFldUIPlaceholder = "ui_placeholder"
 
 
 class InputType(StrEnum):
@@ -93,6 +96,7 @@ class Delay(Enum):
     MEDIUM = 10
     LONG = 20
 
+
 class WidgetName(StrEnum):
     PairStratParams = "pair_strat_params"
     StratLimits = "strat_limits"
@@ -108,11 +112,21 @@ class WidgetName(StrEnum):
     StratBrief = "strat_brief"
     SymbolOverview = "symbol_overview"
 
+
 class ColorType(StrEnum):
     # ERROR = (156, 0, 6)
     WARNING = auto()
     CRITICAL = auto()
 
+
 class ButtonState(StrEnum):
     HIDE = auto()
     SHOW = auto()
+
+
+class FieldType(StrEnum):
+    Autocomplete = auto()
+
+
+class AutoCompleteType:
+    AutocompleteOff = auto()

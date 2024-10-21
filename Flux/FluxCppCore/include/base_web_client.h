@@ -14,12 +14,12 @@ namespace asio = boost::asio;
 namespace FluxCppCore {
 
     struct ClientConfig {
-        std::string create_client_url;
-        std::string get_client_url;
-        std::string get_max_id_client_url;
-        std::string put_client_url;
-        std::string patch_client_url;
-        std::string delete_client_url;
+        std::string create_client_url_;
+        std::string get_client_url_;
+        std::string get_max_id_client_url_;
+        std::string put_client_url_;
+        std::string patch_client_url_;
+        std::string delete_client_url_;
     };
 
     class BaseWebClient {
@@ -146,17 +146,20 @@ namespace FluxCppCore {
 
         [[nodiscard]] bool send_post_request(std::string_view post_url, std::string_view post_json, std::string
         &r_response_json_out) const {
-            return send_http_request(boost::beast::http::verb::post, std::string (post_url), std::string (post_json), r_response_json_out);
+            return send_http_request(boost::beast::http::verb::post, std::string (post_url),
+                std::string (post_json), r_response_json_out);
         }
 
         [[nodiscard]] bool send_patch_request(std::string_view patch_url, std::string_view patch_json,
         std::string &r_response_json_out) const {
-            return send_http_request(boost::beast::http::verb::patch, std::string (patch_url), std::string (patch_json), r_response_json_out);
+            return send_http_request(boost::beast::http::verb::patch, std::string (patch_url),
+                std::string (patch_json), r_response_json_out);
         }
 
         [[nodiscard]] bool send_put_request(std::string_view put_url, std::string_view put_json,
         std::string &r_response_json_out) const {
-            return send_http_request(boost::beast::http::verb::put, std::string (put_url), std::string (put_json), r_response_json_out);
+            return send_http_request(boost::beast::http::verb::put, std::string (put_url),
+                std::string (put_json), r_response_json_out);
         }
 
         [[nodiscard]] bool send_delete_request(std::string_view delete_url, const int32_t &kr_id, std::string
@@ -166,7 +169,8 @@ namespace FluxCppCore {
         }
 
         [[nodiscard]] bool send_delete_request(std::string_view delete_url, std::string &r_response_json_out) const {
-            return send_http_request(boost::beast::http::verb::delete_, std::string (delete_url), "", r_response_json_out);
+            return send_http_request(boost::beast::http::verb::delete_,
+                std::string (delete_url), "", r_response_json_out);
         }
     };
 
@@ -180,8 +184,8 @@ namespace FluxCppCore {
 
         [[nodiscard]] auto get_max_id_client() const {
             std::string json_out;
-            int32_t new_max_id = 0;
-            std::string_view get_max_id_client_url_view = mr_client_config.get_max_id_client_url;
+            int32_t new_max_id = -1;
+            std::string_view get_max_id_client_url_view = mr_client_config.get_max_id_client_url_;
             if (send_get_request(get_max_id_client_url_view, json_out)) {
                 // Find the starting position of the `max_id_val` within the JSON string and calculate the position
                 // where the value associated with it begins. We add the length of `max_id_val_key` and 2 to skip dual-quote
@@ -194,7 +198,8 @@ namespace FluxCppCore {
                     try {
                         new_max_id = std::stoi(max_id_str);
                     } catch (const std::exception& e) {
-                        LOG_ERROR_IMPL(GetCppAppLogger(), "Error parsing {};;; max_id_val: {}", RootModelType::GetDescriptor()->name(), e.what());
+                        LOG_ERROR_IMPL(GetCppAppLogger(), "Error parsing {};;; max_id_val: {}",
+                            RootModelType::GetDescriptor()->name(), e.what());
                     }
                 }
                 return new_max_id;
@@ -208,7 +213,7 @@ namespace FluxCppCore {
         [[nodiscard]] bool get_client(RootModelType &r_obj_out, const int32_t &kr_id) const {
             bool status = false;
             std::string json_out;
-            std::string_view get_client_url_view = mr_client_config.get_client_url;
+            std::string_view get_client_url_view = mr_client_config.get_client_url_;
             status = send_get_request(get_client_url_view, kr_id, json_out);
             if (status) {
                 std::string modified_json;
@@ -223,7 +228,7 @@ namespace FluxCppCore {
                     }
                 }
 
-                status =  m_codec.decode_model(r_obj_out, modified_json);
+                status =  m_codec_.decode_model(r_obj_out, modified_json);
                 return status;
             } else {
                 return status;
@@ -232,11 +237,11 @@ namespace FluxCppCore {
 
         [[nodiscard]] bool create_client (RootModelType &r_obj_in_n_out) {
             std::string json;
-            bool status = m_codec.encode_model(r_obj_in_n_out, json, true);
+            bool status = m_codec_.encode_model(r_obj_in_n_out, json);
             LOG_DEBUG_IMPL(GetCppAppLogger(), "{}: {}: status: {}", __func__, json, status);
             if (status) {
                 std::string json_out;
-                std::string_view create_client_url_view = mr_client_config.create_client_url;
+                std::string_view create_client_url_view = mr_client_config.create_client_url_;
                 status = send_post_request(create_client_url_view, json, json_out);
                 if (status) {
                     std::string modified_json;
@@ -251,16 +256,16 @@ namespace FluxCppCore {
                         }
                     }
                     r_obj_in_n_out.Clear();
-                    status =  m_codec.decode_model(r_obj_in_n_out, modified_json);
+                    status =  m_codec_.decode_model(r_obj_in_n_out, modified_json);
                     return status;
                 } else {
-                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while creating {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
-                              json, create_client_url_view);
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while creating {};;; {} url: {}",
+                        RootModelType::GetDescriptor()->name(), json, create_client_url_view);
                     return false;
                 }
             } else {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
-                          r_obj_in_n_out.DebugString());
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}",
+                    RootModelType::GetDescriptor()->name(), r_obj_in_n_out.DebugString());
                 return false;
             }
             return status;
@@ -268,7 +273,7 @@ namespace FluxCppCore {
 
         [[nodiscard]] bool patch_client (RootModelType &r_obj_in_n_out) const {
             std::string json;
-            bool status = m_codec.encode_model(r_obj_in_n_out, json);
+            bool status = m_codec_.encode_model(r_obj_in_n_out, json);
             if (status) {
                 size_t pos = json.find("id");
                 while (pos != std::string::npos) {
@@ -284,7 +289,7 @@ namespace FluxCppCore {
                 }
 
                 std::string json_out;
-                std::string_view patch_client_url_view = mr_client_config.patch_client_url;
+                std::string_view patch_client_url_view = mr_client_config.patch_client_url_;
                 status = send_patch_request(patch_client_url_view, json, json_out);
                 if (status) {
                     std::string modified_json;
@@ -299,7 +304,7 @@ namespace FluxCppCore {
                         }
                     }
                     r_obj_in_n_out.Clear();
-                    status =  m_codec.decode_model(r_obj_in_n_out, modified_json);
+                    status =  m_codec_.decode_model(r_obj_in_n_out, modified_json);
                     return status;
                 } else {
                     LOG_ERROR_IMPL(GetCppAppLogger(), "Error while patch {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
@@ -316,7 +321,7 @@ namespace FluxCppCore {
 
         [[nodiscard]] bool put_client (RootModelType &r_obj_in_n_out) const {
             std::string json;
-            bool status = m_codec.encode_model(r_obj_in_n_out, json, true);
+            bool status = m_codec_.encode_model(r_obj_in_n_out, json);
             if (status) {
                 size_t pos = json.find("id");
                 while (pos != std::string::npos) {
@@ -331,7 +336,7 @@ namespace FluxCppCore {
                     pos = json.find("id", pos + 1);
                 }
                 std::string json_out;
-                std::string_view put_client_url_view = mr_client_config.put_client_url;
+                std::string_view put_client_url_view = mr_client_config.put_client_url_;
                 status = send_put_request(put_client_url_view, json, json_out);
 
                 if (status) {
@@ -346,7 +351,7 @@ namespace FluxCppCore {
                             modified_json += json_out[i];
                         }
                     }
-                    status =  m_codec.decode_model(r_obj_in_n_out, modified_json);
+                    status =  m_codec_.decode_model(r_obj_in_n_out, modified_json);
                 } else {
                     LOG_ERROR_IMPL(GetCppAppLogger(), "Error while put {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
                               json, put_client_url_view);
@@ -362,7 +367,7 @@ namespace FluxCppCore {
 
         [[nodiscard]] std::string delete_client (const int32_t &kr_id) const {
             std::string delete_response_json;
-            std::string_view delete_client_url_view = mr_client_config.delete_client_url;
+            std::string_view delete_client_url_view = mr_client_config.delete_client_url_;
             if (send_delete_request(delete_client_url_view, kr_id, delete_response_json)) {
                 return delete_response_json;
             }
@@ -373,7 +378,7 @@ namespace FluxCppCore {
         }
 
     protected:
-        RootModelJsonCodec<RootModelType> m_codec;
+        RootModelJsonCodec<RootModelType> m_codec_;
         const ClientConfig& mr_client_config;
     };
 
@@ -390,7 +395,7 @@ namespace FluxCppCore {
 
         [[nodiscard]] auto get_max_id_client() const {
             std::string json_out;
-            int32_t new_max_id = 0;
+            int32_t new_max_id = -1;
             std::string_view get_max_id_client_url_view = get_max_id_client_url.value;
             if (send_get_request(get_max_id_client_url_view, json_out)) {
                 // Find the starting position of the `max_id_val` within the JSON string and calculate the position
@@ -434,7 +439,7 @@ namespace FluxCppCore {
                     }
                 }
 
-                status =  m_codec.decode_model_list(r_obj_out, modified_json);
+                status =  m_codec_.decode_model_list(r_obj_out, modified_json);
                 return status;
             } else {
                 return status;
@@ -443,7 +448,7 @@ namespace FluxCppCore {
 
         [[nodiscard]] bool create_client (RootModelListType &r_obj_in_n_out) {
             std::string json;
-            bool status = m_codec.encode_model_list(r_obj_in_n_out, json);
+            bool status = m_codec_.encode_model_list(r_obj_in_n_out, json);
             if (status) {
                 std::string json_out;
                 std::string_view create_client_url_view = create_client_url.value;
@@ -461,7 +466,7 @@ namespace FluxCppCore {
                         }
                     }
                     r_obj_in_n_out.Clear();
-                    status =  m_codec.decode_model_list(r_obj_in_n_out, modified_json);
+                    status =  m_codec_.decode_model_list(r_obj_in_n_out, modified_json);
                     return status;
                 } else {
                     LOG_ERROR_IMPL(GetCppAppLogger(), "Error while creating {};;;url: {}, Json: {} ",
@@ -481,7 +486,7 @@ namespace FluxCppCore {
         [[nodiscard]] bool patch_client (RootModelListType &r_obj_in_n_out) const {
             std::string json;
             std::string modified_json;
-            bool status = m_codec.encode_model_list(r_obj_in_n_out, json);
+            bool status = m_codec_.encode_model_list(r_obj_in_n_out, json);
             if (status) {
                 for (size_t i = 0; i < json.size(); ++i) {
                     if (i + 1 < json.size() && json[i] == 'i' && json[i + 1] == 'd'
@@ -510,7 +515,7 @@ namespace FluxCppCore {
                         }
                     }
                     r_obj_in_n_out.Clear();
-                    status =  m_codec.decode_model_list(r_obj_in_n_out, decode_modified_json);
+                    status =  m_codec_.decode_model_list(r_obj_in_n_out, decode_modified_json);
                     return status;
                 } else {
                     LOG_ERROR_IMPL(GetCppAppLogger(), "Error while patch {};;;{} url: {}", RootModelListType::GetDescriptor()->name(),
@@ -527,7 +532,7 @@ namespace FluxCppCore {
         [[nodiscard]] bool put_client (RootModelListType &r_obj_in_n_out) const {
             std::string json;
             std::string modified_json;
-            bool status = m_codec.encode_model_list(r_obj_in_n_out, json);
+            bool status = m_codec_.encode_model_list(r_obj_in_n_out, json);
             if (status) {
                 for (size_t i = 0; i < json.size(); ++i) {
                     if (i + 1 < json.size() && json[i] == 'i' && json[i + 1] == 'd'
@@ -555,7 +560,7 @@ namespace FluxCppCore {
                             decode_modified_json += json_out[i];
                         }
                     }
-                    status =  m_codec.decode_model_list(r_obj_in_n_out, decode_modified_json);
+                    status =  m_codec_.decode_model_list(r_obj_in_n_out, decode_modified_json);
                 } else {
                     LOG_ERROR_IMPL(GetCppAppLogger(), "Error while put {};;; {} url: {}", RootModelListType::GetDescriptor()->name(),
                               json, put_client_url_view);
@@ -580,7 +585,7 @@ namespace FluxCppCore {
             return delete_response_json;
         }
     protected:
-        RootModelListJsonCodec<RootModelListType> m_codec;
+        RootModelListJsonCodec<RootModelListType> m_codec_;
     };
 
 }

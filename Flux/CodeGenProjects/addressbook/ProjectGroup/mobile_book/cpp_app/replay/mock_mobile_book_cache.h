@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef TEST
+
 #include "mobile_book_consumer.h"
 
 
@@ -18,3 +20,4 @@ extern "C" void create_or_update_last_barter_n_tob([[maybe_unused]] const int32_
     const int64_t participation_period_last_barter_qty_sum, const int32_t applicable_period_seconds);
 
 
+#endif

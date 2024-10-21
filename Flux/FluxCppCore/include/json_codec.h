@@ -23,12 +23,10 @@ namespace FluxCppCore {
             options.ignore_unknown_fields = true;
         }
 
-        // static inline quill::Logger *c_p_logger_{GetCppAppLogger()};
     };
 
     template<typename RootModelType>
     class RootModelJsonCodec : public JsonCodecOptions {
-        // using JsonCodecOptions::c_p_logger_;
     protected:
         static inline void modify_json(std::string &r_json_str) {
             try {
@@ -62,8 +60,7 @@ namespace FluxCppCore {
             if (msg_name == "market_depth") {
                 modify_json(kr_json);
             }
-            absl::Status status = google::protobuf::util::JsonStringToMessage(kr_json, &r_model_obj,
-                                                                                                options);
+            absl::Status status = google::protobuf::util::JsonStringToMessage(kr_json, &r_model_obj, options);
             if (status.code() == absl::StatusCode::kOk) {
                 return true;
             } else {
@@ -93,7 +90,6 @@ namespace FluxCppCore {
 
     template<typename RootModelListType>
     class RootModelListJsonCodec : public JsonCodecOptions {
-        // using JsonCodecOptions::c_p_logger_;
     protected:
 
         static inline void modify_json(std::string &r_json_str) {
