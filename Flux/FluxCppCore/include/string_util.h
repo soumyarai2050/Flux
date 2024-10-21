@@ -7,7 +7,7 @@
 
 namespace FluxCppCore {
 
-    inline std::string get_utc_time_microseconds() {
+    inline std::string get_local_time_microseconds() {
         // Get the current time
         auto now = std::chrono::system_clock::now();
 

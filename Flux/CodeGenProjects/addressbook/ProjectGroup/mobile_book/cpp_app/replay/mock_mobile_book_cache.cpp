@@ -9,7 +9,7 @@ extern "C" void create_or_update_last_barter_n_tob([[maybe_unused]] const int32_
 	const int64_t qty, const double premium, const char *market_barter_volume_id,
 	const int64_t participation_period_last_barter_qty_sum, const int32_t applicable_period_seconds) {
 
-	auto int_ts = FluxCppCore::get_utc_time_microseconds();
+	auto int_ts = FluxCppCore::get_local_time_microseconds();
 	// std::string time_str;
 	// FluxCppCore::format_time(int_ts, time_str);
 	LastBarter last_barter{id, {symbol, exch_id}, int_ts, int_ts,
@@ -28,7 +28,7 @@ extern "C" void create_or_update_md_n_tob([[maybe_unused]] const int32_t id, con
 	const double px, const int64_t qty, const char *market_maker, const bool is_smart_depth,
 	const double cumulative_notional, const int64_t cumulative_qty, const double cumulative_avg_px) {
 
-	auto int_ts = FluxCppCore::get_utc_time_microseconds();
+	auto int_ts = FluxCppCore::get_local_time_microseconds();
 
 	MarketDepth mkt_depth{id, symbol, int_ts, int_ts, side, px,
 		true, qty, true, position, market_maker, true,
