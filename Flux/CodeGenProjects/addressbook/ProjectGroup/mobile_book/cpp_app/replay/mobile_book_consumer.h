@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "makrket_data_publisher.h"
+#include "mobile_book_publisher.h"
 
 
 class MobileBookConsumer {
@@ -9,10 +9,10 @@ public:
     explicit MobileBookConsumer(const std::string& kr_yaml_config_file) :
     k_mr_yaml_config_file_(kr_yaml_config_file), m_mobile_book_publisher_(k_mr_yaml_config_file_) {}
 
-    void process_market_depth(const MarketDepth &md) {
+    void process_market_depth(const MarketDepthQueueElement &md) {
         LOG_INFO_IMPL(GetCppAppLogger(), "inside: {}: {}", __func__, md.symbol_);
         m_mobile_book_publisher_.process_market_depth(md);
-        PyMarketDepth md_market_depth{md.symbol_.c_str(), md.exch_time_.c_str(),
+        PyMarketDepthQueueElement md_market_depth{md.symbol_.c_str(), md.exch_time_.c_str(),
             md.arrival_time_.c_str(), md.side_, md.px_, md.is_px_set_, md.qty_, md.is_qty_set_,
             md.position_, md.market_maker_.c_str(), md.is_market_maker_set_, md.is_smart_depth_,
             md.is_is_smart_depth_set_, md.cumulative_notional_, md.is_cumulative_notional_set_, md.cumulative_qty_,
@@ -22,9 +22,9 @@ public:
         LOG_INFO_IMPL(GetCppAppLogger(), "exit: {}: {}", __func__, md.symbol_);
     }
 
-    void process_last_barter(const LastBarter &e) {
+    void process_last_barter(const LastBarterQueueElement &e) {
         m_mobile_book_publisher_.process_last_barter(e);
-        PyLastBarter last_barter{{e.symbol_n_exch_id_.symbol_.c_str(),
+        PyLastBarterQueueElement last_barter{{e.symbol_n_exch_id_.symbol_.c_str(),
             e.symbol_n_exch_id_.exch_id_.c_str()}, e.exch_time_.c_str(), e.arrival_time_.c_str(),
             e.px_, e.qty_, e.premium_, e.is_premium_set_,
             {e.market_barter_volume_.id_.c_str(),
@@ -53,7 +53,7 @@ public:
 						side = 'A';
 					}
 
-				MarketDepth mkt_depth;
+				MarketDepthQueueElement mkt_depth;
 				mkt_depth.id_ = m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).id();
 				mkt_depth.symbol_ = m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(
 					market_depth_index).symbol_n_exch_id().symbol();
@@ -96,7 +96,7 @@ public:
 
 				// Replay last barter
 
-				LastBarter last_barter;
+				LastBarterQueueElement last_barter;
 				last_barter.id_ = m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(last_barter_index).id();
 				last_barter.symbol_n_exch_id_.symbol_ = m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(
 					last_barter_index).symbol_n_exch_id().symbol();

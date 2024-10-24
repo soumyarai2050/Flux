@@ -192,7 +192,7 @@ message BarData {
   required BarMetaData bar_meta_data = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
   required string start_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
   required string end_time = 4 [(FluxFldValIsDateTime) = true];
-  optional float vwap = 5 [(FluxFldProjections) = "1", (FluxFldProjections) = "3"];
+  optional float vwap = 5 [(FluxFldProjections) = "1", (FluxFldProjections) = "3", (FluxFldHelp) = "cumulative vwap since SOD, vwap=(sum(vol * px) of all bars from SOD till now) / (total_vol, i.e., sum of vol since SOD)"];
   optional float vwap_change = 6 [(FluxFldProjections) = "2", (FluxFldProjections) = "3", (FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against previous-day close px"];
   optional float premium = 7 [(FluxFldProjections) = "4", (FluxFldProjections) = "6"];
   optional float premium_change = 8 [(FluxFldProjections) = "5", (FluxFldProjections) = "6", (FluxFldNumberFormat) = "%"];
@@ -203,7 +203,7 @@ message BarData {
   optional float low = 13;
   optional float close = 14;
   optional int32 volume = 15;
-  optional int32 cum_volume = 16 [(FluxFldHelp) = "Bar`s day`s cumulative volume"];
+  optional int32 cum_volume = 16 [(FluxFldHelp) = "cumulative volume since SOD"];
   optional int32 bar_count = 17;
   optional string source = 18;
 }
@@ -319,6 +319,54 @@ message MarketMeta {
   optional string exch_timezone = 5;
   repeated BarteringSession bartering_sessions = 6;
   optional string bartering_currency_code = 9;
+}
+
+message Rank {
+  optional string rank_period = 1 [default="30 Days rolling"];
+  optional int32 market_rank = 2; // driven from median notional barterd in last 30 days
+  optional int32 global_rank = 3; // driven from median notional barterd in last 30 days
+  optional int32 hot_rank = 4;  // driven from last bartering day bar notional
+}
+
+message HistoricalSymbolOverview {
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  //Server generated unique Id
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional string symbol = 2;
+  optional string description = 3;
+  optional string currency = 4;
+  optional string product = 5;
+  repeated string exchange = 6;
+  repeated Rank ranks = 9;
+  optional BarData last_bar = 13;
+  optional SymbolOverview symbol_overview = 14;
+}
+
+message BarAvailability {
+  required string start_ts = 1;
+  required string end_ts = 2;
+  required string source = 3;
+  required int64 pred_gap = 4; // number of missing bars before current availability, for eg, if BarType is OneDay then counts of days missing between last availability's end_ts to current availability's start_ts
+}
+
+message BarDataAvailability {
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  //Server generated unique Id
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required string key = 2; // key combination of symbol~exch_id~BarType
+  repeated BarAvailability availability_list = 3; // availability of bar data from start_ts to end_ts with source
 }
 
 message DashList {

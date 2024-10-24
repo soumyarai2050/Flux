@@ -4,6 +4,7 @@
 #include <chrono>
 #include <sstream>
 #include <ctime>
+#include <date/date.h>
 
 namespace FluxCppCore {
 
@@ -11,35 +12,15 @@ namespace FluxCppCore {
         // Get the current time
         auto now = std::chrono::system_clock::now();
 
-        // Get the current time as milliseconds since the epoch
-        auto now_as_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
-        auto timestamp_ms = static_cast<int64_t>(now_as_ms.count());
-
-        // Convert milliseconds to microseconds
-        auto timestamp_us = std::chrono::microseconds(timestamp_ms * 1000);
-
-        // Convert to system_clock time_point
-        auto time_point = std::chrono::system_clock::time_point(timestamp_us);
-
-        // Convert to time_t for use with localtime
-        auto time_t_value = std::chrono::system_clock::to_time_t(time_point);
-
-        // Convert to tm for formatting
-        std::tm* now_as_tm = std::localtime(&time_t_value);
-
-        // Get the current time as microseconds since the epoch
-        auto now_as_us = std::chrono::duration_cast<std::chrono::microseconds>(time_point.time_since_epoch());
-
-        // The number of microseconds that have passed since the last second
-        auto us = now_as_us.count() % 1000000;
-
-        // Create a stream and output the formatted time
-        std::ostringstream oss;
-        oss << std::put_time(now_as_tm, "%Y-%m-%d %H:%M:%S")
-            << '.' << std::setfill('0') << std::setw(6) << us
-            << "+00:00";
-
-        return oss.str();
+        std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+        std::tm tm = *std::localtime(&now_time_t);
+        auto duration = now.time_since_epoch();
+        auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(duration).count() % 1000000;
+        std::ostringstream ss;
+        ss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%S")
+        << '.' << std::setfill('0') << std::setw(6) << microseconds // Print microseconds (6 digits)
+        << 'Z';  // Append 'Z' for UTC
+        return ss.str();
     }
 
     inline int64_t parse_time(const std::string& time_str) {
@@ -159,36 +140,12 @@ namespace FluxCppCore {
         }
 
         static inline bsoncxx::types::b_date convert_utc_string_to_b_date(const std::string& utc_time_str) {
-            std::tm tm = {};
-            std::istringstream ss(utc_time_str);
-            ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S"); // Parse the date-time part
-
-            // Parse microseconds
-            char ch;
-            ss >> ch; // skip the '.'
-            int microseconds = 0;
-            if (ss >> microseconds) {
-                while (microseconds >= 1000000) // ensure microseconds are in correct range
-                    microseconds /= 10;
-            }
-
-            // Parse timezone
-            ss >> ch; // skip the '+'
-            int timezone = 0;
-            if (ss >> timezone) {
-                tm.tm_hour -= timezone / 100; // adjust the hour
-                tm.tm_min -= timezone % 100; // adjust the minute
-            }
-
-            std::time_t tt = timegm(&tm);
-            std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(tt);
-            auto duration_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch());
-
-            // Add microseconds to the duration
-            duration_since_epoch += std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::microseconds(microseconds));
-
-            return bsoncxx::types::b_date(duration_since_epoch);
+            std::istringstream ss{utc_time_str};
+            std::chrono::system_clock::time_point tp;
+            ss >> date::parse("%FT%TZ", tp);
+            auto duration = tp.time_since_epoch();
+            auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+            return bsoncxx::types::b_date{std::chrono::system_clock::time_point(std::chrono::microseconds(microseconds))};
         }
-
     };
 }

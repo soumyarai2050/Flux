@@ -9,8 +9,8 @@
 extern std::atomic<bool> shutdown_db_n_ws_thread;
 void signal_handler([[maybe_unused]] int signal);
 
-using last_barter_fp_t = int(*)(PyLastBarter const*);
-using mkt_depth_fp_t = int(*)(PyMarketDepth const*);
+using last_barter_fp_t = int(*)(PyLastBarterQueueElement const*);
+using mkt_depth_fp_t = int(*)(PyMarketDepthQueueElement const*);
 
 extern last_barter_fp_t last_barter_fp;
 extern mkt_depth_fp_t mkt_depth_fp;

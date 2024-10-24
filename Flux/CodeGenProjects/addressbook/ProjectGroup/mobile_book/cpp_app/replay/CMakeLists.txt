@@ -26,6 +26,8 @@ set(Boost_INCLUDE_LIBS ${LIBS_ROOT_DIR}/boost/lib)
 set(QUILL_INCLUDE ${LIBS_ROOT_DIR}/quill/include)
 set(QUILL_LIB ${LIBS_ROOT_DIR}/quill/lib)
 
+set(DATE_INCLUDE ${LIBS_ROOT_DIR}/date/include)
+
 set(protobuf_ABSL_USED_TARGETS ${libabsl_ROOT_PATH}/libabsl_log_severity.a ${libabsl_ROOT_PATH}/libabsl_raw_logging_internal.a
         ${libabsl_ROOT_PATH}/libabsl_bad_optional_access.a ${libabsl_ROOT_PATH}/libabsl_die_if_null.a
         ${libabsl_ROOT_PATH}/libabsl_hash.a ${libabsl_ROOT_PATH}/libabsl_bad_variant_access.a
@@ -100,7 +102,9 @@ message(WARNING ${BSON_INCLUDE_DIR})
 
 include_directories(${MONGO_INCLUDE_DIR} ${BSON_THIRD_PARTY_INCLUDE_DIR} ${BSON_INCLUDE_DIR} ${Boost_INCLUDE_DIRS}
         ${Protobuf_INCLUDE_DIRS} ${ABSL_INCLUDE_DIR} ${CppCodec} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
-         ${QUILL_INCLUDE} ${CPP_YAML_INCLUDE_DIR})
+        ${QUILL_INCLUDE} ${CPP_YAML_INCLUDE_DIR}
+        ${DATE_INCLUDE}
+)
 
 set(MD_MODEL ../../generated/CppProto2)
 # protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/mobile_book_service.proto)

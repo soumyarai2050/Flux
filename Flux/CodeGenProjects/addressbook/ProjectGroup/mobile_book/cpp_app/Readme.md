@@ -96,3 +96,14 @@ cmake -DYAML_BUILD_SHARED_LIBS=on -DCMAKE_INSTALL_PREFIX=/home/$USER/cpp_libs/li
 make -j8
 sudo make install
 ```
+
+## date
+```
+git clone https://github.com/HowardHinnant/date.git
+cd date
+mkdir build
+cd build
+cmake -DENABLE_DATE_TESTING=OFF -DBUILD_TZ_LIB=OFF -DCMAKE_INSTALL_PREFIX=/home/$USER/cpp_libs/libs_13/cpp_yaml ../
+make -j4
+sudo make install
+```

@@ -21,11 +21,11 @@ public:
 
 	// virtual void go() = 0;
 
-	void process_market_depth(const MarketDepth& market_depth) {
+	void process_market_depth(const MarketDepthQueueElement& market_depth) {
 		mon_md.push(market_depth);
 	}
 
-	void process_last_barter(const LastBarter& last_barter) {
+	void process_last_barter(const LastBarterQueueElement& last_barter) {
 		mon_lt.push(last_barter);
 	}
 
@@ -35,6 +35,9 @@ public:
 	km_project_name_((get_project_name())), m_top_of_book_ws_port_(get_top_of_book_ws_port()),
 	m_last_barter_ws_port_(get_last_barter_ws_port()), m_market_depth_ws_port_(get_market_depth_ws_port()),
 	m_http_client_host_(get_http_ip()), m_http_client_port_(get_http_port()),
+	m_avoid_market_depth_db_update_(avoid_market_depth_db_update()),
+	m_avoid_top_of_book_db_update_(avoid_top_of_book_db_update()),
+	m_avoid_last_barter_db_update_(avoid_last_barter_db_update()),
 	m_md_client_config_(
 		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + create_market_depth_client_url,
 		PATH_SEPARATOR + km_project_name_ + PATH_SEPARATOR + get_market_depth_client_url,
@@ -107,8 +110,8 @@ protected:
 	}
 
 
-	FluxCppCore::Monitor<LastBarter> mon_lt{};
-	FluxCppCore::Monitor<MarketDepth> mon_md{};
+	FluxCppCore::Monitor<LastBarterQueueElement> mon_lt{};
+	FluxCppCore::Monitor<MarketDepthQueueElement> mon_md{};
 
 	mobile_book::TopOfBook m_top_of_book_{};
 	mobile_book::LastBarter m_last_barter_{};
@@ -122,6 +125,9 @@ protected:
 	int32_t m_market_depth_ws_port_;
 	std::string m_http_client_host_;
 	std::string m_http_client_port_;
+	bool m_avoid_market_depth_db_update_;
+	bool m_avoid_top_of_book_db_update_;
+	bool m_avoid_last_barter_db_update_;
 	FluxCppCore::ClientConfig m_md_client_config_;
 	FluxCppCore::ClientConfig m_tob_client_config_;
 	FluxCppCore::ClientConfig m_lt_client_config_;
@@ -236,13 +242,12 @@ protected:
 	}
 
 	void md_consumer_thread() {
-		MarketDepth md;
+		MarketDepthQueueElement md;
 		mobile_book::MarketDepth market_depth;
 		mobile_book::TopOfBook top_of_book;
 		while(true) {
 			auto status = mon_md.pop(md);
 			if (status == FluxCppCore::QueueStatus::DATA_CONSUMED) {
-				std::cout << "md_consumer_thread: mobile_book consumed" << std::endl;
 				market_depth.set_id(md.id_);
 				market_depth.set_symbol(md.symbol_);
 				market_depth.set_exch_time(md.exch_time_);
@@ -291,34 +296,70 @@ protected:
 						top_of_book.mutable_ask_quote()->set_last_update_date_time(md.exch_time_);
 					}
 
-					auto tob_db_id = m_top_of_book_db_codec_.insert_or_update(top_of_book);
-					top_of_book.set_id(tob_db_id);
+					int32_t top_of_book_max_id{0};
+
+					if (!m_avoid_top_of_book_db_update_) {
+						auto tob_db_id = m_top_of_book_db_codec_.insert_or_update(top_of_book);
+						if (tob_db_id == -1) {
+							tob_db_id = m_top_of_book_db_codec_.get_max_id_from_collection();
+							++tob_db_id;
+						}
+						top_of_book.set_id(tob_db_id);
+					} else {
+						top_of_book_max_id = m_top_of_book_db_codec_.get_max_id_from_collection();
+						++top_of_book_max_id;
+						top_of_book.set_id(top_of_book_max_id);
+					}
+
 					if (m_top_of_book_web_socket_server_) {
 						m_top_of_book_web_socket_server_.value().NewClientCallBack(top_of_book, -1);
 					}
+
 					if (m_tob_web_client_) {
 						std::string top_of_book_key;
 						MobileBookKeyHandler::get_key_out(top_of_book, top_of_book_key);
 						auto found = m_top_of_book_db_codec_.m_root_model_key_to_db_id.find(top_of_book_key);
 						if (found == m_top_of_book_db_codec_.m_root_model_key_to_db_id.end()) {
 							assert(m_tob_web_client_.value().create_client(top_of_book));
+							if (m_avoid_top_of_book_db_update_) {
+								m_top_of_book_db_codec_.m_root_model_key_to_db_id[top_of_book_key] = top_of_book.id();
+							}
 						} else {
+							top_of_book.set_id(found->second);
 							assert(m_tob_web_client_.value().patch_client(top_of_book));
 						}
 					}
 				}
-				[[maybe_unused]] auto db_id = m_market_depth_db_codec_.insert_or_update(market_depth);
-				market_depth.set_id(db_id);
+
+				int32_t market_depth_max_id{0};
+				if (!m_avoid_market_depth_db_update_) {
+					auto db_id = m_market_depth_db_codec_.insert_or_update(market_depth);
+					if (db_id == -1) {
+						db_id = m_market_depth_db_codec_.get_max_id_from_collection();
+						++db_id;
+					}
+					market_depth.set_id(db_id);
+				} else {
+					market_depth_max_id = m_market_depth_db_codec_.get_max_id_from_collection();
+					++market_depth_max_id;
+					market_depth.set_id(market_depth_max_id);
+				}
+
 				if (m_market_depth_web_socket_server_) {
 					m_market_depth_web_socket_server_.value().NewClientCallBack(market_depth, -1);
 				}
-				if (m_md_http_client_){
+
+				if (m_md_http_client_) {
 					std::string md_key;
 					MobileBookKeyHandler::get_key_out(market_depth, md_key);
 					auto found = m_market_depth_db_codec_.m_root_model_key_to_db_id.find(md_key);
 					if (found == m_market_depth_db_codec_.m_root_model_key_to_db_id.end()) {
 						assert(m_md_http_client_.value().create_client(market_depth));
+						if (m_avoid_market_depth_db_update_) {
+							m_market_depth_db_codec_.m_root_model_key_to_db_id[md_key] = market_depth.id();
+						}
 					} else {
+						market_depth.set_id(found->second);
 						assert(m_md_http_client_.value().patch_client(market_depth));
 					}
 				}
@@ -329,7 +370,7 @@ protected:
 	}
 
 	void last_barter_consumer_thread() {
-		LastBarter lt;
+		LastBarterQueueElement lt;
 		mobile_book::LastBarter last_barter;
 		mobile_book::TopOfBook tob;
 		while(true)
@@ -337,7 +378,6 @@ protected:
 			auto status = mon_lt.pop(lt);
 			if (status == FluxCppCore::QueueStatus::DATA_CONSUMED)
 			{
-				std::cout << "Market data consumed" << std::endl;
 				last_barter.set_id(lt.id_);
 				last_barter.mutable_symbol_n_exch_id()->set_symbol(lt.symbol_n_exch_id_.symbol_);
 				last_barter.mutable_symbol_n_exch_id()->set_exch_id(lt.symbol_n_exch_id_.exch_id_);
@@ -358,19 +398,49 @@ protected:
 				tob.mutable_last_barter()->set_last_update_date_time(last_barter.exch_time());
 				tob.set_last_update_date_time(last_barter.exch_time());
 				tob.add_market_barter_volume()->CopyFrom(last_barter.market_barter_volume());
-				auto tob_db_id = m_top_of_book_db_codec_.insert_or_update(tob);
-				auto lt_db_id  = m_last_barter_db_codec_.insert(last_barter);
-				tob.set_id(tob_db_id);
-				last_barter.set_id(lt_db_id);
+
+				int32_t top_of_book_max_id{0};
+				int32_t last_barter_max_id{0};
+
+				if (!m_avoid_top_of_book_db_update_) {
+					auto tob_db_id = m_top_of_book_db_codec_.insert_or_update(tob);
+					if (tob_db_id == -1) {
+						tob_db_id = m_top_of_book_db_codec_.get_max_id_from_collection();
+						++tob_db_id;
+					}
+					tob.set_id(tob_db_id);
+				} else {
+					top_of_book_max_id = m_top_of_book_db_codec_.get_max_id_from_collection();
+					++top_of_book_max_id;
+					tob.set_id(top_of_book_max_id);
+				}
+
+				if (!m_avoid_last_barter_db_update_) {
+					auto lt_db_id  = m_last_barter_db_codec_.insert(last_barter);
+					if (lt_db_id == -1) {
+						lt_db_id  = m_last_barter_db_codec_.get_max_id_from_collection();
+						++lt_db_id;
+					}
+					last_barter.set_id(lt_db_id);
+				} else {
+					last_barter_max_id = m_last_barter_db_codec_.get_max_id_from_collection();
+					++last_barter_max_id;
+					last_barter.set_id(last_barter_max_id);
+				}
+
 				if (m_last_barter_web_socket_server_) {
 					m_last_barter_web_socket_server_.value().NewClientCallBack(last_barter, -1);
 				}
+				
 				if (m_top_of_book_web_socket_server_) {
 					m_top_of_book_web_socket_server_.value().NewClientCallBack(tob, -1);
 				}
 
 				if (m_lt_web_client_) {
-					assert(m_lt_web_client_.value().create_client(last_barter));
+					if (!m_lt_web_client_.value().create_client(last_barter)) {
+						LOG_WARNING_IMPL(GetCppAppLogger(), "Error while creating last_barter to web client obj: {}",
+							last_barter.DebugString());
+					}
 				}
 
 				if (m_tob_web_client_) {
@@ -379,7 +449,11 @@ protected:
 					auto found = m_top_of_book_db_codec_.m_root_model_key_to_db_id.find(top_of_book_key);
 					if (found == m_top_of_book_db_codec_.m_root_model_key_to_db_id.end()) {
 						assert(m_tob_web_client_.value().create_client(tob));
+						if (m_avoid_top_of_book_db_update_) {
+							m_top_of_book_db_codec_.m_root_model_key_to_db_id[top_of_book_key] = tob.id();
+						}
 					} else {
+						tob.set_id(found->second);
 						assert(m_tob_web_client_.value().patch_client(tob));
 					}
 				}

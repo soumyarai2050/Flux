@@ -392,10 +392,26 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 simulate_config_yaml_file_data += f"leg_2_feed_code: {self.strat_leg_2.exch_id}\n\n"
                                 simulate_config_yaml_file_data += f"mongo_server: {mongo_server}\n"
                                 simulate_config_yaml_file_data += f"db_name: {self.db_name}\n\n"
-                                simulate_config_yaml_file_data += f"top_of_book_ws_port: {top_of_book_ws_port}\n"
-                                simulate_config_yaml_file_data += f"market_depth_ws_port: {market_depth_ws_port}\n"
-                                simulate_config_yaml_file_data += f"last_barter_ws_port: {last_barter_ws_port}\n"
-                                simulate_config_yaml_file_data += f"websocket_timeout: 300\n"
+
+                                if not executor_config_yaml_dict.get("avoid_cpp_ws_update"):
+                                    simulate_config_yaml_file_data += f"top_of_book_ws_port: {top_of_book_ws_port}\n"
+                                    simulate_config_yaml_file_data += f"market_depth_ws_port: {market_depth_ws_port}\n"
+                                    simulate_config_yaml_file_data += f"last_barter_ws_port: {last_barter_ws_port}\n"
+                                    simulate_config_yaml_file_data += f"websocket_timeout: 300\n"
+
+                                if not executor_config_yaml_dict.get("avoid_cpp_db_update"):
+                                    simulate_config_yaml_file_data += f"avoid_top_of_book_db_update: False\n"
+                                    simulate_config_yaml_file_data += f"avoid_last_barter_db_update: False\n"
+                                    simulate_config_yaml_file_data += f"avoid_market_depth_db_update: False\n"
+
+                                if not executor_config_yaml_dict.get("avoid_cpp_http_update"):
+                                    simulate_config_yaml_file_data += "project_name: street_book\n"
+                                    simulate_config_yaml_file_data += "http_ip: 127.0.0.1\n"
+                                    simulate_config_yaml_file_data += f"http_port: {self.port}\n"
+                                    simulate_config_yaml_file_data += f"avoid_top_of_book_http_update: False\n"
+                                    simulate_config_yaml_file_data += f"avoid_last_barter_http_update: False\n"
+                                    simulate_config_yaml_file_data += f"avoid_market_depth_http_update: False\n"
+
                                 YAMLConfigurationManager.update_yaml_configurations(
                                     simulate_config_yaml_file_data, str(self.simulate_config_yaml_file_path))
                                 os.environ["simulate_config_yaml_file"] = str(self.simulate_config_yaml_file_path)

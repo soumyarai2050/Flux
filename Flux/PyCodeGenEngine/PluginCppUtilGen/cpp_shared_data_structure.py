@@ -85,7 +85,7 @@ class CppSharedDataStructure(BaseProtoPlugin):
 
 
         for i in struct_depend_msg_list:
-            output_content += "struct " + i.proto.name + " {\n"
+            output_content += "struct " + i.proto.name + "QueueElement {\n"
             for fld in i.fields:
                 if fld.proto.name.lower().endswith("time"):
                     output_content += "\tstring " + fld.proto.name + "_;\n"
@@ -104,7 +104,7 @@ class CppSharedDataStructure(BaseProtoPlugin):
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 elif fld.kind.name.lower() == "message":
-                    output_content += "\t" + fld.message.proto.name + " " + fld.proto.name + "_;\n"
+                    output_content += "\t" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 else:
@@ -114,7 +114,7 @@ class CppSharedDataStructure(BaseProtoPlugin):
             output_content += "};\n\n"
 
         for i in struct_msg_list:
-            output_content += "struct " + i.proto.name + " {\n"
+            output_content += "struct " + i.proto.name + "QueueElement {\n"
             for fld in i.fields:
                 if fld.proto.name.lower().endswith("time"):
                     output_content += "\tstring " + fld.proto.name + "_;\n"
@@ -129,7 +129,7 @@ class CppSharedDataStructure(BaseProtoPlugin):
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 elif fld.kind.name.lower() == "message":
-                    output_content += "\t" + fld.message.proto.name + " " + fld.proto.name + "_;\n"
+                    output_content += "\t" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 elif fld.kind.name.lower() == "enum":
@@ -143,7 +143,7 @@ class CppSharedDataStructure(BaseProtoPlugin):
             output_content += "};\n\n"
 
         for i in struct_depend_msg_list:
-            output_content += "struct Py" + i.proto.name + " {\n"
+            output_content += "struct Py" + i.proto.name + "QueueElement {\n"
             for fld in i.fields:
                 if fld.proto.name.lower().endswith("time"):
                     output_content += "\tconst char* " + fld.proto.name + "_;\n"
@@ -166,7 +166,7 @@ class CppSharedDataStructure(BaseProtoPlugin):
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 elif fld.kind.name.lower() == "message":
-                    output_content += "\tPy" + fld.message.proto.name + " " + fld.proto.name + "_;\n"
+                    output_content += "\tPy" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 else:
@@ -176,7 +176,7 @@ class CppSharedDataStructure(BaseProtoPlugin):
             output_content += "};\n\n"
 
         for i in struct_msg_list:
-            output_content += "struct Py" + i.proto.name + " {\n"
+            output_content += "struct Py" + i.proto.name + "QueueElement {\n"
             for fld in i.fields:
                 if fld.proto.name != "id":
                     if fld.proto.name.lower().endswith("time"):
@@ -192,7 +192,7 @@ class CppSharedDataStructure(BaseProtoPlugin):
                         if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                             output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                     elif fld.kind.name.lower() == "message":
-                        output_content += "\tPy" + fld.message.proto.name + " " + fld.proto.name + "_;\n"
+                        output_content += "\tPy" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
                         if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                             output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                     elif fld.kind.name.lower() == "enum":
