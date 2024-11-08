@@ -1,16 +1,19 @@
 import logging
 import os
+import re
 import threading
 from queue import Queue
 from typing import Set
 from datetime import timedelta
 import inspect
 
+# third-party imports
 import pendulum
 
 # Project imports
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
-from FluxPythonUtils.scripts.utility_functions import get_last_log_line_date_time, parse_to_float
+from FluxPythonUtils.scripts.utility_functions import get_last_log_line_date_time, parse_to_float, is_file_modified
 from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_book import AppLogBook
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
@@ -70,6 +73,7 @@ class PhoneBookBaseLogBook(AppLogBook):
         super().__init__(log_detail, regex_file_dir_path, config_yaml_dict,
                          log_prefix_regex_pattern_to_callable_name_dict, debug_mode=debug_mode)
         PhoneBookBaseLogBook.initialize_underlying_http_callables()
+        self.market: Market = Market(MarketID.IN)
         self.simulation_mode = simulation_mode
         self.portfolio_alerts_model_exist: bool = False
         self.portfolio_alerts_cache_dict: Dict[str, PortfolioAlertBaseModel] = {}
@@ -313,7 +317,7 @@ class PhoneBookBaseLogBook(AppLogBook):
                                           self._snapshot_type_callable_err_handler)
         except Exception as e:
             alert_brief: str = f"_process_pair_strat_db_updates failed in log analyzer"
-            alert_details: str = f"{message = }, exception: {e}"
+            alert_details: str = f"{message=}, exception: {e}"
             logging.exception(f"{alert_brief}{PhoneBookBaseLogBook.log_seperator} "
                               f"{alert_details}")
             alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
@@ -360,23 +364,58 @@ class PhoneBookBaseLogBook(AppLogBook):
                 return error_dict
         return None
 
-    def notify_no_activity(self, log_detail: LogDetail):
-        modified_timestamp = os.path.getmtime(log_detail.log_file_path)
-        last_line_date_time = pendulum.from_timestamp(modified_timestamp, tz="UTC")
+    def _send_strat_alerts(self, strat_id: int, severity_str: str, alert_brief: str,
+                           alert_meta: AlertMeta | None = None) -> None:
+        """
+        Handling to be implemented to send strat alert in derived class
+        """
+        raise NotImplementedError
 
-        non_activity_secs = (DateTime.utcnow() - last_line_date_time).total_seconds()
-        if non_activity_secs >= log_detail.poll_timeout:
-            alert_brief: str = f"No new logs found for {log_detail.service} for last " \
-                               f"{non_activity_secs} seconds"
-            alert_details: str = f"{log_detail.service} log file path: {log_detail.log_file_path}"
-            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
-                                            inspect.currentframe().f_lineno, DateTime.utcnow(),
-                                            alert_details)
-            self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
-                                       alert_meta=alert_meta)
+    def send_to_portfolio_or_strat_alert(self, severity: str, alert_brief: str, alert_meta: AlertMeta,
+                                         log_detail: LogDetail | StratLogDetail):
+        if log_detail.strat_id_find_callable is not None:
+            strat_id: int | None = log_detail.strat_id_find_callable(log_detail.log_file_path)
+            if strat_id is not None:
+                self._send_strat_alerts(strat_id=strat_id, severity_str=severity, alert_brief=alert_brief,
+                                        alert_meta=alert_meta)
+                return
+        # all else case - send to portfolio alert
+        self.send_portfolio_alerts(severity=severity, alert_brief=alert_brief, alert_meta=alert_meta)
+
+    def notify_no_activity(self, log_detail: LogDetail):
+        if os.path.exists(log_detail.log_file_path):
+            _, last_modified_timestamp = is_file_modified(log_detail.log_file_path, log_detail.data_snapshot_version)
+            log_detail.data_snapshot_version = last_modified_timestamp
+            last_modified_date_time: DateTime = pendulum.from_timestamp(last_modified_timestamp, tz="UTC")
+            non_activity_secs: int = int((DateTime.utcnow() - last_modified_date_time).total_seconds())
+            if non_activity_secs > log_detail.poll_timeout:
+                non_activity_period_description: str
+                if non_activity_secs >= 60:
+                    non_activity_mins = int(non_activity_secs / 60)
+                    non_activity_period_description = f"almost {non_activity_mins} minute(s)"
+                else:
+                    non_activity_period_description = f"{non_activity_secs} seconds"
+                alert_brief: str = (f"No new logs found for {log_detail.service} for last "
+                                    f"{non_activity_period_description}")
+                alert_details: str = f"{log_detail.service} log file path: {log_detail.log_file_path}"
+                alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                                inspect.currentframe().f_lineno, DateTime.utcnow(), alert_details)
+                # log as warning if bartering not started yet
+                severity = self.get_severity("warning") if self.market.is_bartering_session_not_started() else (
+                    self.get_severity("error"))
+                self.send_to_portfolio_or_strat_alert(severity=severity, alert_brief=alert_brief, alert_meta=alert_meta,
+                                                      log_detail=log_detail)
+            # else not required: new logs are generated but filtered out
+        else:
+            logging.error(f"notify_no_activity failed, {log_detail.log_file_path=} does not exist")
 
     def notify_unexpected_activity(self, log_detail: LogDetail):
-        pass
+        alert_brief: str = f"Unexpected: new logs found in {os.path.basename(log_detail.log_file_path)}"
+        alert_details: str = f"{log_detail.log_file_path=}"
+        alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                        inspect.currentframe().f_lineno, DateTime.utcnow(), alert_details)
+        self.send_to_portfolio_or_strat_alert(severity=self.get_severity("error"), alert_brief=alert_brief,
+                                              alert_meta=alert_meta, log_detail=log_detail)
 
     def notify_tail_event_in_log_service(self, severity: str, brief_msg_str: str, detail_msg_str: str,
                                          source_file_name: str, line_num: int,
@@ -445,7 +484,7 @@ class PhoneBookBaseLogBook(AppLogBook):
         # put in method
         if log_message.startswith(self.pattern_for_log_simulator):
             # handle barter simulator message
-            logging.info(f"Barter simulator message: {log_message = }")
+            logging.info(f"Barter simulator message: {log_message=}")
             self._process_barter_simulator_message(log_message)
             return
 
@@ -491,9 +530,8 @@ class PhoneBookBaseLogBook(AppLogBook):
         system_datetime: pendulum.DateTime = (
             log_detail.last_processed_utc_datetime.in_timezone(tz=pendulum.local_timezone()))
         system_datetime += timedelta(milliseconds=1)
-        last_update_datetime = system_datetime.format("YYYY-MM-DD HH:mm:ss,SSS")
-        print(f"last_update_datetime: {last_update_datetime}")
-
+        restart_datetime: str = system_datetime.format("YYYY-MM-DD HH:mm:ss,SSS")
+        logging.warning(f"Restarting tail for {log_detail.log_file_path=} from {restart_datetime=}")
         log_book_service_http_client.log_book_restart_tail_query_client(log_detail.log_file_path,
-                                                                                last_update_datetime)
+                                                                                restart_datetime)
 

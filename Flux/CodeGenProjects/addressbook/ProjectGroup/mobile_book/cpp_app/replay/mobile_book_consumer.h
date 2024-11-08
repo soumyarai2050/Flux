@@ -6,34 +6,15 @@
 
 class MobileBookConsumer {
 public:
-    explicit MobileBookConsumer(const std::string& kr_yaml_config_file) :
-    k_mr_yaml_config_file_(kr_yaml_config_file), m_mobile_book_publisher_(k_mr_yaml_config_file_) {}
+    explicit MobileBookConsumer(Config& r_config) :
+    mr_config_(r_config), m_mobile_book_publisher_(mr_config_) {}
 
     void process_market_depth(const MarketDepthQueueElement &md) {
-        LOG_INFO_IMPL(GetCppAppLogger(), "inside: {}: {}", __func__, md.symbol_);
         m_mobile_book_publisher_.process_market_depth(md);
-        PyMarketDepthQueueElement md_market_depth{md.symbol_.c_str(), md.exch_time_.c_str(),
-            md.arrival_time_.c_str(), md.side_, md.px_, md.is_px_set_, md.qty_, md.is_qty_set_,
-            md.position_, md.market_maker_.c_str(), md.is_market_maker_set_, md.is_smart_depth_,
-            md.is_is_smart_depth_set_, md.cumulative_notional_, md.is_cumulative_notional_set_, md.cumulative_qty_,
-            md.is_cumulative_qty_set_, md.cumulative_avg_px_, md.is_cumulative_avg_px_set_};
-        LOG_INFO_IMPL(GetCppAppLogger(), "process_market_depth cache: {}", md.symbol_);
-        mkt_depth_fp(&md_market_depth);
-        LOG_INFO_IMPL(GetCppAppLogger(), "exit: {}: {}", __func__, md.symbol_);
     }
 
     void process_last_barter(const LastBarterQueueElement &e) {
         m_mobile_book_publisher_.process_last_barter(e);
-        PyLastBarterQueueElement last_barter{{e.symbol_n_exch_id_.symbol_.c_str(),
-            e.symbol_n_exch_id_.exch_id_.c_str()}, e.exch_time_.c_str(), e.arrival_time_.c_str(),
-            e.px_, e.qty_, e.premium_, e.is_premium_set_,
-            {e.market_barter_volume_.id_.c_str(),
-                e.market_barter_volume_.participation_period_last_barter_qty_sum_,
-                e.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_,
-                e.market_barter_volume_.applicable_period_seconds_,
-                e.market_barter_volume_.is_applicable_period_seconds_set_},
-            e.is_market_barter_volume_set_};
-        last_barter_fp(&last_barter);
     }
 
     void go() {
@@ -55,12 +36,15 @@ public:
 
 				MarketDepthQueueElement mkt_depth;
 				mkt_depth.id_ = m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).id();
-				mkt_depth.symbol_ = m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(
-					market_depth_index).symbol_n_exch_id().symbol();
-				mkt_depth.exch_time_ = m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(
-					market_depth_index).exch_time();
-				mkt_depth.arrival_time_ = m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(
-					market_depth_index).arrival_time();
+				FluxCppCore::StringUtil::setString(mkt_depth.symbol_,
+					m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(
+						market_depth_index).symbol_n_exch_id().symbol().c_str(), sizeof(mkt_depth.symbol_));
+				FluxCppCore::StringUtil::setString(mkt_depth.exch_time_,
+					m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(
+						market_depth_index).exch_time().c_str(), sizeof(mkt_depth.exch_time_));
+				FluxCppCore::StringUtil::setString(mkt_depth.arrival_time_,
+					m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(
+						market_depth_index).arrival_time().c_str(), sizeof(mkt_depth.arrival_time_));
 				mkt_depth.side_ = side;
 				if (m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).has_px()) {
 					mkt_depth.px_ = m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).px();
@@ -78,7 +62,7 @@ public:
 					mkt_depth.is_qty_set_ = false;
 				}
 				mkt_depth.position_ = m_mobile_book_publisher_.m_market_depth_history_collection_.raw_market_depth_history(market_depth_index).position();
-				mkt_depth.market_maker_ = "";
+
 				mkt_depth.is_market_maker_set_ = false;
 				mkt_depth.is_smart_depth_ = false;
 				mkt_depth.is_is_smart_depth_set_ = false;
@@ -98,12 +82,20 @@ public:
 
 				LastBarterQueueElement last_barter;
 				last_barter.id_ = m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(last_barter_index).id();
-				last_barter.symbol_n_exch_id_.symbol_ = m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(
-					last_barter_index).symbol_n_exch_id().symbol();
-				last_barter.symbol_n_exch_id_.exch_id_ = m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(
-					last_barter_index).symbol_n_exch_id().exch_id();
-				last_barter.exch_time_ = m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(last_barter_index).exch_time();
-				last_barter.arrival_time_ = m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(last_barter_index).arrival_time();
+				FluxCppCore::StringUtil::setString(last_barter.symbol_n_exch_id_.symbol_,
+					m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(
+						last_barter_index).symbol_n_exch_id().symbol().c_str(),
+						sizeof(last_barter.symbol_n_exch_id_.symbol_));
+				FluxCppCore::StringUtil::setString(last_barter.symbol_n_exch_id_.exch_id_,
+					m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(
+						last_barter_index).symbol_n_exch_id().exch_id().c_str(),
+						sizeof(last_barter.symbol_n_exch_id_.exch_id_));
+				FluxCppCore::StringUtil::setString(last_barter.exch_time_,
+					m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(
+						last_barter_index).exch_time().c_str(), sizeof(last_barter.exch_time_));
+				FluxCppCore::StringUtil::setString(last_barter.arrival_time_,
+					m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(
+						last_barter_index).arrival_time().c_str(), sizeof(last_barter.arrival_time_));
 				last_barter.px_ = m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(last_barter_index).px();
 				last_barter.qty_ = m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(last_barter_index).qty();
 				if (m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(last_barter_index).has_premium()) {
@@ -115,8 +107,10 @@ public:
 				}
 
 				if (m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(last_barter_index).has_market_barter_volume()) {
-					last_barter.market_barter_volume_.id_ = m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(
-						last_barter_index).market_barter_volume().id();
+					FluxCppCore::StringUtil::setString(last_barter.market_barter_volume_.id_,
+						m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(
+							last_barter_index).market_barter_volume().id().c_str(),
+							sizeof(last_barter.market_barter_volume_.id_));
 					if (m_mobile_book_publisher_.m_last_barter_collection_.raw_last_barter_history(
 						last_barter_index).market_barter_volume().has_participation_period_last_barter_qty_sum()) {
 						last_barter.market_barter_volume_.participation_period_last_barter_qty_sum_ =
@@ -140,7 +134,6 @@ public:
 					}
 					last_barter.is_market_barter_volume_set_ = true;
 				} else {
-					last_barter.market_barter_volume_.id_ = "";
 					last_barter.market_barter_volume_.applicable_period_seconds_ = 0;
 					last_barter.market_barter_volume_.is_applicable_period_seconds_set_ = false;
 					last_barter.market_barter_volume_.participation_period_last_barter_qty_sum_ = 0;
@@ -155,6 +148,6 @@ public:
 		LOG_INFO_IMPL(GetCppAppLogger(), "exit: {}", __func__);
 	}
 protected:
-    const std::string& k_mr_yaml_config_file_;
+    Config& mr_config_;
     MobileBookPublisher m_mobile_book_publisher_;
 };

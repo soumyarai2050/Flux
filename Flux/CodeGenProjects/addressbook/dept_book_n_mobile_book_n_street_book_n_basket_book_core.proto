@@ -48,6 +48,8 @@ message SymbolOverview {
     ExecutorKeySequence: "symbol-'SELL'",
     IsRepeated: true
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional string  company = 3;

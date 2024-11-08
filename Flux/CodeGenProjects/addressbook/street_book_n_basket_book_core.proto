@@ -26,24 +26,41 @@ message NewChore{
   option (FluxMsgJsonQuery) = {
       QueryName: "get_new_chore_from_cache"
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string chore_id = 2 [(FluxFldServerPopulate) = true];
-  required Security security = 3;
-  required Side side = 4;
-  optional float px = 5 [(FluxFldNumberFormat) = ".3"];
-  optional float usd_px = 6 [(FluxFldServerPopulate) = true];
-  optional int64 qty = 7;
-  optional bool finishing_chore = 8 [(FluxFldServerPopulate) = true];
-  optional int32 lot_size = 9 [(FluxFldServerPopulate) = true];
-  optional string force_bkr = 10 [(FluxFldHelp) = "helps force specific broker for the chore"];
-  optional string mstrat = 11 [(FluxFldHelp) = "default micro strategy used if not set - not mandatory"];
-  optional ChoreSubmitType chore_submit_state = 12 [(FluxFldServerPopulate) = true];
-  optional string algo = 13;
-  optional float pov = 14 [(FluxFldTitle) = "Pov", (FluxFldNumberFormat) = "%"]; // percentage of volume
-  optional string activate_dt = 15 [(FluxFldValIsDateTime) = true, (FluxFldTitle) = "Activate", (FluxFldHide) = "True"];
-  optional string deactivate_dt = 16 [(FluxFldValIsDateTime) = true, (FluxFldTitle) = "Deactivate", (FluxFldHide) = "True"];
-  optional string ord_entry_time = 17 [(FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Chore Entry", (FluxFldHide) = "True"];
-  optional string text = 18 [(FluxFldTitle) = "Text", (FluxFldAbbreviated) = "JSON", (FluxFldServerPopulate) = true];
+  optional Security security = 3 [(FluxFldOrmNoUpdate) = true, (FluxFldHide) = "True"];
+  optional string ticker = 4 [(FluxFldOrmNoUpdate) = true];
+  required Side side = 5 [(FluxFldOrmNoUpdate) = true];
+  optional float px = 6 [(FluxFldNumberFormat) = ".3"];
+  optional float usd_px = 7 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = ".3"];
+  optional int64 qty = 8;
+  optional bool finishing_chore = 9 [(FluxFldServerPopulate) = true];
+  optional int32 lot_size = 10 [(FluxFldServerPopulate) = true];
+  optional string force_bkr = 11 [(FluxFldOrmNoUpdate) = true, (FluxFldHelp) = "helps force specific broker for the chore"];
+  optional string mstrat = 12 [(FluxFldOrmNoUpdate) = true, (FluxFldHelp) = "default micro strategy used if not set - not mandatory"];
+  optional ChoreSubmitType chore_submit_state = 13 [(FluxFldServerPopulate) = true];
+  optional string algo = 14 [(FluxFldOrmNoUpdate) = true];
+  optional float pov = 15 [(FluxFldOrmNoUpdate) = true, (FluxFldTitle) = "Pov", (FluxFldNumberFormat) = "%"]; // percentage of volume
+  optional string activate_dt = 16 [(FluxFldOrmNoUpdate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Activate", (FluxFldHide) = "True"];
+  optional string deactivate_dt = 17 [(FluxFldOrmNoUpdate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Deactivate", (FluxFldHide) = "True"];
+  optional string ord_entry_time = 18 [(FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Chore Entry", (FluxFldHide) = "True"];
+  optional string text = 19 [(FluxFldTitle) = "Text", (FluxFldAbbreviated) = "JSON", (FluxFldServerPopulate) = true];
+  optional int64 pending_amd_qty = 20 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldHelp) = "used internally for amend qty support - also helps prevent second amend trigger unless prior is completed - px and qty simultaneous amend is allowed"];
+  optional float pending_amd_px = 21 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldHelp) = "used internally for amend px support - also helps prevent second amend trigger unless prior amend is completed - px and qty simultaneous amend is allowed"];
+  optional bool pending_cxl = 22 [default=false, (FluxFldNoCommonKey) = true, (FluxFldUIUpdateOnly) = true, (FluxFldButton) = {
+    unpressed_caption: "Cxl",
+    pressed_caption: "Cxl Submitted",
+    disabled_captions: "true=REMOVED"
+    value_color_map: "true=DEBUG,false=ERROR"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true",
+    button_icon_name: "Clear",
+    allow_force_update: true
+  }];
 }
 
 message CancelChore{
@@ -61,12 +78,15 @@ message CancelChore{
     IsRepeated: true,
     CacheAsDictWithKeyField: "chore_id"
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required string chore_id = 2;
-  required Security security = 3;
-  required Side side = 4;
-  optional bool cxl_confirmed = 5 [(FluxFldHide) = "True"];
-  optional bool force_cancel = 6 [(FluxFldHide) = "True", (FluxFldHelp) = "allows cancel even if strat not active"];
+  required string chore_id = 2 [(FluxFldServerPopulate) = true];
+  optional Security security = 3 [(FluxFldOrmNoUpdate) = true, (FluxFldHide) = "True"];
+  optional string ticker = 4 [(FluxFldOrmNoUpdate) = true];
+  required Side side = 5;
+  optional bool cxl_confirmed = 6 [(FluxFldHide) = "True"];
+  optional bool force_cancel = 7 [(FluxFldHide) = "True", (FluxFldHelp) = "allows cancel even if strat not active"];
 }
 
 message BarterSimulatorProcessNewChore{
@@ -138,6 +158,8 @@ message FillsJournal{
     LogKeySequence: "fill_id"
     IsRepeated: true
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string chore_id = 2;
   optional float fill_px = 3;
@@ -154,6 +176,8 @@ message FillsJournal{
 }
 
 message UnderlyingAccountNCumFillQty{
+  option (FluxMsgStringLength) = 128;
+
   required string underlying_account = 1;
   required int64 cumulative_qty = 2;
 }

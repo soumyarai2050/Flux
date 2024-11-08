@@ -18,7 +18,7 @@ secret_yaml_path = PurePath(__file__).parent.parent / "data" / "secret.yaml"
 if os.path.exists(secret_yaml_path):
     secret_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(secret_yaml_path))
 else:
-    raise Exception(f"Can't find {secret_yaml_path = } file - can't fetch email credentials")
+    raise Exception(f"Can't find {secret_yaml_path=} file - can't fetch email credentials")
 
 portfolio_fail_log_path = PurePath(__file__).parent.parent / "log" / portfolio_alert_fail_log
 simulator_portfolio_fail_log_path = PurePath(__file__).parent.parent / "log" / simulator_portfolio_alert_fail_log
@@ -52,7 +52,7 @@ def log_file_size_listener_and_mail_notifier(log_file_path: str, retry_wait_sec:
                     receiver_users.append(receiver_user)
 
                 mail_subject = "Portfolio Alert handling in log analyzer failed!"
-                mail_body = (f"Unexpected: {log_file_path = } found some log - something that can't be handled "
+                mail_body = (f"Unexpected: {log_file_path=} found some log - something that can't be handled "
                              f"within log analyzer failed, please check {log_file_path}")
                 email_obj: EmailHandler = EmailHandler(sender_obj, receiver_users, subject=mail_subject,
                                                        content=mail_body)

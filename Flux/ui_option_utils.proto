@@ -33,7 +33,7 @@ enum HoverTextType{
     HoverTextType_VALUE_AND_PERCENTAGE = 4;
 }
 
-enum UILayouts{
+enum UILayoutType{
   UI_ABBREVIATED_FILTER = 0;
   UI_TABLE = 1;
   UI_TREE = 2;
@@ -100,6 +100,10 @@ message WidgetUIDataElement {
   optional bool is_model_alert_type = 22;
   optional JoinSort join_sort = 23;
   optional bool is_read_only = 24;
+  optional string file_upload_query = 25;
+  optional bool disallow_duplicate_file_upload = 26;
+  optional bool disallow_non_today_file_upload = 27;
+  optional int32 default_rows_per_page = 28;  // supported values = 25, 50
 }
 
 message WidgetUIOption {
@@ -117,35 +121,37 @@ message SortOrder {
 }
 
 message WidgetUIData{
-  // layout type
-  optional UILayouts view_layout = 1;
-  repeated string enable_override = 2;
-  repeated string disable_override = 3;
-  optional bool highlight_update = 4 [default = false];
-  optional UILayouts edit_layout = 5;
-  optional bool truncate_date_time = 6 [default = false];
   // for UI to store the bounded id value
-  optional string bind_id_val = 7;
-  repeated ColumnOrder column_orders = 8;
-  repeated SortOrder sort_orders = 9;
-  repeated string join_by = 10;
-  optional bool joined_at_center = 11 [default = false];  // if set, all join keys are at center
-  optional bool flip = 12 [default = false];  // if set, column orders are reversed
-  repeated string show_less = 13;
-  repeated string data_source_colors = 14;
+  optional string bind_id_val = 1;
+  optional UILayoutType view_layout = 2;  // layout in READ mode
+  optional UILayoutType edit_layout = 3;  // layout in EDIT mode
+  repeated string enable_override = 4;
+  repeated string disable_override = 5;
+  repeated ColumnOrder column_orders = 6;
+  repeated SortOrder sort_orders = 7;
+  repeated string join_by = 8;
+  optional bool joined_at_center = 9 [default = false];  // if set, all join keys are at center
+  optional bool flip = 10 [default = false];  // if set, column orders are reversed
+  repeated string show_less = 11;
+  repeated string data_source_colors = 12;
+  optional int32 rows_per_page = 13;
+  optional bool highlight_update = 14 [default = false];
+  optional bool truncate_date_time = 15 [default = false];
 }
 
 message UIButton{
   optional string unpressed_caption = 1;
   optional string pressed_caption = 2;
-  optional string disabled_captions = 3; // coma separated list of value=caption
+  optional string disabled_captions = 3; // comma separated list of value=caption
   optional ButtonType button_type = 5;
   optional ButtonSize button_size = 6;
-  optional string value_color_map = 7;  // coma separated list of key=value
+  optional string value_color_map = 7;  // comma separated list of key=value
   optional string action = 8;
   required string pressed_value_as_text = 9;
   optional string button_icon_name = 10;
   optional bool allow_force_update = 11 [default = false];  // if true, double click will trigger update without confirmation
+  optional bool read_only = 12 [default = false];  // if true, button is hidden in edit mode
+  optional bool hide_caption = 13 [default = false];
 }
 
 message UIProgressBar{

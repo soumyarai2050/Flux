@@ -3,10 +3,11 @@ import _, { cloneDeep } from 'lodash';
 import {
     TableContainer, Table, TableBody, DialogTitle, DialogContent, DialogContentText,
     DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination,
-    Snackbar, Alert, TextField, Popover, Box
+    Snackbar, Alert, Popover, Box,
+    Menu, ListItemIcon, ListItemText
 } from '@mui/material';
 import axios from 'axios';
-import { Settings, Close, Visibility, VisibilityOff, FileDownload, LiveHelp, Help } from '@mui/icons-material';
+import { Settings, Close, Visibility, VisibilityOff, FileDownload, LiveHelp, Help, ClearAll } from '@mui/icons-material';
 import { utils, writeFileXLSX } from 'xlsx';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, getTableRowsFromData, sortColumns, getActiveRows } from '../utils';
@@ -36,7 +37,7 @@ const TableWidget = (props) => {
     const [openSettings, setOpenSettings] = useState(false);
     const [settingsArchorEl, setSettingsArcholEl] = useState();
     const [hide, setHide] = useState(true);
-    const [rowsPerPage, setRowsPerPage] = useState(PageSizeCache.getPageSize(props.name));
+    const [rowsPerPage, setRowsPerPage] = useState(props.rowsPerPage);
     const [page, setPage] = useState(PageCache.getPage(props.name));
     const [sortOrders, setSortOrders] = useState(props.sortOrders ? props.sortOrders : []);
     const [openModalPopup, setOpenModalPopup] = useState(false);
@@ -49,6 +50,7 @@ const TableWidget = (props) => {
     const [visibilityMenuArchorEl, setVisibilityMenuAnchorEl] = useState();
     const [showAll, setShowAll] = useState(false);
     const [moreAll, setMoreAll] = useState(false);
+    const [contextMenu, setContextMenu] = useState(null);
     const visibilityMenuClickTimeout = useRef(null);
 
     useEffect(() => {
@@ -120,7 +122,8 @@ const TableWidget = (props) => {
     const handleChangeRowsPerPage = (event) => {
         const size = parseInt(event.target.value, 10);
         setRowsPerPage(size);
-        PageSizeCache.setPageSize(props.name, size);
+        props.onRowsPerPageChange(size);
+        // PageSizeCache.setPageSize(props.name, size);
         setPage(0);
         PageCache.setPage(props.name, 0);
     };
@@ -212,58 +215,54 @@ const TableWidget = (props) => {
                 if (props.xpath) {
                     modalId = props.name + '_' + props.xpath + '_modal';
                 }
-                document.getElementById(modalId).querySelectorAll("[data-xpath='" + xpath + "']").forEach(el => {
-                    el.classList.add(classes.highlight)
-                })
+                const element = document.getElementById(modalId).querySelectorAll("[data-xpath='" + xpath + "']")[0];
+                if (element) {
+                    element.classList.add(classes.highlight);
+                    element.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                    setTimeout(() => {
+                        element.classList.remove(classes.highlight);
+                    }, 3000);
+                }
             }, 500)
         }
     }
 
     const onRowSelect = (e, rowId) => {
-        // event (e) is used to identify whether to select/unselect the row
-        if (props.mode !== Modes.EDIT_MODE) {
-            if (e.ctrlKey) {
-                setSelectedRows([]);
-                if (props.onSelectRow) {
-                    props.onSelectRow(null);
-                }
-            } else {
-                setSelectedRows([rowId]);
-                if (props.onSelectRow) {
-                    props.onSelectRow(rowId);
-                }
-            }
-            // TODO: below condition is preventing the switch to be efficient
-            // if (!selectedRows.includes(rowId)) {
-                // setSelectedRows([rowId]);
-                // props.onSelectRow(rowId);
-            // }
+        // row select only allowed in READ mode
+        if (props.mode !== Modes.READ_MODE) {
+            return;
         }
-        // TODO: multiple row select removed
-        // let updatedSelectedRows;
-        // if (e.ctrlKey) {
-        //     if (selectedRows.find(row => row === rowId)) {
-        //         // rowId already selected. unselect the row
-        //         updatedSelectedRows = selectedRows.filter(row => row !== rowId);
-        //     } else {
-        //         // new selected row. add it to selected array
-        //         updatedSelectedRows = [...selectedRows, rowId];
-        //     }
-        // } else {
-        //     updatedSelectedRows = [rowId];
-        // }
-        // setSelectedRows(updatedSelectedRows);
-        // if (props.widgetType === 'repeatedRoot') {
-        //     if (updatedSelectedRows.length === 1) {
-        //         props.onSelectRow(rowId);
-        //     } else {
-        //         props.onSelectRow(null);
-        //     }
-        // }
+        let updatedSelectedRows;
+        if (e.ctrlKey) {
+            if (selectedRows.find(row => row === rowId)) {
+                // rowId already selected. unselect the row
+                updatedSelectedRows = selectedRows.filter(row => row !== rowId);
+            } else {
+                // new selected row. add it to selected array
+                updatedSelectedRows = [...selectedRows, rowId];
+            }
+        } else {
+            updatedSelectedRows = [rowId];
+        }
+        setSelectedRows(updatedSelectedRows);
+        if (props.widgetType === 'repeatedRoot') {
+            if (updatedSelectedRows.length === 1) {
+                props.onSelectRow(rowId);
+            } else {
+                props.onSelectRow(null);
+            }
+        }
     }
 
     const onRowDoubleClick = (e) => {
-        if (props.mode === Modes.READ_MODE) {
+        // if widget is in READ mode and widget supports EDIT mode, then change mode to EDIT
+        if (props.mode === Modes.READ_MODE && !currentSchema.widget_ui_data_element.is_read_only) {
+            if (selectedRows.length !== 1) {
+                return;
+            } // else - single selected row
             if (!e.target.closest('button')) {
                 props.headerProps.onChangeMode();
             }
@@ -316,7 +315,7 @@ const TableWidget = (props) => {
     }
 
     const onSettingsItemChange = (e, action, key, value, dataSourceId, source) => {
-    // const onSettingsItemChange = (e, key) => {
+        // const onSettingsItemChange = (e, key) => {
         // let hide = !e.target.checked;
         let hide = value;
         if (hide) {
@@ -404,7 +403,7 @@ const TableWidget = (props) => {
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         const userChangeDict = {
-            [DB_ID]: dataSourceId, 
+            [DB_ID]: dataSourceId,
             [xpath]: value
         }
         props.onUserChange(xpath, value, userChangeDict);
@@ -424,7 +423,7 @@ const TableWidget = (props) => {
         _.set(updatedData, dataxpath, e.target.value);
         props.onUpdate(updatedData);
         const userChangeDict = {
-            [DB_ID]: dataSourceId, 
+            [DB_ID]: dataSourceId,
             [xpath]: e.target.value
         }
         props.onUserChange(xpath, e.target.value, userChangeDict);
@@ -441,7 +440,7 @@ const TableWidget = (props) => {
         _.set(updatedData, dataxpath, e.target.checked);
         props.onUpdate(updatedData);
         const userChangeDict = {
-            [DB_ID]: dataSourceId, 
+            [DB_ID]: dataSourceId,
             [xpath]: e.target.checked
         }
         props.onUserChange(xpath, e.target.checked, userChangeDict);
@@ -458,7 +457,7 @@ const TableWidget = (props) => {
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         const userChangeDict = {
-            [DB_ID]: dataSourceId, 
+            [DB_ID]: dataSourceId,
             [xpath]: value
         }
         props.onUserChange(xpath, value, userChangeDict);
@@ -475,7 +474,7 @@ const TableWidget = (props) => {
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         const userChangeDict = {
-            [DB_ID]: dataSourceId, 
+            [DB_ID]: dataSourceId,
             [xpath]: value
         }
         props.onUserChange(xpath, value, userChangeDict);
@@ -595,6 +594,29 @@ const TableWidget = (props) => {
         } else {
             setHide(false);
         }
+    }
+
+    const handleContextMenu = (event) => {
+        event.preventDefault();
+        setContextMenu(
+            contextMenu === null
+                ? {
+                    mouseX: event.clientX + 2,
+                    mouseY: event.clientY - 6,
+                }
+                :
+                // With this behavior we prevent contextmenu from the backdrop to re-locale existing context menus.
+                null,
+        );
+    }
+
+    const handleContextMenuClose = () => {
+        setContextMenu(null);
+    }
+
+    const handleClearAll = () => {
+        setSelectedRows([]);
+        handleContextMenuClose();
     }
 
     const maxSequence = Math.max(...headCells.map(cell => cell.sequenceNumber));
@@ -769,11 +791,14 @@ const TableWidget = (props) => {
         modalId = props.name + '_' + props.xpath + '_modal';
     }
 
+    const currentSchema = props.schema[props.name];
+    let widgetMode = currentSchema.widget_ui_data_element.is_read_only ? null : props.widgetType === 'repeatedRoot' ? selectedRows.length === 1 ? props.headerProps.mode : null : props.headerProps.mode;
+
     return (
         <WidgetContainer
             name={props.headerProps.name}
             title={props.headerProps.title}
-            mode={props.widgetType === 'repeatedRoot' ? selectedRows.length === 1 ? props.headerProps.mode : null : props.headerProps.mode}
+            mode={widgetMode}
             layout={props.headerProps.layout}
             menu={menu}
             onChangeMode={props.headerProps.onChangeMode}
@@ -799,7 +824,7 @@ const TableWidget = (props) => {
                                 onRemoveSort={handleRemoveSort}
                                 copyColumnHandler={copyColumnHandler}
                             />
-                            <TableBody>
+                            <TableBody onContextMenu={handleContextMenu} style={{ cursor: 'context-menu' }}>
                                 {getActiveRows(rows, page, rowsPerPage, sortOrders, true)
                                     .map((row, index) => {
                                         let cells = getFilteredCells();
@@ -843,6 +868,22 @@ const TableWidget = (props) => {
                                     })}
                             </TableBody>
                         </Table>
+                        <Menu
+                            open={contextMenu !== null}
+                            onClose={handleContextMenuClose}
+                            anchorReference='anchorPosition'
+                            anchorPosition={
+                                contextMenu !== null
+                                    ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+                                    : undefined
+                            }>
+                            <MenuItem dense onClick={handleClearAll}>
+                                <ListItemIcon>
+                                    <ClearAll fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Clear All</ListItemText>
+                            </MenuItem>
+                        </Menu>
                     </TableContainer>
                     {rows.length > 6 &&
                         <TablePagination

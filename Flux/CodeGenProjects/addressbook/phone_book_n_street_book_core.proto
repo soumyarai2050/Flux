@@ -14,6 +14,8 @@ message AdminControl {
     ReadOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required CommandType command_type = 2;
   optional string datetime = 3 [(FluxFldValIsDateTime) = true];

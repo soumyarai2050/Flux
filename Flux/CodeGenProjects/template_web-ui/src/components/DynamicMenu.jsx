@@ -196,6 +196,7 @@ const DynamicMenu = (props) => {
                             source={collection.source}
                             onClick={onClick}
                             iconName={collection.button.button_icon_name}
+                            hideCaption={collection.button.hide_caption}
                         />
                     )
                 }
@@ -245,6 +246,7 @@ const DynamicMenu = (props) => {
                             action={collection.button.action}
                             onClick={onClick}
                             iconName={collection.button.button_icon_name}
+                            hideCaption={collection.button.hide_caption}
                         />
                     )
                 })

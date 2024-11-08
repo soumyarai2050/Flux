@@ -7,6 +7,8 @@ import "projects_core.proto";
 package log_book;
 
 message AlertMeta {
+  option (FluxMsgStringLength) = 128;
+
   optional string component_file_path = 1;
   optional string source_file_name = 2;
   optional int32 line_num = 3;
@@ -47,6 +49,7 @@ message StratAlert {
         query_param_field_src: "PairStrat.id"
       },
     },
+    is_read_only: true,
     is_model_alert_type: true
   };
   option (FluxMsgJsonQuery) = {
@@ -68,6 +71,8 @@ message StratAlert {
       QueryParamsDataType: "int | None = None",
       QueryType: BOTH
   };
+  option (FluxMsgStringLength) = 128;
+
   option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgMainCRUDOperationsAgg) = {
     agg_var_name: "sort_alerts_based_on_severity_n_last_update_analyzer_time",
@@ -115,6 +120,7 @@ message PortfolioAlert {
       view_layout: UI_TABLE
     },
     depending_proto_file_name: "email_book_service.proto",
+    is_read_only: true,
     is_model_alert_type: true
   };
   option (FluxMsgJsonQuery) = {
@@ -131,6 +137,8 @@ message PortfolioAlert {
     agg_var_name: "sort_alerts_based_on_severity_n_last_update_analyzer_time"
     override_get_all_limit_handling: true,
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional bool dismiss = 2 [default = false, (FluxFldIndex) = true, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "dismiss",
@@ -150,6 +158,8 @@ message PortfolioAlert {
 }
 
 message ExecutorEventMeta {
+  option (FluxMsgStringLength) = 128;
+
   required string strat_key = 1 [(FluxFldFilterEnable) = true];
   required string execution_date = 2 [(FluxFldFilterEnable) = true, (FluxFldHelp) = "dd-mm-yyyy"];
 }
@@ -174,8 +184,10 @@ message ExecutorEventJournal {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "email_book_service.proto",
+    depending_proto_file_name: "email_book_service.proto"
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required ExecutorEventMeta executor_event_meta = 2 [(FluxFldValMetaField) = true];
   required string event_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];

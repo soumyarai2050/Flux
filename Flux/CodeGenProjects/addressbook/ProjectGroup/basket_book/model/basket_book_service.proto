@@ -39,6 +39,8 @@ message BasketChore{
     IsTopLvlModel: false,
     ExecutorKeySequence: "security.sec_id-side"
   };
+
+  option (FluxMsgStringLength) = 128;
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   repeated NewChore new_chores = 2 [(FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "algo:ALGO_List, force_bkr:BrokerCode_List, sec_id:CB_List, mstrat:Mstrat_List, sec_id_source=TICKER"];
 }

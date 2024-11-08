@@ -1,5 +1,9 @@
+import ast
+import datetime
+import logging
 import multiprocessing
 import os
+import re
 from typing import Set
 import signal
 import sys
@@ -7,23 +11,16 @@ import inspect
 
 # Project imports
 from FluxPythonUtils.log_book.log_book import get_transaction_counts_n_timeout_from_config
+from FluxPythonUtils.scripts.utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_base_log_book import (
     PhoneBookBaseLogBook, StratLogDetail)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client, get_reset_log_book_cache_wrapper_pattern)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_symbol_side_pattern)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import PairStratBaseModel
-from FluxPythonUtils.scripts.utility_functions import configure_logger
-
-
-LOG_ANALYZER_DATA_DIR = (
-    PurePath(__file__).parent.parent / "data"
-)
-
-debug_mode: bool = False if ((debug_env := os.getenv("PS_LOG_ANALYZER_DEBUG")) is None or
-                             len(debug_env) == 0 or debug_env == "0") else True
 
 strat_alert_bulk_update_counts_per_call, strat_alert_bulk_update_timeout = (
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("strat_alert_config"), is_server_config=False))
@@ -43,21 +40,14 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
         log_dir: PurePath = PurePath(__file__).parent.parent / "log" / "tail_executors"
         configure_logger(logging.DEBUG, log_file_dir_path=str(log_dir),
                          log_file_name=log_file_name)
-
         logging.info(f"Logging for {process_name}")
+
         super().__init__(log_detail, regex_file_dir_path,
                          log_prefix_regex_pattern_to_callable_name_dict, simulation_mode)
         self.pattern_for_pair_strat_db_updates: str = get_pattern_for_pair_strat_db_updates()
         self.symbol_side_pattern: str = get_symbol_side_pattern()
         self.reset_log_book_cache_pattern: str = get_reset_log_book_cache_wrapper_pattern()
         PhoneBookLogBook.initialize_underlying_http_callables()
-        if self.simulation_mode:
-            print(f"CRITICAL: tail executor for process: {process_name} running in simulation mode...")
-            alert_brief: str = "PairStrat Log analyzer running in simulation mode"
-            alert_meta = get_alert_meta_obj(PurePath(__file__).name, PurePath(__file__).name,
-                                            inspect.currentframe().f_lineno, DateTime.utcnow())
-            self.send_portfolio_alerts(severity=self.get_severity("critical"), alert_brief=alert_brief,
-                                       alert_meta=alert_meta)
 
         # running queue handling for pair_start_api_ops
         Thread(target=self._pair_strat_api_ops_queue_handler, daemon=True, name="db_queue_handler").start()
@@ -68,14 +58,29 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
         # running raw_performance thread
         raw_performance_handler_thread = Thread(target=self._handle_raw_performance_data_queue, daemon=True,
                                                 name="raw_performance_handler")
+        raw_performance_handler_thread.start()
         logging.info(f"Thread Started: raw_performance_handler")
 
-        raw_performance_handler_thread.start()
+        self.strat_pause_regex_pattern: List[re.Pattern] = [re.compile(fr'{pattern}') for pattern in
+                                                            config_yaml_dict.get("strat_pause_regex_pattern")]
+        self.pos_disable_regex_pattern: List[re.Pattern] = [re.compile(fr'{pattern}') for pattern in
+                                                            config_yaml_dict.get("pos_disable_regex_pattern")]
+        self.run_startup_checks()
 
         self.terminate_triggered: bool = False
         signal.set_wakeup_fd(-1)
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
+
+    def run_startup_checks(self):
+        if self.simulation_mode:
+            alert_brief: str = "PairStrat Log analyzer running in simulation mode"
+            print(f"CRITICAL: {alert_brief}")
+            alert_meta = get_alert_meta_obj(PurePath(__file__).name, PurePath(__file__).name,
+                                            inspect.currentframe().f_lineno, DateTime.utcnow())
+            self.send_portfolio_alerts(severity=self.get_severity("critical"), alert_brief=alert_brief,
+                                       alert_meta=alert_meta)
+        # else - system not running in simulation node
 
     def _signal_handler(self, signal_type: int, *args) -> None:
         if not self.terminate_triggered:
@@ -151,12 +156,41 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
         portfolio_alert_handler_thread.start()
         strat_alert_handler_thread.start()
 
+    def _force_trigger_strat_pause(self, pair_strat_id: int, error_event_msg: str):
+        try:
+            updated_pair_strat: PairStratBaseModel = PairStratBaseModel.from_kwargs(
+                _id=pair_strat_id, strat_state=StratState.StratState_PAUSED)
+            email_book_service_http_client.patch_pair_strat_client(
+                updated_pair_strat.to_json_dict(exclude_none=True))
+            err_ = f"Force paused {pair_strat_id=}, {error_event_msg}"
+            logging.critical(err_)
+            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                            inspect.currentframe().f_lineno, DateTime.utcnow())
+            self._send_strat_alerts(pair_strat_id, PhoneBookBaseLogBook.get_severity("critical"),
+                                    err_, alert_meta)
+        except Exception as e:
+            alert_brief: str = f"force_trigger_strat_pause failed for {pair_strat_id=}, {error_event_msg=}"
+            alert_details: str = f"exception: {e}"
+            logging.critical(f"{alert_brief};;;{alert_details}")
+            alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
+                                            inspect.currentframe().f_lineno, DateTime.utcnow(), alert_details)
+            self.send_portfolio_alerts(severity=PhoneBookBaseLogBook.get_severity("critical"),
+                                       alert_brief=alert_brief, alert_meta=alert_meta)
+
+    def _handle_strat_pause_pattern_match(self, pair_strat_id: int, message: str, pattern: re.Pattern):
+        msg_brief: str = message.split(";;;")[0]
+        err_: str = f"Matched {pattern.pattern=}, pausing strat with {pair_strat_id=};;;{msg_brief=}"
+        self._force_trigger_strat_pause(pair_strat_id, err_)
+
+    def _handle_pos_disable_pattern_match(self, pair_strat_id: int, message: str, pattern: re.Pattern):
+        pass
+
     def _handle_strat_alert_exception(self, message: str, e: Exception,
                                       severity: str | None = None,
                                       log_date_time: DateTime | None = None,
                                       log_source_file_name: str | None = None,
                                       line_num: int | None = None) -> None:
-        msg_brief_n_detail = message.split(PhoneBookBaseLogBook.log_seperator)
+        msg_brief_n_detail = message.split(PhoneBookBaseLogBook.log_seperator, 1)
         msg_detail = f"_process_strat_alert_message failed with exception: {e}"
         if len(msg_brief_n_detail) == 2:
             msg_brief = msg_brief_n_detail[0]
@@ -195,7 +229,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
                 symbol_side_set.add(value)
 
             if len(symbol_side_set) == 0:
-                raise Exception("no symbol-side pair found while creating strat alert, ")
+                raise Exception("no symbol-side pair found while creating strat alert")
 
             symbol_side: str = list(symbol_side_set)[0]
             symbol, side = symbol_side.split("-")
@@ -203,17 +237,33 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
 
             if strat_id is None or self.strat_alert_cache_dict_by_strat_id_dict.get(strat_id) is None:
 
-                pair_strat_obj: PairStratBaseModel = self._get_pair_strat_obj_from_symbol_side(symbol, side)
+                pair_strat_obj: PairStratBaseModel = self._get_pair_strat_obj_from_symbol_side(symbol, Side(side))
                 if pair_strat_obj is None:
                     raise Exception(f"No pair strat found for symbol_side: {symbol_side}")
                 if not pair_strat_obj.is_executor_running:
-                    raise Exception(f"StartExecutor Server not running for pair_strat: {pair_strat_obj}")
+                    raise Exception(f"StreetBook Server not running for {strat_id=}")
 
                 strat_id = pair_strat_obj.id
                 update_strat_alert_cache(strat_id, self.strat_alert_cache_dict_by_strat_id_dict,
                                          log_book_service_http_client.filtered_strat_alert_by_strat_id_query_client)
-                self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
+                for symbol_side in symbol_side_set:
+                    self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
             # else not required: alert cache exists
+
+            # handle strat_state update mismatch
+            if "Strat state changed from StratState_ACTIVE to StratState_PAUSED" in message:
+                log_book_service_http_client.strat_state_update_matcher_query_client(strat_id, message,
+                                                                                         self.component_file_path)
+
+            pattern: re.Pattern
+            for pattern in self.strat_pause_regex_pattern:
+                if pattern.search(message):
+                    self._handle_strat_pause_pattern_match(strat_id, message, pattern)
+                    break
+            for pattern in self.pos_disable_regex_pattern:
+                if pattern.search(message):
+                    self._handle_pos_disable_pattern_match(strat_id, message, pattern)
+                    break
 
             alert_meta = get_alert_meta_obj(self.component_file_path, log_source_file_name,
                                             line_num, log_date_time, alert_details)
@@ -253,6 +303,21 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             severity, alert_brief, alert_details = self._create_alert(error_dict=error_dict)
 
             strat_id = pair_strat_id
+
+            # handle strat_state update mismatch
+            if "Strat state changed from StratState_ACTIVE to StratState_PAUSED" in message:
+                log_book_service_http_client.strat_state_update_matcher_query_client(strat_id, message,
+                                                                                         self.component_file_path)
+
+            pattern: re.Pattern
+            for pattern in self.strat_pause_regex_pattern:
+                if pattern.search(message):
+                    self._handle_strat_pause_pattern_match(strat_id, message, pattern)
+                    break
+            for pattern in self.pos_disable_regex_pattern:
+                if pattern.search(message):
+                    self._handle_pos_disable_pattern_match(strat_id, message, pattern)
+                    break
 
             alert_meta = get_alert_meta_obj(self.component_file_path, log_source_file_name,
                                             line_num, log_date_time, alert_details)
@@ -346,7 +411,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
 
         # handling ResetLogBookCache
         if match := (
-                re.compile(fr"{self.reset_log_book_cache_pattern}.*{self.reset_log_book_cache_pattern}"
+                re.compile(fr"{self.reset_log_book_cache_pattern}(.*?){self.reset_log_book_cache_pattern}"
                            ).search(log_message)):
             logging.info("Found ResetLogBookCache pattern")
             self._handle_reset_log_book_cache(match[0])

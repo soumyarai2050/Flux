@@ -56,6 +56,8 @@ message SymbolSideSnapshot{
     depends_on_other_model_for_dynamic_url: true,
     is_read_only: true
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required Security security = 2;
   required Side side = 3;
@@ -119,6 +121,8 @@ message StratStatus{
   option (FluxMsgJsonQuery) = {
     QueryName: "put_strat_to_snooze",
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
 
   optional int64 total_buy_qty = 3 [(FluxFldHelp) = "sum of all buy chore qty in chore brief of strat chore snapshot"];
@@ -192,6 +196,8 @@ message StratLimits{
   option (FluxMsgJsonQuery) = {
       QueryName: "get_strat_limits_from_cache"
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int32 max_open_chores_per_side = 2 [(FluxFldValMax) = "5", (FluxFldHelp) = "max simultaneous open chores allowed per side for this strat"];
   optional float max_single_leg_notional = 3 [(FluxFldTitle) = "max single leg $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldValMax) = "10000000", (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];

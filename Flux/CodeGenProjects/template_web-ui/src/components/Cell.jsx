@@ -71,8 +71,10 @@ const Cell = (props) => {
     const validationError = useRef(null);
     const [inputValue, setInputValue] = useState(currentValue);
     const [isDateTimePickerOpen, setIsDateTimePickerOpen] = useState(false);
+    const [autocompleteInputValue, setAutoCompleteInputValue] = useState('');
     const inputRef = useRef(null);
     const cursorPos = useRef(null);
+    const autocompleteRef = useRef(null);
 
     useEffect(() => {
         setInputValue(currentValue);
@@ -129,6 +131,19 @@ const Cell = (props) => {
         cursorPos.current = e.target.selectionStart;
         setInputValue(value);
         props.onTextChange(e, type, xpath, value, dataxpath, validationRes);
+    }
+
+    const handleKeyDown = (e, filteredOptions) => {
+        if (e.keyCode === 13) {
+            if (filteredOptions.length === 1) {
+                props.onAutocompleteOptionChange(e, filteredOptions[0], dataxpath, xpath, dataSourceId, collection.source);
+                setAutoCompleteInputValue('');
+
+                if (autocompleteRef.current) {
+                    autocompleteRef.current.blur();
+                }
+            }
+        }
     }
 
     const onFocusIn = (e) => {
@@ -268,7 +283,7 @@ const Cell = (props) => {
     const placeholder = collection.placeholder ? collection.placeholder : !required ? 'optional' : null;
 
     if (mode === Modes.EDIT_MODE && active && !disabled && !(['repeatedRoot', 'abbreviatedFilter'].includes(props.widgetType) && !props.selected) && (!(collection.ormNoUpdate && !dataAdd)) && !collection.serverPopulate) {
-        if (collection.autocomplete) {
+        if (type !== DataTypes.ENUM && collection.autocomplete) {
             validationError.current = validateConstraints(collection, value);
 
             const endAdornment = validationError.current ? (
@@ -279,9 +294,7 @@ const Cell = (props) => {
             } : {};
 
             if (collection.dynamic_autocomplete) {
-                const widgetName = toCamelCase(collection.autocomplete.split('.')[0]);
-                const dynamicValuePath = collection.autocomplete.substring(collection.autocomplete.indexOf('.') + 1);
-                const dynamicValue = getValueFromReduxStoreFromXpath(reducerDict, dynamicValuePath);
+                const dynamicValue = getValueFromReduxStoreFromXpath(reducerDict, collection.autocomplete);
                 if (schema.autocomplete.hasOwnProperty(dynamicValue)) {
                     collection.options = schema.autocomplete[schema.autocomplete[dynamicValue]];
                     if (!collection.options.includes(collection.value) && !collection.ormNoUpdate && !collection.serverPopulate) {
@@ -317,21 +330,34 @@ const Cell = (props) => {
                         required={required}
                         // clearOnBlur={false}
                         value={collection.value}
+                        inputValue={autocompleteInputValue}
+                        onInputChange={(e, newInputValue) => setAutoCompleteInputValue(newInputValue)}
+                        filteredOptions={(options, { inputValue }) => 
+                            options.filter(option => option.toLowerCase().includes(inputValue.toLowerCase()))
+                        }
                         onBlur={onFocusOut}
                         autoFocus
-                        onChange={(e, v) => props.onAutocompleteOptionChange(e, v, dataxpath, xpath, dataSourceId, collection.source)}
-                        renderInput={(params) => (
-                            <TextField
-                                {...params}
-                                name={collection.key}
-                                error={validationError.current !== null}
-                                placeholder={placeholder}
-                                InputProps={{
-                                    ...params.InputProps,
-                                    ...inputProps
-                                }}
-                            />
-                        )}
+                        onChange={(e, v) => {
+                            props.onAutocompleteOptionChange(e, v, dataxpath, xpath, dataSourceId, collection.source);
+                            setAutoCompleteInputValue('');
+                        }}
+                        renderInput={(params) => {
+                            const filteredOptions = collection.options.filter(option => option.toLowerCase().includes(inputValue.toLowerCase()));
+                            return (
+                                <TextField
+                                    {...params}
+                                    name={collection.key}
+                                    error={validationError.current !== null}
+                                    placeholder={placeholder}
+                                    onKeyDown={(e) => handleKeyDown(e, filteredOptions)}
+                                    inputRef={autocompleteRef}
+                                    InputProps={{
+                                        ...params.InputProps,
+                                        ...inputProps
+                                    }}
+                                />
+                            )
+                        }}
                     />
                 </TableCell>
             )
@@ -748,6 +774,7 @@ const Cell = (props) => {
                     source={collection.source}
                     onClick={props.onButtonClick}
                     iconName={collection.button.button_icon_name}
+                    hideCaption={collection.button.hide_caption}
                 />
             </TableCell>
         )

@@ -59,3 +59,9 @@ pattern_to_remove_file_from_created_cache: "-*-"
 # suppress_alert_regex configs
 regex_file_name: "suppress_alert_regex.txt"
 regex_lock_file_name: "suppress_alert_regex.txt.lock"
+
+strat_pause_regex_pattern:
+  - "^LMT_UP_DN:"
+  - "^Chore found overfilled for"
+pos_disable_regex_pattern:
+  - "^EXT:"

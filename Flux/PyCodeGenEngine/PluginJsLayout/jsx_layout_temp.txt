@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import _, { cloneDeep, isObject } from 'lodash';
 import {
     getAllUILayout, createUILayout, updateUILayout,
@@ -258,215 +258,6 @@ function Layout(props) {
         setOpenLoadLayout(false);
     }
 
-    const onLayoutTypeChange = useCallback((name, layoutType, bindVal = null) => {
-        layoutsRef.current = layoutsRef.current.map(layout => {
-            if (layout.i === name) {
-                layout = cloneDeep(layout);
-                if (bindVal || bindVal === 0) {
-                    bindVal = String(bindVal)
-                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
-                    if (widgetUIData) {
-                        widgetUIData.view_layout = layoutType;
-                        widgetUIData.bind_id_val = bindVal;
-                    } else {
-                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], view_layout: layoutType, bind_id_val: bindVal });
-                    }
-                } else {
-                    layout.widget_ui_data[0].view_layout = layoutType;
-                }
-            }
-            return layout
-        });
-        setLayoutsById();
-        setUpdateCounter(prevCounter => prevCounter + 1);
-    }, [])
-
-    const onColumnOrdersChange = useCallback((name, columnOrders, bindVal = null) => {
-        layoutsRef.current = layoutsRef.current.map(layout => {
-            if (layout.i === name) {
-                layout = cloneDeep(layout);
-                if (bindVal || bindVal === 0) {
-                    bindVal = String(bindVal)
-                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
-                    if (widgetUIData) {
-                        widgetUIData.column_orders = columnOrders;
-                        widgetUIData.bind_id_val = bindVal;
-                    } else {
-                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], column_orders: columnOrders, bind_id_val: bindVal });
-                    }
-                } else {
-                    layout.widget_ui_data[0].column_orders = columnOrders;
-                }
-            }
-            return layout
-        });
-        setLayoutsById();
-        setUpdateCounter(prevCounter => prevCounter + 1);
-    }, [])
-
-    const onSortOrdersChange = useCallback((name, sortOrders, bindVal = null) => {
-        layoutsRef.current = layoutsRef.current.map(layout => {
-            if (layout.i === name) {
-                layout = cloneDeep(layout);
-                if (bindVal || bindVal === 0) {
-                    bindVal = String(bindVal)
-                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
-                    if (widgetUIData) {
-                        widgetUIData.sort_orders = sortOrders;
-                        widgetUIData.bind_id_val = bindVal;
-                    } else {
-                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], sort_orders: sortOrders, bind_id_val: bindVal });
-                    }
-                } else {
-                    layout.widget_ui_data[0].sort_orders = sortOrders;
-                }
-            }
-            return layout
-        });
-        setLayoutsById();
-        setUpdateCounter(prevCounter => prevCounter + 1);
-    }, [])
-
-    const onJoinByChange = useCallback((name, joinBy, bindVal = null) => {
-        layoutsRef.current = layoutsRef.current.map(layout => {
-            if (layout.i === name) {
-                layout = cloneDeep(layout);
-                if (bindVal || bindVal === 0) {
-                    bindVal = String(bindVal)
-                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
-                    if (widgetUIData) {
-                        widgetUIData.join_by = joinBy;
-                        widgetUIData.bind_id_val = bindVal;
-                    } else {
-                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], join_by: joinBy, bind_id_val: bindVal });
-                    }
-                } else {
-                    layout.widget_ui_data[0].join_by = joinBy;
-                }
-            }
-            return layout
-        });
-        setLayoutsById();
-        setUpdateCounter(prevCounter => prevCounter + 1);
-    }, [])
-
-    const onCenterJoinChange = useCallback((name, centerJoin, bindVal = null) => {
-        layoutsRef.current = layoutsRef.current.map(layout => {
-            if (layout.i === name) {
-                layout = cloneDeep(layout);
-                if (bindVal || bindVal === 0) {
-                    bindVal = String(bindVal)
-                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
-                    if (widgetUIData) {
-                        widgetUIData.joined_at_center = centerJoin;
-                        widgetUIData.bind_id_val = bindVal;
-                    } else {
-                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], joined_at_center: centerJoin, bind_id_val: bindVal });
-                    }
-                } else {
-                    layout.widget_ui_data[0].joined_at_center = centerJoin;
-                }
-            }
-            return layout
-        });
-        setLayoutsById();
-        setUpdateCounter(prevCounter => prevCounter + 1);
-    }, [])
-
-    const onFlipChange = useCallback((name, flip, bindVal = null) => {
-        layoutsRef.current = layoutsRef.current.map(layout => {
-            if (layout.i === name) {
-                layout = cloneDeep(layout);
-                if (bindVal || bindVal === 0) {
-                    bindVal = String(bindVal)
-                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
-                    if (widgetUIData) {
-                        widgetUIData.flip = flip;
-                        widgetUIData.bind_id_val = bindVal;
-                    } else {
-                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], flip: flip, bind_id_val: bindVal });
-                    }
-                } else {
-                    layout.widget_ui_data[0].flip = flip;
-                }
-            }
-            return layout
-        });
-        setLayoutsById();
-        setUpdateCounter(prevCounter => prevCounter + 1);
-    }, [])
-
-    const onShowLessChange = useCallback((name, showLess, bindVal = null) => {
-        layoutsRef.current = layoutsRef.current.map(layout => {
-            if (layout.i === name) {
-                layout = cloneDeep(layout);
-                if (bindVal || bindVal === 0) {
-                    bindVal = String(bindVal)
-                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
-                    if (widgetUIData) {
-                        widgetUIData.show_less = showLess;
-                        widgetUIData.bind_id_val = bindVal;
-                    } else {
-                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], show_less: showLess, bind_id_val: bindVal });
-                    }
-                } else {
-                    layout.widget_ui_data[0].show_less = showLess;
-                }
-            }
-            return layout
-        });
-        setLayoutsById();
-        setUpdateCounter(prevCounter => prevCounter + 1);
-    }, [])
-
-    const onDataSourceColorsChange = useCallback((name, updatedColors, bindVal = null) => {
-        layoutsRef.current = layoutsRef.current.map(layout => {
-            if (layout.i === name) {
-                layout = cloneDeep(layout);
-                if (bindVal || bindVal === 0) {
-                    bindVal = String(bindVal)
-                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
-                    if (widgetUIData) {
-                        widgetUIData.data_source_colors = updatedColors;
-                        widgetUIData.bind_id_val = bindVal;
-                    } else {
-                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], data_source_colors: updatedColors, bind_id_val: bindVal });
-                    }
-                } else {
-                    layout.widget_ui_data[0].data_source_colors = updatedColors;
-                }
-            }
-            return layout
-        });
-        setLayoutsById();
-        setUpdateCounter(prevCounter => prevCounter + 1);
-    }, [])
-
-    const onOverrideChange = useCallback((name, enableOverride, disableOverride, bindVal = null) => {
-        layoutsRef.current = layoutsRef.current.map(layout => {
-            if (layout.i === name) {
-                layout = cloneDeep(layout);
-                if (bindVal || bindVal === 0) {
-                    bindVal = String(bindVal);
-                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
-                    if (widgetUIData) {
-                        widgetUIData.enable_override = enableOverride;
-                        widgetUIData.disable_override = disableOverride;
-                        widgetUIData.bind_id_val = bindVal;
-                    } else {
-                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], enable_override: enableOverride, disable_override: disableOverride, bind_id_val: bindVal });
-                    }
-                } else {
-                    layout.widget_ui_data[0].enable_override = enableOverride;
-                    layout.widget_ui_data[0].disable_override = disableOverride;
-                }
-            }
-            return layout
-        });
-        setLayoutsById();
-        setUpdateCounter(prevCounter => prevCounter + 1);
-    }, [])
-
     const onChartDataChange = useCallback((name, chartDataObj) => {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {
@@ -534,6 +325,39 @@ function Layout(props) {
         updatedScrollLock[widgetName] = true;
         setScrollLock(updatedScrollLock);
     }
+
+    // view_layout
+    // column_orders
+    // sort_orders
+    // join_by
+    // joined_at_center
+    // flip
+    // show_less
+    // data_source_colors
+    // enable_override
+    // disable_override
+
+    const onWidgetUIDataChange = useCallback((name, property, value, bindVal = null) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                if (bindVal) {
+                    bindVal = String(bindVal);
+                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
+                    if (widgetUIData) {
+                        widgetUIData[property] = value;
+                    } else {
+                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], bind_id_val: bindVal, [property]: value });
+                    }
+                } else {
+                    layout.widget_ui_data[0][property] = value;
+                }
+            }
+            return layout
+        });
+        setLayoutsById();
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
 
     const storedCookie = sessionStorage.getItem(COOKIE_NAME);
     const queryLayout = queryParams?.layout;

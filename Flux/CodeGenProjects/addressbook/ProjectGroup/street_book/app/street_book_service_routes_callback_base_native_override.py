@@ -1,4 +1,5 @@
 # standard imports
+import os
 import threading
 import time
 import copy
@@ -9,12 +10,14 @@ import stat
 import subprocess
 from typing import Set
 import ctypes
+import mmap
 
+# 3rd party imports
+import posix_ipc
 from sqlalchemy.testing.plugin.plugin_base import logging
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import last_barter_callback_type, \
-    market_depth_callback_type
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import MDSharedMemoryContainer
 # below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import SymbolCacheContainer
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_routes_callback_imports import (
@@ -27,7 +30,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
     get_default_max_open_single_leg_notional, get_default_max_net_filled_notional)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
     host, EXECUTOR_PROJECT_DATA_DIR, executor_config_yaml_dict, main_config_yaml_path, EXECUTOR_PROJECT_SCRIPTS_DIR)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import MobileBookMutexManager, OTHER_TERMINAL_STATES, \
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import OTHER_TERMINAL_STATES, \
     NON_FILLED_TERMINAL_STATES
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     compute_max_single_leg_notional, get_premium)
@@ -61,7 +64,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book import (
-    StreetBook, BarteringDataManager, get_bartering_link, ExtendedTopOfBook, MarketDepth)
+    StreetBook, BarteringDataManager, get_bartering_link, MarketDepth)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_service_routes_callback_base_native_override import BaseBookServiceRoutesCallbackBaseNativeOverride
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import StreetBookServiceKeyHandler
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import (
@@ -234,6 +237,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         # since this init is called before db_init
         self.db_name: str = f"street_book_{self.pair_strat_id}"
         os.environ["DB_NAME"] = self.db_name
+        self.md_shared_memory_name = f"/dev/shm/{self.db_name}_shm"
+        self.shared_memory_semaphore_name = f"/{self.db_name}_sem"
         self.strat_leg_1: StratLeg | None = None  # will be set by once all_service_up test passes
         self.strat_leg_2: StratLeg | None = None  # will be set by once all_service_up test passes
         self.leg1_symbol_cache: StratCache | None = None  # will be set by once all_service_up test passes
@@ -250,10 +255,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
 
-        self.lt_callback = last_barter_callback_type(SymbolCacheContainer.last_barter_callback)
-        self.mobile_book_provider.register_last_barter_fp(self.lt_callback)
-        self.md_callback = market_depth_callback_type(SymbolCacheContainer.market_depth_callback)
-        self.mobile_book_provider.register_mkt_depth_fp(self.md_callback)
+        # self.lt_callback = last_barter_callback_type(SymbolCacheContainer.last_barter_callback)
+        # self.mobile_book_provider.register_last_barter_fp(self.lt_callback)
+        # self.md_callback = market_depth_callback_type(SymbolCacheContainer.market_depth_callback)
+        # self.mobile_book_provider.register_mkt_depth_fp(self.md_callback)
         self.mobile_book_provider.create_or_update_md_n_tob.argtypes = [
             ctypes.c_int32,
             ctypes.c_char_p,
@@ -323,6 +328,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             static_data_service_state: ServiceState = ServiceState(
                 error_prefix=error_prefix + "static_data_service failed, exception: ")
             symbol_overview_for_symbol_exists: bool = False
+            shared_memory_found = False
             should_sleep: bool = False
             while True:
                 if self.strat_cache and not strat_key:
@@ -334,8 +340,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 if service_up_flag_env_var == "1":
                     # validate essential services are up, if so, set service ready state to true
                     # static data and md service are considered essential
-                    if (self.all_services_up and static_data_service_state.ready and self.usd_fx is not None and
-                            symbol_overview_for_symbol_exists and self.bartering_data_manager is not None):
+                    if (self.all_services_up and static_data_service_state.ready and
+                            self.usd_fx is not None and symbol_overview_for_symbol_exists and
+                            self.bartering_data_manager is not None and shared_memory_found):
                         if not self.service_ready:
                             self.service_ready = True
                             # creating required models for this strat
@@ -351,7 +358,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     else:
                         warn: str = (f"strat executor service is not up yet for {strat_key};;;{self.all_services_up=}, "
                                      f"{static_data_service_state.ready=}, {self.usd_fx=}, "
-                                     f"{symbol_overview_for_symbol_exists=}, {self.bartering_data_manager=}")
+                                     f"{symbol_overview_for_symbol_exists=}, {self.bartering_data_manager=}, "
+                                     f"{shared_memory_found=}")
                         if service_up_no_warn_retry <= 0:
                             logging.warning(warn)
                         else:
@@ -393,24 +401,36 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 simulate_config_yaml_file_data += f"mongo_server: {mongo_server}\n"
                                 simulate_config_yaml_file_data += f"db_name: {self.db_name}\n\n"
 
+                                # Note: Publish policy
+                                # 0: None(cpp will not perform that particular operation on which it is set),
+                                # 1: Pre(cpp will perform that operation in main thread and then returns the control back),
+                                # 2: Post(cpp starts new thread and returns control back immediately,
+                                #    operation on which it is set is handled by the different thread)
                                 if not executor_config_yaml_dict.get("avoid_cpp_ws_update"):
                                     simulate_config_yaml_file_data += f"top_of_book_ws_port: {top_of_book_ws_port}\n"
                                     simulate_config_yaml_file_data += f"market_depth_ws_port: {market_depth_ws_port}\n"
                                     simulate_config_yaml_file_data += f"last_barter_ws_port: {last_barter_ws_port}\n"
+                                    simulate_config_yaml_file_data += f"market_depth_ws_update_publish_policy: 2\n"
+                                    simulate_config_yaml_file_data += f"top_of_book_ws_update_publish_policy: 2\n"
+                                    simulate_config_yaml_file_data += f"last_barter_ws_update_publish_policy: 2\n"
                                     simulate_config_yaml_file_data += f"websocket_timeout: 300\n"
 
+                                if not executor_config_yaml_dict.get("avoid_cpp_to_update_python_cache"):
+                                    simulate_config_yaml_file_data += f"market_depth_py_cache_publish_policy: 1\n"
+                                    simulate_config_yaml_file_data += f"last_barter_py_cache_publish_policy: 1\n"
+
                                 if not executor_config_yaml_dict.get("avoid_cpp_db_update"):
-                                    simulate_config_yaml_file_data += f"avoid_top_of_book_db_update: False\n"
-                                    simulate_config_yaml_file_data += f"avoid_last_barter_db_update: False\n"
-                                    simulate_config_yaml_file_data += f"avoid_market_depth_db_update: False\n"
+                                    simulate_config_yaml_file_data += f"market_depth_db_update_publish_policy: 2\n"
+                                    simulate_config_yaml_file_data += f"top_of_book_db_update_publish_policy: 2\n"
+                                    simulate_config_yaml_file_data += f"last_barter_db_update_publish_policy: 2\n"
 
                                 if not executor_config_yaml_dict.get("avoid_cpp_http_update"):
                                     simulate_config_yaml_file_data += "project_name: street_book\n"
                                     simulate_config_yaml_file_data += "http_ip: 127.0.0.1\n"
                                     simulate_config_yaml_file_data += f"http_port: {self.port}\n"
-                                    simulate_config_yaml_file_data += f"avoid_top_of_book_http_update: False\n"
-                                    simulate_config_yaml_file_data += f"avoid_last_barter_http_update: False\n"
-                                    simulate_config_yaml_file_data += f"avoid_market_depth_http_update: False\n"
+                                    simulate_config_yaml_file_data += f"market_depth_http_update_publish_policy: 1\n"
+                                    simulate_config_yaml_file_data += f"top_of_book_http_update_publish_policy: 1\n"
+                                    simulate_config_yaml_file_data += f"last_barter_http_update_publish_policy: 1\n"
 
                                 YAMLConfigurationManager.update_yaml_configurations(
                                     simulate_config_yaml_file_data, str(self.simulate_config_yaml_file_path))
@@ -509,6 +529,39 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         f"self.static_data did init to None for {strat_key=}, unexpected!!")
                             except Exception as exp:
                                 static_data_service_state.handle_exception(exp)
+                        else:
+                            # refresh static data periodically (maybe more in future)
+                            try:
+                                self.static_data_periodic_refresh()
+                            except Exception as exp:
+                                static_data_service_state.handle_exception(exp)
+                                static_data_service_state.ready = False  # forces re-init in next iteration
+
+                        if not shared_memory_found:
+                            try:
+                                shm_fd = os.open(self.md_shared_memory_name, os.O_RDWR)
+                                size = ctypes.sizeof(MDSharedMemoryContainer)
+                                shm = mmap.mmap(shm_fd, size, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE)
+                                SymbolCacheContainer.shared_memory = shm
+                            except FileNotFoundError as exp:
+                                # shared memory doesn't exist yet, will retry in next loop
+                                logging.warning(f"Something went wrong with setting up md shared memory: {exp}")
+
+                            try:
+
+                                semaphore = posix_ipc.Semaphore(
+                                    self.shared_memory_semaphore_name)
+                                SymbolCacheContainer.shared_memory_semaphore = semaphore
+
+                            except posix_ipc.ExistentialError as e:
+                                # shared memory doesn't exist yet, will retry in next loop
+                                logging.warning(f"Something went wrong with setting up md shared memory semaphore: {e}")
+
+                            if (SymbolCacheContainer.shared_memory is not None and
+                                    SymbolCacheContainer.shared_memory_semaphore is not None):
+                                shared_memory_found = True
+                            # else will retry again in next loop run
+
                         if not symbol_overview_for_symbol_exists:
                             # updating symbol_overviews
                             symbol_overview_list = self.strat_cache.symbol_overviews
@@ -535,13 +588,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     symbol_overview_for_symbol_exists = True
                                 else:
                                     symbol_overview_for_symbol_exists = False
-                        else:
-                            # refresh static data periodically (maybe more in future)
-                            try:
-                                self.static_data_periodic_refresh()
-                            except Exception as exp:
-                                static_data_service_state.handle_exception(exp)
-                                static_data_service_state.ready = False  # forces re-init in next iteration
 
                         # Reconnecting lost ws connections in WSReader
                         for ws_cont in WSReader.ws_cont_list:
@@ -724,21 +770,25 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     f" setting to computed_max_single_leg_notional instead, symbol_side_key: "
                     f"{get_symbol_side_key([(symbol, side)])}")
 
-        # warn if computed max cb notional is greater than current max cb notional
-        if computed_max_single_leg_notional > updated_strat_limits_obj.max_single_leg_notional and \
-                 not math.isclose(computed_max_single_leg_notional, updated_strat_limits_obj.max_single_leg_notional):
+        # warn if computed max cb notional > .5% current max cb notional [else not an alert-worthy change: log info]
+        if (computed_max_single_leg_notional > updated_strat_limits_obj.max_single_leg_notional and
+                 not math.isclose(computed_max_single_leg_notional, updated_strat_limits_obj.max_single_leg_notional)):
             warn_str_: str = (f"increased computed max_single_leg_notional to: {computed_max_single_leg_notional:,}, "
                               f"note: this exceeds older max_single_leg_notional: "
-                              f"{updated_strat_limits_obj.max_single_leg_notional:,}, for symbol_side "
+                              f"{updated_strat_limits_obj.max_single_leg_notional:,}, for symbol_side: "
                               f"{get_symbol_side_key([(symbol, side)])}")
-            logging.warning(warn_str_)
+            if (abs(computed_max_single_leg_notional - updated_strat_limits_obj.max_open_single_leg_notional) >
+                    (0.005 * updated_strat_limits_obj.max_single_leg_notional)):
+                logging.warning(warn_str_)
+            else:
+                logging.info(warn_str_)
 
         balance_notional: float = computed_max_single_leg_notional - acquired_notional
         updated_strat_status_obj = StratStatusOptional(id=stored_strat_status_obj.id, balance_notional=balance_notional)
         # collect pair_strat_tuple before marking it done (for today) - update strat status balance notional
         pair_strat_tuple = self.strat_cache.get_pair_strat()
         await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_strat_status_http(
-            updated_strat_status_obj.to_dict(excclude_none=True))
+            updated_strat_status_obj.to_json_dict(excclude_none=True))
         if balance_notional < 0 or math.isclose(balance_notional, 0):
             if pair_strat_tuple is not None:
                 pair_strat, _ = pair_strat_tuple
@@ -746,9 +796,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     updated_pair_strat_obj: PairStratBaseModel = \
                         PairStratBaseModel(id=pair_strat.id, strat_state=StratState.StratState_PAUSED)
                     email_book_service_http_client.patch_pair_strat_client(
-                        updated_pair_strat_obj.to_dict(exclude_none=True))
+                        updated_pair_strat_obj.to_json_dict(exclude_none=True))
                     logging.critical(f"pausing strat! new computed {balance_notional=} found <= 0; "
-                                     f"as current {acquired_notional=:,} >= new"
+                                     f"as current {acquired_notional=:,} >= new "
                                      f"{computed_max_single_leg_notional=:,};;;old balance_notional: "
                                      f"{stored_strat_status_obj.balance_notional:,} old max_single_leg_notional: "
                                      f"{stored_strat_limits_obj.max_single_leg_notional:,} "
@@ -1355,11 +1405,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     ####################################
 
     def _get_last_barter_px_n_symbol_tuples_from_tob(
-            self, current_leg_tob_obj: ExtendedTopOfBook,
-            other_leg_tob_obj: ExtendedTopOfBook) -> Tuple[Tuple[float, str], Tuple[float, str]]:
-        with (MobileBookMutexManager(current_leg_tob_obj, other_leg_tob_obj)):
-            return ((current_leg_tob_obj.last_barter.px, current_leg_tob_obj.symbol),
-                    (other_leg_tob_obj.last_barter.px, other_leg_tob_obj.symbol))
+            self, current_leg_tob_obj: TopOfBookBaseModel,
+            other_leg_tob_obj: TopOfBookBaseModel) -> Tuple[Tuple[float, str], Tuple[float, str]]:
+        return ((current_leg_tob_obj.last_barter.px, current_leg_tob_obj.symbol),
+                (other_leg_tob_obj.last_barter.px, other_leg_tob_obj.symbol))
 
     def __get_residual_obj(self, side: Side, strat_brief: StratBrief) -> Residual | None:
         if side == Side.BUY:
@@ -1583,10 +1632,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     ##############################
     # Chore Journal Update Methods
     ##############################
-
-    def get_last_barter_px_from_tob(self, tob: TopOfBook | ExtendedTopOfBook):
-        with MobileBookMutexManager(tob):
-            return tob.last_barter.px
 
     async def create_chore_journal_pre(self, chore_journal_obj: ChoreJournal) -> None:
         await self.handle_create_chore_journal_pre(chore_journal_obj)
@@ -2697,7 +2742,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         security = symbol_side_snapshot.security
         side = symbol_side_snapshot.side
         symbol = security.sec_id
-
         hedge_ratio: float = self.get_hedge_ratio()
 
         async with StratBrief.reentrant_lock:
@@ -3710,10 +3754,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         update_strat_status_obj.total_fill_buy_qty = int(
                             fetched_strat_status_obj.total_fill_buy_qty + chore_snapshot_obj.last_update_fill_qty)
                         update_strat_status_obj.total_fill_buy_notional = (
-                                fetched_strat_status_obj.total_fill_buy_notional +
-                                chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(
-                            chore_snapshot_obj.last_update_fill_px,
-                            chore_snapshot_obj.chore_brief.security.sec_id))
+                            fetched_strat_status_obj.total_fill_buy_notional +
+                            chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(
+                                chore_snapshot_obj.last_update_fill_px,
+                                chore_snapshot_obj.chore_brief.security.sec_id))
                         update_strat_status_obj.avg_fill_buy_px = \
                             (self.get_local_px_or_notional(update_strat_status_obj.total_fill_buy_notional,
                                                            chore_snapshot_obj.chore_brief.security.sec_id) /
@@ -4098,8 +4142,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             self._call_cpp_mobile_book_updater_from_last_barter(last_barter_obj)
 
     @staticmethod
-    def validate_single_id_per_symbol(stored_tobs: List[TopOfBookBaseModel | ExtendedTopOfBook],
-                                      cmp_tob: ExtendedTopOfBook):
+    def validate_single_id_per_symbol(stored_tobs: List[TopOfBookBaseModel | TopOfBookBaseModel],
+                                      cmp_tob: TopOfBookBaseModel):
         err: str | None = None
         if stored_tobs[0] is not None and cmp_tob.symbol == stored_tobs[0].symbol and cmp_tob.id != stored_tobs[0].id:
             err = f"id_mismatched for same symbol! stored TOB: {stored_tobs[0]}, found TOB: {cmp_tob}"
@@ -4110,12 +4154,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     def update_fill(self):
         self.strat_cache.get_strat_brief()
 
-    async def create_top_of_book_post(self, top_of_book_obj: ExtendedTopOfBook):
+    async def create_top_of_book_post(self, top_of_book_obj: TopOfBookBaseModel):
         # tob creation is expected to be rare [once per symbol] - extra precautionary code is fine
         # updating bartering_data_manager's cache
-        tob_tuple: Tuple[List[TopOfBookBaseModel | ExtendedTopOfBook], DateTime] | None = (
+        tob_tuple: Tuple[List[TopOfBookBaseModel | TopOfBookBaseModel], DateTime] | None = (
             self.bartering_data_manager.strat_cache.get_top_of_book())
-        tob_list: List[TopOfBookBaseModel | ExtendedTopOfBook] | None = None
+        tob_list: List[TopOfBookBaseModel | TopOfBookBaseModel] | None = None
         if tob_tuple is not None:
             tob_list, _ = tob_tuple
         if tob_list:
@@ -4579,7 +4623,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 return cached_chore_snapshot
         return []
 
-    async def get_tob_of_book_from_cache_query_pre(self, top_of_book_class_type: Type[ExtendedTopOfBook]):
+    async def get_tob_of_book_from_cache_query_pre(self, top_of_book_class_type: Type[TopOfBookBaseModel]):
         # used in test case to verify cache after recovery
         tob_list = []
 
@@ -4587,12 +4631,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         leg_2_tob_of_book = self.leg2_symbol_cache.get_top_of_book()
 
         if leg_1_tob_of_book is not None:
-            with MobileBookMutexManager(leg_1_tob_of_book):
-                tob_list.append(leg_1_tob_of_book)
+            tob_list.append(leg_1_tob_of_book)
 
         if leg_2_tob_of_book is not None:
-            with MobileBookMutexManager(leg_2_tob_of_book):
-                tob_list.append(leg_2_tob_of_book)
+            tob_list.append(leg_2_tob_of_book)
         return tob_list
 
     #########################

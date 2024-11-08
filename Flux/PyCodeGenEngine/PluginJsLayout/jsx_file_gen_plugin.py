@@ -230,7 +230,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         else:
             output_str += "import { Fullscreen, CloseFullscreen } from '@mui/icons-material';\n"
         output_str += "import { cleanAllCache } from '../utility/attributeCache';\n"
-        output_str += "import { Icon } from '../components/Icon';\n\n"
+        output_str += "import { Icon } from '../components/Icon';\n"
+        output_str += "import FileUploaderMenu from '../components/FileUploaderMenu';\n"
+        output_str += "import { DEFAULT_ROWS_PER_PAGE } from '../utility/attributeCache';\n\n"
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "const getAllWsWorker = new Worker(new URL('../workers/getAllWsHandler.js', " \
                           "import.meta.url));\n"
@@ -305,6 +307,21 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += ("            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}>"
                            "<CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' "
                            "onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n")
+            output_str += "            {currentSchema.widget_ui_data_element.file_upload_query && (\n"
+            output_str += "                <FileUploaderMenu\n"
+            output_str += "                    name={title}\n"
+            option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+                message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+            other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
+            other_proto_model_name = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field)
+            if other_proto_file is not None and other_proto_model_name is None:
+                output_str += "                    url={url}\n"
+            else:
+                output_str += "                    url={null}\n"
+            output_str += "                    fileUploadQuery={currentSchema.widget_ui_data_element.file_upload_query}\n"
+            output_str += "                    disallowNonTodayFileUpload={currentSchema.widget_ui_data_element.disallow_non_today_file_upload}\n"
+            output_str += "                />\n"
+            output_str += "            )}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += '    )\n\n'
             output_str += "    let cleanedRows = [];\n"
@@ -353,6 +370,21 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                <Icon name='Create' title='Create' " \
                           "onClick={onCreate}><Add fontSize='small' /></Icon>}\n"
             output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
+            output_str += "            {currentSchema.widget_ui_data_element.file_upload_query && (\n"
+            output_str += "                <FileUploaderMenu\n"
+            output_str += "                    name={title}\n"
+            option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+                message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+            other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
+            other_proto_model_name = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field)
+            if other_proto_file is not None and other_proto_model_name is None:
+                output_str += "                    url={url}\n"
+            else:
+                output_str += "                    url={null}\n"
+            output_str += "                    fileUploadQuery={currentSchema.widget_ui_data_element.file_upload_query}\n"
+            output_str += "                    disallowNonTodayFileUpload={currentSchema.widget_ui_data_element.disallow_non_today_file_upload}\n"
+            output_str += "                />\n"
+            output_str += "            )}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += "    )\n\n"
         elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
@@ -366,6 +398,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            data={modified" + f"{message_name}" + "}\n"
             output_str += "            onButtonToggle={onButtonToggle}>\n"
             output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
+            output_str += "            {currentSchema.widget_ui_data_element.file_upload_query && (\n"
+            output_str += "                <FileUploaderMenu\n"
+            output_str += "                    name={title}\n"
+            output_str += "                    url={null}\n"
+            output_str += "                    fileUploadQuery={currentSchema.widget_ui_data_element.file_upload_query}\n"
+            output_str += "                    disallowNonTodayFileUpload={currentSchema.widget_ui_data_element.disallow_non_today_file_upload}\n"
+            output_str += "                />\n"
+            output_str += "            )}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += "    )\n\n"
         else:
@@ -381,6 +421,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            data={_.get(modified" + f"{root_msg_name}" + ", currentSchemaXpath)}\n"
             output_str += "            onButtonToggle={onButtonToggle}>\n"
             output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
+            output_str += "            {currentSchema.widget_ui_data_element.file_upload_query && (\n"
+            output_str += "                <FileUploaderMenu\n"
+            output_str += "                    name={title}\n"
+            output_str += "                    url={null}\n"
+            output_str += "                    fileUploadQuery={currentSchema.widget_ui_data_element.file_upload_query}\n"
+            output_str += "                    disallowNonTodayFileUpload={currentSchema.widget_ui_data_element.disallow_non_today_file_upload}\n"
+            output_str += "                />\n"
+            output_str += "            )}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += "    )\n\n"
         output_str += "    return (\n"
@@ -458,6 +506,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onForceSave={onForceSave}\n"
         output_str += "                    showLess={showLess}\n"
         output_str += "                    onShowLessChange={onShowLessChange}\n"
+        output_str += "                    rowsPerPage={rowsPerPage}\n"
+        output_str += "                    onRowsPerPageChange={onRowsPerPageChange}\n"
         if layout_type != JsxFileGenPlugin.repeated_root_type:
             output_str += "                    forceUpdate={forceUpdate}\n"
         if layout_type in [JsxFileGenPlugin.repeated_root_type, JsxFileGenPlugin.root_type]:
@@ -991,6 +1041,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onShowLessChange={onShowLessChange}\n"
         output_str += "                    dataSourceColors={dataSourceColors}\n"
         output_str += "                    onDataSourceColorsChange={onDataSourceColorsChange}\n"
+        output_str += "                    rowsPerPage={rowsPerPage}\n"
+        output_str += "                    onRowsPerPageChange={onRowsPerPageChange}\n"
         output_str += "                />\n"
         output_str += "            )}\n"
         output_str += "            <FormValidation\n"
@@ -1214,6 +1266,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    let groupedRows = getGroupedTableRows(rows, []);\n"
         # else not required
         output_str += "    const showLess = widgetOption.show_less ? widgetOption.show_less : [];\n"
+        output_str += "    const rowsPerPage = widgetOption.rows_per_page || currentSchema.widget_ui_data_element.default_rows_per_page || DEFAULT_ROWS_PER_PAGE;\n"
         output_str += "    const dataSourceColors = widgetOption.data_source_colors ? widgetOption.data_source_colors : [];\n"
         output_str += "    const truncateDateTime = widgetOption.hasOwnProperty('truncate_date_time') ? " \
                       "widgetOption.truncate_date_time : false;\n"
@@ -1400,17 +1453,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        if (mode === Modes.EDIT_MODE) {\n"
         output_str += "            if (widgetOption.hasOwnProperty('edit_layout') && " \
                       "widgetOption.view_layout !== widgetOption.edit_layout) {\n"
-        output_str += "                if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-        output_str += "                    props.onChangeLayout(props.name, widgetOption.edit_layout, "
-        if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "null);\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
-            output_str += f"selected{root_message_name}Id);\n"
-        else:
-            output_str += f"selected{message_name}Id);\n"
-        output_str += "                } else {\n"
-        output_str += "                    props.onChangeLayout(props.name, widgetOption.edit_layout);\n"
-        output_str += "                }\n"
+        output_str += "                onChangeLayout(widgetOption.edit_layout);\n"
         output_str += "            }\n"
         if layout_type not in [JsxFileGenPlugin.non_root_type, JsxFileGenPlugin.abbreviated_dependent_type]:
             output_str += "            if (currentSchema.widget_ui_data_element.disable_ws_on_edit) {\n"
@@ -1418,17 +1461,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            }\n"
         output_str += "        } else if (mode === Modes.READ_MODE) {\n"
         output_str += "            if (widgetOption.view_layout !== currentSchema.widget_ui_data_element.widget_ui_data[0].view_layout) {\n"
-        output_str += "                if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-        output_str += "                    props.onChangeLayout(props.name, currentSchema.widget_ui_data_element.widget_ui_data[0].view_layout, "
-        if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "null);\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
-            output_str += f"selected{root_message_name}Id);\n"
-        else:
-            output_str += f"selected{message_name}Id);\n"
-        output_str += "                } else {\n"
-        output_str += "                    props.onChangeLayout(props.name, currentSchema.widget_ui_data_element.widget_ui_data[0].view_layout);\n"
-        output_str += "                }\n"
+        output_str += "                onChangeLayout(currentSchema.widget_ui_data_element.widget_ui_data[0].view_layout);\n"
         output_str += "            }\n"
         if layout_type not in [JsxFileGenPlugin.non_root_type, JsxFileGenPlugin.abbreviated_dependent_type]:
             output_str += "            if (currentSchema.widget_ui_data_element.disable_ws_on_edit) {\n"
@@ -2083,7 +2116,20 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        setMaximize(false);\n"
         output_str += "    }\n\n"
 
-        output_str += "    const onChangeLayout = (layoutType) => {\n"
+        output_str += "    function onWidgetUIDataChange(property, value) {\n"
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += "    const selectedId = null;\n"
+        else:
+            msg_name: str
+            if layout_type == JsxFileGenPlugin.non_root_type:
+                msg_name = root_message_name
+            else:
+                msg_name = message_name
+            output_str += f"    const selectedId = currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld') ? selected{msg_name}Id : null;\n"
+        output_str += "    props.onWidgetUIDataChange(props.name, property, value, selectedId);\n"
+        output_str += "    }\n\n"
+
+        output_str += "    function onChangeLayout(layoutType) {\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "        if ([Layouts.PIVOT_TABLE, Layouts.CHART, Layouts.TABLE].includes(layoutType)) {\n"
             output_str += "            setMode(Modes.READ_MODE);\n"
@@ -2092,84 +2138,32 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        if ([Layouts.PIVOT_TABLE, Layouts.CHART].includes(layoutType)) {\n"
             output_str += "            dispatch(setMode(Modes.READ_MODE));\n"
             output_str += "        }\n"
-        output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-        output_str += "            props.onChangeLayout(props.name, layoutType, "
-        if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "null);\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
-            output_str += f"selected{root_message_name}Id);\n"
-        else:
-            output_str += f"selected{message_name}Id);\n"
-        output_str += "        } else {\n"
-        output_str += "            props.onChangeLayout(props.name, layoutType);\n"
-        output_str += "        }\n"
+        output_str += "        onWidgetUIDataChange('view_layout', layoutType);\n"
         output_str += "    }\n\n"
 
         output_str += "    const onOverrideChange = (enableOverride, disableOverride) => {\n"
-        output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-        output_str += "            props.onOverrideChange(props.name, enableOverride, disableOverride, "
-        if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "null);\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
-            output_str += f"selected{root_message_name}Id);\n"
-        else:
-            output_str += f"selected{message_name}Id);\n"
-        output_str += "        } else {\n"
-        output_str += "            props.onOverrideChange(props.name, enableOverride, disableOverride);\n"
-        output_str += "        }\n"
+        output_str += "        onWidgetUIDataChange('enable_override', enableOverride);\n"
+        output_str += "        onWidgetUIDataChange('disable_override', disableOverride);\n"
         output_str += "    }\n\n"
 
         output_str += "    const onColumnOrdersChange = (orders) => {\n"
-        output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-        output_str += "            props.onColumnOrdersChange(props.name, orders, "
-        if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "null);\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
-            output_str += f"selected{root_message_name}Id);\n"
-        else:
-            output_str += f"selected{message_name}Id);\n"
-        output_str += "        } else {\n"
-        output_str += "            props.onColumnOrdersChange(props.name, orders);\n"
-        output_str += "        }\n"
+        output_str += "        onWidgetUIDataChange('column_orders', orders);\n"
         output_str += "    }\n\n"
+
         output_str += "    const onSortOrdersChange = (orders) => {\n"
-        output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-        output_str += "            props.onSortOrdersChange(props.name, orders, "
-        if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "null);\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
-            output_str += f"selected{root_message_name}Id);\n"
-        else:
-            output_str += f"selected{message_name}Id);\n"
-        output_str += "        } else {\n"
-        output_str += "            props.onSortOrdersChange(props.name, orders);\n"
-        output_str += "        }\n"
+        output_str += "        onWidgetUIDataChange('sort_orders', orders);\n"
         output_str += "    }\n\n"
+
         output_str += "    const onShowLessChange = (updatedShowLess) => {\n"
-        output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-        output_str += "            props.onShowLessChange(props.name, updatedShowLess, "
-        if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "null);\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
-            output_str += f"selected{root_message_name}Id);\n"
-        else:
-            output_str += f"selected{message_name}Id);\n"
-        output_str += "        } else {\n"
-        output_str += "            props.onShowLessChange(props.name, updatedShowLess);\n"
-        output_str += "        }\n"
+        output_str += "        onWidgetUIDataChange('show_less', updatedShowLess);\n"
         output_str += "    }\n\n"
+
         output_str += "    const onDataSourceColorsChange = (updatedColors) => {\n"
-        output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-        output_str += "            props.onDataSourceColorsChange(props.name, updatedColors, "
-        if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "null);\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
-            output_str += f"selected{root_message_name}Id);\n"
-        else:
-            output_str += f"selected{message_name}Id);\n"
-        output_str += "        } else {\n"
-        output_str += "            props.onDataSourceColorsChange(props.name, updatedColors);\n"
-        output_str += "        }\n"
+        output_str += "        onWidgetUIDataChange('data_source_colors', updatedColors);\n"
+        output_str += "    }\n\n"
+
+        output_str += "    const onRowsPerPageChange = (updatedRowsPerPage) => {\n"
+        output_str += "        onWidgetUIDataChange('rows_per_page', updatedRowsPerPage);\n"
         output_str += "    }\n\n"
 
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
@@ -2222,6 +2216,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     abbreviated_dependent_msg_name)
 
                 output_str += "        let originalObj;\n"
+                output_str += "        let collectionList;\n"
                 msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
                 is_single_source = True
                 for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
@@ -2235,13 +2230,16 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                             output_str += (
                                     f"        else if (source === '{msg_name_used_in_abb_option_snake_cased}')"+" {\n")
                         output_str += f"            originalObj = {msg_name_used_in_abb_option_camel_cased};\n"
+                        output_str += f"            collectionList = dependentWidgetCollectionsDict['{msg_name_used_in_abb_option_camel_cased}'];\n"
                         is_single_source = False
                 if not is_single_source:
                     output_str += "        } else {\n"
-                    output_str += f"            originalObj = {abbreviated_dependent_msg_camel_cased}\n"
+                    output_str += f"            originalObj = {abbreviated_dependent_msg_camel_cased};\n"
+                    output_str += f"            collectionList = dependentWidgetCollectionsDict['{abbreviated_dependent_msg_camel_cased}'];\n"
                     output_str += "        }\n"
                 else:
-                    output_str += f"        originalObj = {abbreviated_dependent_msg_camel_cased}\n"
+                    output_str += f"        originalObj = {abbreviated_dependent_msg_camel_cased};\n"
+                    output_str += f"        collectionList = dependentWidgetCollectionsDict['{abbreviated_dependent_msg_camel_cased}'];\n"
                 output_str += "        if (!modifiedObj) {\n"
                 is_single_source = True
                 for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
@@ -2271,7 +2269,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        if (createMode) {\n"
                 output_str += "            delete modifiedObj[DB_ID];\n"
                 output_str += "        }\n"
-                output_str += "        const changesDiff = compareJSONObjects(originalObj, modifiedObj);\n"
+                output_str += "        const changesDiff = compareJSONObjects(originalObj, modifiedObj, collectionList);\n"
+                output_str += "        if (!changesDiff) {\n"
+                output_str += "            return;\n"
+                output_str += "        }\n"
             else:
                 output_str += "        if (!modifiedObj) {\n"
                 if layout_type in [JsxFileGenPlugin.root_type, JsxFileGenPlugin.repeated_root_type]:
@@ -2594,45 +2595,35 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onSelectRow = (rowId) => {\n"
             output_str += f"        dispatch(setSelected{message_name}Id(rowId));\n"
             output_str += "    }\n\n"
+
             output_str += "    const onToggleCenterJoin = () => {\n"
-            output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-            output_str += "            props.onCenterJoinChange(props.name, !centerJoin, null);\n"
-            output_str += "        } else {\n"
-            output_str += "            props.onCenterJoinChange(props.name, !centerJoin);\n"
-            output_str += "        }\n"
+            output_str += "        onWidgetUIDataChange('join_at_center', !centerJoin);\n"
             output_str += "    }\n\n"
+
             output_str += "    const onToggleFlip = () => {\n"
-            output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-            output_str += "            props.onFlipChange(props.name, !flip, null);\n"
-            output_str += "        } else {\n"
-            output_str += "            props.onFlipChange(props.name, !flip);\n"
-            output_str += "        }\n"
+            output_str += "        onWidgetUIDataChange('flip', !flip);\n"
             output_str += "    }\n\n"
+
             output_str += "    const onJoinOpen = (e) => {\n"
             output_str += "        setOpenJoin(true);\n"
             output_str += "        setJoinArcholEl(e.currentTarget);\n"
             output_str += "    }\n\n"
+
             output_str += "    const onJoinClose = () => {\n"
             output_str += "        setOpenJoin(false);\n"
             output_str += "        setJoinArcholEl(null);\n"
             output_str += "    }\n\n"
+
             output_str += "    const onJoinChange = (e, column) => {\n"
+            output_str += "        let updatedJoinBy;"
             output_str += "        if (e.target.checked) {\n"
-            output_str += "            const updatedJoinBy = [...joinBy, column];\n"
-            output_str += "            if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-            output_str += "                props.onJoinByChange(props.name, updatedJoinBy, null);\n"
-            output_str += "            } else {\n"
-            output_str += "                props.onJoinByChange(props.name, updatedJoinBy);\n"
-            output_str += "            }\n"
+            output_str += "            updatedJoinBy = [...joinBy, column];\n"
             output_str += "        } else {\n"
-            output_str += "            const updatedJoinBy = joinBy.filter(joinColumn => joinColumn !== column);\n"
-            output_str += "            if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
-            output_str += "                props.onJoinByChange(props.name, updatedJoinBy, null);\n"
-            output_str += "            } else {\n"
-            output_str += "                props.onJoinByChange(props.name, updatedJoinBy);\n"
-            output_str += "            }\n"
+            output_str += "            updatedJoinBy = joinBy.filter(joinColumn => joinColumn !== column);\n"
             output_str += "        }\n"
+            output_str += "        onWidgetUIDataChange('join_by', updatedJoinBy);\n"
             output_str += "    }\n\n"
+
             output_str += "    let centerJoinText = 'Move to Center';\n"
             output_str += "    if (centerJoin) {\n"
             output_str += "        centerJoinText = 'Move to Left';\n"
@@ -2762,6 +2753,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                 output_str += f"        let changesDiff;\n"
                 output_str += f"        let originalObj;\n"
+                output_str += "        let collectionList;\n"
                 output_str += "        if (source === null) {\n"
                 output_str += "            source = updateSource;\n"
                 output_str += "        }\n"
@@ -2782,12 +2774,15 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                 f"'{msg_name_used_in_abb_option_snake_cased}') " + "{\n")
 
                     output_str += f"            originalObj = {msg_name_used_in_abb_option_camel_cased};\n"
+                    output_str += f"            collectionList = dependentWidgetCollectionsDict['{msg_name_used_in_abb_option_camel_cased}'];\n"
                 if msg_used_in_abb_option_list:
                     output_str += "        } else {\n"
                     output_str += f"            originalObj = {abbreviated_dependent_msg_camel_cased};\n"
+                    output_str += f"            collectionList = dependentWidgetCollectionsDict['{abbreviated_dependent_msg_camel_cased}'];\n"
                     output_str += "        }\n"
                 else:
                     output_str += f"        originalObj = {abbreviated_dependent_msg_camel_cased};\n"
+                    output_str += f"        collectionList = dependentWidgetCollectionsDict['{abbreviated_dependent_msg_camel_cased}'];\n"
                     output_str += (f"        modifiedObj = clearxpath(cloneDeep("
                                    f"modified{self.abbreviated_dependent_message_name}));\n")
                 output_str += "        if (!modifiedObj) {\n"
@@ -2814,12 +2809,18 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += (f"            modifiedObj = clearxpath(cloneDeep("
                                    f"modified{self.abbreviated_dependent_message_name}));\n")
                 output_str += "            if (forceSave) {\n"
-                output_str += "                changesDiff = compareJSONObjects(originalObj, modifiedObj);\n"
+                output_str += "                changesDiff = compareJSONObjects(originalObj, modifiedObj, collectionList);\n"
+                output_str += "                if (!changesDiff) {\n"
+                output_str += "                    return;\n"
+                output_str += "                }\n"
                 output_str += "            } else {\n"
                 output_str += "                changesDiff = activeChanges\n"
                 output_str += "            }\n"
                 output_str += "        } else {\n"
-                output_str += "            changesDiff = compareJSONObjects(originalObj, modifiedObj);\n"
+                output_str += "            changesDiff = compareJSONObjects(originalObj, modifiedObj, collectionList);\n"
+                output_str += "            if (!changesDiff) {\n"
+                output_str += "                return;\n"
+                output_str += "            }\n"
                 output_str += "        }\n"
                 output_str += "        if (createMode) {\n"
                 output_str += "            dispatch(setCreateMode(false));\n"

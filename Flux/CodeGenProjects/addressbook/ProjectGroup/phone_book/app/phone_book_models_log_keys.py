@@ -1,4 +1,5 @@
 # standard imports
+from functools import lru_cache
 from typing import List, Tuple, Dict, Any
 
 # project imports
@@ -9,9 +10,20 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBo
     EmailBookServiceKeyHandler)
 
 
-def get_symbol_side_key(symbol_side_tuple_list: List[Tuple[str, Side]]) -> str:
+@lru_cache(maxsize=None)
+def get_symbol_side_key_from_pair(symbol, side):
     symbol_side_pattern: str = get_symbol_side_pattern()
-    key_str = ",".join([f"symbol-side={symbol}-{side.value}" for symbol, side in symbol_side_tuple_list])
+    key_str = f"symbol-side={symbol}-{Side(side).value}"
+    return f"{symbol_side_pattern}{key_str}{symbol_side_pattern}"
+
+
+# @lru_cache(maxsize=None)  # not supported: unhashable type: 'list'
+def get_symbol_side_key(symbol_side_tuple_list: List[Tuple[str, Side | str]]) -> str:
+    if len(symbol_side_tuple_list) == 1:
+        symbol, side = symbol_side_tuple_list[0]
+        return get_symbol_side_key_from_pair(symbol, side)
+    symbol_side_pattern: str = get_symbol_side_pattern()
+    key_str = ",".join([f"symbol-side={symbol}-{Side(side).value}" for symbol, side in symbol_side_tuple_list])
     return f"{symbol_side_pattern}{key_str}{symbol_side_pattern}"
 
 

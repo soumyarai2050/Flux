@@ -87,6 +87,8 @@ message ChoreJournal {
     LogKeySequence: "chore.chore_id",
     IsRepeated: true
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional ChoreBrief chore = 2 [(FluxFldPk) = "chore_id"];
   optional string chore_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
@@ -138,6 +140,7 @@ message ChoreSnapshot {
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgStringLength) = 128;
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional ChoreStatusType chore_status = 2 [(FluxFldNoCommonKey) = true];

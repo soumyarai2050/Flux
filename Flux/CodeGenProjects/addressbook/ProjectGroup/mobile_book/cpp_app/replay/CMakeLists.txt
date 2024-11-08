@@ -121,6 +121,7 @@ message(SRC_FILES ${SRC_FILES})
 add_library(marketdataprovider SHARED ${SRC_FILES} cpp_app_launcher.cpp
         cpp_app_shared_resource.cpp
         mock_mobile_book_cache.cpp
+        mobile_book_publisher.cpp
         mobile_book_interface.cpp
 )
 
@@ -137,4 +138,4 @@ target_link_libraries(marketdataprovider
 )
 
 # Add compile options to the shared library
-target_compile_options(marketdataprovider PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-variable -Wno-error=unused-parameter -DTEST)
+target_compile_options(marketdataprovider PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-variable -Wno-error=unused-parameter -DTEST -Wno-return-type)

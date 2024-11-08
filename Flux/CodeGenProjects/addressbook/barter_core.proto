@@ -8,6 +8,7 @@ enum SecurityIdSource {
   RIC = 1;
   SEDOL = 2;
   TICKER = 3;
+  FIGI = 4;
 }
 
 // rename this to security type
@@ -152,6 +153,8 @@ enum TickType {
 }
 
 message SortCriteria {
+  option (FluxMsgStringLength) = 128;
+
   optional string level1 = 1;
   optional SortType level1_chore = 2 [default = ASCENDING];
   optional string level2 = 3;
@@ -174,17 +177,19 @@ message Position {
     pressed_value_as_text: "true",
     allow_force_update: true
   }];
+  option (FluxMsgStringLength) = 128;
+
   required PositionType type = 3;
   // available position size for consumption
   required int64 available_size = 4;
   // position committed but not consumed (portfolio to strat; day-2: maybe strat to open chore)
   required int64 allocated_size = 5;
   // strat's nett consumption prior to call of load from source + any external consumption
-  optional int64 consumed_size = 6;
+  optional int64 consumed_size = 6 [(FluxFldZeroAsNone) = true];
   // strat's long consumption prior to call of load from source + any external consumption
-  optional int64 bot_size = 7;
+  optional int64 bot_size = 7 [(FluxFldZeroAsNone) = true];
   // strat's short consumption prior to call of load from source + any external consumption
-  optional int64 sld_size = 8;
+  optional int64 sld_size = 8 [(FluxFldZeroAsNone) = true];
   // internal position consumption in current strat run [excluding any recovery consumptions]
   optional int64 strat_consumed_size = 9;
   // cost of using this position type
@@ -204,6 +209,8 @@ message Position {
 }
 
 message SecPosition {
+  option (FluxMsgStringLength) = 128;
+
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required Security security = 2 [(FluxFldAutoComplete) = "sec_id:EQT_List, sec_id_source=TICKER", (FluxFldHelp) = "EQT Tickers"];
   optional string figi = 3 [(FluxFldHide) = "True", (FluxFldHelp) = "Bloomberg identifier for this security"];
@@ -223,6 +230,8 @@ message Broker {
     pressed_value_as_text: "true",
     allow_force_update: true
   }];
+  option (FluxMsgStringLength) = 128;
+
   // per security positions
   repeated SecPosition sec_positions = 3;
   // broker identifier
@@ -232,12 +241,16 @@ message Broker {
 
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
 message Security {
+  option (FluxMsgStringLength) = 128;
+
   required string sec_id = 1 [(FluxFldUIPlaceholder) = "SelectSecurity", (FluxFldSticky) = true, (FluxFldFilterEnable) = true];
   optional SecurityIdSource sec_id_source = 2 [default = SEC_ID_SOURCE_UNSPECIFIED, (FluxFldHide) = "True"];
   optional InstrumentType inst_type = 3 [(FluxFldHide) = "True", (FluxFldServerPopulate) = true];
 }
 
 message Quote {
+  option (FluxMsgStringLength) = 128;
+
   optional float px = 1;
   optional int64 qty = 2 [(FluxFldNoCommonKey) = true];
   optional float premium = 3;
@@ -245,6 +258,8 @@ message Quote {
 }
 
 message ChoreBrief {
+  option (FluxMsgStringLength) = 128;
+
   required string chore_id = 1 [(FluxFldServerPopulate) = true];
   required Security security = 2 [(FluxFldHelp) = "system security"];
   optional Security bartering_security = 3 [(FluxFldHelp) = "bartering security"];
@@ -259,12 +274,16 @@ message ChoreBrief {
 }
 
 message MarketBarterVolume {
+  option (FluxMsgStringLength) = 128;
+
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int64 participation_period_last_barter_qty_sum = 2;
   optional int32 applicable_period_seconds = 3 [(FluxFldHelp) = "sliding window interval of above volume, unset value implies seconds from SOD till time current time"];
 }
 
 message SymbolNExchId {
+  option (FluxMsgStringLength) = 128;
+
   required string symbol = 1;
   required string exch_id = 2;
 }

@@ -128,19 +128,11 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += "            options={"+f"layoutsById.current.{message_name_case_styled}.widget_ui_data"+"}\n"
             output_str += "            chartData={"+ f"layoutsById.current.{message_name_case_styled}.chart_data"+"}\n"
             output_str += "            filters={" + f"layoutsById.current.{message_name_case_styled}.filters" + "}\n"
+            output_str += "            scrollLock={scrollLock." + f"{message_name_case_styled}" + "}\n"
             output_str += "            onChartDataChange={onChartDataChange}\n"
             output_str += "            onChartDelete={onChartDelete}\n"
-            output_str += "            onChangeLayout={onLayoutTypeChange}\n"
-            output_str += '            onOverrideChange={onOverrideChange}\n'
             output_str += "            onFiltersChange={onFiltersChange}\n"
-            output_str += "            onColumnOrdersChange={onColumnOrdersChange}\n"
-            output_str += "            scrollLock={scrollLock." + f"{message_name_case_styled}" + "}\n"
-            output_str += "            onSortOrdersChange={onSortOrdersChange}\n"
-            output_str += "            onJoinByChange={onJoinByChange}\n"
-            output_str += "            onCenterJoinChange={onCenterJoinChange}\n"
-            output_str += "            onFlipChange={onFlipChange}\n"
-            output_str += "            onShowLessChange={onShowLessChange}\n"
-            output_str += "            onDataSourceColorsChange={onDataSourceColorsChange}\n"
+            output_str += "            onWidgetUIDataChange={onWidgetUIDataChange}\n"
             output_str += f'        />\n'
             output_str += f'    </Paper>\n'
             output_str += '}\n'

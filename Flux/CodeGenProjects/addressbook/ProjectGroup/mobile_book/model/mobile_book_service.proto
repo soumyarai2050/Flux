@@ -55,6 +55,8 @@ message MobileBookBrief{
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1;
   required Security security = 2;
   required Side side = 3;
@@ -74,6 +76,8 @@ message TickByTickBBO {
     Granularity: Sec,
     ExpireAfterSeconds: 5
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true];
   required string exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
@@ -84,6 +88,8 @@ message TickByTickBBO {
 }
 
 message MarketBarterVolume {
+  option (FluxMsgStringLength) = 128;
+
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int64 participation_period_last_barter_qty_sum = 2;
   optional int32 applicable_period_seconds = 3 [(FluxFldHelp) = "sliding window interval of above volume, unset value implies seconds from SOD till time current time"];
@@ -100,6 +106,8 @@ message RawMarketDepthHistory {
     Granularity: Sec,
     ExpireAfterSeconds: 5
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true];
   required string exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];

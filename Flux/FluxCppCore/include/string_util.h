@@ -19,7 +19,7 @@ namespace FluxCppCore {
         std::ostringstream ss;
         ss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%S")
         << '.' << std::setfill('0') << std::setw(6) << microseconds // Print microseconds (6 digits)
-        << 'Z';  // Append 'Z' for UTC
+        << "+00:00";
         return ss.str();
     }
 
@@ -142,10 +142,13 @@ namespace FluxCppCore {
         static inline bsoncxx::types::b_date convert_utc_string_to_b_date(const std::string& utc_time_str) {
             std::istringstream ss{utc_time_str};
             std::chrono::system_clock::time_point tp;
-            ss >> date::parse("%FT%TZ", tp);
-            auto duration = tp.time_since_epoch();
-            auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
-            return bsoncxx::types::b_date{std::chrono::system_clock::time_point(std::chrono::microseconds(microseconds))};
+            ss >> date::parse("%FT%T%z", tp);
+            return bsoncxx::types::b_date{tp};
+        }
+
+        static void inline setString(char* dest, const char* src, const size_t size) {
+            strncpy(dest, src, size - 1);
+            dest[size - 1] = '\0';
         }
     };
 }

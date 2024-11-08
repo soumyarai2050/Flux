@@ -625,10 +625,10 @@ def alert_queue_handler_for_create_n_update(
 def clean_alert_str(alert_str: str) -> str:
     # remove object hex memory path
     cleaned_alert_str: str = re.sub(r"0x[a-f0-9]*", "", alert_str)
-    # remove all numeric digits
-    cleaned_alert_str = re.sub(r"-?[0-9]*", "", cleaned_alert_str)
     # remove any pydantic_object_id (str type id)
     cleaned_alert_str = re.sub(r"\'[a-fA-F0-9]{24}\' ", "", cleaned_alert_str)
+    # remove all numeric digits
+    cleaned_alert_str = re.sub(r"-?[0-9]*", "", cleaned_alert_str)
     cleaned_alert_str = cleaned_alert_str.split("...check the file:")[0]
     return cleaned_alert_str
 
@@ -638,8 +638,8 @@ def get_alert_cache_key(severity: Severity, alert_brief: str, component_path: st
     # updated_alert_brief: str = alert_brief.split(":", 3)[-1].strip()
     updated_alert_brief = clean_alert_str(alert_str=alert_brief)
     alert_key = f"{severity}@#@{updated_alert_brief}"
-    if component_path:
-        alert_key += f"@#@{component_path}"
+    # if component_path:
+    #     alert_key += f"@#@{component_path}"
     if source_file_path:
         alert_key += f"@#@{source_file_path}"
     if line_num:
@@ -657,7 +657,6 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
     """
     Handles strat alerts if strat id is passed else handles portfolio alerts
     """
-
     if alert_meta:
         cache_key = get_alert_cache_key(severity, alert_brief, alert_meta.component_file_path,
                                         alert_meta.source_file_name, alert_meta.line_num)

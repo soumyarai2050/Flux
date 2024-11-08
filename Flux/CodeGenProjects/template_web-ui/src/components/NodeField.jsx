@@ -37,8 +37,10 @@ const NodeField = (props) => {
     const [inputValue, setInputValue] = useState(props.data.value);
     const [focus, setFocus] = useState(false);
     const [isDateTimePickerOpen, setIsDateTimePickerOpen] = useState(false);
+    const [autocompleteInputValue, setAutocompleteInputValue] = useState('');
     const inputRef = useRef(null);
     const cursorPos = useRef(null);
+    const autocompleteRef = useRef(null);
 
     useEffect(() => {
         setInputValue(props.data.value);
@@ -79,6 +81,19 @@ const NodeField = (props) => {
         cursorPos.current = e.target.selectionStart;
         setInputValue(value);
         props.data.onTextChange(e, type, xpath, value, dataxpath, validationRes);
+    }
+
+    const handleKeyDown = (e, filteredOptions) => {
+        if (e.keyCode === 13) {
+            if (filteredOptions.length === 1) {
+                props.data.onAutocompleteOptionChange(e, filteredOptions[0], props.data.dataxpath, props.data.xpath);
+                setAutocompleteInputValue('');
+
+                if (autocompleteRef.current) {
+                    autocompleteRef.current.blur();
+                }
+            }
+        }
     }
 
     let disabled = true;
@@ -133,20 +148,33 @@ const NodeField = (props) => {
                 className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                 required={props.data.required}
                 value={value}
-                onChange={(e, v) => props.data.onAutocompleteOptionChange(e, v, props.data.dataxpath, props.data.xpath)}
+                inputValue={autocompleteInputValue}
+                onInputChange={(e, newInputValue) => setAutocompleteInputValue(newInputValue)}
+                filteredOptions={(options, { inputValue }) => 
+                    options.filter(option => option.toLowerCase().includes(inputValue.toLowerCase()))
+                }
+                onChange={(e, v) => {
+                    props.data.onAutocompleteOptionChange(e, v, props.data.dataxpath, props.data.xpath);
+                    setAutocompleteInputValue('');
+                }}
                 // componentsProps={{ popper: { style: { minWidth: 'fit-content', width: 'parent' } } }}
-                renderInput={(params) => (
-                    <TextField
-                        {...params}
-                        name={props.data.key}
-                        error={validationError.current !== null}
-                        placeholder={placeholder}
-                        InputProps={{
-                            ...params.InputProps,
-                            ...inputProps
-                        }}
-                    />
-                )}
+                renderInput={(params) => {
+                    const filteredOptions = props.data.options.filter(option => option.toLowerCase().includes(autocompleteInputValue.toLowerCase()));
+                    return (
+                        <TextField
+                            {...params}
+                            name={props.data.key}
+                            error={validationError.current !== null}
+                            placeholder={placeholder}
+                            onKeyDown={(e) => handleKeyDown(e, filteredOptions)}
+                            inputRef={autocompleteRef}
+                            InputProps={{
+                                ...params.InputProps,
+                                ...inputProps
+                            }}
+                        />
+                    )
+                }}
             />
         )
     } else if (props.data.type === DataTypes.BOOLEAN) {

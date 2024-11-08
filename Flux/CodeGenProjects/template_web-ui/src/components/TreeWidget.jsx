@@ -178,12 +178,12 @@ const TreeWidget = (props) => {
             xpath = getDataxpath(updatedData, xpath);
             let ref = e.currentTarget.attributes['data-ref'].value;
             const isArray = xpath.endsWith(']');
-            // let emptyObject = {};
-            let duplicateObj = cloneDeep(_.get(updatedData, xpath));
-            if (!duplicateObj) return;
-            duplicateObj = clearxpath(duplicateObj);
+            let dupObj = {};
+            let storedObj = cloneDeep(_.get(updatedData, xpath));
+            if (!storedObj) return;
+            storedObj = clearxpath(storedObj);
             if (isArray) {
-                clearId(duplicateObj);
+                clearId(storedObj);
                 if ([DataTypes.NUMBER, DataTypes.STRING].includes(ref)) {
                     let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
                     let parentObject = _.get(updatedData, parentxpath);
@@ -210,21 +210,14 @@ const TreeWidget = (props) => {
                             parentindex = parseInt(propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'))) + 1;
                         }
                         let max = originalindex > parentindex ? originalindex : parentindex;
-
-                        duplicateObj = addxpath(duplicateObj, parentxpath + '[' + max + ']');
-                        // emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema));
-                        // emptyObject = addxpath(emptyObject, parentxpath + '[' + max + ']');
-                        parentObject.push(duplicateObj);
+                        let additionalProps = JSON.parse(e.currentTarget.attributes['data-prop'].value);
+                        dupObj = generateObjectFromSchema(props.schema, cloneDeep(currentSchema), additionalProps, null, storedObj);
+                        dupObj = addxpath(dupObj, parentxpath + '[' + max + ']');
+                        parentObject.push(dupObj);
                     }
                 }
             } else {
-                ref = ref.split('/');
-                // let currentSchema = ref.length === 2 ? props.schema[ref[1]] : props.schema[ref[1]][ref[2]];
-                // let additionalProps = JSON.parse(e.currentTarget.attributes['data-prop'].value);
-                // emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema), additionalProps);
-                // emptyObject = addxpath(emptyObject, xpath);
-                duplicateObj = addxpath(duplicateObj, xpath);
-                _.set(updatedData, xpath, duplicateObj);
+                console.error('duplicate on object is not supported')
             }
             // let changesDict = getXpathKeyValuePairFromObject(emptyObject);
             // props.onUserChange(undefined, undefined, false, changesDict);

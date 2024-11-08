@@ -190,30 +190,6 @@ def get_new_strat_status(strat_limits_obj: StratLimits) -> StratStatus:
     return strat_status
 
 
-def create_stop_md_script(running_process_name: str, generation_stop_file_path: str):
-    script_file_name = os.path.basename(generation_stop_file_path)
-    log_file_path = PurePath(generation_stop_file_path).parent.parent / "log" / f"{script_file_name}.log"
-    # stop file generator
-    with open(generation_stop_file_path, "w") as fl:
-        fl.write("#!/bin/bash\n")
-        fl.write(f"LOG_FILE_PATH={log_file_path}\n")
-        fl.write("echo Log_file_path: ${LOG_FILE_PATH}\n")
-        fl.write("shopt -s expand_aliases >>${LOG_FILE_PATH} 2>&1\n")
-        fl.write("source ${HOME}/.bashrc\n")
-        # create this as alias in your bashrc to cd into market data run.sh script dir
-        fl.write("cdm >>${LOG_FILE_PATH} 2>&1\n")
-        fl.write(f"PROCESS_COUNT=`pgrep -f {running_process_name} | wc -l`\n")
-        fl.write('if [ "$PROCESS_COUNT" -eq 0 ]; then\n')
-        fl.write('  echo "nothing to kill" >>${LOG_FILE_PATH} 2>&1\n')
-        fl.write('else\n')
-        fl.write('  echo "PC: $PROCESS_COUNT" >>${LOG_FILE_PATH} 2>&1\n')
-        fl.write(f'  pids=$(pgrep -f {running_process_name})\n')
-        fl.write('  for pid in $pids; do\n')
-        fl.write('    ./kill_passthrough_service_by_pid.sh PID="$pid" >>${LOG_FILE_PATH} 2>&1\n')
-        fl.write('  done\n')
-        fl.write('fi\n')
-
-
 def get_default_max_notional() -> int:
     return 300_000
 

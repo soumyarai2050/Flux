@@ -29,14 +29,19 @@ namespace FluxCppCore {
                 auto m_mongo_db_collection_ = db[get_root_model_name()];
                 auto insert_result = m_mongo_db_collection_.insert_one(bson_doc.view());
                 auto inserted_id = insert_result->inserted_id().get_int32().value;
-                assert( new_generated_id == inserted_id);
+                if (new_generated_id == inserted_id) {
+                    return new_generated_id;
+                } else {
+                    LOG_WARNING_IMPL(GetCppAppLogger(), "Some error occured while inserting: {};;; doc: {}",
+                        get_root_model_name(), bsoncxx::to_json(bson_doc.view()));
+                }
             } catch (const std::exception& qe) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error while inserting data to collection: {}, document: {}, "
                                                   "error reason: {}", get_root_model_name(),
                                                   bsoncxx::to_json(bson_doc.view()), qe.what());
                 new_generated_id = -1;
             }
-            return new_generated_id;
+            return -1;
         }
 
 
@@ -161,19 +166,30 @@ namespace FluxCppCore {
             return status;
         }
 
+        int32_t get_db_id_from_root_model_obj(const RootModelType &kr_root_model_obj) {
+            std::string root_model_key;
+            MarketDataKeyHandler::get_key_out(kr_root_model_obj, root_model_key);
+            auto found = m_root_model_key_to_db_id.find(root_model_key);
+            if (found == m_root_model_key_to_db_id.end()) {
+                return -1;
+            } else {
+                return found->second;
+            }
+        }
+
+        void update_root_model_key_to_db_id(const RootModelType &kr_root_model_obj) {
+            std::string root_model_key;
+            MarketDataKeyHandler::get_key_out(kr_root_model_obj, root_model_key);
+            m_root_model_key_to_db_id[root_model_key] = kr_root_model_obj.id();
+        }
+
         static bool process_element(const bsoncxx::document::element &element, bsoncxx::builder::basic::document &new_doc) {
             if (element.type() == bsoncxx::type::k_date) {
                 auto date_value = element.get_date();
                 auto duration_since_epoch = std::chrono::duration_cast<std::chrono::microseconds>(date_value.value);
 
                 std::chrono::system_clock::time_point tp(duration_since_epoch);
-
-                std::time_t tt = std::chrono::system_clock::to_time_t(tp);
-                std::tm *gmt = std::localtime(&tt);
-
-                char date_str[256];
-                std::strftime(date_str, sizeof(date_str), "%Y-%m-%dT%H:%M:%S", gmt);
-                std::string iso_date_str = std::string(date_str) + "+00:00";
+                std::string iso_date_str = date::format("%FT%T%z", tp);
 
                 new_doc.append(bsoncxx::builder::basic::kvp(element.key(), iso_date_str));
             } else if (element.type() == bsoncxx::type::k_document) {

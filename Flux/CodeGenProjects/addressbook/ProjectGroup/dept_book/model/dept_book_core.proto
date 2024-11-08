@@ -63,6 +63,8 @@ message Inventory {
 }
 
 message DashLeg {
+  option (FluxMsgStringLength) = 128;
+
     optional string exch_id = 1 [(FluxFldServerPopulate) = true];
     required Security sec = 2 [(FluxFldElaborateTitle) = true];
     optional Security sedol_sec = 3 [(FluxFldServerPopulate) = true, (FluxFldElaborateTitle) = true, (FluxFldHide) = "True", (FluxFldHelp) = "optional, populated only for CBs"];
@@ -80,6 +82,8 @@ message InventorySummary {
 }
 
 message InventoryRequest {
+  option (FluxMsgStringLength) = 128;
+
     required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     optional string requestor = 2;
     optional StratType strat_type = 3;
@@ -92,6 +96,8 @@ message InventoryRequest {
 }
 
 message InventoryCSVRequest {
+  option (FluxMsgStringLength) = 128;
+
     optional string user = 1;
     optional string strategy = 2;
     required string ric = 3;
@@ -109,6 +115,8 @@ enum LegType {
 }
 
 message Leg {
+  option (FluxMsgStringLength) = 128;
+
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required LegType leg_type = 2;
 }

@@ -3,7 +3,7 @@ import logging
 import os
 import time
 from pathlib import PurePath
-from typing import List
+from typing import List, Set, Dict
 
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
@@ -61,34 +61,51 @@ class CppSharedDataStructure(BaseProtoPlugin):
             import_file_msg.append(_.get("ImportFileName"))
             msg_list = _.get("ImportModelName")
             for i in msg_list:
-                import_msg_name_list.append(i)
+                if not i.endswith("List"):
+                    import_msg_name_list.append(i)
                 # output_content += i
                 # print(__)
                 # if __ in flux_import_models:
                 #     outpt_content += str(__)
 
         output_content += "#pragma once\n\n"
-        output_content += "#include <string>\n\n"
+        # output_content += "#include <string>\n\n"
         output_content += "using namespace std;\n\n"
-        struct_msg_list: List[protogen.Message] = []
-        struct_depend_msg_list = []
+
+        # char_size = CppSharedDataStructure.is_option_enabled(file, CppSharedDataStructure.flux_)
+        struct_dict: Dict[str, protogen.Message] = {}
+        struct_depend_dict: Dict[str, protogen.Message] = {}
+
+        for msg in file.messages:
+            if not msg.proto.name.endswith("List") and struct_depend_dict.get(msg.proto.name) is None:
+                struct_dict[msg.proto.name] = msg
+                for fld in msg.fields:
+                    if (fld.message is not None and not fld.message.proto.name.endswith("List") and
+                            struct_dict.get(fld.message.proto.name) is None):
+                        struct_depend_dict[fld.message.proto.name] = fld.message
+
         for f in self.dependency_file_list:
             if f.proto.name in import_file_msg:
                 for msg in f.messages:
-                    if msg.proto.name in import_msg_name_list and msg.proto.name in cache_model_name_list:
-                        if msg not in struct_msg_list:
-                            struct_msg_list.append(msg)
+                    if (not msg.proto.name.endswith("List") and msg.proto.name in import_msg_name_list
+                            and struct_depend_dict.get(msg.proto.name) is None):
+                        struct_dict[msg.proto.name] = msg
                         for fld in msg.fields:
-                            if fld.message is not None:
-                                if fld.message not in struct_depend_msg_list:
-                                    struct_depend_msg_list.append(fld.message)
+                            if (fld.message is not None and not fld.message.proto.name.endswith("List")
+                                    and struct_dict.get(fld.message.proto.name) is None):
+                                struct_depend_dict[fld.message.proto.name] = fld.message
 
+        # Output the struct definitions
+        for name, message in struct_dict.items():
+            output_content += f"struct {name}QueueElement;\n\n"
 
-        for i in struct_depend_msg_list:
+        for i in struct_depend_dict.values():
+            str_val = CppSharedDataStructure.get_simple_option_value_from_proto(i, CppSharedDataStructure.flux_msg_string_length)
+            char_size = str_val if str_val is not None else 64
             output_content += "struct " + i.proto.name + "QueueElement {\n"
             for fld in i.fields:
                 if fld.proto.name.lower().endswith("time"):
-                    output_content += "\tstring " + fld.proto.name + "_;\n"
+                    output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 elif fld.kind.name.lower() == "float":
@@ -97,56 +114,34 @@ class CppSharedDataStructure(BaseProtoPlugin):
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 elif fld.kind.name.lower() == "int64" or fld.kind.name.lower() == "int32":
                     output_content += "\t" + fld.kind.name.lower() + "_t" + " " + fld.proto.name + "_;\n"
-                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                elif fld.kind.name.lower() == "enum":
-                    output_content += "\t" + "char" + "_;\n"
-                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                elif fld.kind.name.lower() == "message":
-                    output_content += "\t" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
-                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                else:
-                    output_content += "\t" + fld.kind.name.lower() + " " + fld.proto.name + "_;\n"
-                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-            output_content += "};\n\n"
-
-        for i in struct_msg_list:
-            output_content += "struct " + i.proto.name + "QueueElement {\n"
-            for fld in i.fields:
-                if fld.proto.name.lower().endswith("time"):
-                    output_content += "\tstring " + fld.proto.name + "_;\n"
-                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                elif fld.kind.name.lower() == "float":
-                    output_content += "\tdouble " + fld.proto.name + "_;\n"
-                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                elif fld.kind.name.lower() == "int64" or fld.kind.name.lower() == "int32":
-                    output_content += "\t" + fld.kind.name.lower() + "_t" + " " + fld.proto.name + "_;\n"
-                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                elif fld.kind.name.lower() == "message":
-                    output_content += "\t" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 elif fld.kind.name.lower() == "enum":
                     output_content += "\t" + "char " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                elif fld.kind.name.lower() == "message":
+                    output_content += "\t" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
+                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                elif fld.kind.name.lower() == "string":
+                    output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
+                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 else:
                     output_content += "\t" + fld.kind.name.lower() + " " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
             output_content += "};\n\n"
 
-        for i in struct_depend_msg_list:
-            output_content += "struct Py" + i.proto.name + "QueueElement {\n"
+        for i in struct_dict.values():
+            str_val = CppSharedDataStructure.get_simple_option_value_from_proto(
+                i, CppSharedDataStructure.flux_msg_string_length)
+            char_size = str_val if str_val is not None else 64
+            output_content += "struct " + i.proto.name + "QueueElement {\n"
             for fld in i.fields:
                 if fld.proto.name.lower().endswith("time"):
-                    output_content += "\tconst char* " + fld.proto.name + "_;\n"
+                    output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 elif fld.kind.name.lower() == "float":
@@ -158,15 +153,15 @@ class CppSharedDataStructure(BaseProtoPlugin):
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 elif fld.kind.name.lower() == "enum":
-                    output_content += "\t" + "char" + "_;\n"
-                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                elif fld.kind.name.lower() == "string":
-                    output_content += "\tconst char* " + fld.proto.name + "_;\n"
+                    output_content += "\t" + "char " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 elif fld.kind.name.lower() == "message":
-                    output_content += "\tPy" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
+                    output_content += "\t" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
+                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                elif fld.kind.name.lower() == "string":
+                    output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
                 else:
@@ -175,41 +170,6 @@ class CppSharedDataStructure(BaseProtoPlugin):
                         output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
             output_content += "};\n\n"
 
-        for i in struct_msg_list:
-            output_content += "struct Py" + i.proto.name + "QueueElement {\n"
-            for fld in i.fields:
-                if fld.proto.name != "id":
-                    if fld.proto.name.lower().endswith("time"):
-                        output_content += "\tconst char* " + fld.proto.name + "_;\n"
-                        if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                            output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                    elif fld.kind.name.lower() == "float":
-                        output_content += "\tdouble " + fld.proto.name + "_;\n"
-                        if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                            output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                    elif fld.kind.name.lower() == "int64" or fld.kind.name.lower() == "int32":
-                        output_content += "\t" + fld.kind.name.lower() + "_t" + " " + fld.proto.name + "_;\n"
-                        if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                            output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                    elif fld.kind.name.lower() == "message":
-                        output_content += "\tPy" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
-                        if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                            output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                    elif fld.kind.name.lower() == "enum":
-                        output_content += "\t" + "char " + fld.proto.name + "_;\n"
-                        if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                            output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                    elif fld.kind.name.lower() == "string":
-                        output_content += "\tconst char* " + fld.proto.name + "_;\n"
-                        if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                            output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-                    else:
-                        output_content += "\t" + fld.kind.name.lower() + " " + fld.proto.name + "_;\n"
-                        if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                            output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
-            output_content += "};\n\n"
-        # outpt_content += str(__)
-        # print(import_msg_name_list)
         output_file_name = f"{proto_file_name}_shared_data_structure.h"
         return {output_file_name: output_content}
 

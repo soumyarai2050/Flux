@@ -28,6 +28,7 @@ message RTDash {
       truncate_date_time: true
     }
   };
+  option (FluxMsgStringLength) = 128;
 
   optional DashLeg leg1 = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "cb", (FluxFldAutoComplete) = "sec_id:CB_List, sec_id_source=TICKER", (FluxFldHelp) = "CB Tickers", (FluxFldMappingUnderlyingMetaField) = "sec.sec_id:BarData.bar_meta_data.symbol",  (FluxFldMappingUnderlyingMetaField) = "exch_id:BarData.bar_meta_data.exch_id", (FluxFldMappingSrc) = "vwap:BarData.vwap", (FluxFldMappingSrc) = "vwap_change:BarData.vwap_change"]; // wont be set for non CB strat
   optional DashLeg leg2 = 2 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "A", (FluxFldAutoComplete) = "sec.sec_id:EQT_List, sec.sec_id_source=TICKER", (FluxFldHelp) = "A Shares Tickers", (FluxFldMappingUnderlyingMetaField) = "sec.sec_id:BarData.bar_meta_data.symbol",  (FluxFldMappingUnderlyingMetaField) = "exch_id:BarData.bar_meta_data.exch_id", (FluxFldMappingSrc) = "vwap:BarData.vwap", (FluxFldMappingSrc) = "vwap_change:BarData.vwap_change"];
@@ -102,6 +103,7 @@ message DashCollection {
       truncate_date_time: true
     }
   };
+  option (FluxMsgStringLength) = 128;
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string dash_name = 2;
@@ -130,6 +132,7 @@ message DashFilters {
       view_layout: UI_TREE
     }
   };
+  option (FluxMsgStringLength) = 128;
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldAbbreviatedLink) = "DashCollection.id"];
   // used to create filtered table for ws update
@@ -163,6 +166,7 @@ message DashFiltersCollection {
       view_layout: UI_ABBREVIATED_FILTER
     }
   };
+  option (FluxMsgStringLength) = 128;
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   repeated string loaded_dash_filters = 2 [(FluxFldAbbreviated) = "Id:DashFilters.id^Dashboard:DashFilters.dash_name", (FluxFldAlertBubbleSource) = "DashCollection.loaded_dashes"];
@@ -172,6 +176,7 @@ message DashFiltersCollection {
 }
 
 message BarMetaData {
+  option (FluxMsgStringLength) = 128;
   required string symbol = 1;
   required string exch_id = 2;
   required BarType bar_type = 3;
@@ -188,6 +193,7 @@ message BarData {
     Granularity: Sec,
     ExpireAfterSeconds: 31536000  // one year worth of seconds
   };
+  option (FluxMsgStringLength) = 128;
   required int32 id = 1;
   required BarMetaData bar_meta_data = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
   required string start_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
@@ -213,6 +219,7 @@ message ErrorBarData {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgStringLength) = 128;
   required int32 id = 1;
   required BarMetaData bar_meta_data = 2 [(FluxFldPk) = "symbol"];
   required string start_time = 3 [(FluxFldValIsDateTime) = true];
@@ -246,6 +253,7 @@ message ImpliedVolData {
     Granularity: Sec,
     ExpireAfterSeconds: 31536000  // one year worth of seconds
   };
+  option (FluxMsgStringLength) = 128;
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
   required string compute_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
@@ -257,6 +265,8 @@ message ImpliedVolData {
 }
 
 message BarDataSymbolNLatestUpdateDateTime{
+  option (FluxMsgStringLength) = 128;
+
   required string symbol = 1;
   required string last_update_datetime = 2 [(FluxFldValIsDateTime) = true];
 }
@@ -297,6 +307,8 @@ enum BarteringSessionType {
 }
 
 message BarteringSession {
+  option (FluxMsgStringLength) = 128;
+
   required string session_name = 1;
   required string session_start_time = 2;
   required string session_end_time = 3;
@@ -311,6 +323,8 @@ message MarketMeta {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgStringLength) = 128;
+
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string exch_name = 2;
@@ -322,6 +336,8 @@ message MarketMeta {
 }
 
 message Rank {
+  option (FluxMsgStringLength) = 128;
+
   optional string rank_period = 1 [default="30 Days rolling"];
   optional int32 market_rank = 2; // driven from median notional barterd in last 30 days
   optional int32 global_rank = 3; // driven from median notional barterd in last 30 days
@@ -336,6 +352,8 @@ message HistoricalSymbolOverview {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgStringLength) = 128;
+
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string symbol = 2;
@@ -363,6 +381,8 @@ message BarDataAvailability {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgStringLength) = 128;
+
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string key = 2; // key combination of symbol~exch_id~BarType

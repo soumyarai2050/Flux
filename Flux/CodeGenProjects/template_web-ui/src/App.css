@@ -95,3 +95,7 @@ code {
 .pvtVals {
   background-color: inherit !important;
 }
+
+.MuiButtonBase-root {
+  text-transform: none !important;
+}

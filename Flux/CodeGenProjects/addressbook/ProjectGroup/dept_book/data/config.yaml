@@ -23,6 +23,3 @@ beanie_override_type: "native"
 cache_override_type: "bare"
 
 log_level: "debug"  # log lvl in int or basic log lvl name
-
-
-

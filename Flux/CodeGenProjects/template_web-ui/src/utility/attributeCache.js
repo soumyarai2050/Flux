@@ -1,5 +1,5 @@
-const DEFAULT_PAGE = 0;
-const DEFAULT_PAGE_SIZE = 25;
+export const DEFAULT_PAGE = 0;
+export const DEFAULT_ROWS_PER_PAGE = 25;
 
 export class SortOrderCache {
     static sortOrderDict = {};
@@ -59,8 +59,12 @@ export class PageCache {
 export class PageSizeCache {
     static pageSizeDict = {};
 
-    static getPageSize(name) {
-        return PageSizeCache.pageSizeDict?.[name] ?? DEFAULT_PAGE_SIZE;
+    static getPageSize(name, defaultSize) {
+        if (defaultSize) {
+            return PageSizeCache.pageSizeDict?.[name] ?? defaultSize;
+        } else {  // no default size is provided - use system default page size
+            return PageSizeCache.pageSizeDict?.[name] ?? DEFAULT_ROWS_PER_PAGE;
+        }
     }
 
     static setPageSize(name, pageSize) {

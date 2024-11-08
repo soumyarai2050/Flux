@@ -21,9 +21,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_h
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecord)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    MDShellEnvData, create_md_shell_script)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
-    create_stop_md_script)
+    MDShellEnvData, create_md_shell_script, create_stop_md_script)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book import BaseBook
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
     SymbolCache)
@@ -931,7 +929,7 @@ class BasketBook(BaseBook):
 
     def run(self):
         while True:
-            SymbolCacheContainer.acquire_notify_semaphore()
+            SymbolCacheContainer.semaphore.acquire()
 
             logging.debug("basket_book signaled")
 

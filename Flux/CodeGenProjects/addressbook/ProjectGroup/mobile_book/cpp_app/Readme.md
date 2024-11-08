@@ -103,7 +103,18 @@ git clone https://github.com/HowardHinnant/date.git
 cd date
 mkdir build
 cd build
-cmake -DENABLE_DATE_TESTING=OFF -DBUILD_TZ_LIB=OFF -DCMAKE_INSTALL_PREFIX=/home/$USER/cpp_libs/libs_13/cpp_yaml ../
+cmake -DENABLE_DATE_TESTING=OFF -DBUILD_TZ_LIB=OFF -DCMAKE_INSTALL_PREFIX=/home/$USER/cpp_libs/libs_13/date ../
 make -j4
 sudo make install
+```
+
+## steps to build
+```
+nevigate to cpp_app dir
+
+mkdir build
+cd build
+cmake ..
+make -j4
+
 ```

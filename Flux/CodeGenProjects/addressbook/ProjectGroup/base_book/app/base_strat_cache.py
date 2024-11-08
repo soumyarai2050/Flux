@@ -7,7 +7,7 @@ from threading import RLock
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.Pydantic.dept_book_n_phone_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
-    SymbolCache, ExtendedTopOfBook, SymbolCacheContainer)
+    SymbolCache, SymbolCacheContainer)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.pos_cache import PosCache
 from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
@@ -49,7 +49,7 @@ class BaseStratCache:
         self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock: Lock = Lock()
 
     @staticmethod
-    def get_top_of_book_from_symbol(symbol: str) -> ExtendedTopOfBook | None:
+    def get_top_of_book_from_symbol(symbol: str) -> TopOfBookBaseModel | None:
         symbol_cache: SymbolCache = SymbolCacheContainer.get_symbol_cache(symbol)
         if symbol_cache is not None:
             return symbol_cache.top_of_book

@@ -138,10 +138,10 @@ class PathWSConnectionManager(WSConnectionManager):
             async with self.rlock:
                 ws = ws_data.ws_object
                 filter_callable = ws_data.filter_callable
-                kwargs_tuple = ws_data.filter_callable_kwargs
+                kwargs_dict = ws_data.filter_callable_kwargs
                 # somehow this was found as a string
                 if filter_callable is not None:
-                    json_str = filter_callable(json_str, **kwargs_tuple)
+                    json_str = filter_callable(json_str, **kwargs_dict)
                 # else not required: if no filter_callable exists then pass json_str as is
 
                 if json_str:

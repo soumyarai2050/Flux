@@ -15,6 +15,8 @@ option (FluxFileWebPageUIData) = {
 };
 
 message StratLeg {
+  option (FluxMsgStringLength) = 128;
+
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
   required Security sec = 2 [(FluxFldOrmNoUpdate) = true];
   optional Side side = 3 [default = SIDE_UNSPECIFIED, (FluxFldOrmNoUpdate) = true, (FluxFldNoCommonKey) = true, (FluxFldColor) = "BUY=SUCCESS,SELL=ERROR"];
@@ -35,6 +37,8 @@ message PairStratParams {
       view_layout: UI_TREE
     }
   };
+  option (FluxMsgStringLength) = 128;
+
   // server provided via security auto complete list (if available)
   optional StratMode strat_mode = 1 [default=StratMode_Normal];
   optional StratType strat_type = 2 [default=Premium, (FluxFldOrmNoUpdate) = true];
@@ -124,7 +128,7 @@ message SystemControl {
   //The big RED button
   required bool kill_switch = 2 [default = false, (FluxFldButton) = {
     unpressed_caption: "KILL",
-    pressed_caption: "Resume",
+    pressed_caption: "RESUME",
     value_color_map: "true=CRITICAL,false=ERROR"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
@@ -133,15 +137,38 @@ message SystemControl {
     allow_force_update: true
   }];
   required bool pause_all_strats = 3 [default = false, (FluxFldButton) = {
-    unpressed_caption: "Pause All Strats",
-    pressed_caption: "Pausing All Strats",
-    disabled_captions: "true=Pausing All Strats"
+    unpressed_caption: "PAUSE ALL STRATS",
+    pressed_caption: "PAUSE IN PROGRESS",
+    disabled_captions: "true=PAUSE IN PROGRESS"
     value_color_map: "true=DEBUG,false=WARNING"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
     pressed_value_as_text: "true",
     button_icon_name: "Pause",
+    allow_force_update: true,
+    hide_caption: true
+  }];
+  required bool load_buffer_strats = 4 [default = false, (FluxFldButton) = {
+    unpressed_caption: "LOAD BUFFERED",
+    pressed_caption: "LOAD IN PROGRESS",
+    disabled_captions: "true=LOAD IN PROGRESS"
+    value_color_map: "true=DEBUG,false=INFO"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true",
+    allow_force_update: true
+  }];
+  required bool cxl_baskets = 5 [default = false, (FluxFldButton) = {
+    unpressed_caption: "CXL BASKETS",
+    pressed_caption: "CXL IN PROGRESS",
+    disabled_captions: "true=CXL IN PROGRESS"
+    value_color_map: "true=CRITICAL,false=ERROR"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true",
     allow_force_update: true
   }];
 }
@@ -238,6 +265,11 @@ message PairStrat {
   option (FluxMsgJsonQuery) = {
     QueryName: "pause_all_active_strats"
   };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "register_pair_strat_for_recovery",
+    QueryParams: "pair_strat_id",
+    QueryParamsDataType: "int"
+  };
   option (FluxMsgExecutorOptions) = {
       IsWebSocketModel: true,
       EnableNotifyAll: false,
@@ -249,6 +281,7 @@ message PairStrat {
       IsRepeated: false
     };
     option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
+  option (FluxMsgStringLength) = 128;
 
     //Server generated unique Id
     required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -303,7 +336,8 @@ message StratCollection {
         sort_type: 'asc'
       },
       placeholders: "BUY"
-    }
+    },
+    default_rows_per_page: 50
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "unload_strat_from_strat_id",
@@ -316,6 +350,8 @@ message StratCollection {
     QueryParamsDataType: "int"
   };
   option (FluxMsgSmallSizedCollection) = true;
+  option (FluxMsgStringLength) = 128;
+
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // leg1_sec_id-leg2_sec_id-leg1_side-uid
@@ -395,6 +431,7 @@ message SampleModel{
       allow_force_update: true
     }
   };
+  option (FluxMsgStringLength) = 128;
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -420,6 +457,7 @@ message SampleTSModel{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
     Granularity: Sec
   };
+  option (FluxMsgStringLength) = 128;
 
     //Server generated unique Id
     required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -442,6 +480,8 @@ message SampleTSModel1{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
     Granularity: Sec
   };
+  option (FluxMsgStringLength) = 128;
+
     option (FluxMsgAggregateQueryVarName) = "sample_cum_aggregate_pipeline";
     //Server generated unique Id
     required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -465,6 +505,8 @@ message SampleFileUpload{
 
 //Not used , maybe deleted in future
 message BarterBrief{
+  option (FluxMsgStringLength) = 128;
+
   required string barter_id = 1;
   required Security security = 2;
   required Side side = 3;
@@ -481,6 +523,8 @@ message CommandRequest{
     ReadOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string command = 2 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific chore state"];
   optional string params = 3 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific chore state"];
@@ -495,6 +539,8 @@ message CommandResponse{
     ReadOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string command = 2 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific chore state"];
   repeated string response = 3 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific chore state"];
@@ -503,6 +549,8 @@ message CommandResponse{
 }
 
 message SymbolNExchange{
+  option (FluxMsgStringLength) = 128;
+
   required string symbol = 1;
   optional string exchange = 2;
   optional string group = 3;
@@ -548,6 +596,8 @@ message TickerPair {
   option (FluxMsgJsonQuery) = {
     QueryName: "get_all_cb_eqt_ticker_pair"
   };
+  option (FluxMsgStringLength) = 128;
+
   required string cb_ticker = 1;
   required string eqt_ticker = 2;
 }
@@ -591,6 +641,8 @@ message House{
     PatchOp: AggregateType_UNSPECIFIED
     DeleteOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string name = 2;
   required Window window = 3 [(FluxFldCollectionLink) = true];

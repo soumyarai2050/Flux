@@ -9,6 +9,8 @@ enum DummyEnumSO {
 
 
 message PairSideBarteringBrief{
+  option (FluxMsgStringLength) = 128;
+
   required Security security = 1;
   required Side side = 2;
   required string last_update_date_time = 3 [(FluxFldValIsDateTime) = true];

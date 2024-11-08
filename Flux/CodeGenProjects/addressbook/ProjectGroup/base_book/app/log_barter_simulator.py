@@ -179,7 +179,7 @@ class LogBarterSimulator(BarteringLinkBase):
         cls.int_id += 1
         sync_check = kwargs.get("sync_check")
         if sync_check:
-            return True, f"place_new_chore---{cls.int_id}"
+            return True, f"placed_new_chore---{cls.int_id}"
         else:
             return True, str(cls.int_id)
 

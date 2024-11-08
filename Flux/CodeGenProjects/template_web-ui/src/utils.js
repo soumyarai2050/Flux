@@ -2,6 +2,7 @@
 import _, { cloneDeep, get, isObject, set } from 'lodash';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import { sha256 } from 'js-sha256';
 // project imports
 import {
     ColorPriority, ColorTypes, DataTypes, HoverTextType, Modes, ShapeType, SizeType,
@@ -77,6 +78,8 @@ const complexFieldProps = [
     { propertyName: "mapping_underlying_meta_field", usageName: "mapping_underlying_meta_field" },
     { propertyName: "mapping_src", usageName: "mapping_src" },
     { propertyName: "val_meta_field", usageName: "val_meta_field" },
+    // if set to true, field is hidden by default
+    { propertyName: "hide", usageName: "hide" },
 ]
 
 // simple field flux properties supported by project
@@ -154,6 +157,7 @@ const fieldProps = [
     { propertyName: "column_direction", usageName: "columnDirection" },
     // sets the allowed diff % on field which is saved without confirmation 
     { propertyName: "diff_threshold", usageName: "diffThreshold" },
+    { propertyName: "zero_as_none", usageName: "zeroAsNone" },
 ]
 
 // additional properties supported only on array fields
@@ -258,7 +262,7 @@ function getAutocompleteDict(autocompleteValue) {
 
 function setAutocompleteValue(schema, object, autocompleteDict, propname, usageName) {
     for (const pathNIndicator in autocompleteDict) {
-        const [path, indicator] = pathNIndicator.split(KEY_INDICATOR_SEPARATOR); 
+        const [path, indicator] = pathNIndicator.split(KEY_INDICATOR_SEPARATOR);
         if (path === propname || object.xpath.endsWith(path)) {
             const value = autocompleteDict[pathNIndicator];
             object[usageName] = value;
@@ -531,7 +535,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
     return collections;
 }
 
-export function generateObjectFromSchema(schema, currentSchema, additionalProps, objectxpath) {
+export function generateObjectFromSchema(schema, currentSchema, additionalProps, objectxpath, objToDup) {
     if (additionalProps && additionalProps instanceof Object) {
         for (const key in additionalProps) {
             const prop = complexFieldProps.find(({ usageName }) => usageName === key);
@@ -550,6 +554,14 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
 
         // do not create fields if populated from server or creation is not allowed on the fields.
         if (metadata.server_populate || metadata.ui_update_only) return;
+
+        if (objToDup) {
+            // if reached here, server_populate and ui_update_only fields are already ignored
+            if ([DataTypes.STRING, DataTypes.NUMBER, DataTypes.BOOLEAN, DataTypes.DATE_TIME, DataTypes.ENUM].includes(metadata.type)) {
+                object[propname] = _.get(objToDup, xpath);
+                return;
+            }
+        }
 
         if (metadata.type === DataTypes.STRING) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : null;
@@ -614,7 +626,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
                 }
 
                 if (!childSchema.server_populate && !metadata.server_populate) {
-                    let child = generateObjectFromSchema(schema, childSchema, null, xpath);
+                    let child = generateObjectFromSchema(schema, childSchema, null, xpath, objToDup);
                     object[propname] = [];
                     object[propname].push(child);
                 }
@@ -631,11 +643,10 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
 
             if (!(childSchema.server_populate || childSchema.ui_update_only)) {
                 if (required) {
-                    object[propname] = generateObjectFromSchema(schema, childSchema, null, xpath);
+                    object[propname] = generateObjectFromSchema(schema, childSchema, null, xpath, objToDup);
                 } else {
                     object[propname] = null;
                 }
-
             }
         }
     });
@@ -1654,14 +1665,17 @@ export function getTableColumns(collections, mode, enableOverride = [], disableO
             return collection;
         })
         .filter(collection => {
+            // add all exclusion cases
             if (collection.serverPopulate && mode === Modes.EDIT_MODE) {
-                // exclude columns with serverPopulate in EDIT mode
                 return false;
             } else if (primitiveDataTypes.includes(collection.type)) {
                 return true;
             } else if (collection.abbreviated && collection.abbreviated === "JSON") {
                 return true;
             } else if (collection.type === 'button' && !collection.rootLevel) {
+                if (mode === Modes.EDIT_MODE && collection.button.read_only) {
+                    return false;    
+                }
                 return true;
             } else if (collection.type === 'progressBar') {
                 return true;
@@ -1706,7 +1720,7 @@ export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], 
             for (let i = 0; i < rows.length; i++) {
                 const groupedRow = rows[i];
                 let firstValue = null;
-                for (let j = 0; j< maxRowSize; j++) {
+                for (let j = 0; j < maxRowSize; j++) {
                     const value = groupedRow?.[j]?.[fieldName];
                     if (!(value === null || value === undefined || value === '')) {
                         firstValue = value;
@@ -1818,8 +1832,12 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
             for (let i = 0; i < rows.length; i++) {
                 const value = rows[i][column.sourceIndex]?.[fieldName];
                 if (value !== firstValue && firstValue !== null) {
-                    found = false;
-                    break;
+                    if (column.type === DataTypes.NUMBER && column.zeroAsNone && firstValue === 0 && value === null) {
+                        continue;
+                    } else {
+                        found = false;
+                        break;
+                    }
                 }
                 // if (!(value === null || value === undefined || value === '')) {
                 //     if (value !== firstValue) {
@@ -2366,12 +2384,34 @@ export function excludeNullFromObject(obj) {
     // else not required
 }
 
-export function compareJSONObjects(obj1, obj2) {
+function getAllObjectPaths(obj, prefix = '', paths = new Set()) {
+    for (const key in obj) {
+        const currentPath = prefix ? `${prefix}.${key}` : key;
+
+        if (typeof obj[key] === 'object' && obj[key] !== null) {
+            if (Array.isArray(obj[key])) {
+                obj[key].forEach((item) => {
+                    getAllObjectPaths(item, currentPath, paths);
+                })
+            } else {
+                getAllObjectPaths(obj[key], currentPath, paths);
+            }
+        } else {
+            paths.add(currentPath);  // Add path for primitive values
+        }
+    }
+    return Array.from(paths);  // Covert set to array
+}
+
+export function compareJSONObjects(obj1, obj2, collections) {
     /* 
     Function to compare two objects and clear null fields from diff
     obj1: initial / original object
     obj2: currrent object
     */
+    if (!checkConstraints(obj1, obj2)) {
+        return null;
+    }
     let diff = {};
     if (_.isObject(obj1) && _.isObject(obj2)) {
         diff = getObjectsDiff(obj1, obj2);
@@ -2385,6 +2425,32 @@ export function compareJSONObjects(obj1, obj2) {
         } else {
             // removing null fields from diff if no ID exists on initial object
             excludeNullFromObject(diff);
+        }
+    }
+    if (collections) {
+        const paths = getAllObjectPaths(diff);
+        for (const path of paths) {
+            // ignore DB_ID
+            if (path === DB_ID) {
+                continue;
+            }
+
+            const collection = collections.find(col => col.tableTitle === path);
+            if (!collection) {
+                const err_ = `ERROR: no collection obj (metadata) found for path: ${path}, likely UI bug. Please send screenshot to DEV for investigation`;
+                console.error(err_);
+                alert(err_);
+                diff = null;
+                return;
+            }  // else not required - collection obj exists
+
+            if (collection.serverPopulate || collection.ormNoUpdate) {
+                const err_ = `CRITICAL: Update request discarded, unmodifiable field found in patch update for path: ${path}, likely UI bug. Please send screenshot to DEV for investigation`;
+                console.error(err_);
+                alert(err_);
+                diff = null;
+                return;
+            }  // else not required - field is modifiable from UI
         }
     }
     return diff;
@@ -3615,11 +3681,14 @@ export function isWebSocketAlive(webSocket) {
 export function getReducerArrrayFromCollections(collections) {
     const reducerArray = [];
     collections
-        .filter(col => typeof col.min === DataTypes.STRING || typeof col.max === DataTypes.STRING)
+        .filter(col => typeof col.min === DataTypes.STRING || typeof col.max === DataTypes.STRING || col.dynamic_autocomplete)
         .map(col => {
-            const dynamicListenProperties = ['min', 'max', 'dynamic_autocomplete'];
+            const dynamicListenProperties = ['min', 'max', 'autocomplete'];
             dynamicListenProperties.forEach(property => {
                 if (col.hasOwnProperty(property) && typeof col[property] === DataTypes.STRING) {
+                    if (property === 'autocomplete' && !col.dynamic_autocomplete) {
+                        return;
+                    }
                     const reducerName = toCamelCase(col[property].split('.')[0]);
                     if (!reducerArray.includes(reducerName)) {
                         reducerArray.push(reducerName);
@@ -3662,7 +3731,7 @@ export function getDataSourceColor(theme, dataSourceIndex, joinKey = false, comm
         let updatedOverrideColor = overrideColor;
         if (overrideColor.length === 4) {
             updatedOverrideColor = '#';
-            for (let i=1; i < overrideColor.length; i++) {
+            for (let i = 1; i < overrideColor.length; i++) {
                 updatedOverrideColor += `${overrideColor[i]}${overrideColor[i]}`;
             }
         }
@@ -3677,7 +3746,7 @@ export function getDataSourceColor(theme, dataSourceIndex, joinKey = false, comm
         baseColor = baseColor.toUpperCase();
         if (baseColor.length === 4) {
             let updatedBaseColor = '#';
-            for (let i=1; i < baseColor.length; i++) {
+            for (let i = 1; i < baseColor.length; i++) {
                 updatedBaseColor += `${baseColor[i]}${baseColor[i]}`;
             }
             baseColor = updatedBaseColor;
@@ -3761,7 +3830,7 @@ export function getBufferAbbreviatedOptionLabel(bufferOption, bufferListFieldAtt
         return values.join('-');
     }
     return bufferOption;
-} 
+}
 
 function getContrastColor(color) {
     // Function to convert hex to RGB
@@ -3851,4 +3920,46 @@ export function clearId(obj) {
         const err_ = 'clearId failed, expected obj of type Object, received: ' + typeof obj;
         console.error(err_);
     }
+}
+
+export async function computeFileChecksum(file) {
+    if (crypto.subtle) {
+        // crypto API is supported by browser
+        const arrayBuffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));  // Convert buffer to byte array
+        const hashHex = hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    } else {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                const fileData = event.target.result;
+                const hash = sha256(fileData);
+                resolve(hash);
+            }
+
+            reader.onerror = (err) => {
+                const err_ = `Error occurred while reading file: ${err}`;
+                console.error(err_);
+                reject();
+            }
+
+            reader.readAsArrayBuffer(file);
+        })
+    }
+}
+
+function checkConstraints(storedObj, updatedObj) {
+    // DB_ID constraints - stored and updated obj DB_ID should be same
+    if (storedObj.hasOwnProperty(DB_ID) && updatedObj.hasOwnProperty(DB_ID) && storedObj[DB_ID] !== updatedObj[DB_ID]) {
+        const err_ = `CRITICAL: mismatch DB_ID found while preparing patch update. storedObj DB_ID: ${storedObj[DB_ID]}, 
+        updatedObj DB_ID: ${updatedObj[DB_ID]}. Please send a screenshot to DEV for investigation;;;${JSON.stringify({ storedObj })}; 
+        ${JSON.stringify({ updatedObj })}`;
+        console.error(err_);
+        alert(err_);
+        return false;
+    } // else not required - DB_ID check passed
+    return true;
 }

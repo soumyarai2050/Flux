@@ -77,8 +77,7 @@ def patch_portfolio_status(overall_buy_notional: float | None, overall_sell_noti
                 elif 1 == len(portfolio_status_list):
                     kwargs.update(_id=portfolio_status_list[0].id)
                     updated_portfolio_status: PortfolioStatusBaseModel = PortfolioStatusBaseModel(**kwargs)
-                    email_book_service_http_client.patch_portfolio_status_client(
-                        jsonable_encoder(updated_portfolio_status, by_alias=True, exclude_none=True))
+                    email_book_service_http_client.patch_portfolio_status_client(updated_portfolio_status.to_json_dict(exclude_none=True))
                 else:
                     logging.critical(
                         "multiple portfolio status entries not supported at this time! "
@@ -384,7 +383,8 @@ def pair_strat_client_call_log_str(pydantic_basemodel_type: Type | None, client_
     fld_sep: str = get_field_seperator_pattern()
     val_sep: str = get_key_val_seperator_pattern()
     pair_strat_db_pattern: str = get_pattern_for_pair_strat_db_updates()
-    log_str = (f"{pair_strat_db_pattern}{pydantic_basemodel_type.__name__}{fld_sep}{update_type.value}"
+    log_str = (f"{pair_strat_db_pattern}"
+               f"{pydantic_basemodel_type.__name__ if pydantic_basemodel_type is not None else 'pydantic_basemodel_type is None'}{fld_sep}{update_type.value}"
                f"{fld_sep}{client_callable.__name__}{fld_sep}")
     for k, v in kwargs.items():
         log_str += f"{k}{val_sep}{v}"
@@ -414,7 +414,7 @@ def guaranteed_call_pair_strat_client(pydantic_basemodel_type: MsgspecModel | No
             pydantic_basemodel_type_obj = pydantic_basemodel_type.from_dict(kwargs)
 
             if str(client_callable.__name__).startswith("patch_"):
-                client_callable(pydantic_basemodel_type_obj.to_dict(exclude_none=True))
+                client_callable(pydantic_basemodel_type_obj.to_json_dict(exclude_none=True))
             else:
                 client_callable(pydantic_basemodel_type_obj)
         else:
@@ -478,7 +478,7 @@ def create_md_shell_script(md_shell_env_data: MDShellEnvData, generation_start_f
         if md_shell_env_data.subscription_data is not None:
             if len(md_shell_env_data.subscription_data) == 1:
                 # ',' separated list of ':' separated pairs of CB, followed by EQT; either can be blank but not both
-                fl.write(f'export CN_CB_EQ{md_shell_env_data.subscription_data[0][0]}:,\n')
+                fl.write(f'export CN_CB_EQ={md_shell_env_data.subscription_data[0][0]}:,\n')
             else:
                 fl.write(f'export SUBSCRIPTION_DATA="{jsonable_encoder(md_shell_env_data.subscription_data)}"\n')
 
@@ -500,6 +500,30 @@ def create_md_shell_script(md_shell_env_data: MDShellEnvData, generation_start_f
         fl.write("else\n")
         fl.write("        ./run.sh\n")
         fl.write("fi\n")
+
+
+def create_stop_md_script(running_process_name: str, generation_stop_file_path: str):
+    script_file_name = os.path.basename(generation_stop_file_path)
+    log_file_path = PurePath(generation_stop_file_path).parent.parent / "log" / f"{script_file_name}.log"
+    # stop file generator
+    with open(generation_stop_file_path, "w") as fl:
+        fl.write("#!/bin/bash\n")
+        fl.write(f"LOG_FILE_PATH={log_file_path}\n")
+        fl.write("echo Log_file_path: ${LOG_FILE_PATH}\n")
+        fl.write("shopt -s expand_aliases >>${LOG_FILE_PATH} 2>&1\n")
+        fl.write("source ${HOME}/.bashrc\n")
+        # create this as alias in your bashrc to cd into market data run.sh script dir
+        fl.write("cdm >>${LOG_FILE_PATH} 2>&1\n")
+        fl.write(f"PROCESS_COUNT=`pgrep -f {running_process_name} | wc -l`\n")
+        fl.write('if [ "$PROCESS_COUNT" -eq 0 ]; then\n')
+        fl.write('  echo "nothing to kill" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('else\n')
+        fl.write('  echo "PC: $PROCESS_COUNT" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write(f'  pids=$(pgrep -f {running_process_name})\n')
+        fl.write('  for pid in $pids; do\n')
+        fl.write('    ./kill_passthrough_service_by_pid.sh PID="$pid" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('  done\n')
+        fl.write('fi\n')
 
 
 @except_n_log_alert()
@@ -600,7 +624,7 @@ def compute_max_single_leg_notional(static_data, brokers: List[Broker | BrokerOp
                                     orig_intra_day_bot: int | None = None,
                                     orig_intra_day_sld: int | None = None) -> Tuple[int, int, int]:
     """
-    TOH: returns computed_max_single_leg_notional + computed bot and sld if passed None in last two return params, else
+    TOH: returns computed max_single_leg_notional + computed bot and sld if passed None in last two return params, else
     passed orig_intra_day_bot and orig_intra_day_sld are returned as-is
     """
     if cb_close_px_ is None or eqt_close_px_ is None:
@@ -697,7 +721,7 @@ def get_sod_borrow_intraday(sec_rec_by_sec_id_dict: Dict[str, SecurityRecord], l
                         # side [prior or current run consumption on sell side eats from what we are allowed to sell
                         # max allowed is always computed by remaining allowed to sell]
                         intraday_sld += position.sld_size if position.sld_size else 0
-                        bot_str = "" if position.bot_size == 0 else f"{ position.bot_size=}"
+                        bot_str = "" if position.bot_size == 0 else f"{position.bot_size=}"
                         logging.warning(f"ignoring intraday: {bot_str} for {ticker=}, found not "
                                         f"executed_tradable")
                         continue
@@ -795,7 +819,7 @@ def compute_max_cb_size(static_data, brokers: List[Broker], cb_side: Side, cb_eq
     sod_sum: int
     borrow_sum: int
     if cb_side == Side.BUY:
-        # implies EQT is Sell [intraday long contributes in max_size, intraday shorts are to be ignored]
+        # implies EQT is Sell [intraday longs contributes in max_size, intraday shorts are to be ignored]
         # only interested in EQT SOD/Borrow/Intraday - rest are ignored if not found in sec_rec_by_sec_id_dict
         sec_rec_by_sec_id_dict: Dict[str, SecurityRecord] = static_data.barter_ready_eqt_records_by_ric
         sod_sum, borrow_sum, intraday_bot, intraday_sld = get_sod_borrow_intraday(sec_rec_by_sec_id_dict, SecType.EQT,
@@ -819,22 +843,35 @@ def compute_max_cb_size(static_data, brokers: List[Broker], cb_side: Side, cb_eq
     return int(max_size), orig_intra_day_bot, orig_intra_day_sld
 
 
-def get_filtered_brokers_by_sec_id_list(brokers: List[Broker], sec_id_list: List[str],
-                                        broker_sec_pos_dict: Dict[str, Dict[str, SecPosition]]) \
-        -> List[BrokerOptional]:
-    filtered_brokers: List[BrokerOptional] = []
+def get_filtered_brokers_by_sec_id_list(brokers: List[Broker | BrokerBaseModel], sec_id_list: List[str],
+                                        broker_sec_pos_dict: Dict[str, Dict[str, SecPosition | SecPositionBaseModel]]) \
+        -> List[BrokerBaseModel]:
+    filtered_brokers: List[BrokerBaseModel] = []
     for broker in brokers:
-        sec_positions: List[SecPosition] = []
-        sec_pos_dict: Dict[str, SecPosition] = broker_sec_pos_dict[broker.broker]
+        sec_positions: List[SecPositionBaseModel] = []
+        sec_pos_dict: Dict[str, SecPositionBaseModel] = broker_sec_pos_dict[broker.broker]
         for sec_id in sec_id_list:
             if sec_position := sec_pos_dict.get(sec_id):
                 sec_positions.append(copy.deepcopy(sec_position))
         if sec_positions:
-            updated_broker = BrokerOptional(broker_disable=broker.bkr_disable, broker=broker.broker,
-                                            sec_positions=sec_positions)
+            updated_broker = BrokerBaseModel(bkr_disable=broker.bkr_disable, broker=broker.broker,
+                                             sec_positions=sec_positions)
             filtered_brokers.append(updated_broker)
     return filtered_brokers
-        
+
+
+def get_both_sym_side_key_from_pair_strat(pair_strat: PairStrat | PairStratBaseModel | PairStratOptional) -> str | None:
+    key: str | None = None
+    if (pair_strat and pair_strat.pair_strat_params and pair_strat.pair_strat_params.strat_leg1 and
+            pair_strat.pair_strat_params.strat_leg1.sec and pair_strat.pair_strat_params.strat_leg2 and
+            pair_strat.pair_strat_params.strat_leg2.sec):
+        key = (f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}"
+               f"-{pair_strat.pair_strat_params.strat_leg1.side}"
+               f"-{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}"
+               f"-{pair_strat.pair_strat_params.strat_leg2.side}")
+    # else not required - returning None (default value of key)
+    return key
+
 
 def get_reset_log_book_cache_wrapper_pattern():
     return "-~-"

@@ -53,3 +53,6 @@ class Market:
 
     def is_uat(self):
         return self.is_sanity_test_run or self.is_test_run or self.is_dev_env
+
+    def is_bartering_session_not_started(self) -> bool:
+        return False

@@ -8,7 +8,6 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
     executor_config_yaml_dict)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import ExtendedTopOfBook
 
 
 class ChoreControl:
@@ -296,7 +295,7 @@ class ChoreControl:
 
     # Utility methods - ideally different file - not here
     @staticmethod
-    def get_last_barter_reference_px(top_of_book: ExtendedTopOfBook, side: Side, system_symbol: str,
+    def get_last_barter_reference_px(top_of_book: TopOfBookBaseModel, side: Side, system_symbol: str,
                                     sym_overview) -> float | None:
         reference_px: float | None = None
         if not top_of_book.last_barter:
@@ -324,6 +323,50 @@ class ChoreControl:
         else:
             # this is EQT leg
             return 0.01
+
+    @staticmethod
+    def validate_md(tob: TopOfBookBaseModel, side: Side,
+                    so: SymbolOverviewBaseModel | SymbolOverview) -> str | None:
+        """returns error string if TOB not as expected, assumes side and so come valid"""
+        warn_: str = ""
+        found_md_gap: bool = False
+        cross_check_na: bool = False  # cross_check_not applicable
+        if not tob:
+            return f"invalid {tob=} for {so.symbol}"
+
+        if tob.bid_quote is None or tob.bid_quote.px is None:
+            if side == Side.SELL and tob.ask_quote and tob.ask_quote.px and math.isclose(tob.ask_quote.px,
+                                                                                         so.limit_up_px):
+                cross_check_na = True  # market is limit UP - Bid Quote is expected to be missing
+            else:
+                warn_ += f"invalid {tob.bid_quote=}; "
+
+        if tob.ask_quote is None or tob.ask_quote.px is None:
+            if side == Side.BUY and tob.bid_quote and tob.bid_quote.px and math.isclose(tob.bid_quote.px,
+                                                                                        so.limit_dn_px):
+                cross_check_na = True  # market is limit DN - Ask Quote is expected to be missing
+            else:
+                warn_ += f"invalid {tob.ask_quote=}; "
+
+        if not tob.last_barter or not tob.last_barter.px or not tob.last_barter.qty:
+            warn_ += f"invalid {tob.last_barter=}; "
+
+        # if warn_ is empty and cross_check_na is False - required cross-check data is present
+        if len(warn_) == 0 and not cross_check_na and tob.bid_quote.px > tob.ask_quote.px:
+            # cross-check applicable: conduct bid/ask cross-check
+            warn_ += f"cross check failed {tob.bid_quote.px=} > {tob.ask_quote.px} "
+
+        return f"for {tob.symbol} {warn_};;;{tob=}" if len(warn_) > 0 else None
+
+    @staticmethod
+    def validate_md_list(
+            tob_side_so_list: List[Tuple[TopOfBookBaseModel, Side, SymbolOverviewBaseModel | SymbolOverview]]) -> Tuple[bool, str | None]:
+        # checks MD(TOB/Bid/Ask/Last data gaps or Bid/Ask cross across the two legs returns False if gaps found
+        err_ = ""
+        for tob, side, so in tob_side_so_list:
+            if err := ChoreControl.validate_md(tob, side, so):
+                err_ += f"{err} {get_symbol_side_key([(so.symbol, side)])}"
+        return (False, err_) if len(err_) > 0 else (True, None)
 
     @staticmethod
     def _get_px_by_max_level(system_symbol: str, side: Side, chore_limits: ChoreLimitsBaseModel,
@@ -363,7 +406,7 @@ class ChoreControl:
                     px_by_max_level = market_depth.px
                     break
 
-        if math.isclose(px_by_max_level, 0):
+        if px_by_max_level is None or math.isclose(px_by_max_level, 0):
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.error(f"blocked generated chore, {system_symbol=}, {side=}, unable to find valid px"
@@ -374,7 +417,7 @@ class ChoreControl:
         return px_by_max_level
 
     @staticmethod
-    def _get_tob_bid_n_ask_quote_px(tob: ExtendedTopOfBook, side: Side,
+    def _get_tob_bid_n_ask_quote_px(tob: TopOfBookBaseModel, side: Side,
                                     system_symbol: str, is_limit_up: bool = False,
                                     is_limit_dn: bool = True) -> Tuple[float | None, float | None] | None:
         if not (tob.ask_quote and tob.ask_quote.px and tob.bid_quote and tob.bid_quote.px):
@@ -394,7 +437,7 @@ class ChoreControl:
             return tob.bid_quote.px, tob.ask_quote.px
 
     @staticmethod
-    def get_breach_threshold_px(tob: ExtendedTopOfBook, sym_ovrw: SymbolOverviewBaseModel,
+    def get_breach_threshold_px(tob: TopOfBookBaseModel, sym_ovrw: SymbolOverviewBaseModel,
                                 chore_limits: ChoreLimitsBaseModel, side: Side, system_symbol: str,
                                 symbol_cache=None, is_algo: bool = False, is_limit_up: bool = False,
                                 is_limit_dn: bool = False) -> float | None:
@@ -419,6 +462,7 @@ class ChoreControl:
                 return None
         else:
             px_by_max_level = None
+            logging.debug(f"passed {symbol_cache=}, max_px by levels check skipped for {system_symbol=}")
 
         last_barter_reference_px: float | None = ChoreControl.get_last_barter_reference_px(tob, side, system_symbol,
                                                                                          sym_ovrw)
@@ -435,9 +479,9 @@ class ChoreControl:
             return None     # error logged in _get_tob_bid_n_ask_quote_px
         bid_quote_px, ask_quote_px = tob_quote_px_tuple
 
-        spread_in_bips = None
+        spread_in_bips: int | None
         if not is_limit_dn and not is_limit_up:
-            spread_in_bips: int | None = ChoreControl.get_spread_in_bips(ask_quote_px, bid_quote_px)
+            spread_in_bips = ChoreControl.get_spread_in_bips(ask_quote_px, bid_quote_px)
 
         if is_algo:
             if (not chore_limits.max_px_deviation_algo) or (not chore_limits.max_basis_points_algo):
@@ -475,7 +519,7 @@ class ChoreControl:
                 min_px_by_bbo_n_tick_size: float = aggressive_quote_px + tick_size
                 min_px_by_last_barter_n_tick_size: float = last_barter_reference_px + tick_size
                 min_px_by_tick_size = max(min_px_by_bbo_n_tick_size, min_px_by_last_barter_n_tick_size)
-                breach_threshold_px_tick_size_check_applied: float = max(min_px_by_tick_size, breach_threshold_px)
+                breach_threshold_px_tick_size_check_applied = max(min_px_by_tick_size, breach_threshold_px)
             else:
                 breach_threshold_px_tick_size_check_applied = breach_threshold_px
             if not is_limit_up and not is_limit_dn:
@@ -529,7 +573,7 @@ class ChoreControl:
         return breach_threshold_px_tick_size_check_applied
 
     @staticmethod
-    def _get_tob_last_barter_px(top_of_book: ExtendedTopOfBook, side: Side) -> float | None:
+    def _get_tob_last_barter_px(top_of_book: TopOfBookBaseModel, side: Side) -> float | None:
         if top_of_book.last_barter is None or math.isclose(top_of_book.last_barter.px, 0):
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
@@ -540,7 +584,7 @@ class ChoreControl:
         return top_of_book.last_barter.px
 
     @staticmethod
-    def get_breach_threshold_px_ext(top_of_book: ExtendedTopOfBook | TopOfBook, sym_ovrw: SymbolOverviewBaseModel,
+    def get_breach_threshold_px_ext(top_of_book: TopOfBookBaseModel | TopOfBook, sym_ovrw: SymbolOverviewBaseModel,
                                     chore_limits: ChoreLimits | ChoreLimitsBaseModel, side: Side, system_symbol: str,
                                     symbol_cache=None, is_algo: bool = False, is_limit_up: bool = False,
                                     is_limit_dn: bool = False) -> float | None:
@@ -562,7 +606,7 @@ class ChoreControl:
         return breach_threshold_px
 
     @staticmethod
-    def check_px(tob: ExtendedTopOfBook, sym_ovrw_getter: Callable, chore_limits: ChoreLimitsBaseModel,
+    def check_px(tob: TopOfBookBaseModel, sym_ovrw_getter: Callable, chore_limits: ChoreLimitsBaseModel,
                  px: float, usd_px: float, qty: int, side: Side, system_symbol: str,
                  symbol_cache=None, is_algo: bool = False) -> int:
         checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS

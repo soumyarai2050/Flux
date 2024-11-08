@@ -158,9 +158,9 @@ class SecPosExtended(SecPosition):
 
     @classmethod
     def from_kwargs(cls, **kwargs):
-        id_val = kwargs.pop("id", None)
+        id_val = kwargs.pop("_id", None)
         if id_val is not None:
-            kwargs["id"] = str(id_val)
+            kwargs["_id"] = str(id_val)
 
         sec_pos_extended = super().from_kwargs(**kwargs)
         return sec_pos_extended
@@ -379,18 +379,22 @@ class SecPositionUtil:
             pos_idx = PositionUtil.find_best_availability(
                 sec_pos.positions, qty, pos_type_vis_max_available_size_n_abs_overall_available_size)
             # compute overall availability and overall max available pos (most preferred) to consume
-            pos: Position | PositionBaseModel | None = None
+            position_: Position | PositionBaseModel | None = None
             if pos_idx is not None:
-                pos: Position | PositionBaseModel | None = sec_pos.positions[pos_idx]
+                position_: Position | PositionBaseModel | None = sec_pos.positions[pos_idx]
             if best_availability_sec_pos_idx is not None and pos_idx is not None:
-                tmp_idx = PositionUtil.best_availability(best_availability_position, pos)
+                # enable if we see exception from here with position_.priority is None
+                # if position_.priority is None:
+                #     logging.error(f"Unexpected: {position_.priority=}; {position_=} for {sec_pos.security.sec_id}; "
+                #                   f"check why, ignoring position;;;{pos_idx=}; {sec_pos.positions=}")
+                tmp_idx = PositionUtil.best_availability(best_availability_position, position_)
                 if tmp_idx == 2:
-                    best_availability_position = pos
+                    best_availability_position = position_
                     best_availability_sec_pos_idx = sec_pos_idx
                     best_availability_pos_idx = pos_idx
                 # else not required - new pos is not better than prior identified best_availability_position
             elif pos_idx is not None:
-                best_availability_position = pos
+                best_availability_position = position_
                 best_availability_sec_pos_idx = sec_pos_idx
                 best_availability_pos_idx = pos_idx
             else:
@@ -563,10 +567,18 @@ class PositionUtil:
                                                            abs_pos_remaining_size, position_.type)
                 continue
             # this is a match, compare with last best match and find new best match
-            temp_best_availability_position_idx = PositionUtil.best_availability(best_availability_position, position_)
-            if temp_best_availability_position_idx == 2:  # else previously stored best_availability_position_idx is ok
-                best_availability_position_idx = idx
-                best_availability_position = position_
+            if position_.priority is None:
+                logging.error(f"Unexpected: {position_.priority=} in acceptable {abs_pos_available_size=} of "
+                              f"{position_}, check why, ignoring position;;;{best_availability_position_idx=}; "
+                              f"{positions_=}")
+                continue
+            else:
+                temp_best_availability_position_idx = PositionUtil.best_availability(best_availability_position,
+                                                                                     position_)
+                if temp_best_availability_position_idx == 2:
+                    best_availability_position_idx = idx
+                    best_availability_position = position_
+                # else previously stored best_availability_position_idx is ok to return
         return best_availability_position_idx
 
     @staticmethod

@@ -1,0 +1,16 @@
+ui_coordinates:
+  StratBrief:
+    x: 0
+    y: 0
+    w: 18
+    h: 12
+  ChoreSnapshot:
+    x: 0
+    y: 12
+    w: 18
+    h: 20
+  ChoreJournal:
+    x: 0
+    y: 32
+    w: 18
+    h: 20

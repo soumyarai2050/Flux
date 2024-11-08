@@ -111,8 +111,8 @@ class BarteringDataManager(BaseBarteringDataManager, EmailBookServiceDataManager
                 if pair_strat_tuple is not None:
                     cached_pair_strat, _ = pair_strat_tuple
                 if cached_pair_strat is not None and cached_pair_strat.strat_state != pair_strat_.strat_state:
-                    logging.warning(f"Strat state changed from {cached_pair_strat.strat_state} to "
-                                    f"{pair_strat_.strat_state};;;pair_strat_log_key: "
+                    logging.warning(f"Strat state changed from {cached_pair_strat.strat_state.value} to "
+                                    f"{pair_strat_.strat_state.value};;;pair_strat_log_key: "
                                     f"{get_pair_strat_log_key(pair_strat_)}")
                 if self.street_book is None:
                     # this is a new pair strat for processing, start its own thread with new strat executor object
@@ -135,8 +135,8 @@ class BarteringDataManager(BaseBarteringDataManager, EmailBookServiceDataManager
                     if pair_strat_tuple is not None:
                         cached_pair_strat, _ = pair_strat_tuple
                     if cached_pair_strat is not None and cached_pair_strat.strat_state != pair_strat_.strat_state:
-                        logging.warning(f"Strat state changed from {cached_pair_strat.strat_state} to "
-                                        f"{pair_strat_.strat_state};;;pair_strat_log_key: "
+                        logging.warning(f"Strat state changed from {cached_pair_strat.strat_state.value} to "
+                                        f"{pair_strat_.strat_state.value};;;pair_strat_log_key: "
                                         f"{get_pair_strat_log_key(pair_strat_)}")
                     self.strat_cache.set_pair_strat(pair_strat_)
                     self.strat_cache.stopped = True

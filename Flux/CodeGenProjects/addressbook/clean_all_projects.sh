@@ -8,8 +8,8 @@ file_paths=(
     "ProjectGroup/log_book/scripts/"
     "ProjectGroup/street_book/scripts/"
     "ProjectGroup/photo_book/scripts/"
+    "ProjectGroup/basket_book/scripts/"
     "ProjectGroup/phone_book/scripts/"
-    "ProjectGroup/basket_book/scripts/"    # basket_book imports phone_book
 )
 
 for file_path in "${file_paths[@]}"; do

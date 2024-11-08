@@ -53,6 +53,8 @@ message TopOfBook {
     ExecutorKeySequence: "symbol-'SELL'",
     IsRepeated: true
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional Quote bid_quote = 3 [(FluxFldElaborateTitle) = true];
@@ -93,7 +95,7 @@ message MarketDepth {
     },
     depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true
+    depends_on_other_model_for_dynamic_url: true,
     depends_on_model_name_for_port: true,
     is_read_only: true
   };
@@ -103,6 +105,8 @@ message MarketDepth {
     QueryParamsDataType: "List[Tuple[str, TickType]]",
     QueryRouteType: PATCH
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   required string exch_time = 3 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
@@ -140,11 +144,12 @@ message LastBarter {
     },
     depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true
+    depends_on_other_model_for_dynamic_url: true,
     depends_on_model_name_for_port: true,
     is_read_only: true
   };
   option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgStringLength) = 128;
 
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];
@@ -167,6 +172,8 @@ message RawLastBarterHistory {
     Granularity: Sec,
     ExpireAfterSeconds: 3600
   };
+  option (FluxMsgStringLength) = 128;
+
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];
   required string exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];

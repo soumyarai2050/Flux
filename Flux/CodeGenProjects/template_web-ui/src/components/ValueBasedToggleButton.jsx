@@ -1,12 +1,9 @@
 import React, { useRef } from 'react';
-import { ToggleButton, Tooltip } from '@mui/material';
+import { ToggleButton } from '@mui/material';
 import * as MuiIcon from '@mui/icons-material'
 import PropTypes from 'prop-types';
 import classes from './ValueBasedToggleButton.module.css';
 
-const ButtonWrapper = ({ condition, wrapper, children }) => {
-    return condition ? wrapper(children) : children;
-}
 
 const ValueBasedToggleButton = (props) => {
     let buttonClass = classes[props.color];
@@ -42,20 +39,17 @@ const ValueBasedToggleButton = (props) => {
     }
 
     return (
-        <ButtonWrapper
-            condition={!!props.disabled}
-            wrapper={children => <Tooltip className={disabledClass} title={props.caption}>{children}</Tooltip>}>
-            <ToggleButton
-                className={`${classes.button} ${buttonClass} ${disabledClass}`}
-                name={props.name}
-                size={props.size}
-                selected={true}
-                disabled={props.disabled ? props.disabled : false}
-                value={props.caption}
-                onClick={handleClicks}>
-                {props.iconName ? <Icon /> : props.caption}
-            </ToggleButton>
-        </ButtonWrapper>
+        <ToggleButton
+            className={`${classes.button} ${buttonClass} ${disabledClass}`}
+            name={props.name}
+            size={props.size}
+            selected={true}
+            disabled={props.disabled ? props.disabled : false}
+            value={props.caption}
+            onClick={handleClicks}>
+            {props.iconName && <Icon />}
+            {!props.hideCaption && props.caption}
+        </ToggleButton>
     )
 }
 

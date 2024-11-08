@@ -27,8 +27,6 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.aggregate impor
     get_last_n_chore_journals_from_chore_id, get_objs_from_symbol)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book import (
     BaseBook)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
-    ExtendedTopOfBook)
 from FluxPythonUtils.scripts.service import Service
 # below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import BaseStratCache, SymbolCacheContainer
@@ -89,7 +87,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         self.is_test_run = self.market.is_test_run
 
         # Load the shared library
-        so_module_dir = PurePath(__file__).parent
+        so_module_dir: PurePath = PurePath(__file__).parent
         so_module_file_name = BarteringLinkBase.pair_strat_config_dict.get("cpp_app_so_module_file_name")
         os.environ["LD_LIBRARY_PATH"] = f"{so_module_dir}:$LD_LIBRARY_PATH"
         self.mobile_book_provider = ctypes.CDLL(so_module_dir / so_module_file_name)
@@ -208,9 +206,6 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     # Chore Journal Update Methods
     ##############################
 
-    def get_last_barter_px_from_tob(self, tob: TopOfBook | ExtendedTopOfBook):
-        raise NotImplementedError
-
     async def handle_create_chore_journal_pre(self, chore_journal_obj: ChoreJournal) -> None:
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
@@ -223,8 +218,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
             if chore_journal_obj.chore.px == 0:
                 top_of_book_obj = BaseStratCache.get_top_of_book_from_symbol(chore_journal_obj.chore.security.sec_id)
                 if top_of_book_obj is not None:
-                    last_barter_px = self.get_last_barter_px_from_tob(top_of_book_obj)
-                    chore_journal_obj.chore.px = last_barter_px
+                    chore_journal_obj.chore.px = top_of_book_obj.last_barter.px
                 else:
                     err_str_ = (f"received chore journal px 0 and to update px, received TOB also as {top_of_book_obj}"
                                 f", chore_journal_key: "
@@ -1646,15 +1640,18 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
 
     async def handle_create_top_of_book_post(self, top_of_book_obj: TopOfBook):
         self.bartering_data_manager.handle_top_of_book_get_all_ws(top_of_book_obj)
+        # used for basket executor - strat executor releases semaphore from cpp app
         SymbolCacheContainer.release_notify_semaphore()
 
     async def handle_update_top_of_book_post(self, updated_top_of_book_obj: TopOfBook):
         self.bartering_data_manager.handle_top_of_book_get_all_ws(updated_top_of_book_obj)
+        # used for basket executor - strat executor releases semaphore from cpp app
         SymbolCacheContainer.release_notify_semaphore()
 
     async def handle_partial_update_top_of_book_post(self, updated_top_of_book_obj_json: Dict[str, Any]):
         updated_top_of_book_obj: TopOfBook = TopOfBook.from_dict(updated_top_of_book_obj_json)
         self.bartering_data_manager.handle_top_of_book_get_all_ws(updated_top_of_book_obj)
+        # used for basket executor - strat executor releases semaphore from cpp app
         SymbolCacheContainer.release_notify_semaphore()
 
     #####################

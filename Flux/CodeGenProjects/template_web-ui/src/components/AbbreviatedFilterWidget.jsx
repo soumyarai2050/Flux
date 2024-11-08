@@ -36,7 +36,7 @@ import { DataSourceHexColorPopup } from './Popup';
 function AbbreviatedFilterWidget(props) {
     const worker = useMemo(() => new Worker(new URL("../workers/abbreviatedRowsHandler.js", import.meta.url)), []);
     const [sortOrders, setSortOrders] = useState(SortOrderCache.getSortOrder(props.name));
-    const [rowsPerPage, setRowsPerPage] = useState(PageSizeCache.getPageSize(props.name));
+    const [rowsPerPage, setRowsPerPage] = useState(props.rowsPerPage);
     const [page, setPage] = useState(PageCache.getPage(props.name));
     const [rows, setRows] = useState([]);
     const [groupedRows, setGroupedRows] = useState([]);
@@ -200,7 +200,8 @@ function AbbreviatedFilterWidget(props) {
     const handleChangeRowsPerPage = (event) => {
         const size = parseInt(event.target.value, 10);
         setRowsPerPage(size);
-        PageSizeCache.setPageSize(props.name, size);
+        // PageSizeCache.setPageSize(props.name, size);
+        props.onRowsPerPageChange(size);
         setPage(0);
         PageCache.setPage(0);
     };

@@ -969,8 +969,14 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             self.port_to_executor_http_client_dict[port] = (
                 StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, port))
 
-    def _set_strat_company(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj_dict: Dict) -> None:
-        if updated_pair_strat_obj_dict.get("is_executor_running"):
+    def _set_strat_company(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat | Dict) -> None:
+        is_executor_running: bool
+        if isinstance(updated_pair_strat_obj, dict):
+            is_executor_running = updated_pair_strat_obj.get("is_executor_running")
+        else:
+            is_executor_running = updated_pair_strat_obj.is_executor_running
+
+        if is_executor_running:
             # update only if strat company is not set for either leg1 or leg2
             if stored_pair_strat_obj.pair_strat_params.strat_leg1.company is None or (
                     stored_pair_strat_obj.pair_strat_params.strat_leg2.company is None):
@@ -989,8 +995,12 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                             strat_leg1_company = symbol_overview.company
                         elif symbol_overview.symbol == stored_pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id:
                             strat_leg2_company = symbol_overview.company
-                    updated_pair_strat_obj_dict["pair_strat_params"]["strat_leg1"]["company"] = strat_leg1_company
-                    updated_pair_strat_obj_dict["pair_strat_params"]["strat_leg2"]["company"] = strat_leg2_company
+                    if isinstance(updated_pair_strat_obj, dict):
+                        updated_pair_strat_obj["pair_strat_params"]["strat_leg1"]["company"] = strat_leg1_company
+                        updated_pair_strat_obj["pair_strat_params"]["strat_leg2"]["company"] = strat_leg2_company
+                    else:
+                        updated_pair_strat_obj.pair_strat_params.strat_leg1.company = strat_leg1_company
+                        updated_pair_strat_obj.pair_strat_params.strat_leg2.company = strat_leg2_company
                 else:
                     err_str_ = (f"_set_strat_company failed. no port found for pair_strat with symbol_side_key: "
                                 f"{get_symbol_side_key([(sec_id, side)])}")
@@ -1008,6 +1018,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
+        self._set_strat_company(stored_pair_strat_obj, updated_pair_strat_obj)
         if updated_pair_strat_obj.frequency is None:
             updated_pair_strat_obj.frequency = 0
         updated_pair_strat_obj.frequency += 1
@@ -1094,11 +1105,16 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         updated_pair_strat_obj_json_list = await submit_task_with_first_completed_wait(tasks)
         return updated_pair_strat_obj_json_list
 
+    def check_n_disable_non_mstrat_positions(self, stored_pair_strat_obj_or_dict: Dict | PairStrat,
+                                             updated_pair_strat_obj_or_dict: Dict | PairStrat):
+        pass
+
     def _update_pair_strat_post(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
         if stored_pair_strat_obj.strat_state != updated_pair_strat_obj.strat_state:
-            logging.warning(f"Strat state changed from {stored_pair_strat_obj.strat_state} to "
-                            f"{updated_pair_strat_obj.strat_state};;;pair_strat_log_key: "
+            logging.warning(f"Strat state changed from {stored_pair_strat_obj.strat_state.value} to "
+                            f"{updated_pair_strat_obj.strat_state.value};;;pair_strat_log_key: "
                             f"{get_pair_strat_log_key(updated_pair_strat_obj)}")
+        self.check_n_disable_non_mstrat_positions(stored_pair_strat_obj, updated_pair_strat_obj)
 
     def _partial_update_pair_strat_post(self, stored_pair_strat_obj_dict: Dict, updated_pair_strat_obj_dict: Dict):
         stored_strat_state = stored_pair_strat_obj_dict.get("strat_state")
@@ -1107,6 +1123,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             logging.warning(f"Strat state changed from {stored_strat_state} to "
                             f"{updated_strat_state};;;pair_strat_log_key: "
                             f"{get_pair_strat_dict_log_key(updated_pair_strat_obj_dict)}")
+        self.check_n_disable_non_mstrat_positions(stored_pair_strat_obj_dict, updated_pair_strat_obj_dict)
 
     async def update_pair_strat_post(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
         self._update_pair_strat_post(stored_pair_strat_obj, updated_pair_strat_obj)
@@ -1170,7 +1187,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         else:
             executor = subprocess.Popen(['python', str(executor_path), f'{pair_strat.id}', '&'])
 
-        logging.info(f"Launched {executor_path} ...")
+        logging.info(f"Launched strat executor for {pair_strat.id=};;;{executor_path=}")
         self.pair_strat_id_to_executor_process_id_dict[pair_strat.id] = executor.pid
 
     def _close_executor_server(self, pair_strat_id: int) -> None:
@@ -1365,7 +1382,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         else:
             err_str_ = ("Unexpected: Strat is not found in loaded or buffer list, ignoring this strat delete, "
                         f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
-            logging.error(err_str_) 
+            logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=400)
 
     async def unload_pair_strats(self, stored_strat_collection_obj: StratCollection,
@@ -1460,6 +1477,8 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         reloaded_strat_keys_frozenset = stored_strat_collection_buffered_strat_keys_frozenset.difference(
             updated_strat_collection_buffered_strat_keys_frozenset)
         if len(reloaded_strat_keys_frozenset) != 0:
+            logging.debug(f"found {len(reloaded_strat_keys_frozenset)} to load from buffered;;;"
+                          f"{reloaded_strat_keys_frozenset=}")
             reloaded_strat_key: str
             for reloaded_strat_key in reloaded_strat_keys_frozenset:
                 if reloaded_strat_key in updated_strat_collection_obj.loaded_strat_keys:  # loaded not deleted
@@ -1467,6 +1486,12 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                     pair_strat = \
                         await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_by_id_http(
                             pair_strat_id)
+
+                    # unload_strat should be False if reached here (reload case)
+                    log_str = pair_strat_client_call_log_str(
+                        StratViewBaseModel, photo_book_service_http_client.patch_all_strat_view_client,
+                        UpdateType.SNAPSHOT_TYPE, _id=pair_strat.id, unload_strat=False, recycle_strat=False)
+                    logging.db(log_str)
 
                     # starting snoozed server
                     await self._start_executor_server(pair_strat)
@@ -1620,18 +1645,36 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             updated_system_control_json_or_obj: Dict | SystemControl):
         if isinstance(stored_system_control_json, dict):
             stored_pause_all_strats = stored_system_control_json.get("pause_all_strats")
+            stored_load_buffer_strats = stored_system_control_json.get("load_buffer_strats")
+            stored_cxl_baskets = stored_system_control_json.get("cxl_baskets")
         else:
             stored_pause_all_strats = stored_system_control_json.pause_all_strats
+            stored_load_buffer_strats = stored_system_control_json.load_buffer_strats
+            stored_cxl_baskets = stored_system_control_json.cxl_baskets
 
         if isinstance(updated_system_control_json_or_obj, dict):
             updated_pause_all_strats = updated_system_control_json_or_obj.get("pause_all_strats")
+            updated_load_buffer_strats = updated_system_control_json_or_obj.get("load_buffer_strats")
+            updated_cxl_baskets = updated_system_control_json_or_obj.get("cxl_baskets")
         else:
             updated_pause_all_strats = updated_system_control_json_or_obj.pause_all_strats
+            updated_load_buffer_strats = updated_system_control_json_or_obj.load_buffer_strats
+            updated_cxl_baskets = updated_system_control_json_or_obj.cxl_baskets
         if not stored_pause_all_strats and updated_pause_all_strats:
             script_path: str = str(CURRENT_PROJECT_DIR / "pyscripts" / "pause_all_active_strats.py")
             cmd: List[str] = ["python", script_path, "&"]
             launcher: subprocess.Popen = subprocess.Popen(cmd)
             logging.warning(f"Triggered pause_all_strat event at {DateTime.utcnow()};;;{cmd=}, {launcher=}")
+        if not stored_load_buffer_strats and updated_load_buffer_strats:
+            script_path: str = str(CURRENT_PROJECT_DIR / "pyscripts" / "load_all_buffer_strats.py")
+            cmd: List[str] = ["python", script_path, "&"]
+            launcher: subprocess.Popen = subprocess.Popen(cmd)
+            logging.warning(f"Triggered load_buffer_strats event at {DateTime.utcnow()};;;{cmd=}, {launcher=}")
+        if not stored_cxl_baskets and updated_cxl_baskets:
+            script_path: str = str(CURRENT_PROJECT_DIR / "pyscripts" / "cancel_all_basket_chores.py")
+            cmd: List[str] = ["python", script_path, "&"]
+            launcher: subprocess.Popen = subprocess.Popen(cmd)
+            logging.warning(f"Triggered cxl_baskets event at {DateTime.utcnow()};;;{cmd=}, {launcher=}")
 
     async def update_system_control_pre(self, stored_system_control_obj: SystemControl,
                                         updated_system_control_obj: SystemControl):
@@ -1746,6 +1789,41 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                 detail="Unexpected: Found stored_sample_model_dict_list == "
                                        "updated_sample_model_dict_list, must be different;;; "
                                        f"{stored_sample_model_dict_list=}, {updated_sample_model_dict_list=}")
+
+    async def register_pair_strat_for_recovery_query_pre(self, pair_strat_class_type: Type[PairStrat],
+                                                         pair_strat_id: int):
+        if not pair_strat_id:
+            err_str_ = f"register_pair_strat_for_recovery failed, {pair_strat_id=} found None, expected int"
+            logging.error(err_str_)
+            raise HTTPException(status_code=400, detail=err_str_)
+        # else not received - received pair_strat_id
+
+        if self.pair_strat_id_to_executor_process_id_dict.get(pair_strat_id) is not None:
+            err_str_ = f"register_pair_strat_for_recovery failed, {pair_strat_id=} already registered for recovery"
+            logging.error(err_str_)
+            raise HTTPException(status_code=400, detail=err_str_)
+
+        # check for valid pair_strat_id and register if present in loaded list
+        try:
+            pair_strat_obj: PairStrat = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
+                                               underlying_read_pair_strat_by_id_http(pair_strat_id))
+            strat_key: str = get_strat_key_from_pair_strat(pair_strat_obj)
+            strat_collection_obj: StratCollection = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
+                                                           underlying_read_strat_collection_by_id_http(1))
+            if strat_key not in strat_collection_obj.loaded_strat_keys:
+                err_str_ = (f"register_pair_strat_for_recovery_failed, {pair_strat_id=} not found in loaded strats;;;"
+                            f"{pair_strat_obj=}, {strat_collection_obj=}")
+                logging.error(err_str_)
+                raise HTTPException(status_code=400, detail=err_str_)
+            # else - valid pair strat id and not monitored
+
+            # register pair strat
+            self.pair_strat_id_to_executor_process_id_dict[pair_strat_id] = None
+            return [pair_strat_obj]
+        except Exception as exp:
+            err_str_ = f"register_pair_strat_for_recovery failed, exception: {exp}"
+            logging.exception(err_str_)
+            raise HTTPException(status_code=400, detail=err_str_)
 
 
 def filter_ws_pair_strat(pair_strat_obj_json: Dict, **kwargs):

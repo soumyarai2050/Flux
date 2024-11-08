@@ -188,6 +188,7 @@ class BaseProtoPlugin(ABC):
     flux_fld_server_running_status: ClassVar[str] = "FluxFldServerRunningStatus"
     flux_fld_server_ready_status: ClassVar[str] = "FluxFldServerReadyStatus"
     flux_fld_diff_threshold: ClassVar[str] = "FluxFldDiffThreshold"
+    flux_fld_zero_as_none: ClassVar[str] = "FluxFldZeroAsNone"
     executor_option_is_websocket_model_field: ClassVar[str] = "IsWebSocketModel"
     executor_option_enable_notify_all_field: ClassVar[str] = "EnableNotifyAll"
     executor_option_is_top_lvl_model_field: ClassVar[str] = "IsTopLvlModel"
@@ -198,6 +199,7 @@ class BaseProtoPlugin(ABC):
     executor_option_cache_as_dict_with_key_field: ClassVar[str] = "CacheAsDictWithKeyField"
     flux_msg_small_sized_collection: ClassVar[str] = "FluxMsgSmallSizedCollection"
     flux_fld_PK: ClassVar[str] = "FluxFldPk"
+    flux_msg_string_length: ClassVar[str] = "FluxMsgStringLength"
     flux_enum_cmnt: ClassVar[str] = "FluxEnumCmnt"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: ClassVar[str] = "DefaultIdType"  # to be used in models as default type variable name
