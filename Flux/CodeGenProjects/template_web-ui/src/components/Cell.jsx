@@ -169,7 +169,7 @@ const Cell = (props) => {
     const handleDiffThreshold = (storedValue, updatedValue) => {
         if (collection.diffThreshold) {
             if (typeof storedValue === DataTypes.NUMBER && typeof updatedValue === DataTypes.NUMBER) {
-                const diffPercentage = Math.abs(updatedValue - storedValue) * 100 / storedValue;
+                const diffPercentage = Math.abs(updatedValue - storedValue) * 100 / Math.abs(storedValue);
                 if (diffPercentage < collection.diffThreshold) {
                     if (props.onForceSave) {
                         props.onForceSave();

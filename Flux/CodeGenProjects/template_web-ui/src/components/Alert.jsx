@@ -32,7 +32,7 @@ Alert.propTypes = {
     open: PropTypes.bool.isRequired,
     onClose: PropTypes.func.isRequired,
     severity: PropTypes.string,
-    children: PropTypes.any.isRequired
+    // children: PropTypes.any.isRequired
 }
 
 export const AlertErrorMessage = (props) => {

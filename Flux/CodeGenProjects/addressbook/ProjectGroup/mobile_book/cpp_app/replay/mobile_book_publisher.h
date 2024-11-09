@@ -192,7 +192,7 @@ protected:
 			auto status = mon_md.pop(md);
 			if (status == FluxCppCore::QueueStatus::DATA_CONSUMED) {
 
-				if (mr_config_.m_market_depth_py_cache_publish_policy_ == PublishPolicy::POST) {
+				if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::POST) {
 					update_shm_cache(md);
 				}
 
@@ -285,7 +285,7 @@ protected:
 			auto status = mon_lt.pop(lt);
 			if (status == FluxCppCore::QueueStatus::DATA_CONSUMED)
 			{
-				if (mr_config_.m_last_barter_py_cache_publish_policy_ == PublishPolicy::POST) {
+				if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::POST) {
 					update_shm_cache(lt);
 				}
 

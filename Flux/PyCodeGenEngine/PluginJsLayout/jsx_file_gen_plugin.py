@@ -231,7 +231,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "import { Fullscreen, CloseFullscreen } from '@mui/icons-material';\n"
         output_str += "import { cleanAllCache } from '../utility/attributeCache';\n"
         output_str += "import { Icon } from '../components/Icon';\n"
-        output_str += "import FileUploaderMenu from '../components/FileUploaderMenu';\n"
+        output_str += "import ButtonQuery from '../components/ButtonQuery';\n"
         output_str += "import { DEFAULT_ROWS_PER_PAGE } from '../utility/attributeCache';\n\n"
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "const getAllWsWorker = new Worker(new URL('../workers/getAllWsHandler.js', " \
@@ -307,9 +307,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += ("            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}>"
                            "<CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' "
                            "onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n")
-            output_str += "            {currentSchema.widget_ui_data_element.file_upload_query && (\n"
-            output_str += "                <FileUploaderMenu\n"
-            output_str += "                    name={title}\n"
+            output_str += "            {currentSchema.button_query && currentSchema.button_query.map((queryObj, idx) => (\n"
+            output_str += "                <ButtonQuery\n"
+            output_str += "                    key={idx}\n"
             option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                 message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
             other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
@@ -318,10 +318,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                    url={url}\n"
             else:
                 output_str += "                    url={null}\n"
-            output_str += "                    fileUploadQuery={currentSchema.widget_ui_data_element.file_upload_query}\n"
+            output_str += "                    queryObj={queryObj}\n"
             output_str += "                    disallowNonTodayFileUpload={currentSchema.widget_ui_data_element.disallow_non_today_file_upload}\n"
             output_str += "                />\n"
-            output_str += "            )}\n"
+            output_str += "            ))}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += '    )\n\n'
             output_str += "    let cleanedRows = [];\n"
@@ -370,9 +370,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                <Icon name='Create' title='Create' " \
                           "onClick={onCreate}><Add fontSize='small' /></Icon>}\n"
             output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
-            output_str += "            {currentSchema.widget_ui_data_element.file_upload_query && (\n"
-            output_str += "                <FileUploaderMenu\n"
-            output_str += "                    name={title}\n"
+            output_str += "            {currentSchema.button_query && currentSchema.button_query.map((queryObj, idx) => (\n"
+            output_str += "                <ButtonQuery\n"
+            output_str += "                    key={idx}\n"
             option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                 message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
             other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
@@ -381,10 +381,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                    url={url}\n"
             else:
                 output_str += "                    url={null}\n"
-            output_str += "                    fileUploadQuery={currentSchema.widget_ui_data_element.file_upload_query}\n"
+            output_str += "                    queryObj={queryObj}\n"
             output_str += "                    disallowNonTodayFileUpload={currentSchema.widget_ui_data_element.disallow_non_today_file_upload}\n"
             output_str += "                />\n"
-            output_str += "            )}\n"
+            output_str += "            ))}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += "    )\n\n"
         elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
@@ -398,14 +398,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            data={modified" + f"{message_name}" + "}\n"
             output_str += "            onButtonToggle={onButtonToggle}>\n"
             output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
-            output_str += "            {currentSchema.widget_ui_data_element.file_upload_query && (\n"
-            output_str += "                <FileUploaderMenu\n"
-            output_str += "                    name={title}\n"
+            output_str += "            {currentSchema.button_query && currentSchema.button_query.map((queryObj, idx) => (\n"
+            output_str += "                <ButtonQuery\n"
+            output_str += "                    key={idx}\n"
             output_str += "                    url={null}\n"
-            output_str += "                    fileUploadQuery={currentSchema.widget_ui_data_element.file_upload_query}\n"
+            output_str += "                    queryObj={queryObj}\n"
             output_str += "                    disallowNonTodayFileUpload={currentSchema.widget_ui_data_element.disallow_non_today_file_upload}\n"
             output_str += "                />\n"
-            output_str += "            )}\n"
+            output_str += "            ))}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += "    )\n\n"
         else:
@@ -421,14 +421,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            data={_.get(modified" + f"{root_msg_name}" + ", currentSchemaXpath)}\n"
             output_str += "            onButtonToggle={onButtonToggle}>\n"
             output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
-            output_str += "            {currentSchema.widget_ui_data_element.file_upload_query && (\n"
-            output_str += "                <FileUploaderMenu\n"
-            output_str += "                    name={title}\n"
+            output_str += "            {currentSchema.button_query && currentSchema.button_query.map((queryObj, idx) => (\n"
+            output_str += "                <ButtonQuery\n"
+            output_str += "                    key={idx}\n"
             output_str += "                    url={null}\n"
-            output_str += "                    fileUploadQuery={currentSchema.widget_ui_data_element.file_upload_query}\n"
-            output_str += "                    disallowNonTodayFileUpload={currentSchema.widget_ui_data_element.disallow_non_today_file_upload}\n"
+            output_str += "                    queryObj={queryObj}\n"
             output_str += "                />\n"
-            output_str += "            )}\n"
+            output_str += "            ))}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += "    )\n\n"
         output_str += "    return (\n"

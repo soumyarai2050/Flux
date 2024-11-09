@@ -415,9 +415,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     simulate_config_yaml_file_data += f"last_barter_ws_update_publish_policy: 2\n"
                                     simulate_config_yaml_file_data += f"websocket_timeout: 300\n"
 
-                                if not executor_config_yaml_dict.get("avoid_cpp_to_update_python_cache"):
-                                    simulate_config_yaml_file_data += f"market_depth_py_cache_publish_policy: 1\n"
-                                    simulate_config_yaml_file_data += f"last_barter_py_cache_publish_policy: 1\n"
+                                if not executor_config_yaml_dict.get("avoid_cpp_shm_update"):
+                                    simulate_config_yaml_file_data += f"cpp_shm_update_publish_policy: 1\n"
 
                                 if not executor_config_yaml_dict.get("avoid_cpp_db_update"):
                                     simulate_config_yaml_file_data += f"market_depth_db_update_publish_policy: 2\n"

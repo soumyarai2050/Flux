@@ -1,6 +1,7 @@
 // third-party package imports
 import _, { cloneDeep, get, isObject, set } from 'lodash';
 import dayjs from 'dayjs';
+import axios from 'axios';
 import utc from 'dayjs/plugin/utc';
 import { sha256 } from 'js-sha256';
 // project imports
@@ -3962,4 +3963,17 @@ function checkConstraints(storedObj, updatedObj) {
         return false;
     } // else not required - DB_ID check passed
     return true;
+}
+
+export function getAxiosMethod(queryRouteType) {
+    switch (queryRouteType.toLowerCase()) {
+        case 'get':
+            return axios.get;
+        case 'post':
+            return axios.post;
+        case 'patch':
+            return axios.patch;
+        default:
+            throw new Error(`Unsupported queryRouteType: ${queryRouteType}`);
+    }
 }

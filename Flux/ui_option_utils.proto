@@ -100,10 +100,7 @@ message WidgetUIDataElement {
   optional bool is_model_alert_type = 22;
   optional JoinSort join_sort = 23;
   optional bool is_read_only = 24;
-  optional string file_upload_query = 25;
-  optional bool disallow_duplicate_file_upload = 26;
-  optional bool disallow_non_today_file_upload = 27;
-  optional int32 default_rows_per_page = 28;  // supported values = 25, 50
+  optional int32 default_rows_per_page = 25;  // supported values = 25, 50
 }
 
 message WidgetUIOption {

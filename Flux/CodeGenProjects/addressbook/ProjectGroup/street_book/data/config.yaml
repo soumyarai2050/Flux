@@ -22,7 +22,7 @@ avoid_last_barter_db_update: True  # to be used in routes to bypass db updates i
 avoid_cpp_ws_update: False # If true, bypasses updates through WebSocket from CPP
 avoid_cpp_db_update: False # If true, bypasses the CPP database updates (false by default)
 avoid_cpp_http_update: True # If true, bypasses updates through HTTP from CPP
-avoid_cpp_to_update_python_cache: False
+avoid_cpp_shm_update: False
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"

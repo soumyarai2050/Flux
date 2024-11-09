@@ -479,7 +479,7 @@ class ChoreControl:
             return None     # error logged in _get_tob_bid_n_ask_quote_px
         bid_quote_px, ask_quote_px = tob_quote_px_tuple
 
-        spread_in_bips: int | None
+        spread_in_bips: int | None = None
         if not is_limit_dn and not is_limit_up:
             spread_in_bips = ChoreControl.get_spread_in_bips(ask_quote_px, bid_quote_px)
 

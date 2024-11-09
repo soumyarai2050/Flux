@@ -132,6 +132,21 @@ message PortfolioAlert {
       QueryParams: "alert_details"
       QueryParamsDataType: "str | None = None"
   };
+  option (FluxMsgButtonQuery) = {
+    query_data: {
+      QueryName: "dismiss_all_portfolio_alerts"
+      QueryType: HTTP
+    };
+    ui_button: {
+      unpressed_caption: "DISMISS ALL",
+      pressed_caption: "DISMISS ALL IN PROGRESS",
+      value_color_map: "true=DEBUG,false=INFO",
+      button_type: BUTTON_TYPE_RECTANGLE,
+      button_size: BUTTON_SIZE_MEDIUM,
+      action: "flux_toggle",
+      pressed_value_as_text: "true"
+    }
+  };
   option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgMainCRUDOperationsAgg) = {
     agg_var_name: "sort_alerts_based_on_severity_n_last_update_analyzer_time"

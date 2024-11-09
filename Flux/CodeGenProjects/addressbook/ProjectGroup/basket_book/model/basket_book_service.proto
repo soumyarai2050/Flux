@@ -32,14 +32,32 @@ message BasketChore{
     },
     depending_proto_file_name: "email_book_service.proto",
   };
-  option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
     EnableNotifyAll: true,
     IsTopLvlModel: false,
     ExecutorKeySequence: "security.sec_id-side"
   };
-
+  option (FluxMsgButtonQuery) = {
+    query_data: {
+      QueryName: "basket_chore_file_upload"
+      QueryType: HTTP_FILE
+    };
+    ui_button: {
+      unpressed_caption: "UPLOAD",
+      pressed_caption: "UPLOAD IN PROGRESS",
+      value_color_map: "true=DEBUG,false=INFO",
+      button_type: BUTTON_TYPE_RECTANGLE,
+      button_size: BUTTON_SIZE_MEDIUM,
+      action: "flux_toggle",
+      pressed_value_as_text: "true"
+    },
+    file_upload_options: {
+      AllowFileUpload: true,
+      DisallowNonTodayFileUpload: true,
+      DisallowDuplicateFileUpload: true
+    }
+  };
   option (FluxMsgStringLength) = 128;
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   repeated NewChore new_chores = 2 [(FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "algo:ALGO_List, force_bkr:BrokerCode_List, sec_id:CB_List, mstrat:Mstrat_List, sec_id_source=TICKER"];

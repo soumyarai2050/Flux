@@ -91,7 +91,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         # put this category options here
     ]
     flx_msg_complex_repeated_attribute_options: List[str] = [
-        # put this category options here
+        BaseProtoPlugin.flux_msg_button_query
     ]
 
     options_having_msg_fld_names: List[str] = [
@@ -639,20 +639,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                                                          option_value_dict, int(init_space_count/2))
 
                     if option == JsonSchemaConvertPlugin.flux_fld_button:
-                        json_msg_str_splitted_list = json_msg_str.split("\n")
-                        for index, line in enumerate(json_msg_str_splitted_list):
-                            if ':' in line and "{" not in line and "[" not in line:
-                                if '"' not in line[line.index(":")+1:]:
-                                    key_str: str
-                                    val_str: str
-                                    key_str, val_str = line.split(":")
-
-                                    if val_str.endswith(","):
-                                        val_str = f' "{val_str[:-1].strip()}",'
-                                    else:
-                                        val_str = f' "{val_str.strip()}"'
-
-                                    json_msg_str_splitted_list[index] = f"{key_str}:{val_str}"
+                        json_msg_str_splitted_list = self.__handle_all_fields_of_option_val_as_str(json_msg_str)
                         json_msg_str = "\n".join(json_msg_str_splitted_list)
                     # else not required: if option is not flux_fld_button then avoid as only this option
                     # has dependency to keep every option field as str, more specifically it has some fields
@@ -662,7 +649,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 elif option in (self.flx_fld_complex_repeated_attribute_options +
                                 self.flx_msg_complex_repeated_attribute_options):
                     option_value_dict: List[Dict] = \
-                        self.get_complex_option_value_from_proto(field_or_message_obj, option)
+                        self.get_complex_option_value_from_proto(field_or_message_obj, option, is_option_repeated=True)
                     # converting flux_option into json attribute name
                     flux_prefix_removed_option_name = self.__convert_option_name_to_json_attribute_name(option)
                     flux_prefix_removed_option_name_case_styled = \
@@ -671,7 +658,37 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     json_msg_str += self._get_json_complex_key_value_str(flux_prefix_removed_option_name_case_styled,
                                                                          option_value_dict, int(init_space_count / 2))
 
+                    if option == JsonSchemaConvertPlugin.flux_msg_button_query:
+                        json_msg_str_splitted_list = self.__handle_all_fields_of_option_val_as_str(json_msg_str)
+                        json_msg_str = "\n".join(json_msg_str_splitted_list)
+                    # else not required: if option is not flux_fld_button then avoid as only this option
+                    # has dependency to keep every option field as str, more specifically it has some fields
+                    # which needs to have value 'true' or 'false' as string form but since in plugin handling
+                    # if any field is found having value as string form of bool then it is type-cast to
+                    # json bool, to avoid this explicitly value is turned into str bool
+
         return json_msg_str
+
+    def __handle_all_fields_of_option_val_as_str(self, json_msg_str: str):
+        """
+        Useful when some fields of option val has non-str fields (e.g. bool) but all fields must be of str type
+        for some specific use-case on ui side
+        """
+        json_msg_str_splitted_list = json_msg_str.split("\n")
+        for index, line in enumerate(json_msg_str_splitted_list):
+            if ':' in line and "{" not in line and "[" not in line:
+                if '"' not in line[line.index(":") + 1:]:
+                    key_str: str
+                    val_str: str
+                    key_str, val_str = line.split(":")
+
+                    if val_str.endswith(","):
+                        val_str = f' "{val_str[:-1].strip()}",'
+                    else:
+                        val_str = f' "{val_str.strip()}"'
+
+                    json_msg_str_splitted_list[index] = f"{key_str}:{val_str}"
+        return json_msg_str_splitted_list
 
     def parse_python_type_to_json_type_str(self, value: str) -> str | int | bool | float:
         if isinstance(value, bool):
@@ -829,8 +846,22 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         return json_msg_str
 
     def __handle_underlying_message_part(self, message: protogen.Message, indent_space_count: int):
+        # Adding simple type non-repeated options as attributes
         json_msg_str = self.__handle_simple_proto_option_attributes(
             JsonSchemaConvertPlugin.flx_msg_simple_non_repeated_attribute_options, message, indent_space_count)
+        # Adding simple type repeated options as attributes
+        json_msg_str += \
+            self.__handle_simple_proto_option_attributes(
+                JsonSchemaConvertPlugin.flx_msg_simple_repeated_attribute_options, message, indent_space_count)
+        # Adding complex type non-repeated options as attributes
+        json_msg_str += \
+            self.__handle_complex_proto_option_attributes(
+                JsonSchemaConvertPlugin.flx_msg_complex_non_repeated_attribute_options, message, indent_space_count)
+        # Adding complex type repeated options as attributes
+        json_msg_str += \
+            self.__handle_complex_proto_option_attributes(
+                JsonSchemaConvertPlugin.flx_msg_complex_repeated_attribute_options, message, indent_space_count)
+
         json_msg_str += self.__handle_msg_leading_comment_as_attribute(message, indent_space_count)
         # Handling json root attribute
         if (self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_json_root) or
@@ -964,7 +995,10 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             output_str += '[\n'
             for option_value in option_value_dict_or_list:
                 output_str += (" " * ((indent_count*2) + 2) +
-                               self._get_json_complex_key_value_dict_str(option_value, indent_count))
+                               self._get_json_complex_key_value_dict_str(option_value, indent_count+1))
+                if option_value != option_value_dict_or_list[-1]:
+                    output_str += ","
+                output_str += "\n"
             output_str += " " * (indent_count*2) + f']'
         output_str += ",\n"
         return output_str

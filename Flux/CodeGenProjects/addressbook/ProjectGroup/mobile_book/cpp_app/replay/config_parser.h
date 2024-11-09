@@ -96,10 +96,8 @@ struct Config
         m_last_barter_ws_update_publish_policy_ = static_cast<PublishPolicy>(get_value_of.template operator()<int32_t>(
             "last_barter_ws_update_publish_policy", false).value_or(0));
 
-        m_market_depth_py_cache_publish_policy_ = static_cast<PublishPolicy>(get_value_of.template operator()<int32_t>(
-            "market_depth_py_cache_publish_policy", false).value_or(0));
-        m_last_barter_py_cache_publish_policy_ = static_cast<PublishPolicy>(get_value_of.template operator()<int32_t>(
-            "last_barter_py_cache_publish_policy", false).value_or(0));
+        m_shm_update_publish_policy_ = static_cast<PublishPolicy>(get_value_of.template operator()<int32_t>(
+            "cpp_shm_update_publish_policy", false).value_or(0));
 
         m_md_client_config_ = {
             PATH_SEPARATOR + m_project_name_ + PATH_SEPARATOR + create_market_depth_client_url,
@@ -152,8 +150,7 @@ struct Config
     PublishPolicy m_market_depth_ws_update_publish_policy_;
     PublishPolicy m_top_of_book_ws_update_publish_policy_;
     PublishPolicy m_last_barter_ws_update_publish_policy_;
-    PublishPolicy m_market_depth_py_cache_publish_policy_;
-    PublishPolicy m_last_barter_py_cache_publish_policy_;
+    PublishPolicy m_shm_update_publish_policy_;
 
     FluxCppCore::ClientConfig m_md_client_config_;
     FluxCppCore::ClientConfig m_tob_client_config_;

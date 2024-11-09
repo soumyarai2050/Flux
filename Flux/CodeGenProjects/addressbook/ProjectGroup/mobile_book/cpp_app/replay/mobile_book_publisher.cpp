@@ -3,7 +3,7 @@
 
 void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement &kr_market_depth_queue_element) {
 
-	if (mr_config_.m_market_depth_py_cache_publish_policy_ == PublishPolicy::PRE) {
+	if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
 		update_shm_cache(kr_market_depth_queue_element);
 	}
 
@@ -81,7 +81,7 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement &kr
 		}
 	}
 
-	if (mr_config_.m_market_depth_py_cache_publish_policy_ == PublishPolicy::POST ||
+	if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::POST ||
 		mr_config_.m_market_depth_db_update_publish_policy_ == PublishPolicy::POST ||
 		mr_config_.m_market_depth_http_update_publish_policy_ == PublishPolicy::POST ||
 		mr_config_.m_market_depth_ws_update_publish_policy_ == PublishPolicy::POST) {
@@ -92,7 +92,7 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement &kr
 
 void MobileBookPublisher::process_last_barter(const LastBarterQueueElement &kr_last_barter_queue_element) {
 
-	if (mr_config_.m_last_barter_py_cache_publish_policy_ == PublishPolicy::PRE) {
+	if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
 		update_shm_cache(kr_last_barter_queue_element);
 	}
 
@@ -160,7 +160,7 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement &kr_l
 		m_top_of_book_web_socket_server_.value().NewClientCallBack(top_of_book, -1);
 	}
 
-	if (mr_config_.m_last_barter_py_cache_publish_policy_ == PublishPolicy::POST ||
+	if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::POST ||
 		mr_config_.m_last_barter_db_update_publish_policy_ == PublishPolicy::POST ||
 		mr_config_.m_last_barter_http_update_publish_policy_ == PublishPolicy::POST ||
 		mr_config_.m_last_barter_ws_update_publish_policy_ == PublishPolicy::POST) {
