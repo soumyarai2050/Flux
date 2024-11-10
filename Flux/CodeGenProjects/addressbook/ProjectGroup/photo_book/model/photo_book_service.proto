@@ -38,24 +38,26 @@ message StratView{
   required bool unload_strat = 10 [default = false, (FluxFldButton) = {
     unpressed_caption: "Unload Strat",
     pressed_caption: "In Progress",
-    disabled_captions: "true=In Progress"
-    value_color_map: "true=DEBUG,false=ERROR"
+    disabled_captions: "true=In Progress",
+    value_color_map: "true=DEBUG,false=ERROR",
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
     pressed_value_as_text: "true",
-    button_icon_name: "Delete"
+    button_icon_name: "Delete",
+    hide_caption: true
   }];
   required bool recycle_strat = 11 [default = false, (FluxFldButton) = {
     unpressed_caption: "Recycle Strat",
     pressed_caption: "In Progress",
-    disabled_captions: "true=In Progress"
-    value_color_map: "true=DEBUG,false=SUCCESS"
+    disabled_captions: "true=In Progress",
+    value_color_map: "true=DEBUG,false=SUCCESS",
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
     pressed_value_as_text: "true",
-    button_icon_name: "Recycling"
+    button_icon_name: "Recycling",
+    hide_caption: true
   }];
 }
 

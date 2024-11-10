@@ -1176,8 +1176,19 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def strat_state_update_matcher_query_pre(
             self, strat_state_update_matcher_class_type: Type[StratStateUpdateMatcher], strat_id: int,
             message: str, log_file_path: str):
-        self._handle_strat_state_update_mismatch(strat_id, message, log_file_path)
+        # self._handle_strat_state_update_mismatch(strat_id, message, log_file_path)
         return []
+
+    async def dismiss_all_portfolio_alerts_query_pre(self, portfolio_alert_class_type: Type[PortfolioAlert]):
+        async with PortfolioAlert.reentrant_lock:
+            existing_portfolio_alerts: List[PortfolioAlert] = await (
+                LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_alert_http())
+
+            for existing_portfolio in existing_portfolio_alerts:
+                existing_portfolio.dismiss = True
+
+            await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_portfolio_alert_http(
+                existing_portfolio_alerts)
 
 
 def _handle_strat_alert_ids_list_update_for_start_id_in_filter_callable(
