@@ -721,6 +721,7 @@ function AbbreviatedFilterWidget(props) {
                                                                 {filteredHeadCells.map((cell, i) => {
                                                                     // if (cell.hide) return;
                                                                     let cellRow = row[cell.sourceIndex];
+                                                                    const nullCell = Object.keys(cellRow).length === 0 && !cell.commonGroupKey;
                                                                     if (cellRow) {
                                                                         Object.keys(props.itemsMetadataDict).map((source) => {
                                                                             storedMetadaDict[source] = props.itemsMetadataDict[source].find(o => o[DB_ID] === cellRow?.['data-id']);
@@ -810,7 +811,7 @@ function AbbreviatedFilterWidget(props) {
                                                                             onForceSave={props.onForceSave}
                                                                             onRowSelect={onRowSelect}
                                                                             dataSourceId={cellRow ? cellRow['data-id'] : null}
-                                                                            nullCell={cellRow ? false : true}
+                                                                            nullCell={nullCell}
                                                                             dataSourceColors={props.dataSourceColors}
                                                                         />
                                                                     )

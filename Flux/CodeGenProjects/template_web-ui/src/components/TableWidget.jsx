@@ -791,7 +791,7 @@ const TableWidget = (props) => {
         modalId = props.name + '_' + props.xpath + '_modal';
     }
 
-    const currentSchema = props.schema[props.name];
+    const currentSchema = props.schema[props.headerProps.name];
     let widgetMode = currentSchema.widget_ui_data_element.is_read_only ? null : props.widgetType === 'repeatedRoot' ? selectedRows.length === 1 ? props.headerProps.mode : null : props.headerProps.mode;
 
     return (

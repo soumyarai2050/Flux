@@ -296,10 +296,11 @@ message PairStrat {
     optional int64 top_of_book_port = 10 [(FluxFldHide) = "True"];
     optional int64 market_depth_port = 11 [(FluxFldHide) = "True"];
     optional int64 last_barter_port = 12 [(FluxFldHide) = "True"];
-    optional bool is_executor_running = 13 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerReadyStatus) = true];
-    optional bool is_partially_running = 14 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
+    optional int64 cpp_http_port = 13 [(FluxFldHide) = "True"];
+    optional bool is_executor_running = 14 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerReadyStatus) = true];
+    optional bool is_partially_running = 15 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
     // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
-    required StratState strat_state = 15 [default = StratState_SNOOZED, (FluxFldButton) = {
+    required StratState strat_state = 16 [default = StratState_SNOOZED, (FluxFldButton) = {
       unpressed_caption: "Activate",
       pressed_caption: "Pause",
       disabled_captions: "StratState_DONE=Done",

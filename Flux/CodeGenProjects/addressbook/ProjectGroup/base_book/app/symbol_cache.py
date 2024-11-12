@@ -1,10 +1,18 @@
+# standard imports
 import logging
 from ctypes import *
 import threading
 from typing import Dict, Any, List, ClassVar, Tuple, Final
+import os
+import ctypes
+import mmap
+
+# 3rd party imports
+import posix_ipc
 import pendulum
 from pendulum import DateTime, parse
 
+# project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
     TickType, TopOfBookBaseModel)
 from Flux.CodeGenProjects.AddressBook.Pydantic.barter_core_msgspec_model import QuoteBaseModel
@@ -945,6 +953,32 @@ class SymbolCacheContainer:
             SymbolCacheContainer.shared_memory_semaphore.acquire()
         else:
             SymbolCacheContainer.semaphore.acquire()
+
+    @staticmethod
+    def check_if_shared_memory_exists(md_shared_memory_name: str, shared_memory_semaphore_name: str) -> bool:
+        shared_memory_found = False
+        try:
+            shm_fd = os.open(md_shared_memory_name, os.O_RDWR)
+            size = ctypes.sizeof(MDSharedMemoryContainer)
+            shm = mmap.mmap(shm_fd, size, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE)
+            SymbolCacheContainer.shared_memory = shm
+        except FileNotFoundError as exp:
+            # shared memory doesn't exist yet, will retry in next loop
+            logging.warning(f"Something went wrong with setting up md shared memory: {exp}")
+
+        try:
+            semaphore = posix_ipc.Semaphore(shared_memory_semaphore_name)
+            SymbolCacheContainer.shared_memory_semaphore = semaphore
+
+        except posix_ipc.ExistentialError as e:
+            # shared memory doesn't exist yet, will retry in next loop
+            logging.warning(f"Something went wrong with setting up md shared memory semaphore: {e}")
+
+        if (SymbolCacheContainer.shared_memory is not None and
+                SymbolCacheContainer.shared_memory_semaphore is not None):
+            shared_memory_found = True
+        # else will retry again in next loop run
+        return shared_memory_found
 
     @staticmethod
     def update_md_cache_from_shared_memory() -> bool:

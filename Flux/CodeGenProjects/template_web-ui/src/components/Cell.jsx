@@ -120,10 +120,12 @@ const Cell = (props) => {
     }, [currentValue, oldValue, timeoutRef, classes, props.highlightUpdate])
 
     const onRowSelect = (e) => {
-        if (props.widgetType === 'root') {
-            props.onRowSelect(e, rowindex);
-        } else {
-            props.onRowSelect(e, dataSourceId);
+        if (!collection.commonGroupKey) {
+            if (props.widgetType === 'root') {
+                props.onRowSelect(e, rowindex);
+            } else {
+                props.onRowSelect(e, dataSourceId);
+            }
         }
     }
 
@@ -243,7 +245,7 @@ const Cell = (props) => {
     if (props.nullCell) {
         const classesStr = `${classes.cell} ${disabledClass}`;
         return (
-            <TableCell className={classesStr} size='small' />
+            <TableCell className={classesStr} size='small' data-xpath={xpath} />
         )
     }
 

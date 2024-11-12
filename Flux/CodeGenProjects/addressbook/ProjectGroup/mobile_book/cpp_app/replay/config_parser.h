@@ -24,7 +24,7 @@ struct Config
     explicit Config(const char* config_file)
     {
         YAML::Node config = YAML::LoadFile(config_file);
-        auto get_value_of = [&config, &config_file]<typename ValueT>(const char* param, bool required)
+        auto get_value_of = [&config, &config_file]<typename ValueT>(const char* param, bool required) -> std::optional<ValueT>
         {
             std::stringstream ss;
             ss << std::format("param: {}. converting to {}", param, boost::core::demangle(typeid(ValueT).name()));
@@ -74,6 +74,7 @@ struct Config
             false).value_or(0);
         m_last_barter_ws_port_ = get_value_of.template operator()<int32_t>("last_barter_ws_port",
             false).value_or(0);
+        m_http_server_port_ = get_value_of.template operator()<int32_t>("cpp_http_port", true).value_or(0);
 
         m_market_depth_db_update_publish_policy_ = static_cast<PublishPolicy>(get_value_of.template operator()<int32_t>(
             "market_depth_db_update_publish_policy", false).value_or(0));
@@ -140,6 +141,7 @@ struct Config
     int32_t m_top_of_book_ws_port_;
     int32_t m_market_depth_ws_port_;
     int32_t m_last_barter_ws_port_;
+    int32_t m_http_server_port_;
 
     PublishPolicy m_market_depth_db_update_publish_policy_;
     PublishPolicy m_top_of_book_db_update_publish_policy_;

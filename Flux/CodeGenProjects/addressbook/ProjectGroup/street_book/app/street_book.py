@@ -18,14 +18,15 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
     get_consumable_participation_qty_http, get_new_chore_log_key,
-    get_strat_brief_log_key)
+    get_strat_brief_log_key, get_simulator_config_file_path)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
     executor_config_yaml_dict)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, create_stop_md_script, MDShellEnvData, email_book_service_http_client,
-    guaranteed_call_pair_strat_client, get_symbol_side_key)
+    guaranteed_call_pair_strat_client, get_symbol_side_key, create_start_cpp_md_shell_script,
+    create_stop_cpp_md_shell_script)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensions import SecPosExtended
 from Flux.PyCodeGenEngine.FluxCodeGenCore.perf_benchmark_decorators import perf_benchmark_sync_callable
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
@@ -829,22 +830,11 @@ class StreetBook(BaseBook):
 
     @staticmethod
     def create_n_run_md_shell_script(pair_strat, generation_start_file_path, generation_stop_file_path):
-        subscription_data = \
-            [
-                (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
-                 str(pair_strat.pair_strat_params.strat_leg1.sec.sec_id_source)),
-                (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
-                 str(pair_strat.pair_strat_params.strat_leg2.sec.sec_id_source))
-            ]
-        db_name = os.environ["DB_NAME"]
         exch_code = "SS" if pair_strat.pair_strat_params.strat_leg1.exch_id == "SSE" else "SZ"
 
-        md_shell_env_data: MDShellEnvData = (
-            MDShellEnvData(subscription_data=subscription_data, host=pair_strat.host,
-                           port=pair_strat.port, db_name=db_name, exch_code=exch_code,
-                           project_name="street_book"))
-
-        create_stop_md_script(str(generation_start_file_path), str(generation_stop_file_path))
+        config_file_path = get_simulator_config_file_path(pair_strat.id)
+        create_stop_cpp_md_shell_script(str(generation_start_file_path), str(generation_stop_file_path),
+                                        config_file_path=str(config_file_path))
         os.chmod(generation_stop_file_path, stat.S_IRWXU)
 
         if os.path.exists(generation_start_file_path):
@@ -853,8 +843,8 @@ class StreetBook(BaseBook):
             # wait for scripts to complete execution and delete existing stop and start scripts
             process.wait()
 
-        create_md_shell_script(md_shell_env_data, str(generation_start_file_path), mode="MD",
-                               instance_id=str(pair_strat.id))
+        create_start_cpp_md_shell_script(str(generation_start_file_path), str(config_file_path),
+                                         instance_id=str(pair_strat.id))
         os.chmod(generation_start_file_path, stat.S_IRWXU)
         subprocess.Popen([f"{generation_start_file_path}"])
 
@@ -983,7 +973,19 @@ class StreetBook(BaseBook):
                 return -6000
             self.check_n_pause_strat_before_run_if_portfolio_limit_breached()
 
+            db_name = os.environ["DB_NAME"]
+            md_shared_memory_name = f"/dev/shm/{db_name}_shm"
+            shared_memory_semaphore_name = f"/{db_name}_sem"
+            shared_memory_found = False
             while 1:
+                if not shared_memory_found:
+                    shared_memory_found = SymbolCacheContainer.check_if_shared_memory_exists(md_shared_memory_name,
+                                                                                             shared_memory_semaphore_name)
+                    if not shared_memory_found:
+                        time.sleep(1)
+                        continue
+                    # else not required: if shared_memory is found - all good, starting internal run
+
                 try:
                     ret_val = self.internal_run()
                 except Exception as e:

@@ -1,4 +1,5 @@
 # standard imports
+import json
 import os
 import threading
 import time
@@ -11,6 +12,7 @@ import subprocess
 from typing import Set
 import ctypes
 import mmap
+import requests
 
 # 3rd party imports
 import posix_ipc
@@ -27,7 +29,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
     email_book_service_http_client, get_consumable_participation_qty,
     get_strat_brief_log_key, get_new_strat_limits, get_new_strat_status,
     log_book_service_http_client, post_book_service_http_client, get_default_max_notional,
-    get_default_max_open_single_leg_notional, get_default_max_net_filled_notional)
+    get_default_max_open_single_leg_notional, get_default_max_net_filled_notional,
+    get_simulator_config_file_path)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
     host, EXECUTOR_PROJECT_DATA_DIR, executor_config_yaml_dict, main_config_yaml_path, EXECUTOR_PROJECT_SCRIPTS_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import OTHER_TERMINAL_STATES, \
@@ -35,7 +38,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helpe
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     compute_max_single_leg_notional, get_premium)
 from FluxPythonUtils.scripts.utility_functions import (
-    avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger,
+    avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, handle_http_response, HTTPRequestType,
     handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, YAMLConfigurationManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecordManager)
@@ -237,14 +240,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         # since this init is called before db_init
         self.db_name: str = f"street_book_{self.pair_strat_id}"
         os.environ["DB_NAME"] = self.db_name
-        self.md_shared_memory_name = f"/dev/shm/{self.db_name}_shm"
-        self.shared_memory_semaphore_name = f"/{self.db_name}_sem"
         self.strat_leg_1: StratLeg | None = None  # will be set by once all_service_up test passes
         self.strat_leg_2: StratLeg | None = None  # will be set by once all_service_up test passes
         self.leg1_symbol_cache: StratCache | None = None  # will be set by once all_service_up test passes
         self.leg2_symbol_cache: StratCache | None = None  # will be set by once all_service_up test passes
         # restricted variable: don't overuse this will be extended to multi-currency support
         self.port: int | None = None  # will be set by app_launch_pre
+        self.cpp_http_url: str | None = None  # will be set by app_launch_pre
         self.web_client = None
         self.project_config_yaml_path = main_config_yaml_path
         self.executor_config_yaml_dict = executor_config_yaml_dict
@@ -255,46 +257,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
 
-        # self.lt_callback = last_barter_callback_type(SymbolCacheContainer.last_barter_callback)
-        # self.mobile_book_provider.register_last_barter_fp(self.lt_callback)
-        # self.md_callback = market_depth_callback_type(SymbolCacheContainer.market_depth_callback)
-        # self.mobile_book_provider.register_mkt_depth_fp(self.md_callback)
-        self.mobile_book_provider.create_or_update_md_n_tob.argtypes = [
-            ctypes.c_int32,
-            ctypes.c_char_p,
-            ctypes.c_char_p,
-            ctypes.c_char_p,
-            ctypes.c_char,
-            ctypes.c_int32,
-            ctypes.c_double,
-            ctypes.c_int64,
-            ctypes.c_char_p,
-            ctypes.c_bool,
-            ctypes.c_double,
-            ctypes.c_int64,
-            ctypes.c_double
-        ]
-        self.mobile_book_provider.create_or_update_last_barter_n_tob.argtypes = [
-            ctypes.c_int32,
-            ctypes.c_char_p,
-            ctypes.c_char_p,
-            ctypes.c_char_p,
-            ctypes.c_char_p,
-            ctypes.c_double,
-            ctypes.c_int64,
-            ctypes.c_double,
-            ctypes.c_char_p,
-            ctypes.c_int64,
-            ctypes.c_int32
-        ]
-        self.mobile_book_provider.cpp_app_launcher.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
-        self.mobile_book_provider.create_or_update_md_n_tob.restype = None
-        self.mobile_book_provider.create_or_update_last_barter_n_tob.restype = None
-        self.mobile_book_provider.cpp_app_launcher.restype = None
-
     def set_log_simulator_file_name_n_path(self):
-        self.simulate_config_yaml_file_path = (
-                EXECUTOR_PROJECT_DATA_DIR / f"executor_{self.pair_strat_id}_simulate_config.yaml")
+        self.simulate_config_yaml_file_path = (get_simulator_config_file_path(self.pair_strat_id))
         self.log_dir_path = PurePath(__file__).parent.parent / "log"
         self.log_simulator_file_name = f"log_simulator_{self.pair_strat_id}_logs_{self.datetime_fmt_str}.log"
         self.log_simulator_file_path = (PurePath(__file__).parent.parent / "log" /
@@ -328,7 +292,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             static_data_service_state: ServiceState = ServiceState(
                 error_prefix=error_prefix + "static_data_service failed, exception: ")
             symbol_overview_for_symbol_exists: bool = False
-            shared_memory_found = False
             should_sleep: bool = False
             while True:
                 if self.strat_cache and not strat_key:
@@ -342,7 +305,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     # static data and md service are considered essential
                     if (self.all_services_up and static_data_service_state.ready and
                             self.usd_fx is not None and symbol_overview_for_symbol_exists and
-                            self.bartering_data_manager is not None and shared_memory_found):
+                            self.bartering_data_manager is not None):
                         if not self.service_ready:
                             self.service_ready = True
                             # creating required models for this strat
@@ -358,8 +321,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     else:
                         warn: str = (f"strat executor service is not up yet for {strat_key};;;{self.all_services_up=}, "
                                      f"{static_data_service_state.ready=}, {self.usd_fx=}, "
-                                     f"{symbol_overview_for_symbol_exists=}, {self.bartering_data_manager=}, "
-                                     f"{shared_memory_found=}")
+                                     f"{symbol_overview_for_symbol_exists=}, {self.bartering_data_manager=}")
                         if service_up_no_warn_retry <= 0:
                             logging.warning(warn)
                         else:
@@ -393,6 +355,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 top_of_book_ws_port = find_free_port()
                                 market_depth_ws_port = find_free_port()
                                 last_barter_ws_port = find_free_port()
+                                cpp_http_port = find_free_port()
+                                self.cpp_http_url = f"http://127.0.0.1:{cpp_http_port}/"
                                 simulate_config_yaml_file_data += "\n\n"
                                 simulate_config_yaml_file_data += f"leg_1_symbol: {self.strat_leg_1.sec.sec_id}\n"
                                 simulate_config_yaml_file_data += f"leg_1_feed_code: {self.strat_leg_1.exch_id}\n"
@@ -410,6 +374,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     simulate_config_yaml_file_data += f"top_of_book_ws_port: {top_of_book_ws_port}\n"
                                     simulate_config_yaml_file_data += f"market_depth_ws_port: {market_depth_ws_port}\n"
                                     simulate_config_yaml_file_data += f"last_barter_ws_port: {last_barter_ws_port}\n"
+                                    simulate_config_yaml_file_data += f"cpp_http_port: {cpp_http_port}\n"
                                     simulate_config_yaml_file_data += f"market_depth_ws_update_publish_policy: 2\n"
                                     simulate_config_yaml_file_data += f"top_of_book_ws_update_publish_policy: 2\n"
                                     simulate_config_yaml_file_data += f"last_barter_ws_update_publish_policy: 2\n"
@@ -434,7 +399,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 YAMLConfigurationManager.update_yaml_configurations(
                                     simulate_config_yaml_file_data, str(self.simulate_config_yaml_file_path))
                                 os.environ["simulate_config_yaml_file"] = str(self.simulate_config_yaml_file_path)
-                                simulate_config_yaml_file_str: str = str(self.simulate_config_yaml_file_path)
                                 # setting simulate_config_file_name
                                 BarteringLinkBase.simulate_config_yaml_path = self.simulate_config_yaml_file_path
                                 LogBarterSimulator.executor_port = self.port
@@ -449,6 +413,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     pair_strat.top_of_book_port = top_of_book_ws_port
                                     pair_strat.last_barter_port = last_barter_ws_port
                                     pair_strat.market_depth_port = market_depth_ws_port
+                                    pair_strat.cpp_http_port = cpp_http_port
 
                                 try:
                                     updated_pair_strat = email_book_service_http_client.put_pair_strat_client(pair_strat)
@@ -462,25 +427,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     self.leg2_symbol_cache = (
                                         SymbolCacheContainer.add_symbol_cache_for_symbol(self.strat_leg_2.sec.sec_id))
 
-                                    # Launching CppApp which internally creates and updates
-                                    # MobileBookCache in real-time
-                                    simulate_config_yaml_file_bytes: bytes = simulate_config_yaml_file_str.encode("utf-8")
-                                    simulate_config_yaml_file_len: int = len(simulate_config_yaml_file_bytes)
-
-                                    thread = threading.Thread(target=self.mobile_book_provider.cpp_app_launcher,
-                                                              args=(simulate_config_yaml_file_bytes,
-                                                                    simulate_config_yaml_file_len),
-                                                              name="CPPAPP",
-                                                              daemon=True)
-                                    thread.start()
-
                                     logging.info(f"Creating bartering_data_manager for {strat_key=}")
                                     self.strat_cache: StratCache = self.get_pair_strat_loaded_strat_cache(
                                         updated_pair_strat)
                                     # Setting asyncio_loop for StreetBook
                                     StreetBook.asyncio_loop = self.asyncio_loop
-                                    StreetBook.mobile_book_provider = self.mobile_book_provider
-                                    # StreetBook.bartering_link.asyncio_loop = self.asyncio_loop
                                     BarteringDataManager.asyncio_loop = self.asyncio_loop
                                     self.bartering_data_manager = BarteringDataManager(StreetBook.executor_trigger,
                                                                                    self.strat_cache)
@@ -535,31 +486,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             except Exception as exp:
                                 static_data_service_state.handle_exception(exp)
                                 static_data_service_state.ready = False  # forces re-init in next iteration
-
-                        if not shared_memory_found:
-                            try:
-                                shm_fd = os.open(self.md_shared_memory_name, os.O_RDWR)
-                                size = ctypes.sizeof(MDSharedMemoryContainer)
-                                shm = mmap.mmap(shm_fd, size, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE)
-                                SymbolCacheContainer.shared_memory = shm
-                            except FileNotFoundError as exp:
-                                # shared memory doesn't exist yet, will retry in next loop
-                                logging.warning(f"Something went wrong with setting up md shared memory: {exp}")
-
-                            try:
-
-                                semaphore = posix_ipc.Semaphore(
-                                    self.shared_memory_semaphore_name)
-                                SymbolCacheContainer.shared_memory_semaphore = semaphore
-
-                            except posix_ipc.ExistentialError as e:
-                                # shared memory doesn't exist yet, will retry in next loop
-                                logging.warning(f"Something went wrong with setting up md shared memory semaphore: {e}")
-
-                            if (SymbolCacheContainer.shared_memory is not None and
-                                    SymbolCacheContainer.shared_memory_semaphore is not None):
-                                shared_memory_found = True
-                            # else will retry again in next loop run
 
                         if not symbol_overview_for_symbol_exists:
                             # updating symbol_overviews
@@ -4019,92 +3945,78 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                  updated_strat_status_obj.total_fill_sell_notional)
         logging.db(log_str)
 
+    def cpp_market_depth_client(self, market_depth_json: Dict):
+        market_depth_url = self.cpp_http_url + "market_depth"
+        response = requests.post(market_depth_url, json=market_depth_json)
+        status_code, response_json = handle_http_response(response)
+        expected_status_code = 201
+        if status_code != expected_status_code:
+            raise Exception(f"failed for cpp url: {market_depth_url}, http_request_type: {str(HTTPRequestType.POST)} "
+                            f"http_error: {response_json}, status_code: {status_code}")
+
+    def cpp_last_barter_client(self, last_barter_json: Dict):
+        last_barter_url = self.cpp_http_url + "last_barter"
+        response = requests.post(last_barter_url, json=last_barter_json)
+        status_code, response_json = handle_http_response(response)
+        expected_status_code = 201
+        if status_code != expected_status_code:
+            raise Exception(f"failed for cpp url: {last_barter_url}, http_request_type: {str(HTTPRequestType.POST)} "
+                            f"http_error: {response_json}, status_code: {status_code}")
+
     def _call_cpp_mobile_book_updater_from_market_depth(self, market_depth: MarketDepth):
-        # Convert string to bytes (for char* arguments)
-        symbol = market_depth.symbol.encode('utf-8')
-        market_maker = market_depth.market_maker.encode('utf-8') if market_depth.market_maker else "".encode('utf-8')
-        # Convert to bytes (for char* arguments)
-        exch_time_bytes = str(market_depth.exch_time).encode('utf-8')
-        arrival_date_time = str(market_depth.arrival_time).encode('utf-8')
-        side = b"B" if market_depth.side == TickType.BID else b"A"
-        is_smart_depth = ctypes.c_bool(
-            market_depth.is_smart_depth) if market_depth.is_smart_depth is not None else False
-        cumulative_notional = ctypes.c_double(
-            market_depth.cumulative_notional) if market_depth.cumulative_notional else 0
-        cumulative_qty = market_depth.cumulative_qty if market_depth.cumulative_qty else 0
-        cumulative_avg_px = ctypes.c_double(market_depth.cumulative_avg_px) if market_depth.cumulative_avg_px else 0
-
-        # Call the C++ function
-        self.mobile_book_provider.create_or_update_md_n_tob(
-            ctypes.c_int32(market_depth.id), symbol, exch_time_bytes, arrival_date_time, ctypes.c_char(side),
-            ctypes.c_int32(market_depth.position),
-            ctypes.c_double(market_depth.px), ctypes.c_int64(market_depth.qty),
-            market_maker, is_smart_depth,
-            cumulative_notional, ctypes.c_int64(cumulative_qty),
-            cumulative_avg_px)
-
+        json_data = market_depth.to_json_dict()
+        self._call_cpp_mobile_book_updater_from_market_depth_json(json_data)
 
     def _call_cpp_mobile_book_updater_from_market_depth_json(self, market_depth_json: Dict):
-        # Convert string to bytes (for char* arguments)
         symbol = market_depth_json.get("symbol")
-        if symbol is not None:
-            symbol = symbol.encode('utf-8')
-        else:
-            symbol = "".encode('utf-8')
+        if symbol is None:
+            market_depth_json["symbol"] = ""
 
         market_maker = market_depth_json.get("market_maker")
-        if market_maker is not None:
-            market_maker = market_maker.encode('utf-8')
-        else:
-            market_maker = "".encode('utf-8')
+        if market_maker is None:
+            market_depth_json["market_maker"] = ""
         # Convert to bytes (for char* arguments)
         exch_time = market_depth_json.get("exch_time")
         if exch_time is not None:
-            exch_time_bytes = str(exch_time).encode('utf-8')
+            market_depth_json["exch_time"] = str(exch_time)
         else:
-            exch_time_bytes = "".encode('utf-8')
+            market_depth_json["exch_time"] = ""
         arrival_time = market_depth_json.get("arrival_time")
         if arrival_time is not None:
-            arrival_date_time = str(arrival_time).encode('utf-8')
+            market_depth_json["arrival_time"] = str(arrival_time)
         else:
-            arrival_date_time = "".encode('utf-8')
-        side = b"B" if market_depth_json.get("side") == "BID" else b"A"
+            market_depth_json["arrival_time"] = ""
         is_smart_depth = market_depth_json.get("is_smart_depth")
-        is_smart_depth = ctypes.c_bool(is_smart_depth) if is_smart_depth is not None else ctypes.c_bool(False)
+        market_depth_json["is_smart_depth"] = True if is_smart_depth is not None else False
         cumulative_notional = market_depth_json.get("cumulative_notional")
-        cumulative_notional = ctypes.c_double(cumulative_notional) if cumulative_notional else ctypes.c_double(0.0)
+        market_depth_json["cumulative_notional"] = cumulative_notional if cumulative_notional else 0.0
         cumulative_qty = market_depth_json.get("cumulative_qty")
-        cumulative_qty = cumulative_qty if cumulative_qty else 0
+        market_depth_json["cumulative_qty"] = cumulative_qty if cumulative_qty else 0
         cumulative_avg_px = market_depth_json.get("cumulative_avg_px")
-        cumulative_avg_px = ctypes.c_double(cumulative_avg_px) if cumulative_avg_px else ctypes.c_double(0)
+        market_depth_json["cumulative_avg_px"] = cumulative_avg_px if cumulative_avg_px else 0
 
-        # Call the C++ function
-        self.mobile_book_provider.create_or_update_md_n_tob(
-            ctypes.c_int32(market_depth_json.get("_id")), symbol, exch_time_bytes, arrival_date_time,
-            ctypes.c_char(side), ctypes.c_int32(market_depth_json.get("position")),
-            ctypes.c_double(market_depth_json.get("px")), ctypes.c_int64(market_depth_json.get("qty")),
-            market_maker, is_smart_depth,
-            cumulative_notional, ctypes.c_int64(cumulative_qty), cumulative_avg_px)
+        if market_depth_json.get("update_id"):
+            del market_depth_json["update_id"]
+        market_depth_json['id'] = market_depth_json['_id']
+        del market_depth_json['_id']
+
+        self.cpp_market_depth_client(market_depth_json)
 
     def _call_cpp_mobile_book_updater_from_last_barter(self, last_barter: LastBarter):
-        # Convert string to bytes (for char* arguments)
-        symbol = last_barter.symbol_n_exch_id.symbol.encode('utf-8')
-        exch_id = last_barter.symbol_n_exch_id.exch_id.encode('utf-8')
-        # Convert to bytes (for char* arguments)
-        exch_time_bytes = str(last_barter.exch_time).encode('utf-8')
-        arrival_date_time = str(last_barter.arrival_time).encode('utf-8')
-        premium = ctypes.c_double(last_barter.premium) if last_barter.premium else 0
-        market_barter_vol_id = last_barter.market_barter_volume.id.encode(
-            'utf-8') if last_barter.market_barter_volume.id else ""
-        participation_period_last_barter_qty_sum = last_barter.market_barter_volume.participation_period_last_barter_qty_sum if last_barter.market_barter_volume.participation_period_last_barter_qty_sum else 0
-        applicable_period_seconds = last_barter.market_barter_volume.applicable_period_seconds if last_barter.market_barter_volume.applicable_period_seconds else 0
+        json_data = last_barter.to_json_dict()
+        json_data['id'] = json_data['_id']
+        del json_data['_id']
+        if json_data.get("update_id"):
+            del json_data["update_id"]
 
-        # Call the C++ function
-        self.mobile_book_provider.create_or_update_last_barter_n_tob(
-            last_barter.id, symbol, exch_id, exch_time_bytes, arrival_date_time,
-            ctypes.c_double(last_barter.px), last_barter.qty, premium,
-            market_barter_vol_id, participation_period_last_barter_qty_sum,
-            applicable_period_seconds)
+        json_data["premium"] = last_barter.premium if last_barter.premium else 0
+        if last_barter.market_barter_volume is not None:
+            json_data["market_barter_volume"]["id"] = last_barter.market_barter_volume.id if last_barter.market_barter_volume.id else ""
+            if json_data["market_barter_volume"].get("_id") is not None:
+                del json_data["market_barter_volume"]["_id"]
+        json_data["participation_period_last_barter_qty_sum"] = last_barter.market_barter_volume.participation_period_last_barter_qty_sum if last_barter.market_barter_volume.participation_period_last_barter_qty_sum else 0
+        json_data["applicable_period_seconds"] = last_barter.market_barter_volume.applicable_period_seconds if last_barter.market_barter_volume.applicable_period_seconds else 0
+        self.cpp_last_barter_client(json_data)
 
     async def create_market_depth_pre(self, market_depth_obj: MarketDepth):
         self._call_cpp_mobile_book_updater_from_market_depth(market_depth_obj)

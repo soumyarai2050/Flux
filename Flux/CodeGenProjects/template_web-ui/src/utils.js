@@ -1713,6 +1713,9 @@ export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], 
             if (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble') {
                 return;
             }
+            if (column.noCommonKey) {
+                return;
+            }
             let fieldName = column.tableTitle;
             if (collectionView) {
                 fieldName = column.key;

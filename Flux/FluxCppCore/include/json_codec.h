@@ -57,13 +57,16 @@ namespace FluxCppCore {
             decode_options(options);
             StringUtil string_util;
             std::string msg_name = string_util.camel_to_snake(RootModelType::GetDescriptor()->name());
-            if (msg_name == "market_depth") {
-                modify_json(kr_json);
-            }
+            // if (msg_name == "market_depth") {
+            //     modify_json(kr_json);
+            // }
             absl::Status status = google::protobuf::util::JsonStringToMessage(kr_json, &r_model_obj, options);
             if (status.code() == absl::StatusCode::kOk) {
                 return true;
             } else {
+                auto err = std::format("Failed Decoding {};;; error: {};;; json: {}",
+                          RootModelType::GetDescriptor()->name(), status.message(), kr_json);
+                std::cout << err << std::endl;
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Failed Decoding {};;; error: {};;; json: {}",
                           RootModelType::GetDescriptor()->name(), status.message(), kr_json);
                 return false;

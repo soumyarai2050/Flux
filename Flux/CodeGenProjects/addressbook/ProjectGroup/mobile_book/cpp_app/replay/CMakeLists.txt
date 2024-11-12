@@ -117,16 +117,15 @@ set(SRC_FILES
 )
 
 message(SRC_FILES ${SRC_FILES})
-# Create shared library including dependencies
-add_library(marketdataprovider SHARED ${SRC_FILES} cpp_app_launcher.cpp
+
+
+add_executable(mobile_book_executable main.cpp ${SRC_FILES}
         cpp_app_shared_resource.cpp
-        mock_mobile_book_cache.cpp
-        mobile_book_publisher.cpp
         mobile_book_interface.cpp
+        mobile_book_publisher.cpp
 )
 
-# Link dependencies to the shared library
-target_link_libraries(marketdataprovider
+target_link_libraries(mobile_book_executable
         ${MONGO_LIB}
         ${BSON_LIB}
         ${protobuf_lib}
@@ -138,4 +137,6 @@ target_link_libraries(marketdataprovider
 )
 
 # Add compile options to the shared library
-target_compile_options(marketdataprovider PRIVATE -g -ggdb3 -Werror -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-variable -Wno-error=unused-parameter -DTEST -Wno-return-type)
+target_compile_options(mobile_book_executable PRIVATE -g -ggdb3 -Werror -Wall -Wextra
+        -Wno-deprecated-declarations -Wno-unused-variable -Wno-error=unused-parameter
+        -DTEST -Wno-missing-field-initializers -Wno-return-type)

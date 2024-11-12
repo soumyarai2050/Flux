@@ -6,8 +6,6 @@
 
 
 constexpr auto MARKET_DEPTH_LEVEL = 10;
-constexpr auto MAX_STRING_LENGTH = 128;
-
 
 struct MobileBookShmCache {
     int64_t update_counter;

@@ -102,6 +102,7 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement &kr_l
 	last_barter_data.mutable_symbol_n_exch_id()->set_symbol(kr_last_barter_queue_element.symbol_n_exch_id_.symbol_);
 	last_barter_data.mutable_symbol_n_exch_id()->set_exch_id(kr_last_barter_queue_element.symbol_n_exch_id_.exch_id_);
 	last_barter_data.set_exch_time(kr_last_barter_queue_element.exch_time_);
+	last_barter_data.set_arrival_time(kr_last_barter_queue_element.arrival_time_);
 	last_barter_data.set_px(static_cast<float>(kr_last_barter_queue_element.px_));
 	last_barter_data.set_qty(kr_last_barter_queue_element.qty_);
 	if (kr_last_barter_queue_element.is_premium_set_) {
@@ -284,6 +285,7 @@ void MobileBookPublisher::update_last_barter_cache(const LastBarterQueueElement&
 }
 
 void MobileBookPublisher::create_or_update_market_depth_db(mobile_book::MarketDepth &kr_market_depth) {
+	std::cout << kr_market_depth.DebugString() << std::endl;
 	m_market_depth_db_codec_.insert_or_update(kr_market_depth);
 }
 

@@ -202,3 +202,6 @@ def get_default_max_net_filled_notional() -> int:
     return 160_000
 
 
+def get_simulator_config_file_path(strat_id: int) -> str:
+    config_file_path = PurePath(__file__).parent.parent / "data" / f"executor_{strat_id}_simulate_config.yaml"
+    return str(config_file_path)

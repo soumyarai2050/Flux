@@ -322,7 +322,8 @@ class CppConstantsHandlerPlugin(BaseProtoPlugin):
 
         output_content += "\tconstexpr int min_pool_size_val = 2;\n"
         output_content += "\tconstexpr int max_pool_size_val = 2;\n"
-        output_content += '\tconstexpr std::string PATH_SEPARATOR = "/";'
+        output_content += '\tconstexpr std::string PATH_SEPARATOR = "/";\n'
+        output_content += '\tconstexpr int MAX_STRING_LENGTH = 128;\n'
         output_content += "\tconstexpr int connection_timeout = 3600;\n\n"
         file_name = str(file.proto.name).split(".")[0]
         output_content += (f'    const std::string {file_name}_db_name = getenv("DB_NAME") ? getenv("DB_NAME") : '

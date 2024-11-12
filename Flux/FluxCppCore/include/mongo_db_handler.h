@@ -31,7 +31,6 @@ namespace FluxCppCore {
               m_mongo_db_name_(kr_db_name),
               m_mongo_uri_(m_mongo_db_uri_),
               m_pool_(m_mongo_uri_) {
-            std::cout << "Mongo URI: " << m_mongo_db_uri_ << std::endl;
         }
 
         // Get a client from the pool

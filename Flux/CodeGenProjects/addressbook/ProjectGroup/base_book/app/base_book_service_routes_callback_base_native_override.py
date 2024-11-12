@@ -87,10 +87,10 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         self.is_test_run = self.market.is_test_run
 
         # Load the shared library
-        so_module_dir: PurePath = PurePath(__file__).parent
-        so_module_file_name = BarteringLinkBase.pair_strat_config_dict.get("cpp_app_so_module_file_name")
-        os.environ["LD_LIBRARY_PATH"] = f"{so_module_dir}:$LD_LIBRARY_PATH"
-        self.mobile_book_provider = ctypes.CDLL(so_module_dir / so_module_file_name)
+        # so_module_dir: PurePath = PurePath(__file__).parent
+        # so_module_file_name = BarteringLinkBase.pair_strat_config_dict.get("cpp_app_so_module_file_name")
+        # os.environ["LD_LIBRARY_PATH"] = f"{so_module_dir}:$LD_LIBRARY_PATH"
+        # self.mobile_book_provider = ctypes.CDLL(so_module_dir / so_module_file_name)
 
     @property
     def derived_class_type(self):

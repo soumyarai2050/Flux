@@ -96,6 +96,8 @@ const Row = (props) => {
                     buttonDisable = true;
                 }
 
+                const nullCell = Object.keys(cellRow).length === 0 && !cell.commonGroupKey;
+
                 return (
                     <Cell
                         key={i}
@@ -129,7 +131,7 @@ const Row = (props) => {
                         onForceSave={props.onForceSave}
                         dataSourceId={cellRow ? props.widgetType === 'root' ? props.index : cellRow['data-id'] : null}
                         onRowSelect={onRowSelect}
-                        nullCell={cellRow ? false : true}
+                        nullCell={nullCell}
                         dataSourceColors={props.dataSourceColors}
                     />
                 )

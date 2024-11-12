@@ -14,7 +14,7 @@
 #include "json_codec.h"
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/ProtoGenCc/market_data_service.pb.h"
 #include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_constants.h"
-#include "logger.h"
+#include "cpp_app_logger.h"
 
 
 namespace beast = boost::beast;

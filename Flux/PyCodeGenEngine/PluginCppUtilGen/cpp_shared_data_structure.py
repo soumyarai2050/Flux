@@ -107,31 +107,31 @@ class CppSharedDataStructure(BaseProtoPlugin):
                 if fld.proto.name.lower().endswith("time"):
                     output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 elif fld.kind.name.lower() == "float":
                     output_content += "\tdouble " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 elif fld.kind.name.lower() == "int64" or fld.kind.name.lower() == "int32":
                     output_content += "\t" + fld.kind.name.lower() + "_t" + " " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 elif fld.kind.name.lower() == "enum":
                     output_content += "\t" + "char " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 elif fld.kind.name.lower() == "message":
                     output_content += "\t" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 elif fld.kind.name.lower() == "string":
                     output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 else:
                     output_content += "\t" + fld.kind.name.lower() + " " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
             output_content += "};\n\n"
 
         for i in struct_dict.values():
@@ -143,31 +143,31 @@ class CppSharedDataStructure(BaseProtoPlugin):
                 if fld.proto.name.lower().endswith("time"):
                     output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 elif fld.kind.name.lower() == "float":
                     output_content += "\tdouble " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 elif fld.kind.name.lower() == "int64" or fld.kind.name.lower() == "int32":
                     output_content += "\t" + fld.kind.name.lower() + "_t" + " " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 elif fld.kind.name.lower() == "enum":
                     output_content += "\t" + "char " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 elif fld.kind.name.lower() == "message":
                     output_content += "\t" + fld.message.proto.name + "QueueElement " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 elif fld.kind.name.lower() == "string":
                     output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                 else:
                     output_content += "\t" + fld.kind.name.lower() + " " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_;\n"
+                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
             output_content += "};\n\n"
 
         output_file_name = f"{proto_file_name}_shared_data_structure.h"
