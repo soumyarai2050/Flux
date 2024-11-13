@@ -14,6 +14,7 @@
 #include "mobile_book_web_socket_server.h"
 #include "queue_handler.h"
 #include "mobile_book_service_shared_data_structure.h"
+#include "cpp_app_shared_resource.h"
 
 
 using namespace mobile_book_handler;
@@ -45,7 +46,14 @@ public:
 		m_symbols_manager_.write_to_shared_memory(m_shm_symbol_cache_);
 	}
 
-	virtual ~MobileBookPublisher() = default;
+	virtual ~MobileBookPublisher() {
+		shutdown_flag_ = true;
+		m_symbols_manager_.~SharedMemoryManager();
+		if (md_thread_.joinable() && lt_thread_.joinable()) {
+			md_thread_.join();
+			lt_thread_.join();
+		}
+	};
 
 	// virtual void go() = 0;
 
@@ -103,6 +111,7 @@ protected:
 	}
 
 
+	std::atomic<bool> shutdown_flag_{false};
 	FluxCppCore::Monitor<LastBarterQueueElement> mon_lt{};
 	FluxCppCore::Monitor<MarketDepthQueueElement> mon_md{};
 
@@ -138,8 +147,8 @@ protected:
 	std::optional<FluxCppCore::RootModelWebClient<mobile_book::TopOfBook>> m_tob_web_client_;
 	std::optional<FluxCppCore::RootModelWebClient<mobile_book::LastBarter>> m_lt_web_client_;
 
-	std::jthread md_thread_;
-	std::jthread lt_thread_;
+	std::thread md_thread_;
+	std::thread lt_thread_;
 
 	/*
 	 * This function updates the shared memory cache with market depth and top of book information
@@ -180,15 +189,15 @@ protected:
 	void publish_last_barter_over_ws(mobile_book::LastBarter &r_last_barter);
 
 	void start_thread() {
-		md_thread_ = std::jthread([this]() { md_consumer_thread(); });
-		lt_thread_ = std::jthread([this]() { last_barter_consumer_thread(); });
+		md_thread_ = std::thread([this]() { md_consumer_thread(); });
+		lt_thread_ = std::thread([this]() { last_barter_consumer_thread(); });
 	}
 
 	void md_consumer_thread() {
 		MarketDepthQueueElement md;
 		mobile_book::MarketDepth market_depth;
 		mobile_book::TopOfBook top_of_book;
-		while(true) {
+		while(!shutdown_flag_) {
 			auto status = mon_md.pop(md);
 			if (status == FluxCppCore::QueueStatus::DATA_CONSUMED) {
 
@@ -280,7 +289,7 @@ protected:
 		LastBarterQueueElement lt;
 		mobile_book::LastBarter last_barter;
 		mobile_book::TopOfBook tob;
-		while(true)
+		while(!shutdown_flag_)
 		{
 			auto status = mon_lt.pop(lt);
 			if (status == FluxCppCore::QueueStatus::DATA_CONSUMED)

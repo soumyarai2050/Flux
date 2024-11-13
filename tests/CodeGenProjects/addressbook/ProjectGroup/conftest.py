@@ -1,11 +1,11 @@
 import time
-
-import pendulum
-import pytest
 import os
 import copy
 
-os.environ["DBType"] = "msgspec"
+import pendulum
+import pytest
+
+os.environ["ModelType"] = "msgspec"
 
 # Project Imports
 from tests.CodeGenProjects.BarterEngine.ProjectGroup.phone_book.app.utility_test_functions import *
@@ -324,7 +324,8 @@ def expected_portfolio_status_():
 
 @pytest.fixture()
 def expected_system_control_():
-    yield SystemControlBaseModel.from_kwargs(_id=1, kill_switch=False, pause_all_strats=False)
+    yield SystemControlBaseModel.from_kwargs(_id=1, kill_switch=False, pause_all_strats=False,
+                                             load_buffer_strats=False, cxl_baskets=False)
 
 
 @pytest.fixture()

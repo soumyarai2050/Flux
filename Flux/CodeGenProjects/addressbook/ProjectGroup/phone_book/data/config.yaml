@@ -48,8 +48,6 @@ multi_project_plugin:
   - "basket_book":
       - "BasketChore"
 
-cpp_app_so_module_file_name: "libmarketdataprovider.so"
-
 # to be used by publisher to block any position refresh if set to True
 pos_standby: False
 

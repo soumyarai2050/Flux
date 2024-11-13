@@ -34,25 +34,20 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
     post_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
-    SymbolCache, MarketDepth1, MarketDepth2, TopOfBook1, TopOfBook2, LastBarter1, LastBarter2)
+    SymbolCache, MarketDepth, TopOfBook, LastBarter)
 # below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import SymbolCacheContainer
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book import BaseBook
 
 
-TopOfBookType = TypeVar('TopOfBookType', bound=TopOfBook1 | TopOfBook2)
-MarketDepthType = TypeVar('MarketDepthType', bound=MarketDepth1 | MarketDepth2)
-LastBarterType = TypeVar('LastBarterType', bound=LastBarter1 | LastBarter2)
-
-
-def depths_str(depths: List[MarketDepthType], notional_fx_rate: float | None = None) -> str:
+def depths_str(depths: List[MarketDepth], notional_fx_rate: float | None = None) -> str:
     if not notional_fx_rate:
         notional_fx_rate = 1
     if depths:
         symbol: str = depths[0].symbol
         side = depths[0].side
         ret_str = f" Depths of {symbol}, {side}: ["
-        depth: MarketDepthType
+        depth: MarketDepth
         for depth in depths:
             if symbol != depth.symbol:
                 logging.error(f"mismatched {depth.symbol=} found in {depth} expected {symbol};;;depths: "
@@ -179,8 +174,8 @@ class StreetBook(BaseBook):
                 executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat")) is not None else False
         self.leg1_consumed_depth_time: DateTime = DateTime.utcnow()
         self.leg2_consumed_depth_time: DateTime = DateTime.utcnow()
-        self.leg1_consumed_depth: MarketDepthType | None = None
-        self.leg2_consumed_depth: MarketDepthType | None = None
+        self.leg1_consumed_depth: MarketDepth | None = None
+        self.leg2_consumed_depth: MarketDepth | None = None
 
         self.pair_street_book_id: str | None = None
 
@@ -298,7 +293,7 @@ class StreetBook(BaseBook):
                                                     config_dict)
         return False  # NOQA - code should ideally never reach here [defensive]
 
-    def update_aggressive_market_depths_in_cache(self) -> Tuple[List[MarketDepthType], List[MarketDepthType]]:
+    def update_aggressive_market_depths_in_cache(self) -> Tuple[List[MarketDepth], List[MarketDepth]]:
         if not self.aggressive_symbol_side_tuples_dict:
             if not self.init_aggressive_symbol_side_tuples_dict():
                 return [], []  # error logged internally
@@ -312,11 +307,11 @@ class StreetBook(BaseBook):
             symbol_side_tuple_list: List = list(self.aggressive_symbol_side_tuples_dict.values())[0]
             sym1, sym1_aggressive_side = symbol_side_tuple_list[0]
             sym2, sym2_aggressive_side = symbol_side_tuple_list[1]
-            sym1_filtered_market_depths: List[MarketDepthType] = []  # sym1 may not be same as strat leg1
-            sym2_filtered_market_depths: List[MarketDepthType] = []  # sym2 may not be same as strat leg2
+            sym1_filtered_market_depths: List[MarketDepth] = []  # sym1 may not be same as strat leg1
+            sym2_filtered_market_depths: List[MarketDepth] = []  # sym2 may not be same as strat leg2
             sym1_newest_exch_time = None
             sym2_newest_exch_time = None
-            md: MarketDepthType
+            md: MarketDepth
 
             # now block for task to finish
             market_depths = future.result()
@@ -390,10 +385,10 @@ class StreetBook(BaseBook):
                                                                               (leg2_sec, leg2_aggressive_side_str)]}
         return True
 
-    def extract_strat_specific_legs_from_tobs(self, pair_strat, top_of_books) -> Tuple[TopOfBookType | None,
-                                                                                       TopOfBookType | None]:
-        leg1_tob: TopOfBookType | None
-        leg2_tob: TopOfBookType | None
+    def extract_strat_specific_legs_from_tobs(self, pair_strat, top_of_books) -> Tuple[TopOfBook | None,
+                                                                                       TopOfBook | None]:
+        leg1_tob: TopOfBook | None
+        leg2_tob: TopOfBook | None
         leg1_tob, leg2_tob = self.extract_legs_from_tobs(pair_strat, top_of_books)
         # Note: Not taking tob mutex since symbol never changes in tob
         if leg1_tob is not None and self.strat_cache.leg1_bartering_symbol is None:
@@ -407,9 +402,9 @@ class StreetBook(BaseBook):
         return leg1_tob, leg2_tob
 
     @staticmethod
-    def extract_legs_from_tobs(pair_strat, top_of_books) -> Tuple[TopOfBookType | None, TopOfBookType | None]:
-        leg1_tob: TopOfBookType | None = None
-        leg2_tob: TopOfBookType | None = None
+    def extract_legs_from_tobs(pair_strat, top_of_books) -> Tuple[TopOfBook | None, TopOfBook | None]:
+        leg1_tob: TopOfBook | None = None
+        leg2_tob: TopOfBook | None = None
         error = False
         # Note: Not taking tob mutex since symbol never changes in tob
         if pair_strat.pair_strat_params.strat_leg1.sec.sec_id == top_of_books[0].symbol:
@@ -468,7 +463,7 @@ class StreetBook(BaseBook):
                           f"pair_strat_key_key: {get_pair_strat_log_key(pair_strat)}")
         return False
 
-    def place_new_chore(self, top_of_book: TopOfBookType, sym_overview: SymbolOverviewBaseModel | SymbolOverview,
+    def place_new_chore(self, top_of_book: TopOfBook, sym_overview: SymbolOverviewBaseModel | SymbolOverview,
                         strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel, pair_strat: PairStrat,
                         new_ord: NewChoreBaseModel, err_dict: Dict[str, any] | None = None,
                         check_mask: int = ChoreControl.ORDER_CONTROL_SUCCESS) -> int:
@@ -599,7 +594,7 @@ class StreetBook(BaseBook):
             return True
 
     def check_strat_limits(self, pair_strat: PairStrat, strat_brief: StratBriefBaseModel,
-                           top_of_book: TopOfBookType, chore_limits: ChoreLimitsBaseModel,
+                           top_of_book: TopOfBook, chore_limits: ChoreLimitsBaseModel,
                            new_ord: NewChoreBaseModel, chore_usd_notional: float, err_dict: Dict[str, any]):
         checks_passed = ChoreControl.ORDER_CONTROL_SUCCESS
         symbol_overview: SymbolOverviewBaseModel | None = None
@@ -758,7 +753,7 @@ class StreetBook(BaseBook):
 
         return checks_passed
 
-    def check_chore_limits(self, top_of_book: TopOfBookType, chore_limits: ChoreLimitsBaseModel,
+    def check_chore_limits(self, top_of_book: TopOfBook, chore_limits: ChoreLimitsBaseModel,
                            pair_strat: PairStrat, new_ord: NewChoreBaseModel, chore_usd_notional: float,
                            check_mask: int = ChoreControl.ORDER_CONTROL_SUCCESS):
         sys_symbol = new_ord.security.sec_id
@@ -806,7 +801,7 @@ class StreetBook(BaseBook):
 
         return checks_passed
 
-    def check_new_chore(self, top_of_book: TopOfBookType, strat_brief: StratBriefBaseModel,
+    def check_new_chore(self, top_of_book: TopOfBook, strat_brief: StratBriefBaseModel,
                         chore_limits: ChoreLimitsBaseModel, pair_strat: PairStrat, new_ord: NewChoreBaseModel,
                         err_dict: Dict[str, any], check_mask: int = ChoreControl.ORDER_CONTROL_SUCCESS) -> int:
         checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS
@@ -1050,10 +1045,10 @@ class StreetBook(BaseBook):
     @perf_benchmark_sync_callable
     def _check_tob_n_place_non_systematic_chore(self, new_chore: NewChoreBaseModel, pair_strat: PairStrat,
                                                 strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel,
-                                                top_of_books: List[TopOfBookType]) -> int:
-        leg1_tob: TopOfBookType | None
-        leg2_tob: TopOfBookType | None
-        barter_tob: TopOfBookType | None = None
+                                                top_of_books: List[TopOfBook]) -> int:
+        leg1_tob: TopOfBook | None
+        leg2_tob: TopOfBook | None
+        barter_tob: TopOfBook | None = None
         leg1_tob, leg2_tob = self.extract_strat_specific_legs_from_tobs(pair_strat, top_of_books)
 
         if leg1_tob is not None:
@@ -1107,7 +1102,7 @@ class StreetBook(BaseBook):
             return None
 
     def _place_chore(self, pair_strat: PairStratBaseModel, strat_brief: StratBriefBaseModel,
-                     chore_limits: ChoreLimitsBaseModel, quote: QuoteBaseModel, tob: TopOfBookType, leg_sym_ovrw) -> float:
+                     chore_limits: ChoreLimitsBaseModel, quote: QuoteBaseModel, tob: TopOfBook, leg_sym_ovrw) -> float:
         """returns float posted notional of the chore sent"""
         # fail-safe
         pair_strat = self.strat_cache.get_pair_strat_obj()
@@ -1131,12 +1126,12 @@ class StreetBook(BaseBook):
 
     @perf_benchmark_sync_callable
     def _check_tob_and_place_chore(self, pair_strat: PairStratBaseModel | PairStrat, strat_brief: StratBriefBaseModel,
-                                   chore_limits: ChoreLimitsBaseModel, top_of_books: List[TopOfBookType]) -> int:
+                                   chore_limits: ChoreLimitsBaseModel, top_of_books: List[TopOfBook]) -> int:
         posted_leg1_notional: float = 0
         posted_leg2_notional: float = 0
-        leg1_tob: TopOfBookType | None
-        leg2_tob: TopOfBookType | None
-        barter_tob: TopOfBookType
+        leg1_tob: TopOfBook | None
+        leg2_tob: TopOfBook | None
+        barter_tob: TopOfBook
         leg1_tob, leg2_tob = self.extract_strat_specific_legs_from_tobs(pair_strat, top_of_books)
         leg1_sym_ovrw = self.strat_cache.symbol_overviews[0]
         leg2_sym_ovrw = self.strat_cache.symbol_overviews[1]
@@ -1178,34 +1173,34 @@ class StreetBook(BaseBook):
                           f"{[str(tob) for tob in top_of_books]}")
         return chore_placed
 
-    def _both_side_tob_has_data(self, leg_1_tob: TopOfBookType, leg_2_tob: TopOfBookType) -> bool:
+    def _both_side_tob_has_data(self, leg_1_tob: TopOfBook, leg_2_tob: TopOfBook) -> bool:
         if leg_1_tob is not None and leg_2_tob is not None:
             if leg_1_tob.last_update_date_time is not None and leg_2_tob.last_update_date_time is not None:
                 return True
         return False
 
-    def _get_tob_bid_quote_px(self, tob: TopOfBookType) -> float | None:
+    def _get_tob_bid_quote_px(self, tob: TopOfBook) -> float | None:
         if tob.bid_quote is not None:
             return tob.bid_quote.px
         else:
             logging.info(f"Can't find bid_quote in tob of symbol: {tob.symbol};;; tob: {tob}")
             return None
 
-    def _get_tob_ask_quote_px(self, tob: TopOfBookType) -> float | None:
+    def _get_tob_ask_quote_px(self, tob: TopOfBook) -> float | None:
         if tob.ask_quote is not None:
             return tob.ask_quote.px
         else:
             logging.info(f"Can't find ask_quote in tob of symbol: {tob.symbol};;; tob: {tob}")
             return None
 
-    def _get_tob_bid_quote_last_update_date_time(self, tob: TopOfBookType) -> DateTime | None:
+    def _get_tob_bid_quote_last_update_date_time(self, tob: TopOfBook) -> DateTime | None:
         if tob.bid_quote is not None:
             return tob.bid_quote.last_update_date_time
         else:
             logging.info(f"Can't find bid_quote in tob of symbol: {tob.symbol};;; tob: {tob}")
             return None
 
-    def _get_tob_ask_quote_last_update_date_time(self, tob: TopOfBookType) -> DateTime | None:
+    def _get_tob_ask_quote_last_update_date_time(self, tob: TopOfBook) -> DateTime | None:
         if tob.ask_quote is not None:
             return tob.ask_quote.last_update_date_time
         else:
@@ -1215,9 +1210,9 @@ class StreetBook(BaseBook):
     @perf_benchmark_sync_callable
     def _check_tob_and_place_chore_test(self, pair_strat: PairStratBaseModel | PairStrat,
                                         strat_brief: StratBriefBaseModel, chore_limits: ChoreLimitsBaseModel,
-                                        top_of_books: List[TopOfBookType]) -> int:
-        buy_top_of_book: TopOfBookType | None = None
-        sell_top_of_book: TopOfBookType | None = None
+                                        top_of_books: List[TopOfBook]) -> int:
+        buy_top_of_book: TopOfBook | None = None
+        sell_top_of_book: TopOfBook | None = None
         is_cb_buy: bool = True
 
         if pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
@@ -1235,9 +1230,9 @@ class StreetBook(BaseBook):
 
         chore_placed: int = ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
-        leg_1_top_of_book: TopOfBookType = (
+        leg_1_top_of_book: TopOfBook = (
             self.leg_1_symbol_cache.get_top_of_book(self._top_of_books_update_date_time))
-        leg_2_top_of_book = (
+        leg_2_top_of_book: TopOfBook = (
             self.leg_2_symbol_cache.get_top_of_book(self._top_of_books_update_date_time))
 
         if self._both_side_tob_has_data(leg_1_top_of_book, leg_2_top_of_book):

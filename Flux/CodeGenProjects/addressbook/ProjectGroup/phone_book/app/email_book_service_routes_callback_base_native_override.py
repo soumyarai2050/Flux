@@ -1542,7 +1542,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                 if loaded_strat_key == strat_key:
                     # strat found to unload
                     strat_collection.loaded_strat_keys.remove(strat_key)
-                    strat_collection.buffered_strat_keys.append(strat_key)
+                    strat_collection.buffered_strat_keys.insert(0, strat_key)
                     await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
                         strat_collection)
                     break

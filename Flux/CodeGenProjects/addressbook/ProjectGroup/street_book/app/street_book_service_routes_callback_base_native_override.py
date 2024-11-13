@@ -4556,15 +4556,26 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             self, barter_simulator_process_new_chore_class_type: Type[BarterSimulatorProcessNewChore],
             px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str, symbol_type: str,
             underlying_account: str, exchange: str | None = None, internal_ord_id: str | None = None):
-        return await self.handle_barter_simulator_place_new_chore_query_pre(
-            px, qty, side, bartering_sec_id, system_sec_id, symbol_type, underlying_account, exchange, internal_ord_id)
+        try:
+            return await self.handle_barter_simulator_place_new_chore_query_pre(
+                px, qty, side, bartering_sec_id, system_sec_id, symbol_type, underlying_account, exchange, internal_ord_id)
+        except Exception as e_:
+            err_str_ = f"barter_simulator_place_new_chore_query_pre failed: exception: {e_}"
+            logging.exception(err_str_)
+            raise HTTPException(detail=err_str_, status_code=500)
 
     async def barter_simulator_place_cxl_chore_query_pre(
             self, barter_simulator_process_cxl_chore_class_type: Type[BarterSimulatorProcessCxlChore],
             chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
             system_sec_id: str | None = None, underlying_account: str | None = None):
-        return await self.handle_barter_simulator_place_cxl_chore_query_pre(chore_id, side, bartering_sec_id,
-                                                                           system_sec_id, underlying_account)
+        try:
+            return await self.handle_barter_simulator_place_cxl_chore_query_pre(chore_id, side, bartering_sec_id,
+                                                                               system_sec_id, underlying_account)
+        except Exception as e_:
+            err_str_ = f"barter_simulator_place_cxl_chore_query_pre failed: exception: {e_}"
+            logging.exception(err_str_)
+            raise HTTPException(detail=err_str_, status_code=500)
+
 
     async def barter_simulator_process_chore_ack_query_pre(
             self, barter_simulator_process_chore_ack_class_type: Type[BarterSimulatorProcessChoreAck], chore_id: str,

@@ -1,2 +1,0 @@
-Sample text in file
-Used in test_email_book_service_routes_callback_override.py to verify file upload query

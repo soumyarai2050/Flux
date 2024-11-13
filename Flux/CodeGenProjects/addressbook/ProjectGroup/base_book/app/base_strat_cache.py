@@ -189,7 +189,7 @@ class BaseStratCache:
             Tuple[SymbolOverviewBaseModel | SymbolOverview, DateTime] | None:
         symbol_overview = self.get_symbol_overview_from_symbol_obj(symbol)
 
-        if date_time is None or date_time < symbol_overview.last_update_date_time:
+        if symbol_overview is not None and (date_time is None or date_time < symbol_overview.last_update_date_time):
             return symbol_overview, symbol_overview.last_update_date_time
         # if no match - return None
         return None

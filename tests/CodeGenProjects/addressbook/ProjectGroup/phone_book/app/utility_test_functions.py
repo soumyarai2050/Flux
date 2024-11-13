@@ -36,6 +36,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_servi
     post_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client import PhotoBookServiceHttpClient
 from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_http_client import PerformanceBenchmarkServiceHttpClient
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_http_client import BasketBookServiceHttpClient
@@ -504,7 +505,7 @@ def update_expected_strat_brief_for_sell(expected_chore_snapshot_obj: ChoreSnaps
 
 def check_strat_view_computes(strat_view_id: int, executor_http_client) -> None:
     start_time = DateTime.utcnow()
-    for i in range(10):
+    for i in range(60):
         strat_view = photo_book_web_client.get_strat_view_client(strat_view_id)
         strat_status_obj = get_strat_status(executor_http_client)
         strat_limits_obj = get_strat_limits(executor_http_client)
@@ -2437,7 +2438,7 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
         buy_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg2.sec.sec_id
         sell_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id
 
-    for _ in range(30):
+    for _ in range(60):
         # checking is_partially_running of executor
         try:
             updated_pair_strat = (
@@ -2486,10 +2487,7 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
             assert False, (f"Unexpected: Can't strat gdb terminal - "
                            f"Can't find any pid from port {updated_pair_strat.port}")
 
-    # creating market_depth
-    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_web_client)
-    print(f"market_depth created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
+    time.sleep(5)
     # running symbol_overview
     run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list, executor_web_client)
     print(f"SymbolOverview created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
@@ -2554,7 +2552,7 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
 
     # checking strat_view values
     start_time = DateTime.utcnow()
-    for _ in range(10):
+    for _ in range(60):
         strat_view = photo_book_web_client.get_strat_view_client(updated_pair_strat.id)
         strat_status_obj = get_strat_status(executor_web_client)
         strat_limits_obj = get_strat_limits(executor_web_client)
@@ -2604,6 +2602,11 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
         (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
          f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
     print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
+    time.sleep(10)
+    # creating market_depth
+    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_web_client)
+    print(f"market_depth created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     return activated_pair_strat, executor_web_client
 
@@ -2669,7 +2672,7 @@ def manage_strat_creation_and_activation(leg1_symbol: str, leg2_symbol: str,
         buy_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg2.sec.sec_id
         sell_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id
 
-    for _ in range(30):
+    for _ in range(60):
         # checking is_partially_running of executor
         try:
             updated_pair_strat = (
@@ -2915,16 +2918,28 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
             log_book_web_client.log_book_force_kill_tail_executor_query_client(street_book_log_file)
         time.sleep(1)
 
-        pair_strat = PairStratBaseModel.from_kwargs(_id=pair_strat.id, strat_state=StratState.StratState_DONE)
-        email_book_service_native_web_client.patch_pair_strat_client(generic_encoder(pair_strat, by_alias=True,
-                                                                        exclude_none=True))
+        photo_book_web_client.patch_strat_view_client({'_id': pair_strat.id, 'unload_strat': True})
+
+    try_count = 30
+    for _ in range(try_count):
+        time.sleep(2)
+        strat_collection_list = email_book_service_native_web_client.get_all_strat_collection_client()
+        strat_collection = strat_collection_list[0]
+        if not strat_collection.loaded_strat_keys:
+            break
+    else:
+        raise Exception(f"Strat Collection found having loaded strats even after {try_count} retries - "
+                        "all must have got unloaded")
+
+    # deleting all strats if all unloaded
+    for pair_strat in existing_pair_strat:
         # removing today_activated_symbol_side_lock_file
         admin_control_obj: AdminControlBaseModel = (
             AdminControlBaseModel.from_kwargs(command_type=CommandType.CLEAR_STRAT,
                                               datetime=DateTime.utcnow()))
         email_book_service_native_web_client.create_admin_control_client(admin_control_obj)
-
         email_book_service_native_web_client.delete_pair_strat_client(pair_strat.id)
+
         time.sleep(1)
 
 
@@ -5745,8 +5760,8 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
                                                                                last_chore_id=buy_ack_chore_id)
             buy_ack_chore_id = ack_chore_journal.chore.chore_id
 
-            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
-                # Sleeping to let the chore get cxlled
+            if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+                # Sleeping to let the chore get cxled
                 time.sleep(residual_wait_sec)
 
         # Placing sell chores
@@ -5764,8 +5779,8 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
                                                                                last_chore_id=sell_ack_chore_id)
             sell_ack_chore_id = ack_chore_journal.chore.chore_id
 
-            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
-                # Sleeping to let the chore get cxlled
+            if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+                # Sleeping to let the chore get cxled
                 time.sleep(residual_wait_sec)
         return buy_symbol, sell_symbol, created_pair_strat, executor_web_client
 

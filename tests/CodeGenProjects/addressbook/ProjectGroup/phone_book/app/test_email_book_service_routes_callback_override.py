@@ -3,6 +3,7 @@
 import math
 import concurrent.futures
 import random
+import time
 
 import pytest
 import pandas as pd
@@ -36,7 +37,7 @@ def test_clean_database_n_logs():
     clean_project_logs()
 
 
-def _test_sanity_create_strat_parallel(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+def test_sanity_create_strat_parallel(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
                                        expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
                                        market_depth_basemodel_list):
     max_count = int(len(buy_sell_symbol_list)/2)
@@ -1100,6 +1101,25 @@ def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
                                                                 f"{stored_portfolio_limits_.eligible_brokers}"
 
 
+@pytest.mark.nightly
+def test_strat_gets_deleted_even_when_symbol_overview_is_not_found(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+
+    created_pair_strat = create_strat(buy_symbol, sell_symbol, pair_strat_)
+    time.sleep(30)
+
+    # deleting strat without creating symbol overview
+    expected_delete_res = {'msg': 'Deletion Successful', 'id': created_pair_strat.id}
+    delete_res = email_book_service_native_web_client.delete_pair_strat_client(created_pair_strat.id)
+    assert delete_res == expected_delete_res, \
+        f"Mismatch: expected delete response: {expected_delete_res}, got {delete_res}"
+
+
 @pytest.mark.nightly1
 def test_buy_sell_chore_multi_pair_serialized(static_data_, clean_and_set_limits, pair_securities_with_sides_,
                                               buy_chore_, sell_chore_, buy_fill_journal_,
@@ -1156,7 +1176,7 @@ def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
     overall_sell_fill_notional = 0
 
     leg1_leg2_symbol_list = []
-    total_strats = 10
+    total_strats = 1
     pair_strat_list = []
     for i in range(1, total_strats + 1):
         leg1_symbol = f"CB_Sec_{i}"

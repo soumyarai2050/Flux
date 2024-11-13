@@ -134,7 +134,7 @@ namespace FluxCppCore {
             return false; // not initialized or missing required fields
         }
 
-        bool patch(const RootModelType &kr_root_model_obj, const std::string &r_root_model_key) {
+        bool patch(const RootModelType &kr_root_model_obj, std::string &r_root_model_key) {
             bsoncxx::builder::basic::document bson_doc{};
             if (!r_root_model_key.empty()) {
                 prepare_doc(kr_root_model_obj, bson_doc);
