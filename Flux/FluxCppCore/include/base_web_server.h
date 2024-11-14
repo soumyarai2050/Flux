@@ -55,11 +55,19 @@ namespace FluxCppCore {
 
         void run() {
             try {
-                while (true) {
+                while (!shutdown_db_n_ws_thread.load()) {
                     tcp::socket socket{m_ioc_};
-                    m_acceptor_.accept(socket);
-                    beast::tcp_stream stream(std::move(socket));
-                    handle_request(stream);
+                    m_acceptor_.async_accept(socket, [this, &socket](beast::error_code ec) {
+                        if (!ec) {
+                        // Successfully accepted the connection, create a stream and handle the request
+                        beast::tcp_stream stream(std::move(socket));
+                        handle_request(stream);
+                        } else {
+                            // Log the error if the accept failed
+                            LOG_ERROR_IMPL(GetCppAppLogger(), "Error accepting connection: {}", ec.message());
+                        }
+                    });
+                    m_ioc_.run();
                 }
             } catch (std::exception const& e) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error: {}", e.what());

@@ -3110,7 +3110,8 @@ def place_new_chore(sec_id: str, side: Side, px: float, qty: int,
                     executor_web_client: StreetBookServiceHttpClient, inst_type: InstrumentType):
     security = SecurityBaseModel.from_kwargs(sec_id=sec_id, sec_id_source=SecurityIdSource.TICKER, inst_type=inst_type)
     usd_px = get_px_in_usd(px)
-    new_chore_obj = NewChoreBaseModel.from_kwargs(security=security, side=side, px=px, qty=qty, usd_px=usd_px)
+    new_chore_obj = NewChoreBaseModel.from_kwargs(security=security, side=side, px=px, qty=qty, usd_px=usd_px,
+                                                  pending_cxl=True)
     created_new_chore_obj = executor_web_client.create_new_chore_client(new_chore_obj)
 
     new_chore_obj.id = created_new_chore_obj.id

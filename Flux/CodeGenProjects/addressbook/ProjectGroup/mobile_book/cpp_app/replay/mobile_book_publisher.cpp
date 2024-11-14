@@ -346,3 +346,158 @@ void MobileBookPublisher::publish_last_barter_over_ws(mobile_book::LastBarter &r
 }
 
 
+void MobileBookPublisher::last_barter_consumer_thread() {
+	LastBarterQueueElement lt;
+	mobile_book::LastBarter last_barter;
+	mobile_book::TopOfBook tob;
+	while(!shutdown_db_n_ws_thread.load())
+	{
+		auto status = mon_lt.pop(lt);
+		if (status == FluxCppCore::QueueStatus::DATA_CONSUMED)
+		{
+			if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::POST) {
+				update_shm_cache(lt);
+			}
+
+			last_barter.set_id(lt.id_);
+			last_barter.mutable_symbol_n_exch_id()->set_symbol(lt.symbol_n_exch_id_.symbol_);
+			last_barter.mutable_symbol_n_exch_id()->set_exch_id(lt.symbol_n_exch_id_.exch_id_);
+			last_barter.set_px(static_cast<float>(lt.px_));
+			last_barter.set_qty(lt.qty_);
+			last_barter.set_exch_time(lt.exch_time_);
+			last_barter.set_arrival_time(lt.arrival_time_);
+			last_barter.mutable_market_barter_volume()->set_id(lt.market_barter_volume_.id_);
+			last_barter.mutable_market_barter_volume()->set_participation_period_last_barter_qty_sum(
+				lt.market_barter_volume_.participation_period_last_barter_qty_sum_);
+			last_barter.mutable_market_barter_volume()->set_applicable_period_seconds(
+				lt.market_barter_volume_.applicable_period_seconds_);
+
+			tob.set_id(1);
+			tob.set_symbol(lt.symbol_n_exch_id_.symbol_);
+			tob.mutable_last_barter()->set_px(static_cast<float>(lt.px_));
+			tob.mutable_last_barter()->set_qty(lt.qty_);
+			tob.mutable_last_barter()->set_last_update_date_time(last_barter.exch_time());
+			tob.set_last_update_date_time(last_barter.exch_time());
+			tob.add_market_barter_volume()->CopyFrom(last_barter.market_barter_volume());
+
+			if (mr_config_.m_top_of_book_db_update_publish_policy_ == PublishPolicy::POST) {
+				create_or_update_top_of_book_db(tob);
+			}
+
+			if (mr_config_.m_last_barter_db_update_publish_policy_ == PublishPolicy::POST) {
+				create_or_update_last_barter_db(last_barter);
+			}
+
+			if (mr_config_.m_last_barter_http_update_publish_policy_ == PublishPolicy::POST) {
+				create_or_update_last_barter_http(last_barter);
+			}
+
+			if (mr_config_.m_top_of_book_http_update_publish_policy_ == PublishPolicy::POST) {
+				create_or_update_top_of_book_http(tob);
+			}
+
+			if (mr_config_.m_last_barter_ws_update_publish_policy_ == PublishPolicy::POST) {
+				publish_last_barter_over_ws(last_barter);
+			}
+
+			if (mr_config_.m_top_of_book_ws_update_publish_policy_ == PublishPolicy::POST) {
+				m_top_of_book_web_socket_server_.value().NewClientCallBack(tob, -1);
+			}
+
+			last_barter.Clear();
+			tob.Clear();
+		}
+	}
+}
+
+void MobileBookPublisher::md_consumer_thread() {
+	MarketDepthQueueElement md;
+	mobile_book::MarketDepth market_depth;
+	mobile_book::TopOfBook top_of_book;
+	while(!shutdown_db_n_ws_thread.load()) {
+		auto status = mon_md.pop(md);
+		if (status == FluxCppCore::QueueStatus::DATA_CONSUMED) {
+
+			if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::POST) {
+				update_shm_cache(md);
+			}
+
+			market_depth.set_id(md.id_);
+			market_depth.set_symbol(md.symbol_);
+			market_depth.set_exch_time(md.exch_time_);
+			market_depth.set_arrival_time(md.arrival_time_);
+			if (md.side_ == 'B') {
+				market_depth.set_side(mobile_book::TickType::BID);
+			} else {
+				market_depth.set_side(mobile_book::TickType::ASK);
+			}
+			if (md.is_px_set_)
+				market_depth.set_px(static_cast<float>(md.px_));
+
+			if (md.is_qty_set_) {
+				market_depth.set_qty(md.qty_);
+			}
+			market_depth.set_position(md.position_);
+			if (md.is_market_maker_set_) {
+				market_depth.set_market_maker(md.market_maker_);
+			}
+
+			if (md.is_is_smart_depth_set_) {
+				market_depth.set_is_smart_depth(md.is_smart_depth_);
+			}
+			if (md.is_cumulative_notional_set_) {
+				market_depth.set_cumulative_notional(static_cast<float>(md.cumulative_notional_));
+			}
+
+			if (md.is_cumulative_qty_set_) {
+				market_depth.set_cumulative_qty(md.cumulative_qty_);
+			}
+
+			if (md.is_cumulative_avg_px_set_) {
+				market_depth.set_cumulative_avg_px(static_cast<float>(md.cumulative_avg_px_));
+			}
+			if (md.position_ == 0) {
+				top_of_book.set_id(1);
+				top_of_book.set_symbol(md.symbol_);
+				top_of_book.set_last_update_date_time(md.exch_time_);
+				if (md.side_ == 'B') {
+					top_of_book.mutable_bid_quote()->set_px(static_cast<float>(md.px_));
+					top_of_book.mutable_bid_quote()->set_qty(md.qty_);
+					top_of_book.mutable_bid_quote()->set_last_update_date_time(md.exch_time_);
+				} else {
+					top_of_book.mutable_ask_quote()->set_px(static_cast<float>(md.px_));
+					top_of_book.mutable_ask_quote()->set_qty(md.qty_);
+					top_of_book.mutable_ask_quote()->set_last_update_date_time(md.exch_time_);
+				}
+
+
+				if (mr_config_.m_top_of_book_db_update_publish_policy_ == PublishPolicy::POST) {
+					create_or_update_top_of_book_db(top_of_book);
+				}
+
+				if (mr_config_.m_top_of_book_http_update_publish_policy_ == PublishPolicy::POST) {
+					create_or_update_top_of_book_http(top_of_book);
+				}
+
+				if (mr_config_.m_top_of_book_ws_update_publish_policy_ == PublishPolicy::POST) {
+					m_top_of_book_web_socket_server_.value().NewClientCallBack(top_of_book, -1);
+				}
+			}
+
+			if (mr_config_.m_market_depth_db_update_publish_policy_ == PublishPolicy::POST) {
+				create_or_update_market_depth_db(market_depth);
+			}
+
+			if (mr_config_.m_market_depth_http_update_publish_policy_ == PublishPolicy::POST) {
+				create_or_update_market_depth_http(market_depth);
+			}
+
+			if (mr_config_.m_market_depth_ws_update_publish_policy_ == PublishPolicy::POST) {
+				publish_market_depth_over_ws(market_depth);
+			}
+
+			market_depth.Clear();
+			top_of_book.Clear();
+		}
+	}
+}

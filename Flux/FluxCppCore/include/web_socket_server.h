@@ -35,7 +35,7 @@ namespace FluxCppCore {
         km_read_timeout_seconds_(std::chrono::duration_cast<std::chrono::seconds>(k_read_timeout).count()),
         m_timer_(m_io_context_, km_read_timeout_seconds_) {
             start_connection();
-            m_ws_run_thread_ = std::jthread([this]() {
+            m_ws_run_thread_ = std::thread([this]() {
                 run();
             });
         }
@@ -45,6 +45,7 @@ namespace FluxCppCore {
         }
 
         virtual ~WebSocketServer(){
+            m_ws_run_thread_.join();
             m_shutdown_ = true;
             ws_vector_.clear();
         }
@@ -177,7 +178,7 @@ namespace FluxCppCore {
         // interval to timeout read if no data and handle any shutdown if requested
         boost::asio::deadline_timer m_timer_;
         std::unique_ptr<tcp::acceptor> m_acceptor_;
-        std::jthread m_ws_run_thread_;
+        std::thread m_ws_run_thread_;
     };
 
 }
