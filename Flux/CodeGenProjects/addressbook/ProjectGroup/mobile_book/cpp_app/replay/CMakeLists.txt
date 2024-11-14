@@ -121,8 +121,8 @@ message(SRC_FILES ${SRC_FILES})
 
 add_executable(mobile_book_executable main.cpp ${SRC_FILES}
         cpp_app_shared_resource.cpp
-        mobile_book_interface.cpp
         mobile_book_publisher.cpp
+
 )
 
 target_link_libraries(mobile_book_executable
