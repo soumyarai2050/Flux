@@ -66,7 +66,7 @@ class BasketBook(BaseBook):
         self.usd_fx = None
         thread: Thread = Thread(target=self.handle_non_cached_basket_chore_from_queue, daemon=True)
         thread.start()
-        SymbolCacheContainer.release_notify_semaphore()   # releasing it once so that if is recovery, data can be loaded
+        SymbolCacheContainer.release_semaphore()   # releasing it once so that if is recovery, data can be loaded
         BasketBook.initialize_underlying_http_callables()
 
     @property
@@ -215,7 +215,7 @@ class BasketBook(BaseBook):
         self.add_chore_to_managed_chores_by_symbol(system_symbol, new_chore_obj)
 
         # releasing semaphore to get added chores executed
-        SymbolCacheContainer.release_notify_semaphore()
+        SymbolCacheContainer.release_semaphore()
 
     def add_chore_to_managed_chores_by_symbol(self, system_symbol: str, chore_obj: NewChore):
         with BasketBook.manage_chores_lock:

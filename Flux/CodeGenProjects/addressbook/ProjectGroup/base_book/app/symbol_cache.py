@@ -1,5 +1,6 @@
 # standard imports
 import logging
+import time
 from ctypes import *
 import threading
 from typing import Dict, Any, List, ClassVar, Tuple, Final
@@ -29,10 +30,22 @@ def convert_str_to_datetime(date_str: str) -> DateTime:
 MAX_STRING_LENGTH: Final[int] = 128
 
 
-class SymbolCacheShadowFields:
+class ShadowFields:
     def __init__(self):
-        self.original_val: bytes | None = None
+        self._original_val: bytes | None = None
         self.manufactured_val: Any = None
+
+
+class DTShadowFields(ShadowFields):
+
+    @property
+    def original_val(self) -> bytes:
+        return self._original_val
+
+    @original_val.setter
+    def original_val(self, val: bytes):
+        self._original_val = val
+        self.manufactured_val = pendulum.parse(self._original_val.decode())
 
 
 class MarketBarterVolume(Structure):
@@ -112,21 +125,19 @@ class LastBarter(Structure):
     @property
     def exch_time(self):
         if not hasattr(self, "_exch_time"):
-            self._exch_time = SymbolCacheShadowFields()
+            self._exch_time = DTShadowFields()
 
         if self.exch_time_ != self._exch_time.original_val:
             self._exch_time.original_val = self.exch_time_
-            self._exch_time.manufactured_val = pendulum.parse(self.exch_time_.decode())
         return self._exch_time.manufactured_val
 
     @property
     def arrival_time(self):
         if not hasattr(self, "_arrival_time"):
-            self._arrival_time = SymbolCacheShadowFields()
+            self._arrival_time = DTShadowFields()
 
         if self.arrival_time_ != self._arrival_time.original_val:
             self._arrival_time.original_val = self.exch_time_
-            self._arrival_time.manufactured_val = pendulum.parse(self.arrival_time_.decode())
         return self._arrival_time.manufactured_val
 
     @property
@@ -181,11 +192,10 @@ class Quote(Structure):
     def last_update_date_time(self):
         if self.is_last_update_date_time_set_:
             if not hasattr(self, "_last_update_date_time"):
-                self._last_update_date_time = SymbolCacheShadowFields()
+                self._last_update_date_time = DTShadowFields()
 
             if self.last_update_date_time_ != self._last_update_date_time:
                 self._last_update_date_time.original_val = self.last_update_date_time_
-                self._last_update_date_time.manufactured_val = pendulum.parse(self.last_update_date_time_.decode())
             return self._last_update_date_time.manufactured_val
         return None
 
@@ -261,11 +271,10 @@ class TopOfBook(Structure):
     def last_update_date_time(self):
         if self.is_last_update_date_time_set_:
             if not hasattr(self, "_tob_last_update_date_time"):
-                self._tob_last_update_date_time = SymbolCacheShadowFields()
+                self._tob_last_update_date_time = DTShadowFields()
 
             if self.last_update_date_time_ != self._tob_last_update_date_time:
                 self._tob_last_update_date_time.original_val = self.last_update_date_time_
-                self._tob_last_update_date_time.manufactured_val = pendulum.parse(self.last_update_date_time_.decode())
             return self._tob_last_update_date_time.manufactured_val
         return None
 
@@ -307,38 +316,36 @@ class MarketDepth(Structure):
     def exch_time(self):
         if self.side == TickType.BID:
             if not hasattr(self, "_bid_market_depth_list"):
-                self._bid_market_depth_list = [[(
-                    SymbolCacheShadowFields(),
-                    SymbolCacheShadowFields())] * 10]
-            cached_exch_time = self._bid_market_depth_list[self.position][0]
+                self._bid_market_depth_list = [(
+                                                   DTShadowFields(),
+                                                   DTShadowFields()) * 10]
+            cached_exch_time: DTShadowFields = self._bid_market_depth_list[self.position][0]
         else:
             if not hasattr(self, "_ask_market_depth_list"):
-                self._ask_market_depth_list = [[(
-                    SymbolCacheShadowFields(),
-                    SymbolCacheShadowFields())] * 10]
-            cached_exch_time = self._ask_market_depth_list[self.position][0]
+                self._ask_market_depth_list = [(
+                                                   DTShadowFields(),
+                                                   DTShadowFields()) * 10]
+            cached_exch_time: DTShadowFields = self._ask_market_depth_list[self.position][0]
         if cached_exch_time.original_val != self.exch_time_:
             cached_exch_time.original_val = self.exch_time_
-            cached_exch_time.manufactured_val = pendulum.parse(self.exch_time_.decode())
         return cached_exch_time.manufactured_val
 
     @property
     def arrival_time(self):
         if self.side == TickType.BID:
             if not hasattr(self, "_bid_market_depth_list"):
-                self._bid_market_depth_list = [[(
-                                               SymbolCacheShadowFields(),
-                                               SymbolCacheShadowFields())] * 10]
-            cached_arrival_time = self._bid_market_depth_list[self.position][1]
+                self._bid_market_depth_list = [(
+                                                   DTShadowFields(),
+                                                   DTShadowFields()) * 10]
+            cached_arrival_time: DTShadowFields = self._bid_market_depth_list[self.position][1]
         else:
             if not hasattr(self, "_ask_market_depth_list"):
-                self._ask_market_depth_list = [[(
-                                               SymbolCacheShadowFields(),
-                                               SymbolCacheShadowFields())] * 10]
-            cached_arrival_time = self._ask_market_depth_list[self.position][1]
+                self._ask_market_depth_list = [(
+                                                   DTShadowFields(),
+                                                   DTShadowFields()) * 10]
+            cached_arrival_time: DTShadowFields = self._ask_market_depth_list[self.position][1]
         if cached_arrival_time.original_val != self.exch_time_:
             cached_arrival_time.original_val = self.exch_time_
-            cached_arrival_time.manufactured_val = pendulum.parse(self.arrival_time_.decode())
         return cached_arrival_time.manufactured_val
 
 
@@ -355,10 +362,12 @@ class MarketDepth(Structure):
         return None
 
 
-class MDSharedMemory(Structure):
+class MDContainer(Structure):
     _fields_ = [
-        ("update_counter", c_int64), ("symbol_", c_char * MAX_STRING_LENGTH),
-        ("last_barter", LastBarter), ("top_of_book", TopOfBook),
+        ("update_counter", c_int64),
+        ("symbol_", c_char * MAX_STRING_LENGTH),
+        ("last_barter", LastBarter),
+        ("top_of_book", TopOfBook),
         ("bid_market_depth_list", MarketDepth * 10),
         ("ask_market_depth_list", MarketDepth * 10)
     ]
@@ -379,7 +388,8 @@ class MDSharedMemory(Structure):
 
 class BaseMDSharedMemoryContainer(Structure):
     _fields_ = [
-        ("leg_1_md_shared_memory", MDSharedMemory), ("leg_2_md_shared_memory", MDSharedMemory)
+        ("leg_1_md_shared_memory", MDContainer),
+        ("leg_2_md_shared_memory", MDContainer)
     ]
 
     def __str__(self):
@@ -464,20 +474,19 @@ class SymbolCacheContainer:
     # below None data-members must be initialized at init time of executor process
     shared_memory = None
     shared_memory_semaphore = None
-    is_shm_ready = False
-    EXPECTED_SHM_SIGNATURE: hex = 0xFAFAFAFAFAFAFAFA    # hard-coded: cpp puts same value
+    EXPECTED_SHM_SIGNATURE: Final[hex] = 0xFAFAFAFAFAFAFAFA    # hard-coded: cpp puts same value
     symbol_to_symbol_cache_dict: Dict[str, SymbolCache] = {}
     semaphore = threading.Semaphore(0)
 
     @staticmethod
-    def release_notify_semaphore():
+    def release_semaphore():
         if SymbolCacheContainer.shared_memory_semaphore is not None:
             SymbolCacheContainer.shared_memory_semaphore.release()
         else:
             SymbolCacheContainer.semaphore.release()
 
     @staticmethod
-    def acquire_notify_semaphore():
+    def acquire_semaphore():
         if SymbolCacheContainer.shared_memory_semaphore is not None:
             SymbolCacheContainer.shared_memory_semaphore.acquire()
         else:
@@ -510,59 +519,74 @@ class SymbolCacheContainer:
         return shared_memory_found
 
     @staticmethod
-    def update_md_cache_from_shared_memory() -> bool:
+    def get_shm_mutex() -> PThreadShmMutex | None:
         md_shared_memory_container: MDSharedMemoryContainer = (
             MDSharedMemoryContainer.from_buffer(SymbolCacheContainer.shared_memory))
-        if not SymbolCacheContainer.is_shm_ready:
-            if md_shared_memory_container.shm_update_signature == SymbolCacheContainer.EXPECTED_SHM_SIGNATURE:
-                SymbolCacheContainer.is_shm_ready = True
-            else:
-                logging.warning("Couldn't find matching shm signature, ignoring this internal run cycle - retrying "
-                                f"on next semaphore release, {SymbolCacheContainer.EXPECTED_SHM_SIGNATURE=}, "
-                                f"found {md_shared_memory_container.shm_update_signature}")
-                return False
-        # else not required: no need for reassigning is_shm_ready once expected signature matches
+        sleep_sec = 1
+        if md_shared_memory_container.shm_update_signature != SymbolCacheContainer.EXPECTED_SHM_SIGNATURE:
+            logging.warning("Couldn't find matching shm signature, ignoring this internal run cycle - sleeping for "
+                            f"{sleep_sec}(s) and retrying on next semaphore release, "
+                            f"{SymbolCacheContainer.EXPECTED_SHM_SIGNATURE=}, "
+                            f"found {md_shared_memory_container.shm_update_signature}")
+            time.sleep(1)
+            return None
+        # else not required: all good
 
         pthread_shm_mutex: PThreadShmMutex = PThreadShmMutex(md_shared_memory_container.mutex)
-        while True:
-            lock_try_time = DateTime.utcnow()
-            lock_res = pthread_shm_mutex.try_timedlock()
-            if lock_res == 0:
-                try:
-                    md_shared_memory_container: MDSharedMemoryContainer = (
-                        MDSharedMemoryContainer.from_buffer_copy(SymbolCacheContainer.shared_memory))
-                    md_shared_memory_container_ = md_shared_memory_container.md_cache_container
+        return pthread_shm_mutex
 
-                    # setting leg1 md data
-                    leg_1_md_shared_memory = md_shared_memory_container_.leg_1_md_shared_memory
-                    symbol = leg_1_md_shared_memory.symbol
-                    symbol_cache = SymbolCacheContainer.symbol_to_symbol_cache_dict.get(symbol)
-                    symbol_cache.top_of_book = leg_1_md_shared_memory.top_of_book
-                    symbol_cache.last_barter = leg_1_md_shared_memory.last_barter
-                    symbol_cache.bid_market_depth = leg_1_md_shared_memory.bid_market_depth_list
-                    symbol_cache.ask_market_depth = leg_1_md_shared_memory.ask_market_depth_list
+    @staticmethod
+    def get_base_md_shared_memory_container() -> BaseMDSharedMemoryContainer | None:
+        pthread_shm_mutex: PThreadShmMutex = SymbolCacheContainer.get_shm_mutex()
+        if pthread_shm_mutex is not None:
+            while True:
+                lock_try_time = DateTime.utcnow()
+                lock_res = pthread_shm_mutex.try_timedlock()
+                if lock_res == 0:
+                    try:
+                        md_shared_memory_container_: MDSharedMemoryContainer = (
+                            MDSharedMemoryContainer.from_buffer_copy(SymbolCacheContainer.shared_memory))
+                        base_md_shared_memory_container_ = md_shared_memory_container_.md_cache_container
+                    except Exception as e:
+                        logging.exception(f"get_base_md_shared_memory_container failed: exception {e}")
+                        return None
+                    finally:
+                        pthread_shm_mutex.unlock()
+                        break
+                else:
+                    lock_timed_out_time = DateTime.utcnow()
+                    logging.error(f"pthread lock tried to take lock at {lock_try_time}, but timed-out at "
+                                  f"{lock_timed_out_time}, taking total "
+                                  f"{(lock_timed_out_time - lock_try_time).total_seconds()} sec(s), {lock_res=}")
+            return base_md_shared_memory_container_
+        else:
+            return None
 
-                    # setting leg2 md data
-                    leg_2_md_shared_memory = md_shared_memory_container_.leg_2_md_shared_memory
-                    symbol = leg_2_md_shared_memory.symbol
-                    symbol_cache = SymbolCacheContainer.symbol_to_symbol_cache_dict.get(symbol)
-                    symbol_cache.top_of_book = leg_2_md_shared_memory.top_of_book
-                    symbol_cache.last_barter = leg_2_md_shared_memory.last_barter
-                    symbol_cache.bid_market_depth = leg_2_md_shared_memory.bid_market_depth_list
-                    symbol_cache.ask_market_depth = leg_2_md_shared_memory.ask_market_depth_list
+    @staticmethod
+    def update_md_cache_from_shared_memory() -> bool:
+        base_md_shared_memory_container_ = SymbolCacheContainer.get_base_md_shared_memory_container()   # blocking call
 
-                except Exception as e:
-                    logging.exception(f"update_md_cache_from_shared_memory failed: exception {e}")
-                    return False
-                finally:
-                    pthread_shm_mutex.unlock()
-                    break
-            else:
-                lock_timed_out_time = DateTime.utcnow()
-                logging.error(f"pthread lock tried to take lock at {lock_try_time}, but timed-out at "
-                              f"{lock_timed_out_time}, taking total "
-                              f"{(lock_timed_out_time - lock_try_time).total_seconds()} sec(s), {lock_res=}")
-        return True
+        if base_md_shared_memory_container_ is not None:
+            # setting leg1 md data
+            leg_1_md_shared_memory: MDContainer = base_md_shared_memory_container_.leg_1_md_shared_memory
+            symbol1 = leg_1_md_shared_memory.symbol
+            symbol_cache = SymbolCacheContainer.symbol_to_symbol_cache_dict.get(symbol1)
+            symbol_cache.top_of_book = leg_1_md_shared_memory.top_of_book
+            symbol_cache.last_barter = leg_1_md_shared_memory.last_barter
+            symbol_cache.bid_market_depth = leg_1_md_shared_memory.bid_market_depth_list
+            symbol_cache.ask_market_depth = leg_1_md_shared_memory.ask_market_depth_list
+
+            # setting leg2 md data
+            leg_2_md_shared_memory = base_md_shared_memory_container_.leg_2_md_shared_memory
+            symbol2 = leg_2_md_shared_memory.symbol
+            symbol_cache = SymbolCacheContainer.symbol_to_symbol_cache_dict.get(symbol2)
+            symbol_cache.top_of_book = leg_2_md_shared_memory.top_of_book
+            symbol_cache.last_barter = leg_2_md_shared_memory.last_barter
+            symbol_cache.bid_market_depth = leg_2_md_shared_memory.bid_market_depth_list
+            symbol_cache.ask_market_depth = leg_2_md_shared_memory.ask_market_depth_list
+            return True
+        else:
+            return False
 
 
     @classmethod

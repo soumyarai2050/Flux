@@ -69,7 +69,6 @@ def depths_str(depths: List[MarketDepth], notional_fx_rate: float | None = None)
 
 class StreetBook(BaseBook):
     # Query Callables
-    underlying_get_aggressive_market_depths_query_http: Callable[..., Any] | None = None
     underlying_handle_strat_activate_query_http: Callable[..., Any] | None = None
     underlying_update_residuals_query_http: Callable[..., Any] | None = None
 
@@ -78,9 +77,7 @@ class StreetBook(BaseBook):
     @classmethod
     def initialize_underlying_http_routes(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes_imports import (
-            underlying_get_market_depths_query_http, underlying_handle_strat_activate_query_http,
-            underlying_update_residuals_query_http)
-        cls.underlying_get_aggressive_market_depths_query_http = underlying_get_market_depths_query_http
+            underlying_handle_strat_activate_query_http, underlying_update_residuals_query_http)
         cls.underlying_handle_strat_activate_query_http = underlying_handle_strat_activate_query_http
         cls.underlying_update_residuals_query_http = underlying_update_residuals_query_http
 
@@ -292,75 +289,6 @@ class StreetBook(BaseBook):
                                                     self.meta_no_executed_tradable_symbol_replenishing_side_dict,
                                                     config_dict)
         return False  # NOQA - code should ideally never reach here [defensive]
-
-    def update_aggressive_market_depths_in_cache(self) -> Tuple[List[MarketDepth], List[MarketDepth]]:
-        if not self.aggressive_symbol_side_tuples_dict:
-            if not self.init_aggressive_symbol_side_tuples_dict():
-                return [], []  # error logged internally
-
-        # coro needs public method
-        run_coro = StreetBook.underlying_get_aggressive_market_depths_query_http(
-            self.aggressive_symbol_side_tuples_dict)
-        future = asyncio.run_coroutine_threadsafe(run_coro, StreetBook.asyncio_loop)
-
-        try:
-            symbol_side_tuple_list: List = list(self.aggressive_symbol_side_tuples_dict.values())[0]
-            sym1, sym1_aggressive_side = symbol_side_tuple_list[0]
-            sym2, sym2_aggressive_side = symbol_side_tuple_list[1]
-            sym1_filtered_market_depths: List[MarketDepth] = []  # sym1 may not be same as strat leg1
-            sym2_filtered_market_depths: List[MarketDepth] = []  # sym2 may not be same as strat leg2
-            sym1_newest_exch_time = None
-            sym2_newest_exch_time = None
-            md: MarketDepth
-
-            # now block for task to finish
-            market_depths = future.result()
-            # store for subsequent reference
-            if market_depths:
-                for md in market_depths:
-                    if md.qty != 0 and (not math.isclose(md.px, 0)):
-                        if md.symbol == sym1:
-                            sym1_filtered_market_depths.append(md)
-                            if not sym1_newest_exch_time:
-                                sym1_newest_exch_time = md.exch_time
-                            if md.exch_time > sym1_newest_exch_time:
-                                sym1_newest_exch_time = md.exch_time
-
-                        elif md.symbol == sym2:
-                            sym2_filtered_market_depths.append(md)
-                            if not sym2_newest_exch_time:
-                                sym2_newest_exch_time = md.exch_time
-                            if not md.exch_time > sym2_newest_exch_time:
-                                sym2_newest_exch_time = md.exch_time
-
-                        else:
-                            logging.error(f"update_aggressive_market_depths_in_cache failed, expected: {sym1} or "
-                                          f"{sym2} found for symbol: {md.symbol}, ignoring depth;;;{md}")
-                    else:
-                        logging.error(f"update_aggressive_market_depths_in_cache failed, invalid px or qty: {md.px}, "
-                                      f"{md.qty} found for symbol: {md.symbol}, ignoring depth;;;{md}")
-
-                # sort by px - most aggressive to passive (reverse sorts big to small)
-                sym1_filtered_market_depths.sort(reverse=(sym1_aggressive_side == "ASK"), key=lambda x: x.px)
-                sym2_filtered_market_depths.sort(reverse=(sym2_aggressive_side == "ASK"), key=lambda x: x.px)
-
-            if not sym1_filtered_market_depths:
-                sym1_side = Side.BUY if sym1_aggressive_side == "ASK" else Side.SELL
-                logging.error(f"update_aggressive_market_depths_in_cache failed, no market_depth object found "
-                              f"symbol_side_key: {get_symbol_side_key([(sym1, sym1_side)])}")
-            if not sym2_filtered_market_depths:
-                sym2_side = Side.BUY if sym2_aggressive_side == "ASK" else Side.SELL
-                logging.error(f"update_aggressive_market_depths_in_cache failed, no market_depth object found "
-                              f"symbol_side_key: {get_symbol_side_key([(sym2, sym2_side)])}")
-            self.strat_cache.set_sorted_market_depths(sym1, sym1_aggressive_side, sym1_newest_exch_time,
-                                                      sym1_filtered_market_depths)
-            self.strat_cache.set_sorted_market_depths(sym2, sym2_aggressive_side, sym2_newest_exch_time,
-                                                      sym2_filtered_market_depths)
-            return sym1_filtered_market_depths, sym2_filtered_market_depths
-        except Exception as e:
-            logging.exception(f"update_aggressive_market_depths_in_cache failed for: "
-                              f"{str(self.aggressive_symbol_side_tuples_dict)} with exception: {e}")
-            return [], []
 
     def init_aggressive_symbol_side_tuples_dict(self) -> bool:
         if self.aggressive_symbol_side_tuples_dict:
@@ -1133,8 +1061,8 @@ class StreetBook(BaseBook):
         leg2_tob: TopOfBook | None
         barter_tob: TopOfBook
         leg1_tob, leg2_tob = self.extract_strat_specific_legs_from_tobs(pair_strat, top_of_books)
-        leg1_sym_ovrw = self.strat_cache.symbol_overviews[0]
-        leg2_sym_ovrw = self.strat_cache.symbol_overviews[1]
+        leg1_sym_ovrw = self.leg_1_symbol_cache.so
+        leg2_sym_ovrw = self.leg_2_symbol_cache.so
 
         chore_placed: int = ChoreControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
         if leg1_tob is not None and self.strat_cache.leg1_bartering_symbol is not None:
@@ -1237,7 +1165,6 @@ class StreetBook(BaseBook):
 
         if self._both_side_tob_has_data(leg_1_top_of_book, leg_2_top_of_book):
             top_of_books = [leg_1_top_of_book, leg_2_top_of_book]
-            self.update_aggressive_market_depths_in_cache()
             latest_update_date_time: DateTime | None = None
             for top_of_book in top_of_books:
                 if latest_update_date_time is None:
@@ -1473,7 +1400,7 @@ class StreetBook(BaseBook):
             try:
                 logging.debug("street_book going to acquire semaphore")
                 # self.strat_cache.notify_semaphore.acquire()
-                SymbolCacheContainer.acquire_notify_semaphore()
+                SymbolCacheContainer.acquire_semaphore()
                 # remove all unprocessed signals from semaphore, logic handles all new updates in single iteration
                 # clear_semaphore(self.strat_cache.notify_semaphore)
                 logging.debug("street_book signaled")
@@ -1556,14 +1483,13 @@ class StreetBook(BaseBook):
                     continue  # go next run - we don't stop processing for one faulty strat_cache
 
                 # 4.1 check symbol overviews [if they don't exist - continue]
-                symbol_overviews: List[SymbolOverviewBaseModel | SymbolOverview | None]
-                symbol_overviews = self.strat_cache.symbol_overviews
-                if symbol_overviews and len(symbol_overviews) == 2 and (symbol_overviews[0] is not None) and (
-                        symbol_overviews[1] is not None):
+                leg1_symbol_overview = self.leg_1_symbol_cache.so
+                leg2_symbol_overview = self.leg_2_symbol_cache.so
+                if (leg1_symbol_overview is not None) and (leg2_symbol_overview is not None):
                     pass
                 else:
-                    logging.warning(f"found: {len(symbol_overviews)=} expected 2 for {self};;;received-SOs: "
-                                    f"{[str(so) for so in symbol_overviews]}!")
+                    logging.warning(f"found either leg1 or leg2 symbol overview as None;;;"
+                                    f"{leg1_symbol_overview=}, {leg2_symbol_overview=}")
                     continue  # go next run - we don't stop processing - retry in next iteration
 
                 # 4.2 get top_of_book (new or old to be checked by respective strat based on strat requirement)
@@ -1606,7 +1532,6 @@ class StreetBook(BaseBook):
                 if new_chores_and_date_tuple is not None:
                     new_chores, self._new_chores_update_date_time = new_chores_and_date_tuple
                     if new_chores is not None:
-                        self.update_aggressive_market_depths_in_cache()
                         final_slice = len(new_chores)
                         unprocessed_new_chores: List[NewChoreBaseModel] = (
                             new_chores[self._new_chores_processed_slice:final_slice])

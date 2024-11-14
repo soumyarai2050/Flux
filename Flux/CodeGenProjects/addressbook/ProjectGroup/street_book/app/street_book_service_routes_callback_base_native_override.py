@@ -21,7 +21,7 @@ from sqlalchemy.testing.plugin.plugin_base import logging
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import MDSharedMemoryContainer
 # below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import SymbolCacheContainer
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import SymbolCacheContainer, SymbolCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_routes_callback_imports import (
     StreetBookServiceRoutesCallback)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
@@ -242,8 +242,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         os.environ["DB_NAME"] = self.db_name
         self.strat_leg_1: StratLeg | None = None  # will be set by once all_service_up test passes
         self.strat_leg_2: StratLeg | None = None  # will be set by once all_service_up test passes
-        self.leg1_symbol_cache: StratCache | None = None  # will be set by once all_service_up test passes
-        self.leg2_symbol_cache: StratCache | None = None  # will be set by once all_service_up test passes
+        self.leg1_symbol_cache: SymbolCache | None = None  # will be set by once all_service_up test passes
+        self.leg2_symbol_cache: SymbolCache | None = None  # will be set by once all_service_up test passes
         # restricted variable: don't overuse this will be extended to multi-currency support
         self.port: int | None = None  # will be set by app_launch_pre
         self.cpp_http_url: str | None = None  # will be set by app_launch_pre
@@ -489,8 +489,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
                         if not symbol_overview_for_symbol_exists:
                             # updating symbol_overviews
-                            symbol_overview_list = self.strat_cache.symbol_overviews
-                            if None not in symbol_overview_list:
+                            leg1_symbol_overview = self.leg1_symbol_cache.so
+                            leg2_symbol_overview = self.leg2_symbol_cache.so
+                            if leg1_symbol_overview is not None and leg2_symbol_overview is not None:
                                 symbol_overview_for_symbol_exists = True
                             else:
                                 run_coro = (
@@ -506,10 +507,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                       f"failed for {strat_key=} with exception: {e}")
                                 else:
                                     for symbol_overview in symbol_overview_list:
-                                        self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview)
+                                        # updating symbol_cache
+                                        self.strat_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview)
 
-                                symbol_overview_list = self.strat_cache.symbol_overviews
-                                if None not in symbol_overview_list:
+                                leg1_symbol_overview = self.leg1_symbol_cache.so
+                                leg2_symbol_overview = self.leg2_symbol_cache.so
+                                if leg1_symbol_overview is not None and leg2_symbol_overview is not None:
                                     symbol_overview_for_symbol_exists = True
                                 else:
                                     symbol_overview_for_symbol_exists = False
@@ -1335,21 +1338,27 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return ((current_leg_tob_obj.last_barter.px, current_leg_tob_obj.symbol),
                 (other_leg_tob_obj.last_barter.px, other_leg_tob_obj.symbol))
 
+    def get_cached_top_of_book_from_symbol(self, symbol: str):
+        if self.strat_leg_1.sec.sec_id == symbol:
+            return self.leg1_symbol_cache.top_of_book
+        else:
+            return self.leg2_symbol_cache.top_of_book
+
     def __get_residual_obj(self, side: Side, strat_brief: StratBrief) -> Residual | None:
         if side == Side.BUY:
             residual_qty = strat_brief.pair_buy_side_bartering_brief.residual_qty
             other_leg_residual_qty = strat_brief.pair_sell_side_bartering_brief.residual_qty
             top_of_book_obj = \
-                StratCache.get_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
+                self.get_cached_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
             other_leg_top_of_book = \
-                StratCache.get_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
+                self.get_cached_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
         else:
             residual_qty = strat_brief.pair_sell_side_bartering_brief.residual_qty
             other_leg_residual_qty = strat_brief.pair_buy_side_bartering_brief.residual_qty
             top_of_book_obj = \
-                StratCache.get_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
+                self.get_cached_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
             other_leg_top_of_book = \
-                StratCache.get_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
+                self.get_cached_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
 
         if top_of_book_obj is None or other_leg_top_of_book is None:
             logging.error(f"Received both leg's TOBs as {top_of_book_obj} and {other_leg_top_of_book}, "
@@ -2969,8 +2978,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         other_leg_residual_qty = strat_brief_obj.pair_buy_side_bartering_brief.residual_qty
                         stored_pair_strat_bartering_brief = strat_brief_obj.pair_sell_side_bartering_brief
                         other_leg_symbol = strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id
-                    top_of_book_obj = StratCache.get_top_of_book_from_symbol(symbol)
-                    other_leg_top_of_book = StratCache.get_top_of_book_from_symbol(other_leg_symbol)
+                    top_of_book_obj = self.get_cached_top_of_book_from_symbol(symbol)
+                    other_leg_top_of_book = self.get_cached_top_of_book_from_symbol(other_leg_symbol)
                     if top_of_book_obj is not None and other_leg_top_of_book is not None:
 
                         # same residual_qty will be used if no match found below else will be replaced with
@@ -4064,24 +4073,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
     def update_fill(self):
         self.strat_cache.get_strat_brief()
-
-    async def create_top_of_book_post(self, top_of_book_obj: TopOfBookBaseModel):
-        # tob creation is expected to be rare [once per symbol] - extra precautionary code is fine
-        # updating bartering_data_manager's cache
-        tob_tuple: Tuple[List[TopOfBookBaseModel | TopOfBookBaseModel], DateTime] | None = (
-            self.bartering_data_manager.strat_cache.get_top_of_book())
-        tob_list: List[TopOfBookBaseModel | TopOfBookBaseModel] | None = None
-        if tob_tuple is not None:
-            tob_list, _ = tob_tuple
-        if tob_list:
-            err = self.validate_single_id_per_symbol(tob_list, top_of_book_obj)
-            if err:
-                logging.warning(f"create_top_of_book_post validate_single_id_per_symbol failed, DB will have duplicate "
-                                f"tob entry for symbol: {top_of_book_obj.symbol};;;error detail: {err}")
-
-        self.bartering_data_manager.handle_top_of_book_get_all_ws(top_of_book_obj)
-        logging.info(f"TOB Created for id: {top_of_book_obj.id} for symbol: {top_of_book_obj.symbol};;;"
-                     f"{top_of_book_obj=}")
 
     async def partial_update_fills_journal_post(self, updated_fills_journal_obj_json: Dict[str, Any]):
         await self.handle_partial_update_fills_journal_post(updated_fills_journal_obj_json)

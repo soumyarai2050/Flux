@@ -3,8 +3,6 @@
 #include <boost/asio.hpp>
 #include <yaml-cpp/yaml.h>
 
-#include "market_data_service.pb.h"
-
 namespace FluxCppCore {
 
     inline int32_t find_free_port() {

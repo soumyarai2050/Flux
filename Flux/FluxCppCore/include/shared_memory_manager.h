@@ -21,14 +21,19 @@
 #include <format>
 #include <stdexcept>
 
+#include "binary_file_writer.h"
+
 constexpr mode_t SHM_PERMISSIONS = 0666; // Permissions for shared memory
 
 template<typename T>
 class SharedMemoryManager {
 public:
     // Constructor to initialize shared memory and semaphore
-    explicit SharedMemoryManager(const std::string& shm_name, const std::string& sem_name)
-        : m_shm_name_(shm_name), m_sem_name_(sem_name), m_shm_size_(sizeof(ShmStruct)) {
+    explicit SharedMemoryManager(const std::string& shm_name, const std::string& sem_name,
+        const std::string& r_binary_file_)
+    : m_shm_name_(shm_name), m_sem_name_(sem_name), m_binary_file_(r_binary_file_),
+    m_binary_file_writer_(m_binary_file_),
+    m_shm_size_(sizeof(ShmStruct)) {
 
         // Open shared memory
         m_shm_fd_ = shm_open(m_shm_name_.c_str(), O_CREAT | O_RDWR, SHM_PERMISSIONS);
@@ -97,10 +102,9 @@ public:
             }
             unlock(); // Release the lock
             sem_post(mp_sem_); // Signal that data is available
-
+            m_binary_file_writer_.write(m_shm_data_->data);
         } else {
-            std::cerr << "Error writing to shared memory, lock not found\n";
-            // LOG_DEBUG_IMPL(GetCppAppLogger(), "Skipping write as shared memory is locked by another process.");
+            LOG_DEBUG_IMPL(GetCppAppLogger(), "Skipping write as shared memory is locked by another process.");
         }
     }
 
@@ -123,6 +127,8 @@ protected:
 
     std::string m_shm_name_; // Name of the shared memory
     std::string m_sem_name_; // Name of the semaphore
+    std::string m_binary_file_;
+    BinaryFileWriter m_binary_file_writer_;
     size_t m_shm_size_; // Size of the shared memory
     // control variable helps set shm_signature if found false during a shm write, reader will not read shm until sig is set
     bool m_shm_signature_set = false;

@@ -204,7 +204,7 @@ void MobileBookPublisher::update_shm_cache(const LastBarterQueueElement& kr_last
 }
 
 void MobileBookPublisher::update_market_depth_cache(const MarketDepthQueueElement& kr_market_depth_queue_element,
-	MobileBookShmCache& r_mobile_book_cache_out) {
+	MDContainer& r_mobile_book_cache_out) {
 
 	if (kr_market_depth_queue_element.side_ == 'B') {
 		r_mobile_book_cache_out.bid_market_depths_[
@@ -257,7 +257,7 @@ void MobileBookPublisher::update_market_depth_cache(const MarketDepthQueueElemen
 }
 
 void MobileBookPublisher::update_last_barter_cache(const LastBarterQueueElement& kr_last_barter_queue_element,
-	MobileBookShmCache& r_mobile_book_cache_out) {
+	MDContainer& r_mobile_book_cache_out) {
 	// LastBarter
 		r_mobile_book_cache_out.last_barter_ = kr_last_barter_queue_element;
 

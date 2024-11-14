@@ -16,6 +16,44 @@
 // #define SHM_NAME "/my_shm"
 // #define SEM_NAME "/my_sem"
 
+inline void format_data(MobileBookShmCache const& cache, std::vector<char>& buffer) {
+    // std::format_to(std::back_inserter(buffer), "{:*^40}\n{:5} {:10.5f}  {:10.5f} {:5}\n", "GOOG", 1202, 22.86, 22.9, 1386);
+
+    std::format_to(std::back_inserter(buffer), "{:*^40}\n", std::string_view(cache.symbol_));
+
+    std::format_to(std::back_inserter(buffer), "Last Barter: {} {}@{} CumQty: {} ExchTs: {} ArrTs: {}\n\n",
+        std::string_view(cache.last_barter_.symbol_n_exch_id_.symbol_), cache.last_barter_.qty_, cache.last_barter_.px_,
+        cache.last_barter_.market_barter_volume_.participation_period_last_barter_qty_sum_, cache.last_barter_.exch_time_,
+        cache.last_barter_.arrival_time_);
+
+    const auto top_bid_qty = (int)cache.top_of_book_.bid_quote_.qty_; // cache.top_of_book_.is_bid_quote_set_ ? cache.top_of_book_.bid_quote_.qty_ : 0;
+    const auto top_bid_px = (float)cache.top_of_book_.bid_quote_.px_; //cache.top_of_book_.is_bid_quote_set_? cache.top_of_book_.bid_quote_.px_ : 0;
+
+    const auto top_ask_qty = (int)cache.top_of_book_.ask_quote_.qty_; //cache.top_of_book_.is_ask_quote_set_? cache.top_of_book_.ask_quote_.qty_ : 0;
+    const auto top_ask_px = (float)cache.top_of_book_.ask_quote_.px_; //cache.top_of_book_.is_ask_quote_set_? cache.top_of_book_.ask_quote_.px_ : 0;
+
+    const auto last_barter_qty = (int)cache.top_of_book_.last_barter_.qty_; //cache.last_barter_.is_qty_set_? cache.last_barter_.qty
+    const auto last_barter_px = (float)cache.top_of_book_.last_barter_.px_; //cache.last_barter_.is_px_set_? cache.last_barter_.px_ : 0;
+
+    std::format_to(std::back_inserter(buffer), "Top of Book: {:6} {:10.5f}  {:10.5f} {:6}\n", top_bid_qty, top_bid_px, top_ask_px, top_ask_qty );
+    std::format_to(std::back_inserter(buffer), "Last Price: {}@{} cumQty: {} updateTs: {}\n\n", last_barter_px, last_barter_qty,
+        "Not Set", cache.top_of_book_.last_barter_.last_update_date_time_);
+
+    std::format_to(std::back_inserter(buffer), "{:*^40}\n", "Market Depth");
+    for (size_t i{0}; i < MARKET_DEPTH_LEVEL; ++i) {
+        const auto& bid = cache.bid_market_depths_[i];
+        const auto& ask = cache.ask_market_depths_[i];
+        auto bid_qty = bid.qty_ ; //bid.is_qty_set_ ? bid.qty_ : 0;
+        auto bid_px = bid.px_; //bid.is_px_set_? bid.px_ : 0;
+
+        auto ask_qty = ask.qty_; //ask.is_qty_set_? ask.qty_ : 0;
+        auto ask_px = ask.px_; // ask.is_px_set_? ask.px_ : 0;
+
+        std::format_to(std::back_inserter(buffer), "{:6} {:10.5f}  {:10.5f} {:6}\n", bid_qty, bid_px, ask_px, ask_qty);
+    }
+}
+
+
 constexpr mode_t SHM_PERMISSIONS = 0666; // Permissions for shared memory
 
 template<typename T>
@@ -32,31 +70,14 @@ public:
                 strerror(errno), m_shm_name_));
         }
 
-        // Set the size of shared memory
-        if (ftruncate(m_shm_fd_, m_shm_size_) != 0) {
-            shm_unlink(m_shm_name_.c_str()); // Cleanup on error
-            throw std::runtime_error(std::format("Error truncating shared memory: {}, shared memory name: {}, size: {}",
-                strerror(errno), m_shm_name_, m_shm_size_));
-        }
-
         // Map shared memory
         ptr_ = mmap(nullptr, m_shm_size_, PROT_READ | PROT_WRITE, MAP_SHARED, m_shm_fd_, 0);
         if (m_shm_data_ == MAP_FAILED) {
-            shm_unlink(m_shm_name_.c_str()); // Cleanup on error
             throw std::runtime_error(std::format("Error mapping shared memory: {}, shared memory name: {}",
                 strerror(errno), m_shm_name_));
         }
 
         m_shm_data_ = new (ptr_) ShmStruct;
-
-        // Open semaphore
-        mp_sem_ = sem_open(m_sem_name_.c_str(), O_CREAT, SHM_PERMISSIONS, 0);
-        if (mp_sem_ == SEM_FAILED) {
-            munmap(m_shm_data_, m_shm_size_); // Cleanup on error
-            shm_unlink(m_shm_name_.c_str());
-            throw std::runtime_error(std::format("Error opening semaphore: {}, semaphore name: {}",
-                strerror(errno), m_sem_name_));
-        }
 
         // Initialize mutex attributes
         pthread_mutexattr_t mutex_attr;
@@ -65,41 +86,23 @@ public:
 
         // Initialize mutex
         if (pthread_mutex_init(&m_shm_data_->mutex, &mutex_attr) != 0) {
-            munmap(m_shm_data_, m_shm_size_); // Cleanup on error
-            shm_unlink(m_shm_name_.c_str());
             throw std::runtime_error(std::format("Error initializing mutex: {}, shm name: {}, sem name: {}",
                 strerror(errno), m_shm_name_, m_sem_name_));
         }
     }
-
-    // Destructor to clean up resources
-    ~SharedMemoryManager() {
-        pthread_mutex_destroy(&m_shm_data_->mutex); // Destroy mutex
-        munmap(m_shm_data_, m_shm_size_); // Unmap shared memory
-        sem_close(mp_sem_); // Close semaphore
-        shm_unlink(m_shm_name_.c_str()); // Unlink shared memory
-    }
-
-    // Write data to shared memory
-    void write_to_shared_memory(const T& new_data) {
-        if (try_lock()) [[likely]] {  // Attempt to acquire the lock without blocking
-            std::memcpy(&m_shm_data_->data, &new_data, sizeof(T)); // Copy data to shared memory
-            if(!m_shm_signature_set) [[unlikely]] {
-                auto signature = new_data.is_data_set() ? k_shm_signature : 0;
-                m_shm_data_->shm_update_signature = signature;
-                m_shm_signature_set = signature == k_shm_signature ? true : false;
-            }
-            unlock(); // Release the lock
-            sem_post(mp_sem_); // Signal that data is available
-
-        } else {
-            std::cerr << "Error writing to shared memory, lock not found\n";
-            // LOG_DEBUG_IMPL(GetCppAppLogger(), "Skipping write as shared memory is locked by another process.");
+    struct LockGuard {
+        LockGuard(SharedMemoryManager* manager) : manager_(manager) {
+            manager_->lock();
         }
-    }
 
+        ~LockGuard() {
+            manager_->unlock();
+        }
+        SharedMemoryManager* manager_;
+    };
     // Read data from shared memory
     T read_from_shared_memory() {
+        LockGuard lock(this);
         T data_copy = m_shm_data_->data; // Copy data from shared memory
         return data_copy; // Return the copied data
     }
@@ -153,18 +156,23 @@ int main(int argc, char* argv[]) {
     try {
         SharedMemoryManager<ShmSymbolCache> shmManager(argv[1], argv[2]);
 
-        auto d =shmManager.read_from_shared_memory();
-        d.m_leg_1_data_shm_cache_.print();
-        sleep(50);
-        std::cout << "Mutex unlocked, press any key to start cleaning up..." << std::endl;
-        std::cin.get();
+        while (1) {
+        //     // Read data from shared memory
+            std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
+            auto d =shmManager.read_from_shared_memory();
+            std::vector<char> buffer;
+            format_data(d.m_leg_1_data_shm_cache_, buffer);
+            std::cout << std::string_view{buffer.begin(), buffer.end()} << '\n';
+            buffer.clear();
+            std::cout << "------------------------------------ LEG 2 ------------------------------------\n";
+            format_data(d.m_leg_2_data_shm_cache_, buffer);
+            std::cout << std::string_view{buffer.begin(), buffer.end()} << '\n';
+        }
+
     } catch (const std::exception& ex) {
         std::cerr << ex.what() << std::endl;
         return 1;
     }
-
-    std::cout << "Cleanup completed" << std::endl;
-    return 0;
 }
 
 

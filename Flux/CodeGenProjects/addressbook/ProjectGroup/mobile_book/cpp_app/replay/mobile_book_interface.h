@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mobile_book_consumer.h"
-#include "config_parser.h"
+#include "../include/config_parser.h"
 
 #include <memory>
 

@@ -111,7 +111,7 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                             (message_field, CppPopulateRandomValueHandlerPlugin.flux_fld_val_is_datetime):
                                 output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->" \
                                           f"mutable_{parent_field}()->mutable_{field_name}()->set_" \
-                                          f"{message_field_name}(FluxCppCore::get_utc_time_microseconds());\n"
+                                          f"{message_field_name}(FluxCppCore::get_local_time_microseconds());\n"
                             else:
                                 if message_field_name != "id":
                                     output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->" \
@@ -144,7 +144,7 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                         if CppPopulateRandomValueHandlerPlugin.is_option_enabled \
                                     (message_field, CppPopulateRandomValueHandlerPlugin.flux_fld_val_is_datetime):
                             output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->set_" \
-                                      f"{message_field_name}(FluxCppCore::get_utc_time_microseconds());\n"
+                                      f"{message_field_name}(FluxCppCore::get_local_time_microseconds());\n"
                         else:
                             if message_field_name != "id":
                                 output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->set_" \
@@ -184,7 +184,7 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                 if field_name != "id":
                     if CppPopulateRandomValueHandlerPlugin.is_option_enabled\
                                 (fields, CppPopulateRandomValueHandlerPlugin.flux_fld_val_is_datetime):
-                        output += f"\t\t\t{message_field_name}->set_{field_name}(FluxCppCore::get_utc_time_microseconds());\n"
+                        output += f"\t\t\t{message_field_name}->set_{field_name}(FluxCppCore::get_local_time_microseconds());\n"
                     else:
                         output += f"\t\t\t{message_field_name}->set_{field_name}(random_data_gen.get_random_{field_kind}());\n"
                 else:
@@ -297,7 +297,7 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                                             if CppPopulateRandomValueHandlerPlugin.is_option_enabled\
                                                 (field, CppPopulateRandomValueHandlerPlugin.flux_fld_val_is_datetime):
                                                 output_content += f'\t\t\t{message_name_snake_cased}.set_{field_name}' \
-                                                                  f'(FluxCppCore::get_utc_time_microseconds());\n'
+                                                                  f'(FluxCppCore::get_local_time_microseconds());\n'
                                             else:
                                                 output_content += f'\t\t\t{message_name_snake_cased}.set_{field_name}(random_data_gen.get_random_' \
                                                                   f'{field_type}());\n'

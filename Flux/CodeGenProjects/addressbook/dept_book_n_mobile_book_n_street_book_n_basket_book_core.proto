@@ -39,15 +39,6 @@ message SymbolOverview {
     QueryParams: "symbol",
     QueryParamsDataType: "str"
   };
-  option (FluxMsgExecutorOptions) = {
-    IsWebSocketModel: true,
-    EnableNotifyAll: true,
-    IsTopLvlModel: false,
-    ExecutorKeyCounts: 2,
-    ExecutorKeySequence: "symbol-'BUY'",
-    ExecutorKeySequence: "symbol-'SELL'",
-    IsRepeated: true
-  };
   option (FluxMsgStringLength) = 128;
 
   required int32 id = 1;

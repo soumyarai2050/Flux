@@ -10,11 +10,12 @@
 #include "mongo_db_codec.h"
 #include "base_web_client.h"
 #include "shared_memory_manager.h"
-#include "config_parser.h"
+#include "../include/config_parser.h"
 #include "mobile_book_web_socket_server.h"
 #include "queue_handler.h"
 #include "mobile_book_service_shared_data_structure.h"
 #include "cpp_app_shared_resource.h"
+#include "../include/shm_symbol_cache.h"
 
 
 using namespace mobile_book_handler;
@@ -28,7 +29,7 @@ public:
 	m_last_barter_db_codec_(m_sp_mongo_db_), m_market_depth_history_db_codec_(m_sp_mongo_db_),
 	m_last_barter_history_db_codec_(m_sp_mongo_db_),
 	m_symbols_manager_(mr_config_.m_shm_cache_name_,
-		mr_config_.m_shm_semaphore_name_) {
+		mr_config_.m_shm_semaphore_name_, mr_config_.m_binary_log_path_) {
 
 		m_last_barter_history_db_codec_.get_all_data_from_collection(m_last_barter_collection_);
 		m_market_depth_history_db_codec_.get_all_data_from_collection(m_market_depth_history_collection_);
@@ -167,10 +168,10 @@ protected:
 	void update_shm_cache(const LastBarterQueueElement& kr_last_barter_queue_element);
 
 	static void update_market_depth_cache(const MarketDepthQueueElement& kr_market_depth_queue_element,
-		MobileBookShmCache& r_mobile_book_cache_out);
+		MDContainer& r_mobile_book_cache_out);
 
 	static void update_last_barter_cache(const LastBarterQueueElement& kr_last_barter_cache,
-		MobileBookShmCache& r_mobile_book_cache_out);
+		MDContainer& r_mobile_book_cache_out);
 
 	void create_or_update_market_depth_db(mobile_book::MarketDepth& kr_market_depth);
 

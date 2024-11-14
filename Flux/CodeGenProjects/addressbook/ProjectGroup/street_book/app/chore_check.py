@@ -606,7 +606,7 @@ class ChoreControl:
         return breach_threshold_px
 
     @staticmethod
-    def check_px(tob: TopOfBookBaseModel, sym_ovrw_getter: Callable, chore_limits: ChoreLimitsBaseModel,
+    def check_px(tob: TopOfBookBaseModel | TopOfBook, sym_ovrw_getter: Callable, chore_limits: ChoreLimitsBaseModel,
                  px: float, usd_px: float, qty: int, side: Side, system_symbol: str,
                  symbol_cache=None, is_algo: bool = False) -> int:
         checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS

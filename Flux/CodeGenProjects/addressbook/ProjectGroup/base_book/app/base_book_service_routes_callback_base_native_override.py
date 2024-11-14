@@ -29,7 +29,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book impor
     BaseBook)
 from FluxPythonUtils.scripts.service import Service
 # below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import BaseStratCache, SymbolCacheContainer
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import BaseStratCache, SymbolCacheContainer, SymbolCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_bartering_data_manager import (
     BaseBarteringDataManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_symbol_side_key
@@ -85,12 +85,6 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         self.initialize_log_simulator_logger()
 
         self.is_test_run = self.market.is_test_run
-
-        # Load the shared library
-        # so_module_dir: PurePath = PurePath(__file__).parent
-        # so_module_file_name = BarteringLinkBase.pair_strat_config_dict.get("cpp_app_so_module_file_name")
-        # os.environ["LD_LIBRARY_PATH"] = f"{so_module_dir}:$LD_LIBRARY_PATH"
-        # self.mobile_book_provider = ctypes.CDLL(so_module_dir / so_module_file_name)
 
     @property
     def derived_class_type(self):
@@ -206,6 +200,16 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     # Chore Journal Update Methods
     ##############################
 
+    @staticmethod
+    def get_cached_top_of_book_from_symbol(symbol: str) -> TopOfBookBaseModel | None:
+        symbol_cache: SymbolCache = SymbolCacheContainer.get_symbol_cache(symbol)
+        if symbol_cache is not None:
+            return symbol_cache.top_of_book
+        else:
+            logging.error(f"Can't find any symbol_cache with {symbol=};;; "
+                          f"{SymbolCacheContainer.symbol_to_symbol_cache_dict}")
+            return None
+
     async def handle_create_chore_journal_pre(self, chore_journal_obj: ChoreJournal) -> None:
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
@@ -216,7 +220,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         # updating chore notional in chore journal obj
         if chore_journal_obj.chore_event == ChoreEventType.OE_NEW:
             if chore_journal_obj.chore.px == 0:
-                top_of_book_obj = BaseStratCache.get_top_of_book_from_symbol(chore_journal_obj.chore.security.sec_id)
+                top_of_book_obj = self.get_cached_top_of_book_from_symbol(chore_journal_obj.chore.security.sec_id)
                 if top_of_book_obj is not None:
                     chore_journal_obj.chore.px = top_of_book_obj.last_barter.px
                 else:
@@ -1570,18 +1574,18 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     async def handle_create_new_chore_post(self, new_chore_obj: NewChore):
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_new_chore_get_all_ws(new_chore_obj)
-        SymbolCacheContainer.release_notify_semaphore()
+        SymbolCacheContainer.release_semaphore()
 
     async def handle_create_cancel_chore_post(self, cancel_chore_obj: CancelChore):
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_cancel_chore_get_all_ws(cancel_chore_obj)
-        SymbolCacheContainer.release_notify_semaphore()
+        SymbolCacheContainer.release_semaphore()
 
     async def handle_partial_update_cancel_chore_post(self, updated_cancel_chore_obj_json: Dict[str, Any]):
         updated_cancel_chore_obj = CancelChore.from_dict(updated_cancel_chore_obj_json)
         # updating bartering_data_manager's strat_cache
         self.bartering_data_manager.handle_cancel_chore_get_all_ws(updated_cancel_chore_obj)
-        SymbolCacheContainer.release_notify_semaphore()
+        SymbolCacheContainer.release_semaphore()
 
     async def handle_create_symbol_overview_pre(self, symbol_overview_obj: SymbolOverview):
         return create_symbol_overview_pre_helper(self.static_data, symbol_overview_obj)
@@ -1599,60 +1603,62 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
 
     async def handle_create_symbol_overview_post(self, symbol_overview_obj: SymbolOverview):
         symbol_overview_obj.force_publish = False  # setting it false if at create is it True
-        # updating bartering_data_manager's strat_cache
-        if self.bartering_data_manager is not None:
-            self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-        SymbolCacheContainer.release_notify_semaphore()
+        # updating symbol_cache
+        self.strat_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
+
+        SymbolCacheContainer.release_semaphore()
 
     async def handle_update_symbol_overview_post(self, updated_symbol_overview_obj: SymbolOverview):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
-        SymbolCacheContainer.release_notify_semaphore()
+        # updating symbol_cache
+        self.strat_cache.handle_set_symbol_overview_in_symbol_cache(updated_symbol_overview_obj)
+        SymbolCacheContainer.release_semaphore()
 
     async def handle_partial_update_symbol_overview_post(self, updated_symbol_overview_obj_json: Dict[str, Any]):
         updated_symbol_overview_obj = SymbolOverview.from_dict(updated_symbol_overview_obj_json)
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
-        SymbolCacheContainer.release_notify_semaphore()
+        # updating symbol_cache
+        self.strat_cache.handle_set_symbol_overview_in_symbol_cache(updated_symbol_overview_obj)
+        SymbolCacheContainer.release_semaphore()
 
     async def handle_create_all_symbol_overview_post(self, symbol_overview_obj_list: List[SymbolOverview]):
         # updating bartering_data_manager's strat_cache
         for symbol_overview_obj in symbol_overview_obj_list:
             symbol_overview_obj.force_publish = False  # setting it false if at create it is True
-            if self.bartering_data_manager:
-                self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-                SymbolCacheContainer.release_notify_semaphore()
+            # updating symbol_cache
+            self.strat_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
+            SymbolCacheContainer.release_semaphore()
             # else not required: since symbol overview is required to make executor service ready,
             #                    will add this to strat_cache explicitly using underlying http call
 
     async def handle_update_all_symbol_overview_post(self, updated_symbol_overview_obj_list: List[SymbolOverview]):
         # updating bartering_data_manager's strat_cache
         for symbol_overview_obj in updated_symbol_overview_obj_list:
-            self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-            SymbolCacheContainer.release_notify_semaphore()
+            # updating symbol_cache
+            self.strat_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
+            SymbolCacheContainer.release_semaphore()
 
     async def handle_partial_update_all_symbol_overview_post(self, updated_symbol_overview_dict_list: List[Dict[str, Any]]):
         updated_symbol_overview_obj_list = SymbolOverview.from_dict_list(updated_symbol_overview_dict_list)
         # updating bartering_data_manager's strat_cache
         for symbol_overview_obj in updated_symbol_overview_obj_list:
-            self.bartering_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-            SymbolCacheContainer.release_notify_semaphore()
+            # updating symbol_cache
+            self.strat_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
+            SymbolCacheContainer.release_semaphore()
 
     async def handle_create_top_of_book_post(self, top_of_book_obj: TopOfBook):
         self.bartering_data_manager.handle_top_of_book_get_all_ws(top_of_book_obj)
         # used for basket executor - strat executor releases semaphore from cpp app
-        SymbolCacheContainer.release_notify_semaphore()
+        SymbolCacheContainer.release_semaphore()
 
     async def handle_update_top_of_book_post(self, updated_top_of_book_obj: TopOfBook):
         self.bartering_data_manager.handle_top_of_book_get_all_ws(updated_top_of_book_obj)
         # used for basket executor - strat executor releases semaphore from cpp app
-        SymbolCacheContainer.release_notify_semaphore()
+        SymbolCacheContainer.release_semaphore()
 
     async def handle_partial_update_top_of_book_post(self, updated_top_of_book_obj_json: Dict[str, Any]):
         updated_top_of_book_obj: TopOfBook = TopOfBook.from_dict(updated_top_of_book_obj_json)
         self.bartering_data_manager.handle_top_of_book_get_all_ws(updated_top_of_book_obj)
         # used for basket executor - strat executor releases semaphore from cpp app
-        SymbolCacheContainer.release_notify_semaphore()
+        SymbolCacheContainer.release_semaphore()
 
     #####################
     # Query Pre/Post handling

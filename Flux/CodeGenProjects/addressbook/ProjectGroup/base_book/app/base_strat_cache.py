@@ -49,16 +49,6 @@ class BaseStratCache:
         self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock: Lock = Lock()
 
     @staticmethod
-    def get_top_of_book_from_symbol(symbol: str) -> TopOfBookBaseModel | None:
-        symbol_cache: SymbolCache = SymbolCacheContainer.get_symbol_cache(symbol)
-        if symbol_cache is not None:
-            return symbol_cache.top_of_book
-        else:
-            logging.error(f"Can't find any symbol_cache with {symbol=};;; "
-                          f"{SymbolCacheContainer.symbol_to_symbol_cache_dict}")
-            return None
-
-    @staticmethod
     def get_pos_cache_from_symbol_side(symbol: str, side: Side) -> PosCache | None:
         symbol_cache: SymbolCache = SymbolCacheContainer.get_symbol_cache(symbol)
         if symbol_cache is not None:
@@ -170,14 +160,6 @@ class BaseStratCache:
         exchange = "bartering_exchange"
         return bartering_symbol, account, exchange
 
-    def handle_set_symbol_overview_in_symbol_cache(self, symbol_overview_: SymbolOverviewBaseModel | SymbolOverview):
-        symbol_cache = SymbolCacheContainer.get_symbol_cache(symbol_overview_.symbol)
-        if symbol_cache is None:
-            symbol_cache = SymbolCacheContainer.add_symbol_cache_for_symbol(symbol_overview_.symbol)
-
-        symbol_cache.so = symbol_overview_
-        return symbol_cache.so
-
     def get_symbol_overview_from_symbol_obj(self, symbol: str) -> SymbolOverviewBaseModel | SymbolOverview | None:
         symbol_cache = SymbolCacheContainer.get_symbol_cache(symbol)
         if symbol_cache is not None and symbol_cache.so is not None:
@@ -215,3 +197,11 @@ class BaseStratCache:
                     raise Exception(f"self.static_data init to None, unexpected!!")
             except Exception as e:
                 cls.static_data_service_state.handle_exception(e)
+
+    def handle_set_symbol_overview_in_symbol_cache(self, symbol_overview_: SymbolOverviewBaseModel | SymbolOverview):
+        symbol_cache = SymbolCacheContainer.get_symbol_cache(symbol_overview_.symbol)
+        if symbol_cache is None:
+            symbol_cache = SymbolCacheContainer.add_symbol_cache_for_symbol(symbol_overview_.symbol)
+
+        symbol_cache.so = symbol_overview_
+        return symbol_cache.so
