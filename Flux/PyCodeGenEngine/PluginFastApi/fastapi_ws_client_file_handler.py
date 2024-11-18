@@ -210,17 +210,22 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
         for aggregate_value in aggregate_value_list:
             query_name = aggregate_value[FastapiWSClientFileHandler.query_name_key]
             query_params = aggregate_value[FastapiWSClientFileHandler.query_params_key]
-            query_params_types = aggregate_value[FastapiWSClientFileHandler.query_params_data_types_key]
             query_type = str(aggregate_value[FastapiWSClientFileHandler.query_type_key]).lower() \
                 if aggregate_value[FastapiWSClientFileHandler.query_type_key] is not None else None
+
+            # query_param_name_n_param_type_list = []
+            query_params_name_list = []
+            if query_params:
+                for query_param_name, _ in query_params:
+                    query_params_name_list.append(query_param_name)
+
             params_str = ", ".join([f"{aggregate_param}: {aggregate_params_type}"
-                                    for aggregate_param, aggregate_params_type in zip(query_params,
-                                                                                      query_params_types)])
+                                    for aggregate_param, aggregate_params_type in query_params])
             if query_type == "ws" or query_type == "both":
                 output_str += (f'\tdef query_{query_name}_ws_client(self, notify: bool, {params_str}, '
                                f'need_initial_snapshot: bool | None = True) -> WSReader:\n')
                 params_dict_str = \
-                    ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
+                    ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params_name_list])
                 output_str += "\t\tquery_kwargs = {" + f"{params_dict_str}" + "}\n"
                 output_str += f'\t\tif need_initial_snapshot is not None:\n'
                 output_str += f'\t\t\tquery_kwargs["need_initial_snapshot"] = str(need_initial_snapshot).lower()\n'

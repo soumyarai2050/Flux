@@ -195,16 +195,26 @@ message PortfolioStatus {
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "update_portfolio_status_by_chore_or_fill_data",
-    QueryParams: "overall_buy_notional",
-    QueryParamsDataType: "float | None = None",
-    QueryParams: "overall_sell_notional",
-    QueryParamsDataType: "float | None = None",
-    QueryParams: "overall_buy_fill_notional",
-    QueryParamsDataType: "float | None = None",
-    QueryParams: "overall_sell_fill_notional",
-    QueryParamsDataType: "float | None = None",
-    QueryParams: "open_chore_count",
-    QueryParamsDataType: "int | None = None"
+    QueryParams: {
+      QueryParamName: "overall_buy_notional",
+      QueryParamDataType: "float | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "overall_sell_notional",
+      QueryParamDataType: "float | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "overall_buy_fill_notional",
+      QueryParamDataType: "float | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "overall_sell_fill_notional",
+      QueryParamDataType: "float | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "open_chore_count",
+      QueryParamDataType: "int | None = None"
+    }
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -233,42 +243,58 @@ message PairStrat {
   };
     option (FluxMsgJsonQuery) = {
       QueryName: "get_pair_strat_sec_filter_json",
-      QueryParams: "security_id",
-      QueryParamsDataType: "str"
+      QueryParams: {
+        QueryParamName: "security_id",
+        QueryParamDataType: "str"
+      }
   };
     option (FluxMsgJsonQuery) = {
     QueryName: "get_ongoing_or_single_exact_non_ongoing_pair_strat_from_symbol_side",
-    QueryParams: "sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "side",
-    QueryParamsDataType: "Side"
+    QueryParams: {
+      QueryParamName: "sec_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side"
+    }
   };
     option (FluxMsgJsonQuery) = {
     QueryName: "get_all_pair_strats_from_symbol_side",
     AggregateVarName: "get_all_pair_strat_from_symbol_n_side",
-    QueryParams: "sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "side",
-    QueryParamsDataType: "Side"
+    QueryParams: {
+      QueryParamName: "sec_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side"
+    }
   };
     option (FluxMsgJsonQuery) = {
       QueryName: "filtered_notify_pair_strat_update",
-      QueryParams: "symbols",
-      QueryParamsDataType: "List[str]",
+      QueryParams: {
+        QueryParamName: "symbols",
+        QueryParamDataType: "List[str]"
+      }
       QueryType: WS
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "update_pair_strat_to_non_running_state",
-    QueryParams: "pair_strat_id",
-    QueryParamsDataType: "int"
+    QueryParams: {
+      QueryParamName: "pair_strat_id",
+      QueryParamDataType: "int"
+    }
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "pause_all_active_strats"
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "register_pair_strat_for_recovery",
-    QueryParams: "pair_strat_id",
-    QueryParamsDataType: "int"
+    QueryParams: {
+      QueryParamName: "pair_strat_id",
+      QueryParamDataType: "int"
+    }
   };
   option (FluxMsgExecutorOptions) = {
       IsWebSocketModel: true,
@@ -342,13 +368,17 @@ message StratCollection {
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "unload_strat_from_strat_id",
-    QueryParams: "strat_id",
-    QueryParamsDataType: "int"
+    QueryParams: {
+      QueryParamName: "strat_id",
+      QueryParamDataType: "int"
+    }
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "reload_strat_from_strat_id",
-    QueryParams: "strat_id",
-    QueryParamsDataType: "int"
+    QueryParams: {
+      QueryParamName: "strat_id",
+      QueryParamDataType: "int"
+    }
   };
   option (FluxMsgSmallSizedCollection) = true;
   option (FluxMsgStringLength) = 128;
@@ -365,10 +395,14 @@ message StratCollection {
 message DismissFilterPortfolioLimitBroker{
   option (FluxMsgJsonQuery) = {
     QueryName: "get_dismiss_filter_portfolio_limit_brokers",
-    QueryParams: "security_id1",
-    QueryParamsDataType: "str",
-    QueryParams: "security_id2",
-    QueryParamsDataType: "str"
+    QueryParams: {
+      QueryParamName: "security_id1",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "security_id2",
+      QueryParamDataType: "str"
+    }
   };
   repeated Broker brokers = 1;
 }
@@ -392,15 +426,19 @@ message SampleModel{
   option (FluxMsgAggregateQueryVarName) = "sample_cum_aggregate_pipeline";
   option (FluxMsgJsonQuery) = {
       QueryName: "file_upload_from_sample_model",
-      QueryParams: "save_file_destination",
-      QueryParamsDataType: "str",
+      QueryParams: {
+        QueryParamName: "save_file_destination",
+        QueryParamDataType: "str"
+      }
       QueryType: HTTP_FILE
   };
   option (FluxMsgButtonQuery) = {
     query_data: {
       QueryName: "sample_http_button"
-      QueryParams: 'sample_param'
-      QueryParamsDataType: 'str'
+      QueryParams: {
+        QueryParamName: "sample_param",
+        QueryParamDataType: "str"
+      }
       QueryType: HTTP
     };
     ui_button: {
@@ -417,8 +455,10 @@ message SampleModel{
   option (FluxMsgButtonQuery) = {
     query_data: {
       QueryName: "sample_file_upload_button"
-      QueryParams: 'sample_param'
-      QueryParamsDataType: 'str'
+      QueryParams: {
+        QueryParamName: "sample_param",
+        QueryParamDataType: "str"
+      }
       QueryType: HTTP_FILE
     };
     ui_button: {
@@ -496,8 +536,10 @@ message SampleTSModel1{
 message SampleFileUpload{
   option (FluxMsgJsonQuery) = {
       QueryName: "sample_file_upload",
-      QueryParams: "save_file_destination",
-      QueryParamsDataType: "str",
+      QueryParams: {
+        QueryParamName: "save_file_destination",
+        QueryParamDataType: "str"
+      },
       QueryType: HTTP_FILE
   };
   required bool check_result = 1;

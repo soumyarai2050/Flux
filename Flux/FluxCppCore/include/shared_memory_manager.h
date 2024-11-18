@@ -36,10 +36,14 @@ public:
     m_shm_size_(sizeof(ShmStruct)) {
 
         // Open shared memory
-        m_shm_fd_ = shm_open(m_shm_name_.c_str(), O_CREAT | O_RDWR, SHM_PERMISSIONS);
+        m_shm_fd_ = shm_open(m_shm_name_.c_str(), O_RDWR, SHM_PERMISSIONS);
         if (m_shm_fd_ < 0) {
-            throw std::runtime_error(std::format("Error opening shared memory: {}, shared memory name: {}",
-                strerror(errno), m_shm_name_));
+            m_shm_already_exists_ = false;
+            m_shm_fd_ = shm_open(m_shm_name_.c_str(), O_CREAT | O_RDWR, SHM_PERMISSIONS);
+            if (m_shm_fd_ < 0) {
+                throw std::runtime_error(std::format("Error opening shared memory: {}, shared memory name: {}",
+                    strerror(errno), m_shm_name_));
+            }
         }
 
         // Set the size of shared memory
@@ -68,17 +72,16 @@ public:
                 strerror(errno), m_sem_name_));
         }
 
-        // Initialize mutex attributes
-        pthread_mutexattr_t mutex_attr;
-        pthread_mutexattr_init(&mutex_attr);
-        pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED);
-
-        // Initialize mutex
-        if (pthread_mutex_init(&m_shm_data_->mutex, &mutex_attr) != 0) {
-            munmap(m_shm_data_, m_shm_size_); // Cleanup on error
-            shm_unlink(m_shm_name_.c_str());
-            throw std::runtime_error(std::format("Error initializing mutex: {}, shm name: {}, sem name: {}",
-                strerror(errno), m_shm_name_, m_sem_name_));
+        if (m_shm_already_exists_) {
+            m_shm_data_->shm_update_signature = 0;
+            for (size_t i = 0; i < 5; ++i) {
+                sem_post(mp_sem_);
+                sleep(1);
+            }
+            initialize_mutex();
+        } else {
+            // Initialize mutex attributes
+            initialize_mutex();
         }
     }
 
@@ -133,6 +136,7 @@ protected:
     // control variable helps set shm_signature if found false during a shm write, reader will not read shm until sig is set
     bool m_shm_signature_set = false;
     const uint64_t k_shm_signature = 0xFAFAFAFAFAFAFAFA;
+    bool m_shm_already_exists_ = true;
     int m_shm_fd_; // File descriptor for shared memory
     void* ptr_;
     ShmStruct* m_shm_data_; // Pointer to shared memory data
@@ -155,5 +159,19 @@ protected:
     // Attempt to lock the mutex without blocking
     bool try_lock() {
         return pthread_mutex_trylock(&m_shm_data_->mutex) == 0; // Return true if lock was acquired
+    }
+
+    void initialize_mutex() {
+        pthread_mutexattr_t mutex_attr;
+        pthread_mutexattr_init(&mutex_attr);
+        pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED);
+
+        // Initialize mutex
+        if (pthread_mutex_init(&m_shm_data_->mutex, &mutex_attr) != 0) {
+            munmap(m_shm_data_, m_shm_size_); // Cleanup on error
+            shm_unlink(m_shm_name_.c_str());
+            throw std::runtime_error(std::format("Error initializing mutex: {}, shm name: {}, sem name: {}",
+                                                 strerror(errno), m_shm_name_, m_sem_name_));
+        }
     }
 };

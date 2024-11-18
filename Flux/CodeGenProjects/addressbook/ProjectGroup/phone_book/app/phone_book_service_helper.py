@@ -458,22 +458,23 @@ def create_start_cpp_md_shell_script(generation_start_file_path: str, config_fil
     script_file_name = os.path.basename(generation_start_file_path)
     env_file_name = f"env_{script_file_name}"
     env_file_path = f"{os.path.dirname(generation_start_file_path)}/{env_file_name}"
-    log_file_path = PurePath(generation_start_file_path).parent.parent / "log" / f"{script_file_name}.log"
+    log_dir_path = PurePath(generation_start_file_path).parent.parent / "log"
+    script_log_file_path = log_dir_path / f"{script_file_name}.log"
     with open(env_file_path, "w") as fl:
         fl.write("#!/bin/bash\n")
-        fl.write(f"LOG_FILE_PATH={log_file_path}\n")
-        fl.write("echo Log_file_path: ${LOG_FILE_PATH}\n")
-        fl.write("shopt -s expand_aliases >>${LOG_FILE_PATH} 2>&1\n")
+        fl.write(f"SCRIPT_LOG_FILE_PATH={script_log_file_path}\n")
+        fl.write("echo SCRIPT_LOG_FILE_PATH: ${SCRIPT_LOG_FILE_PATH}\n")
+        fl.write(f"export LOG_DIR_PATH={log_dir_path}\n")
+        fl.write('echo LOG_DIR_PATH: "${LOG_DIR_PATH}" >>${SCRIPT_LOG_FILE_PATH} 2>&1\n')
+        fl.write("shopt -s expand_aliases >>${SCRIPT_LOG_FILE_PATH} 2>&1\n")
         fl.write("source ${HOME}/.bashrc\n")
-        # create this as alias in your bashrc to cd into market data run.sh script dir
-        fl.write("cdm >>${LOG_FILE_PATH} 2>&1\n")
         fl.write("#export GDB_DEBUG=1  # uncomment if you want the process to start in GDB\n")
         fl.write(f'export INSTANCE_ID={instance_id}\n')
         executor_static_config_file_path = PurePath(__file__).parent.parent.parent / "street_book" / "data" / "config.yaml"
         fl.write(f'export CONFIG_FILE={executor_static_config_file_path}\n')
-        fl.write('echo CONFIG_FILE: "${CONFIG_FILE}"\n')
-        fl.write('echo GDB_DEBUG: "${GDB_DEBUG}" >>${LOG_FILE_PATH} 2>&1\n')
-        fl.write('echo triggering run from "${PWD}" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo CONFIG_FILE: "${CONFIG_FILE}" >>${SCRIPT_LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo GDB_DEBUG: "${GDB_DEBUG}" >>${SCRIPT_LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo triggering run from "${PWD}" >>${SCRIPT_LOG_FILE_PATH} 2>&1\n')
     os.chmod(env_file_path, stat.S_IRWXU)
 
     md_exec_file_path = PurePath(__file__).parent.parent.parent / "base_book" / "app" / "mobile_book_executable"
@@ -481,7 +482,7 @@ def create_start_cpp_md_shell_script(generation_start_file_path: str, config_fil
         fl.write("#!/bin/bash\n")
         fl.write(f"source {env_file_path}\n")
         fl.write('if [ -z "$GDB_DEBUG" ] ; then\n')
-        fl.write(f"        {md_exec_file_path} {config_file_path} "+" >>${LOG_FILE_PATH} 2>&1\n")
+        fl.write(f"        {md_exec_file_path} {config_file_path} "+" >>${SCRIPT_LOG_FILE_PATH} 2>&1\n")
         fl.write("else\n")
         fl.write(f"        {md_exec_file_path} {config_file_path}\n")
         fl.write("fi\n")

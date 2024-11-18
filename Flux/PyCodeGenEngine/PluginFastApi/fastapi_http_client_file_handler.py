@@ -357,23 +357,26 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         for aggregate_value in aggregate_value_list:
             query_name = aggregate_value[FastapiHttpClientFileHandler.query_name_key]
             query_params = aggregate_value[FastapiHttpClientFileHandler.query_params_key]
-            query_params_types = aggregate_value[FastapiHttpClientFileHandler.query_params_data_types_key]
             query_type_value = aggregate_value[FastapiHttpClientFileHandler.query_type_key]
             query_type = str(query_type_value).lower() if query_type_value is not None else None
             query_route_type_value = aggregate_value[FastapiHttpClientFileHandler.query_route_type_key]
             query_route_type = str(query_route_type_value) if query_route_type_value is not None else \
                 FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val
 
+            query_params_name_list = []
+            if query_params:
+                for query_param_name, param_type in query_params:
+                    query_params_name_list.append(query_param_name)
+
             params_str = ", ".join([f"{aggregate_param}: {aggregate_params_type}"
-                                    for aggregate_param, aggregate_params_type in zip(query_params,
-                                                                                      query_params_types)])
+                                    for aggregate_param, aggregate_params_type in query_params])
             message_name = message.proto.name
 
             if query_type is None or query_type == "http" or query_type == "both":
-                output_str += self._handle_client_http_query_output(message_name, query_name, query_params,
+                output_str += self._handle_client_http_query_output(message_name, query_name, query_params_name_list,
                                                                     params_str, query_route_type)
             elif query_type == "http_file":
-                output_str += self._handle_client_http_file_query_output(message_name, query_name, query_params, params_str)
+                output_str += self._handle_client_http_file_query_output(message_name, query_name, query_params_name_list, params_str)
             # else not required: ws handling is done by ws client plugin
         return output_str
 
@@ -385,19 +388,24 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         query_type_value = query_data.get(FastapiHttpClientFileHandler.flux_json_query_type_field)
         query_type = str(query_type_value).lower() if query_type_value is not None else None
         query_params = query_data.get(FastapiHttpClientFileHandler.flux_json_query_params_field)
-        query_params_types = query_data.get(FastapiHttpClientFileHandler.flux_json_query_params_data_type_field)
         query_route_type_value = query_data.get(FastapiHttpClientFileHandler.flux_json_query_route_type_field)
         query_route_type = str(query_route_type_value) if query_route_type_value is not None else \
             FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val
 
         params_str = ""
+        query_params_name_list = []
         if query_params:
+            query_param_name_n_param_type_list = []
+            for query_param in query_params:
+                query_param_name = query_param.get(BaseFastapiPlugin.flux_json_query_params_name_field)
+                query_param_type = query_param.get(BaseFastapiPlugin.flux_json_query_params_data_type_field)
+                query_param_name_n_param_type_list.append((query_param_name, query_param_type))
+                query_params_name_list.append(query_param_name)
             params_str = ", ".join([f"{aggregate_param}: {aggregate_params_type}"
-                                    for aggregate_param, aggregate_params_type in zip(query_params,
-                                                                                      query_params_types)])
+                                    for aggregate_param, aggregate_params_type in query_param_name_n_param_type_list])
 
         if query_type is None or query_type == "http" or query_type == "both":
-            output_str += self._handle_client_http_query_output(message_name, query_name, query_params,
+            output_str += self._handle_client_http_query_output(message_name, query_name, query_params_name_list,
                                                                 params_str, query_route_type)
         elif query_type == "http_file":
             file_upload_data = query_data_dict.get(
@@ -406,10 +414,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             if file_upload_data:
                 disallow_duplicate_file_upload = file_upload_data.get("disallow_duplicate_file_upload")
 
-            if query_params is None:
-                query_params = ["disallow_duplicate_file_upload"]
-            else:
-                query_params.append("disallow_duplicate_file_upload")
+            query_params_name_list.append("disallow_duplicate_file_upload")
 
             if params_str:
                 if disallow_duplicate_file_upload:
@@ -421,7 +426,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                     params_str = "disallow_duplicate_file_upload: bool = True"
                 else:
                     params_str = "disallow_duplicate_file_upload: bool = False"
-            output_str += self._handle_client_http_file_query_output(message_name, query_name, query_params, params_str)
+            output_str += self._handle_client_http_file_query_output(message_name, query_name, query_params_name_list, params_str)
         return output_str
 
     def _handle_client_projection_query_methods(self, message: protogen.Message):

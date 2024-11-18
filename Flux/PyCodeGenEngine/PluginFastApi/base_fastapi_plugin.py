@@ -39,7 +39,6 @@ class BaseFastapiPlugin(BaseProtoPlugin):
     query_name_key: ClassVar[str] = "query_name"
     query_aggregate_var_name_key: ClassVar[str] = "query_agg_var_name"
     query_params_key: ClassVar[str] = "query_params"
-    query_params_data_types_key: ClassVar[str] = "query_params_data_types"
     query_type_key: ClassVar[str] = "query_type"
     query_route_type_key: ClassVar[str] = "query_route_type"
     button_query_data_key: ClassVar[str] = "query_data"
@@ -182,28 +181,14 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                 option_dict.get(BaseFastapiPlugin.flux_json_query_type_field)
             agg_value_dict[BaseFastapiPlugin.query_route_type_key] = \
                 option_dict.get(BaseFastapiPlugin.flux_json_query_route_type_field)
+            agg_value_dict[BaseFastapiPlugin.query_params_key] = []
             if (query_params := option_dict.get(
                     BaseFastapiPlugin.flux_json_query_params_field)) is not None:
-                query_params_data_types = \
-                    option_dict.get(BaseFastapiPlugin.flux_json_query_params_data_type_field)
-                # if only one element exists in query_params then it is received as single object so making it list
-                # same for query_params_data_types
-                query_params = query_params if isinstance(query_params, list) else [query_params]
-                query_params_data_types = query_params_data_types \
-                    if isinstance(query_params_data_types, list) else [query_params_data_types]
-                if len(query_params) != len(query_params_data_types):
-                    err_str = f"{BaseFastapiPlugin.flux_msg_json_query} option should have equal numbers of" \
-                              f"{BaseFastapiPlugin.flux_json_query_params_field} and " \
-                              f"{BaseFastapiPlugin.flux_json_query_params_data_type_field}"
-                    logging.exception(err_str)
-                    raise Exception(err_str)
-                else:
-                    agg_value_dict[BaseFastapiPlugin.query_params_key] = query_params
-                    agg_value_dict[BaseFastapiPlugin.query_params_data_types_key] = query_params_data_types
-            else:
-                agg_value_dict[BaseFastapiPlugin.query_params_key] = []
-                agg_value_dict[BaseFastapiPlugin.query_params_data_types_key] = []
-
+                # time.sleep(10)
+                for query_param in query_params:
+                    query_param_name = query_param.get(BaseFastapiPlugin.flux_json_query_params_name_field)
+                    query_param_type = query_param.get(BaseFastapiPlugin.flux_json_query_params_data_type_field)
+                    agg_value_dict[BaseFastapiPlugin.query_params_key].append((query_param_name, query_param_type))
             list_of_agg_value_dict.append(agg_value_dict)
         return list_of_agg_value_dict
 

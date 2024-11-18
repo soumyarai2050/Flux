@@ -1,19 +1,15 @@
-import random
-import datetime
-
-import pendulum
 import pytest
-
 from selenium.webdriver.support import expected_conditions as EC  # noqa
 
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.Pydentic.basket_book_service_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
+    EmailBookServiceHttpClient)
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import \
+    fx_symbol_overview_obj
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.utility_test_functions import wait, \
-    get_web_project_url, create_pair_strat, override_default_limits
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
-    FxSymbolOverviewBaseModel, EmailBookServiceHttpClient)
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import fx_symbol_overview_obj
 
 
 @pytest.fixture()
@@ -24,7 +20,6 @@ def market_depth_basemodel_fixture() -> List[MarketDepthBaseModel]:
         for side, px, qty, dev in [("BID", 100, 90, -1), ("ASK", 110, 70, 1)]:
             for position in range(1, 6):
                 id_value = len(input_data) + 1  # Using the length of input_data as id
-
                 input_data.extend([
                     {
                         "id": id_value,
@@ -36,7 +31,11 @@ def market_depth_basemodel_fixture() -> List[MarketDepthBaseModel]:
                         "qty": random.randint(10, 1000),
                         "position": position,
                         "market_maker": "string",
-                        "is_smart_depth": False
+                        "is_smart_depth": False,
+                        "cumulative_notional": 2224.5,
+                        "cumulative_qty": 555,
+                        "cumulative_avg_px": 44.4
+
                     }
                 ])
 
@@ -54,8 +53,8 @@ def last_barter_basemodel_fixture() -> List[LastBarterBaseModel]:
         id += 1
         symbol_n_exch_id = SymbolNExchIdBaseModel(symbol=symbol, exch_id="Exch")
         market_barter_volume = MarketBarterVolumeBaseModel(id=str(id),
-            participation_period_last_barter_qty_sum=0,
-            applicable_period_seconds=0
+            participation_period_last_barter_qty_sum=33,
+            applicable_period_seconds=22
         )
 
         input_data.append(
@@ -396,7 +395,7 @@ def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, exp
 
 
 @pytest.fixture(scope="session")
-def schema_dict() -> Dict[str, any]:
+def schema_dict():
     schema_path: PurePath = project_dir_path / "web-ui" / "public" / "schema.json"
     with open(str(schema_path), "r") as f:
         schema_dict: Dict[str, any] = json.loads(f.read())
@@ -416,7 +415,7 @@ def driver_type(request):
 
 
 @pytest.fixture()
-def driver(driver_type, config_dict) -> WebDriver:
+def driver(driver_type, config_dict: Dict[str, any]) -> WebDriver:
     driver: WebDriver = get_driver(config_dict=config_dict, driver_type=driver_type)
     yield driver
     driver.quit()
@@ -431,7 +430,7 @@ def web_project(driver: WebDriver, pair_strat: Dict, expected_chore_limits_: Cho
                 chore_snapshot_basemodel_fixture: List[ChoreSnapshotBaseModel],
                 chore_journal_basemodel_fixture: List[ChoreJournalBaseModel],
                 symbol_side_snapshot_fixture: SymbolSideSnapshotBaseModel,
-                strat_limits_fixture: StratLimitsBaseModel):
+                strat_limits_fixture: StratLimitsBaseModel, expected_pair_strat: Dict[str, any], basket_chore):
 
     host: str = "127.0.0.1"
     port: int = 8020
@@ -453,13 +452,13 @@ def web_project(driver: WebDriver, pair_strat: Dict, expected_chore_limits_: Cho
 
 
     wait(driver, Delay.LONG.value).until(EC.presence_of_element_located((By.ID, "system_control")))
-    system_control_widget = driver.find_element(By.ID, "system_control")
-    scroll_into_view(driver=driver, element=system_control_widget)
-    click_button_with_name(system_control_widget, "Create")
+    widget = driver.find_element(By.ID, "system_control")
+    scroll_into_view(driver=driver, element=widget)
+    click_button_with_name(widget=widget, button_name="Create")
     wait(driver, Delay.LONG.value).until(EC.presence_of_element_located((By.NAME, "kill_switch")))
-    kill_switch_btn = system_control_widget.find_element(By.NAME, "kill_switch")
+    kill_switch_btn = widget.find_element(By.NAME, "kill_switch")
     assert kill_switch_btn.is_displayed(), "failed to load web project, kill switch button not found"
-    create_pair_strat(driver=driver, pair_strat=pair_strat)
+    create_pair_strat(driver=driver, pair_strat=pair_strat, expected_pair_strat=expected_pair_strat)
     create_tob_md_ld_fj_os_oj(driver=driver, top_of_book_fixture=top_of_book_fixture,
                               market_depth_basemodel_fixture=market_depth_basemodel_fixture,
                               last_barter_basemodel_fixture=last_barter_basemodel_fixture,
@@ -467,7 +466,6 @@ def web_project(driver: WebDriver, pair_strat: Dict, expected_chore_limits_: Cho
                               chore_snapshot_basemodel_fixture=chore_snapshot_basemodel_fixture,
                               chore_journal_basemodel_fixture=chore_journal_basemodel_fixture,
                               strat_limits_fixture=strat_limits_fixture)
-
 
 @pytest.fixture()
 def pair_strat() -> Dict[str, any]:
@@ -482,13 +480,26 @@ def pair_strat() -> Dict[str, any]:
             "strat_leg2": {
                 "sec": {
                     "sec_id": "EQT_Sec_1"
-                },
-                "side": "SELL"
+                }
             },
             "common_premium": 3
         }
     }
-    yield pair_strat
+    return pair_strat
+
+
+
+@pytest.fixture()
+def expected_pair_strat(pair_strat) -> Dict[str, any]:
+    pair_strat_params = pair_strat["pair_strat_params"]
+
+    expected_pair_strat= {
+        "pair_strat_params.strat_leg1.sec.sec_id": pair_strat_params["strat_leg1"]["sec"]["sec_id"],
+        "pair_strat_params.strat_leg1.side": pair_strat_params["strat_leg1"]["side"],
+        "pair_strat_params.strat_leg2.sec.sec_id": pair_strat_params["strat_leg2"]["sec"]["sec_id"],
+        "pair_strat_params.common_premium": pair_strat_params["common_premium"]
+    }
+    return expected_pair_strat
 
 
 @pytest.fixture()
@@ -562,141 +573,53 @@ def set_micro_seperator_and_clean(schema_dict: Dict[str, any]):
 
 @pytest.fixture
 def ui_layout_list_(schema_dict) -> UILayoutBaseModel:
-    # Initialize variables for x, y, w, h
-    x = 2
-    y = 3
-    w = 4
-    h = 5
+    # Create an instance of UILayoutBaseModel with required fields
+    ui_layout: UILayoutBaseModel = UILayoutBaseModel(
+        id=1,
+        profile_id="test",
+        theme=Theme.THEME_DARK,
+        widget_ui_data_elements=[]
+    )
 
-    # List to store widget data elements
-    widget_ui_data_elements = []
-
-    # Iterate over schema_dict and create WidgetUIDataElementBaseModel instances
     for widget_name, widget_schema in schema_dict.items():
-        x += 5
-        y += 3
-        w += 6
-        h += 2
-        if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element"]:
+        # Skip specific widget names
+        if widget_name in ["definitions", "autocomplete", "ui_layout", "basket_chore"]:
             continue
 
-        sort_chores=SortChoreBaseModel(
-            chore_by="chore",
-            sort_type="sort",
-        )
-        sort_chore_list = [sort_chores]
-        column_chores = ColumnChoreBaseModel(
-            column_name="222",
-            sequence=1
-        )
-        column_chores_list = [column_chores]
-        widget_ui_data = WidgetUIDataBaseModel(
-            view_layout=Layout.TABLE,
-            enable_override=["demo1", "demo2"],
-            disable_override=["demo3", "demo4"],
-            highlight_update=False,
-            edit_layout=UILayouts.UI_TABLE,
-            truncate_date_time=False,
-            bind_id_val="123",
-            column_chores=column_chores_list,
-            sort_chores=sort_chore_list,
-            join_by="join",
-            joined_at_center=False,
-            flip=False,
-            show_less=["showless1", "showless2"],
-            data_source_colors=["datasource1, datasource2"]
+        widget_ui_data_element = widget_schema.get("widget_ui_data_element")
 
-        )
-        widget_ui_data_list = [widget_ui_data]
-
-
-        filters = UIFilterBaseModel(
-            fld_name="fld",
-            fld_value="123",
-        )
-        filters_list = [filters]
-
-        series = ChartSeriesBaseModel(
-            id=None,
-            type=ChartType.CHART_TYPE_UNSPECIFIED,
-            y_min=22.3,
-            y_max=33.3,
-        )
-        chart_series_list = [series]
-        chart_data=ChartDataBaseModel(
-            id=None,
-            chart_name=widget_name,
-            time_series=False,
-            filters=filters_list,
-            partition_fld="partition_fld",
-            series=chart_series_list,
-        )
-        chart_data_list = [chart_data]
-
-        filters = UIFilterBaseModel(
-            fld_name="fld",
-            fld_value="123",
-        )
-        filters_list = [filters]
-
-        ui_query_params=UIQueryParamBaseModel(
-            query_param_field="query_param_field",
-            query_param_field_src="query_param_field_src",
-        )
-        ui_query_params_list = [ui_query_params]
-        override_default_crud = OverrideDefaultCRUDBaseModel(
-            ui_crud_type=UICRUDType.GET_,
-            query_name="query_name",
-            query_src_model_name="model",
-            ui_query_params=ui_query_params_list
-        )
-        override_default_crud_list = [override_default_crud]
-
-        sort_chore = SortChoreBaseModel(
-            chore_by="chore",
-            sort_type="sort_type"
-        )
-        sort_chore_list = [sort_chore]
-
-        join_sort = JoinSortBaseModel(
-            sort_chore=sort_chore_list,
-            placeholders=["placeholder1", "placeholder2"],
-        )
-        join_sort_list = List[join_sort]
-        widget_ui_data_elements.append(WidgetUIDataElementBaseModel(
+        # Create a new WidgetUIDataElementBaseModel instance
+        widget_ui_data_element = WidgetUIDataElementBaseModel(
             i=widget_name,
-            x=x,
-            y=y,
-            w=w,
-            h=h,
-            is_repeated=False,
-            alert_bubble_source="bubble",
-            alert_bubble_color="red",
-            disable_ws_on_edit=True,
-            bind_id_fld="bind_123",
-            dynamic_widget_title_fld="Dynamic Widget",
-            widget_ui_data=widget_ui_data_list,
-            chart_data=chart_data_list,
-            filters=filters_list,
-            depending_proto_file_name="proto_file",
-            depending_proto_model_name="proto_model",
-            depends_on_other_model_for_id=False,
-            depends_on_other_model_for_dynamic_url=False,
-            depends_on_model_name_for_port=False,
-            override_default_crud=override_default_crud_list,
-            is_model_alert_type=False,
-            join_sort=join_sort_list,
-            is_read_only=True,
-        ))
-
-        ui_layout_list_ = UILayoutBaseModel(
-            id=1,
-            profile_id="test",
-            widget_ui_data_elements=widget_ui_data_elements,
-            theme=Theme.THEME_DARK
+            x=widget_ui_data_element.get("x"), # Default to 0 if not found
+            y = widget_ui_data_element.get("y"),
+            w = widget_ui_data_element.get("w"),
+            h = widget_ui_data_element.get("h"),
+            is_repeated = widget_ui_data_element.get("is_repeated"),
+            alert_bubble_source=widget_ui_data_element.get("alert_bubble_source"),
+            alert_bubble_color=widget_ui_data_element.get("alert_bubble_color"),
+            disable_ws_on_edit=widget_ui_data_element.get("disable_ws_on_edit"),
+            bind_id_fld=widget_ui_data_element.get("bind_id_fld"),
+            dynamic_widget_title_fld=widget_ui_data_element.get("dynamic_widget_title_fld"),
+            widget_ui_data=widget_ui_data_element.get("widget_ui_data"),
+            chart_data=widget_ui_data_element.get("chart_data"),
+            filters=widget_ui_data_element.get("filters"),
+            depending_proto_file_name=widget_ui_data_element.get("depending_proto_file_name"),
+            depending_proto_model_name=widget_ui_data_element.get("depending_proto_model_name"),
+            depends_on_other_model_for_id=widget_ui_data_element.get("depends_on_other_model_for_id"),
+            depends_on_other_model_for_dynamic_url=widget_ui_data_element.get("depends_on_other_model_for_dynamic_url"),
+            depends_on_model_name_for_port=widget_ui_data_element.get("depends_on_model_name_for_port"),
+            override_default_crud=widget_ui_data_element.get("override_default_crud"),
+            is_model_alert_type=widget_ui_data_element.get("is_model_alert_type"),
+            join_sort=widget_ui_data_element.get("join_sort"),
+            is_read_only=widget_ui_data_element.get("is_read_only"),
         )
 
-    yield ui_layout_list_
+        # Append the widget data element to the layout
+        ui_layout.widget_ui_data_elements.append(widget_ui_data_element)
+
+    yield ui_layout
+
 
 
 @pytest.fixture
@@ -714,18 +637,47 @@ def set_disable_ws_on_edit_and_clean(schema_dict: Dict[str, any]):
 @pytest.fixture
 def expected_chart():
     # Directly yield the list of expected chart fields
-    yield ["dismiss", "severity", "alert_count", "alert_brief", "alert_meta", "last_update_analyzer_time"]
+    yield ["_id", "symbol", "exch_time", "arrival_time", "side", "px", "qty", "position",
+           "market_maker", "is_smart_depth", "cumulative_notional", "cumulative_qty", "cumulative_avg_px"]
+
 
 
 @pytest.fixture
 def ui_chart(expected_chart):
     ui_chart = {
-        "chart_name": "test",
-        "fld_name": expected_chart,  # Use the list of expected fields directly
-        "partition_fld": "alert_brief",
-        "fld_value": "123",
-        "type": ["bar", "line", "scatter"],
-        "x": expected_chart,  # Use expected_chart list for x-axis
-        "y": expected_chart,  # Use expected_chart list for y-axis
+        "chart_data":{
+            "chart_name": "test",
+        },
+        "filters":{
+            "fld_name": expected_chart,  # Use the list of expected fields directly
+            "partition_fld": ["symbol", "market_maker"],
+            "fld_value": ["123","4423"]
+        },
+        "series": {
+            "type": ["bar", "line", "scatter"],
+        },
+        "encode":{
+            "x": expected_chart,  # Use expected_chart list for x-axis
+            "y": expected_chart,  # Use expected_chart list for y-axis
+        }
     }
     yield ui_chart
+
+
+
+
+@pytest.fixture
+def basket_chore():
+    new_chore_list: List[NewChoreBaseModel] = []
+    for _ in range(5):
+        sec_id = f"CB_Sec_{random.randint(1, 10)}"
+        side = random.choice([Side.BUY, Side.SELL])
+        px = random.randint(90, 100)
+        qty = random.randint(80, 90)
+        security = SecurityOptional(sec_id=sec_id, sec_id_source=SecurityIdSource.TICKER)
+        new_chore_obj = NewChoreBaseModel(security=security, side=side, px=px, qty=qty)
+        new_chore_list.append(new_chore_obj)
+
+    yield BasketChoreBaseModel(id = 1, new_chores=new_chore_list)
+
+

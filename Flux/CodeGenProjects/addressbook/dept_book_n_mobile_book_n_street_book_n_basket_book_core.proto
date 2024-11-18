@@ -36,8 +36,10 @@ message SymbolOverview {
   option (FluxMsgJsonQuery) = {
     QueryName: "get_symbol_overview_from_symbol",
     AggregateVarName: "get_symbol_overview_from_symbol",
-    QueryParams: "symbol",
-    QueryParamsDataType: "str"
+    QueryParams: {
+        QueryParamName: "symbol",
+        QueryParamDataType: "str"
+      }
   };
   option (FluxMsgStringLength) = 128;
 

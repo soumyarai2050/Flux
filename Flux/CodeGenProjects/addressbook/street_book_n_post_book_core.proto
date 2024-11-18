@@ -56,13 +56,17 @@ message StratBrief {
   option (FluxMsgJsonQuery) = {
       QueryName: "get_strat_brief_from_symbol",
       AggregateVarName: "get_strat_brief_from_symbol",
-      QueryParams: "security_id",
-      QueryParamsDataType: "str"
+      QueryParams: {
+        QueryParamName: "security_id",
+        QueryParamDataType: "str"
+      }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "filtered_notify_strat_brief_update",
-      QueryParams: "side",
-      QueryParamsDataType: "Side"
+      QueryParams: {
+        QueryParamName: "side",
+        QueryParamDataType: "Side"
+      }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_strat_brief_from_cache"
@@ -89,8 +93,10 @@ message StratBrief {
 message OpenChoreCount{
   option (FluxMsgJsonQuery) = {
       QueryName: "get_open_chore_count"
-      QueryParams: "symbol",
-      QueryParamsDataType: "str"
+      QueryParams: {
+        QueryParamName: "symbol",
+        QueryParamDataType: "str"
+      }
   };
   required int32 open_chore_count = 1;
 }

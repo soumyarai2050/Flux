@@ -9,7 +9,7 @@ public:
     explicit MobileBookConsumer(Config& r_config) :
     mr_config_(r_config), m_mobile_book_publisher_(mr_config_) {}
 
-    void process_market_depth(const MarketDepthQueueElement &md) {
+    void process_market_depth(MarketDepthQueueElement &md) {
         m_mobile_book_publisher_.process_market_depth(md);
     }
 

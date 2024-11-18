@@ -67,7 +67,7 @@ public:
 	 * If the position is 0, it also creates a TopOfBook object and publishes it similarly.
 	 * Finally, if any of the publish policies are set to POST, it pushes the original queue element to a monitoring queue.
 	 */
-	void process_market_depth(const MarketDepthQueueElement& kr_market_depth);
+	void process_market_depth(MarketDepthQueueElement& kr_market_depth);
 
 	/*
 	 * This function processes the last barter data received from a queue element.
@@ -159,7 +159,7 @@ protected:
 	 * It checks if the symbol of the market depth element matches either of the configured leg symbols
 	 * and updates the corresponding shared memory cache. Finally, it writes the updated cache to shared memory.
 	 */
-	void update_shm_cache(const MarketDepthQueueElement& kr_market_depth_queue_element);
+	void update_shm_cache(MarketDepthQueueElement& kr_market_depth_queue_element);
 
 	/*
 	 * This function updates the shared memory cache with last barter and top of book information

@@ -517,7 +517,6 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
             for aggregate_value in aggregate_value_list:
                 query_name = aggregate_value[FastapiCallbackFileHandler.query_name_key]
                 query_params = aggregate_value[FastapiCallbackFileHandler.query_params_key]
-                query_params_data_types = aggregate_value[FastapiCallbackFileHandler.query_params_data_types_key]
                 query_type_value = aggregate_value[FastapiCallbackFileHandler.query_type_key]
                 query_type = str(query_type_value).lower() if query_type_value is not None else None
                 query_route_type_value = aggregate_value[FastapiCallbackFileHandler.query_route_type_key]
@@ -526,8 +525,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                 agg_params_with_type_str = None
                 if query_params:
                     agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
-                                                          for param, param_type in zip(query_params,
-                                                                                       query_params_data_types)])
+                                                          for param, param_type in query_params])
 
                 output_str += self._handle_callback_query_methods_output(
                     message, query_name, query_route_type, agg_params_with_type_str, query_type,
@@ -538,8 +536,6 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                 query_data = query_data_dict.get(FastapiCallbackFileHandler.button_query_data_key)
                 query_name = query_data.get(FastapiCallbackFileHandler.flux_json_query_name_field)
                 query_params = query_data.get(FastapiCallbackFileHandler.flux_json_query_params_field)
-                query_params_data_types = query_data.get(
-                    FastapiCallbackFileHandler.flux_json_query_params_data_type_field)
                 query_type_value = query_data.get(FastapiCallbackFileHandler.flux_json_query_type_field)
                 query_type = str(query_type_value).lower() if query_type_value is not None else None
                 query_route_type_value = query_data.get(FastapiCallbackFileHandler.flux_json_query_route_type_field)
@@ -547,9 +543,13 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
                 agg_params_with_type_str = None
                 if query_params:
+                    query_param_name_n_param_type_list = []
+                    for query_param in query_params:
+                        query_param_name = query_param.get(BaseFastapiPlugin.flux_json_query_params_name_field)
+                        query_param_type = query_param.get(BaseFastapiPlugin.flux_json_query_params_data_type_field)
+                        query_param_name_n_param_type_list.append((query_param_name, query_param_type))
                     agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
-                                                          for param, param_type in zip(query_params,
-                                                                                       query_params_data_types)])
+                                                          for param, param_type in query_param_name_n_param_type_list])
                 if query_type == "http_file":
                     file_upload_data = query_data_dict.get(
                         FastapiCallbackFileHandler.button_query_file_upload_options_key)

@@ -93,7 +93,7 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any], expected_pa
     set_dropdown_field(widget=widget, xpath=xpath, name=name, value=value)
 
     xpath = "pair_strat_params.strat_leg2"
-    show_nested_fld_in_tree_layout(widget=widget, fld_xpath=xpath)
+    show_nested_fld_in_tree_layout(widget=widget, driver=driver)
 
     # select strat_leg2.sec.sec_id
     xpath = "pair_strat_params.strat_leg2.sec.sec_id"
@@ -181,6 +181,26 @@ def get_tree_input_field_xpath(xpath: str, data_add: bool = False) -> str:
     if data_add:
         return f"//button[@data-add='{xpath}']"
     return f"//div[@data-xpath='{xpath}']"
+
+
+def get_xpath_with_attribute(tag_name: str, attribute_name: str, attribute_value: str) -> str:
+    """
+    Generates an XPath for a given tag name with a specified attribute and value.
+
+    Args:
+        tag_name (str): The HTML tag name (e.g., 'button', 'div', '*').
+        attribute (str): The attribute to match (e.g., 'aria-label', 'id', 'class').
+        attribute_value (str): The value of the attribute to match.
+
+    Returns:
+        str: The generated XPath string.
+    """
+    return f"//{tag_name}[@{attribute_name}='{attribute_value}']"
+
+
+# Example usage
+xpath = get_xpath_with_attribute("button", "aria-label", "More Options")
+print(xpath)  # Output: //button[@aria-label='More Options']
 
 
 def set_tree_input_field(driver, widget: WebElement, xpath: str, name: str, value: str="",
@@ -706,31 +726,29 @@ def switch_layout(widget: WebElement, layout: Layout) -> None:
 
 
 def activate_strat(widget: WebElement, driver: WebDriver) -> None:
-    tr_element = widget.find_element(By.CSS_SELECTOR,
-                                     ".MuiTableRow-root.AbbreviatedFilterWidget_row__8S-pB.css-4etz12-MuiTableRow-root")
+    css_selector = get_css_selector_with_partial_class_name("MuiTableContainer-root")
+    tr_element = widget.find_element(By.CSS_SELECTOR, css_selector)
 
-    activate_btn_element = tr_element.find_elements(By.TAG_NAME, "td")
-    activate_btn = activate_btn_element[4].find_element(By.TAG_NAME, "button")
+    activate_btn_elements = tr_element.find_elements(By.TAG_NAME, "td")
+    activate_btn = activate_btn_elements[5].find_element(By.TAG_NAME, "button")
 
     btn_caption = activate_btn.text
+    assert btn_caption in ["Activate", "ERROR", "Pause"], "Unknown button state."
 
-    # Check if the button text is ACTIVATE, ERROR, or PAUSED
-    assert btn_caption in ["ACTIVATE", "ERROR", "PAUSE"], "Unknown button state."
-
-    if btn_caption == "ACTIVATE":
+    if btn_caption == "Activate":
         activate_btn.click()
         time.sleep(Delay.SHORT.value)
         click_confirm_save(driver=driver)
 
         # Verify if the strat is in active state
-        tr_element = widget.find_element(By.CSS_SELECTOR,
-                                         ".MuiTableRow-root.AbbreviatedFilterWidget_row__8S-pB.css-4etz12-MuiTableRow-root")
+        css_selector = get_css_selector_with_partial_class_name("MuiTableContainer-root")
+        tr_element = widget.find_element(By.CSS_SELECTOR, css_selector)
 
         activate_btn_element = tr_element.find_elements(By.TAG_NAME, "td")
-        btn_caption = activate_btn_element[4].find_element(By.TAG_NAME, "button").text
-        assert btn_caption == "PAUSE", "Failed to activate strat."
+        btn_caption = activate_btn_element[5].find_element(By.TAG_NAME, "button").text
+        assert btn_caption == "Pause", "Failed to activate strat."
 
-    elif btn_caption in ["ERROR", "PAUSE"]:
+    elif btn_caption in ["ERROR", "Pause"]:
         print(f"Strat is in {btn_caption} state. Cannot activate.")
 
 
@@ -749,7 +767,8 @@ def get_dialog_element(driver: WebDriver) -> WebElement:
     return dialog_element
 
 
-def hide_n_show_inside_setting(driver: WebDriver, common_keys_fields: List[str], button_state: ButtonState):
+def hide_n_show_inside_setting(widget: WebElement, driver: WebDriver, common_keys_fields: List[str], button_state: ButtonState):
+    click_button_with_name(widget=widget, button_name="Settings")
     while True:
         # select a random key
         selected_fld: str = random.choice(common_keys_fields)
@@ -757,17 +776,17 @@ def hide_n_show_inside_setting(driver: WebDriver, common_keys_fields: List[str],
         try:
             hide_or_show_btn_element = settings_dropdown_widget.find_element(By.NAME, selected_fld)
         except NoSuchElementException:
-            logging.warning(f"Element with name '{selected_fld}' not found. Trying with 'security.{selected_fld}'.")
             selected_fld = f"security.{selected_fld}"
             try:
                 hide_or_show_btn_element = settings_dropdown_widget.find_element(By.NAME, selected_fld)
             except NoSuchElementException:
-                logging.error(f"Element with name '{selected_fld}' not found even after modifying the name.")
+                logging.error(f"Element with name '{selected_fld}' not found even after modifying the locator name.")
                 continue  # Skip this iteration and retry with a field
 
         btn_caption = hide_or_show_btn_element.text
         if btn_caption == button_state.value:
             hide_or_show_btn_element.click()
+            close_setting(driver)
         return selected_fld
 
 
@@ -783,7 +802,8 @@ def click_show_btn_inside_setting(driver: WebDriver, common_keys_fields: List[st
             break
 
 
-def show_hidden_fields_in_tree_layout(widget: WebElement, driver: WebDriver) -> None:
+def show_hidden_fields_in_tree_layout(widget: WebElement, driver: WebDriver, layout: Layout) -> None:
+    switch_layout(widget=widget, layout=layout)
     click_button_with_name(widget=widget, button_name="Show")
     list_element = driver.find_element(By.XPATH, "//ul[@role='listbox']")
     li_elements = list_element.find_elements(By.TAG_NAME, "li")
@@ -806,7 +826,7 @@ def is_table_cell_enabled_n_get_input_element(widget: WebElement, xpath: str) ->
         return [True, input_element]
     except Exception as e:
         print(f"With this xpath '{xpath}', the field is not enabled.{e}")
-        return False
+        return [False, None]
 
 
 def wait_until_input_field_value_is_not_blank(driver, locator):
@@ -852,7 +872,7 @@ def click_edit_btn(driver: WebDriver, widget: WebElement):
 
 
 def get_flux_fld_number_format(driver: WebDriver, widget: WebElement, xpath: str,
-                               layout: Layout, widget_name: str) -> str:
+                               layout: Layout, widget_name: str, widget_type: WidgetType) -> str:
     element: WebElement
     is_visible_without_click: bool = True
 
@@ -860,7 +880,7 @@ def get_flux_fld_number_format(driver: WebDriver, widget: WebElement, xpath: str
     if not is_showing:
         show_hidden_fields_for_layout(driver, widget, layout, widget_name)
     if layout == Layout.TABLE:
-        is_visible_without_click: bool = is_num_format_visible_without_click_in_table_layout(widget, xpath)
+        is_visible_without_click: bool = is_num_format_visible_without_click_in_table_layout(widget, xpath, widget_type=widget_type)
     if is_visible_without_click:
         element: WebElement = get_num_format_element_for_layout(widget=widget, xpath=xpath, layout=layout)
     else:
@@ -898,9 +918,12 @@ def get_only_num_format_frm_string(num_format: str) -> str:
         return num_format[-1]
 
 
-def is_num_format_visible_without_click_in_table_layout(widget: WebElement, xpath: str) -> bool:
+def is_num_format_visible_without_click_in_table_layout(widget: WebElement, xpath: str, widget_type: WidgetType) -> bool:
     try:
-        xpath_element: WebElement = get_table_layout_xpath_element(widget=widget, xpath=xpath)
+        if widget_type != WidgetType.REPEATED_INDEPENDENT:
+            xpath_element: WebElement = get_table_layout_xpath_element(widget=widget, xpath=xpath)
+        else:
+            xpath_element: WebElement = get_table_layout_xpath_element_based_on_index(widget=widget, xpath=xpath)
         num_format_element = xpath_element.find_element(By.TAG_NAME, "span")
         num_format = num_format_element.text
         if num_format:
@@ -917,6 +940,16 @@ def get_table_layout_xpath_element(widget: WebElement, xpath: str):
     return xpath_element
 
 
+def get_table_layout_xpath_element_based_on_index(widget: WebElement, xpath: str, index_no: str="0"):
+    xpath = get_table_layout_xpath_based_on_index(xpath=xpath, index_no=index_no)
+    xpath_element = widget.find_element(By.XPATH, xpath)
+    return xpath_element
+
+
+def get_table_layout_xpath_based_on_index(xpath: str, index_no: str):
+    return f"//td[@data-xpath='[{index_no}].{xpath}']"
+
+
 def is_num_format_field_showing(widget: WebElement, xpath: str, layout: Layout) -> bool:
     try:
         element: WebElement = get_num_format_element_for_layout(widget=widget, xpath=xpath, layout=layout)
@@ -929,9 +962,9 @@ def is_num_format_field_showing(widget: WebElement, xpath: str, layout: Layout) 
 
 def show_hidden_fields_for_layout(driver: WebDriver, widget: WebElement, layout: Layout, widget_name: str):
     if layout == Layout.TABLE:
-        show_hidden_fields_in_table_layout(driver, widget, widget_name)
+        show_hidden_fields_in_table_layout(driver, widget, widget_name, layout=layout)
     else:
-        show_hidden_fields_in_tree_layout(widget, driver)
+        show_hidden_fields_in_tree_layout(widget, driver, layout=layout)
 
 
 def get_num_format_element_for_layout(widget: WebElement, xpath: str, layout: Layout) -> WebElement:
@@ -990,7 +1023,8 @@ def get_table_setting_id_with_widget_name(widget_name: str):
     return widget_name + "_table_settings"
 
 
-def show_hidden_fields_in_table_layout(driver: WebDriver, widget: WebElement, widget_name: str):
+def show_hidden_fields_in_table_layout(driver: WebDriver, widget: WebElement, widget_name: str, layout: Layout):
+    switch_layout(widget, layout)
     click_show_all_btn_inside_setting(driver, widget, widget_name)
     close_setting(driver)
 
@@ -999,10 +1033,8 @@ def close_setting(driver: WebDriver):
     action = get_action_chain_instance(driver)
     try:
         action.send_keys(Keys.ESCAPE).perform()
-        # wait_until_tooltip_not_closed(driver, widget_name)
     except Exception as e:
         raise Exception(f"Unexpected error: {e}")
-
 
 
 def wait_until_tooltip_not_closed(driver, widget_name):
@@ -1608,8 +1640,13 @@ def get_placeholder_from_element(widget: WebElement, id: str) -> str:
     return input_element.get_attribute('placeholder')
 
 
-def flux_fld_sequence_number_in_widget(result: List[WidgetQuery], driver: WebDriver, widget_type: WidgetType):
-    for widget_query in result:
+def get_n_validate_flux_fld_sequence_number_in_widget(schema_dict, driver: WebDriver, widget_type: WidgetType):
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=widget_type,
+                                          flux_property=FluxPropertyType.FluxFldSequenceNumber)
+    assert result[0]
+
+
+    for widget_query in result[1]:
         driver.refresh()
         time.sleep(Delay.SHORT.value)
         i: int = 1
@@ -1642,44 +1679,35 @@ def flux_fld_sequence_number_in_widget(result: List[WidgetQuery], driver: WebDri
             if (field_sequence_value - previous_field_sequence_value) > 1:
                 sequence_number += ((field_sequence_value - previous_field_sequence_value) - 1)
             previous_field_sequence_value = field_sequence_value
-
             assert sequence_number == field_sequence_value
 
 
-def flux_fld_ui_place_holder_in_widget(result: List[WidgetQuery], driver: WebDriver):
-    for widget_query in result:
+def flux_fld_ui_place_holder_in_widget(schema_dict, driver: WebDriver, widget_type: WidgetType):
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=widget_type,
+                                          flux_property=FluxPropertyType.FluxFldUIPlaceholder)
+    print(result)
+    assert result[0]
+
+    for widget_query in result[1]:
         refresh_page_n_default_delay(driver)
         widget_name: str = widget_query.widget_name
         widget: WebElement = driver.find_element(By.ID, widget_name)
-
+        scroll_into_view(driver=driver, element=widget)
+        if widget_type != WidgetType.REPEATED_INDEPENDENT:
+            switch_layout(widget=widget, layout=Layout.TREE)
         if widget_name in ["basket_chore"]:
             continue
 
-        if widget_name == "strat_status":
-            scroll_into_view(driver=driver, element=widget)
-            click_button_with_name(widget=widget, button_name="Create")
-            switch_layout(widget=widget, layout=Layout.TREE)
-            # show_nested_fld_in_tree_layout(widget=widget)
-            # widget.find_element(By.XPATH, '//*[@id="strat_status"]/div/div/div/ul/div[27]/div[2]/button').click()
-            # widget.find_element(By.XPATH, '//*[@id="strat_status"]/div/div/div/ul/div[27]/div[2]').click()
-
-        elif widget_name == "pair_strat_params":
+        if widget_name == "pair_strat_params":
             click_button_with_name(driver.find_element(By.ID, "strat_collection"), button_name="Create")
-            scroll_into_view(driver=driver, element=widget)
-            switch_layout(widget=widget, layout=Layout.TREE)
-            show_nested_fld_in_tree_layout(widget=widget, fld_xpath="")
-            # widget.find_element(By.XPATH, '//*[@id="pair_strat_params"]/div/div/div/ul/ul/div[2]/div[2]/button').click()
-            # widget.find_element(By.XPATH, '//*[@id="pair_strat_params"]/div/div/div/ul/ul/div[2]/div[2]').click()
         else:
-            scroll_into_view(driver=driver, element=widget)
             click_button_with_name(widget=widget, button_name="Create")
-            switch_layout(widget=widget, layout=Layout.TREE)
+        show_nested_fld_in_tree_layout(widget=widget, driver=driver)
 
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
             placeholder: str = get_placeholder_from_element(widget=widget, id=field_name)
             default_placeholder: str = field_query.properties['ui_placeholder']
-
             assert default_placeholder == placeholder
 
 
@@ -1803,7 +1831,8 @@ def get_btn_caption_class_elements(widget: WebElement):
 
 
 def validate_unpressed_n_pressed_btn_txt(ui_unpressed_n_pressed_captions, schema_pressed_n_pressed_captions):
-    assert schema_pressed_n_pressed_captions == ui_unpressed_n_pressed_captions, f"Expected unpressed button text '{schema_pressed_n_pressed_captions}', but got '{ui_unpressed_n_pressed_captions}'"
+    assert schema_pressed_n_pressed_captions == ui_unpressed_n_pressed_captions, f"Expected unpressed btn txt '{schema_pressed_n_pressed_captions}', but got '{ui_unpressed_n_pressed_captions}'"
+
 
 
 def validate_hide_n_show_in_common_key(widget, hide_n_show_fld: str, button_state: ButtonState):
@@ -1812,10 +1841,17 @@ def validate_hide_n_show_in_common_key(widget, hide_n_show_fld: str, button_stat
     except NoSuchElementException:
         common_keys_fields: List[str] = get_table_headers(widget=widget)
 
+    if hide_n_show_fld == "sec_id":
+        for common_key_fld in common_keys_fields:
+            if common_key_fld == "sec_id":
+                fld_locator = common_key_fld.replace("sec_id", "security.sec_id")
+                common_keys_fields.append(fld_locator)
+                break
+
     if button_state == button_state.HIDE:
-        assert hide_n_show_fld not in common_keys_fields, f"{hide_n_show_fld} is showing inside pair strat common key but it must be hidden"
+        assert hide_n_show_fld not in common_keys_fields, f"{hide_n_show_fld} is showing inside common key but it must be hidden"
     else:
-        assert hide_n_show_fld in common_keys_fields, f"{hide_n_show_fld} is hidden inside pair strat common key but it must be show"
+        assert hide_n_show_fld in common_keys_fields, f"{hide_n_show_fld} is hidden inside common key but it must be show"
 
 
 def validate_val_max_fields_in_widget(driver: WebDriver, widget: WebElement, widget_name: str, input_type: InputType,
@@ -1945,24 +1981,21 @@ def is_val_min_n_default_fld_value_equal(widget, val_min: int, layout: Layout, x
         return val_min == int(default_field_value)
 
 
-def show_nested_fld_in_tree_layout(widget: WebElement, fld_xpath):
-    xpath = get_tree_input_field_xpath(fld_xpath)
-    header_fld = widget.find_element(By.XPATH, xpath)
-    options_btn = header_fld.find_element(By.TAG_NAME, "button")
-    options_btn.click()
-    # plus btn
-    data_add_xpath = get_tree_input_field_xpath(fld_xpath, data_add=True)
-    widget.find_element(By.XPATH, data_add_xpath).click()
-    # Find the header field by a partial class name match
-    # header_fld = widget.find_element(By.CSS_SELECTOR, "[class*='HeaderField_container']")
-    # header_fld_option = header_fld.find_element(By.CSS_SELECTOR, "[class*='HeaderField_option']")
-    # btn_element = header_fld_option.find_element(By.TAG_NAME, "button")
-    # btn_element.click()
-    #
-    # # Find the copy and plus element by partial class name match
-    # copy_n_plus_element = widget.find_element(By.CSS_SELECTOR, "[class*='HeaderField_menu']")
-    # plus_element = copy_n_plus_element.find_element(By.TAG_NAME, "button")
-    # plus_element.click()
+def show_nested_fld_in_tree_layout(driver: WebDriver, widget: WebElement):
+    xpath = get_xpath_with_attribute(tag_name="button", attribute_name="aria-label", attribute_value="More Options")
+    more_options = widget.find_elements(By.XPATH, xpath)
+    for i in range(len(more_options)):
+        # Re-locate 'more_options' to get the current element in the DOM
+        more_option = widget.find_elements(By.XPATH, xpath)[i]
+        more_option.click()
+        time.sleep(Delay.SHORT.value)
+        # plus btn
+        css_selector = get_css_selector_with_partial_class_name("HeaderField_menu")
+        css_element = widget.find_element(By.CSS_SELECTOR, css_selector)
+        options_btn = css_element.find_element(By.TAG_NAME, "button")
+        options_btn.click()
+        time.sleep(Delay.SHORT.value)
+        close_setting(driver)
 
 
 def get_css_selector_with_partial_class_name(partial_class_name: str) -> str:
@@ -2305,69 +2338,32 @@ def set_n_validate_val_min_input_fld(driver: WebDriver, flux_property: FluxPrope
             validate_flux_fld_val_min_in_widget(widget=widget, field_name=field_name)
 
 
-def get_server_populate_fld(driver: WebDriver, schema_dict, layout: Layout, widget_type: WidgetType):
+def get_n_validate_server_populate_fld(driver: WebDriver, schema_dict, layout: Layout, widget_type: WidgetType):
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict),
-                                          widget_type=WidgetType.INDEPENDENT,
+                                          widget_type=widget_type,
                                           flux_property=FluxPropertyType.FluxFldServerPopulate)
     assert result[0]
 
-    # table layout and tree
-    if widget_type == WidgetType.INDEPENDENT:
-        for widget_query in result[1]:
-            widget_name = widget_query.widget_name
-            widget = driver.find_element(By.ID, widget_name)
-            scroll_into_view(driver=driver, element=widget)
-            # SYSTEM CONTROL WIDGET IS ALREADY IN CREATE MODE SO EDIT BTN GeT invisible
-            if widget_name in ["system_control"]:
-                continue
-            if layout == Layout.TABLE:
-                show_hidden_fields_in_table_layout(driver, widget, widget_name)
+    for widget_query in result[1]:
+        widget_name = widget_query.widget_name
+        widget = driver.find_element(By.ID, widget_name)
+        scroll_into_view(driver=driver, element=widget)
+        # SYSTEM CONTROL WIDGET IS ALREADY IN CREATE MODE SO EDIT BTN GeT invisible,
+        # chore limits switch layout btn is not visible
+        if widget_name in ["system_control", "basket_chore", "chore_limits"]:
+            continue
+        show_hidden_fields_for_layout(widget=widget, driver=driver, layout=layout, widget_name=widget_name)
+        if layout == Layout.TABLE:
+            if widget_type != WidgetType.DEPENDENT:
                 click_button_with_name(widget=widget, button_name="Edit")
-            else:
-                switch_layout(widget=widget, layout=Layout.TREE)
-                show_hidden_fields_in_tree_layout(widget=widget, driver=driver)
+        for field_query in widget_query.fields:
+            field_name: str = field_query.field_name
+            xpath = get_xpath_from_field_name(schema_dict, widget_type=widget_type,
+                                              widget_name=widget_name,
+                                              field_name=field_name)
 
-            for field_query in widget_query.fields:
-                field_name: str = field_query.field_name
-                xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
-                                                  widget_name=widget_name,
-                                                  field_name=field_name)
-
-                validate_server_populate_fld(widget=widget, xpath=xpath, field_name=field_name,
-                                             layout=layout)
-
-    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
-                                          flux_property=FluxPropertyType.FluxFldServerPopulate)
-    print(result)
-    assert result[0]
-
-    # table layout and tree
-    # TODO: exch_id field is not present in common_key in pair strat params widget
-    if widget_type == WidgetType.DEPENDENT:
-        for widget_query in result[1]:
-            widget_name = widget_query.widget_name
-            widget = driver.find_element(By.ID, widget_name)
-            scroll_into_view(driver=driver, element=widget)
-            if layout == Layout.TABLE:
-                switch_layout(widget=widget, layout=Layout.TABLE)
-                click_button_with_name(widget=widget, button_name="Show")
-                if widget_name in ["pair_strat_params"]:
-                    click_button_with_name(driver.find_element(By.ID, "strat_collection"), button_name="Edit")
-                else:
-                    continue
-            else:
-                switch_layout(widget=widget, layout=Layout.TREE)
-                show_hidden_fields_in_tree_layout(widget=widget, driver=driver)
-            for field_query in widget_query.fields:
-                field_name: str = field_query.field_name
-                if field_name == "exch_id":
-                    continue
-                xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.DEPENDENT,
-                                                  widget_name=widget_name,
-                                                  field_name=field_name)
-
-                validate_server_populate_fld(widget=widget, xpath=xpath, field_name=field_name,
-                                             layout=layout)
+            validate_server_populate_fld(widget=widget, xpath=xpath, field_name=field_name,
+                                         layout=layout)
 
 
 def set_n_validate_input_value_for_comma_seperated(driver: WebDriver, schema_dict, layout: Layout):
@@ -2416,34 +2412,39 @@ def set_n_validate_input_value_for_comma_seperated(driver: WebDriver, schema_dic
 
 def get_n_validate_number_format_from_input_fld(schema_dict: Dict[str, any], widget_type: WidgetType, driver: WebDriver,
                                                 flux_property: FluxPropertyType, layout: Layout):
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=widget_type,
-                                          flux_property=flux_property)
-    assert result[0]
-    print(result)
+    try:
+        result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=widget_type,
+                                              flux_property=flux_property)
+        assert result[0]
+        print(result)
 
-    for widget_query in result[1]:
-        widget_name = widget_query.widget_name
-        # TODO: LAZY basket chore is not implemented yet for table layout and
-        if widget_name in [WidgetName.BasketChore.value, WidgetName.SymbolOverview.value, WidgetName.StratBrief.value,
-                           WidgetName.SymbolSideSnapShot.value]:
-            continue
-        widget: WebElement = driver.find_element(By.ID, widget_name)
-        scroll_into_widget_with_widget_name(widget=widget, driver=driver, widget_name=widget_name)
-        switch_layout(widget, layout)
-        if not widget_type == WidgetType.REPEATED_INDEPENDENT:
-            click_edit_btn(driver, widget)
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            if field_name == "max_accounts_nett_notional":
+        for widget_query in result[1]:
+            # chore limits widget has hidden layout btn
+            widget_name = widget_query.widget_name
+            if widget_name in [WidgetName.BasketChore.value, WidgetName.SymbolOverview.value,
+                               WidgetName.StratBrief.value,
+                               WidgetName.SymbolSideSnapShot.value, WidgetName.ChoreLimits.value]:
                 continue
-            number_format_frm_schema: str = field_query.properties.get(FluxPropertyType.FluxFldNumberFormat)
-            xpath = get_xpath_from_field_name(schema_dict, widget_type=widget_type, widget_name=widget_name,
-                                              field_name=field_name)
-            number_format: str = get_flux_fld_number_format(driver, widget, xpath, layout, widget_name)
-            assert number_format_frm_schema == number_format, f"expected {number_format_frm_schema} but got {number_format} for fld {field_name} inside {widget_name}:- widget"
-            # repetated independent fld does not have any save btn
+            widget: WebElement = driver.find_element(By.ID, widget_name)
+            scroll_into_widget_with_widget_name(widget=widget, driver=driver, widget_name=widget_name)
+            switch_layout(widget, layout)
             if not widget_type == WidgetType.REPEATED_INDEPENDENT:
-                click_save_with_widget_name(driver, widget, widget_name)
+                click_edit_btn(driver, widget)
+            for field_query in widget_query.fields:
+                field_name: str = field_query.field_name
+                if field_name == "accounts_nett_notional":
+                    continue
+                number_format_frm_schema: str = field_query.properties.get(FluxPropertyType.FluxFldNumberFormat)
+                xpath = get_xpath_from_field_name(schema_dict, widget_type=widget_type, widget_name=widget_name,
+                                                  field_name=field_name)
+                number_format: str = get_flux_fld_number_format(driver, widget, xpath, layout, widget_name, widget_type=widget_type)
+                assert number_format_frm_schema == number_format, f"expected {number_format_frm_schema} but got {number_format} for fld {field_name} inside {widget_name}:- widget"
+                # repetated independent fld does not have any save btn
+                if not widget_type == WidgetType.REPEATED_INDEPENDENT:
+                    click_save_with_widget_name(driver, widget, widget_name)
+
+    except Exception as e:
+        pass
 
 
 def reload_n_click_edit_btn_in_widget(widget: WebElement):
@@ -2542,7 +2543,7 @@ def get_n_validate_fld_fld_elaborate_title(schema_dict, driver: WebDriver, widge
         switch_layout(widget=widget, layout=Layout.TABLE)
         if widget_type == WidgetType.REPEATED_INDEPENDENT:
             click_button_with_name(widget=widget, button_name="Reload")
-        show_hidden_fields_in_table_layout(driver, widget, widget_name)
+        show_hidden_fields_in_table_layout(driver, widget, widget_name, layout=Layout.TABLE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
             # not showing in pair strat common keys(company)
@@ -2578,3 +2579,41 @@ def reload_widget_open_n_close_setting(driver: WebDriver, widget: WebElement, wi
     click_button_with_name(widget=widget, button_name="Reload")
     click_show_all_btn_inside_setting(driver, widget, widget_name)
     close_setting(driver)
+
+
+def get_n_validate_fld_btn(schema_dict, driver: WebDriver, widget_type: WidgetType):
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict),
+                                          widget_type=widget_type,
+                                          flux_property=FluxPropertyType.FluxFldButton)
+    print(result)
+    assert result[0]
+
+    # TABLE LAYOUT
+    for widget_query in result[1]:
+        ui_unpressed_n_pressed_captions = {}
+        schema_pressed_n_pressed_captions = {}
+        index_no = 0
+        widget_name = widget_query.widget_name
+        widget = driver.find_element(By.ID, widget_name)
+        scroll_into_view(driver=driver, element=widget)
+        for field_query in widget_query.fields:
+            unpressed_schema_caption: str = field_query.properties['button']['unpressed_caption']
+            pressed_schema_caption: str = field_query.properties['button']['pressed_caption']
+            if widget_name in ["system_control", "basket_chore", "portfolio_alert", "strat_alert"]:
+                continue
+            if widget_name == "strat_limits":
+                click_button_with_name(widget=widget, button_name="Edit")
+
+            unpressed_ui_txt = get_btn_caption(widget, index_no)
+            btn_td_elements = get_btn_caption_class_elements(widget)
+            btn_td_elements[index_no].click()
+            time.sleep(Delay.SHORT.value)
+            click_confirm_save(driver)
+            time.sleep(Delay.SHORT.value)
+            pressed_ui_txt = get_btn_caption(widget, index_no)
+
+            ui_unpressed_n_pressed_captions[unpressed_ui_txt] = pressed_ui_txt
+            schema_pressed_n_pressed_captions[unpressed_schema_caption] = pressed_schema_caption
+            index_no += 1
+
+        validate_unpressed_n_pressed_btn_txt(ui_unpressed_n_pressed_captions, schema_pressed_n_pressed_captions)

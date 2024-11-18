@@ -91,7 +91,8 @@ class BaseProtoPlugin(ABC):
     flux_json_query_name_field: ClassVar[str] = "QueryName"
     flux_json_query_aggregate_var_name_field: ClassVar[str] = "AggregateVarName"
     flux_json_query_params_field: ClassVar[str] = "QueryParams"
-    flux_json_query_params_data_type_field: ClassVar[str] = "QueryParamsDataType"
+    flux_json_query_params_name_field: ClassVar[str] = "QueryParamName"
+    flux_json_query_params_data_type_field: ClassVar[str] = "QueryParamDataType"
     flux_json_query_type_field: ClassVar[str] = "QueryType"
     flux_json_query_route_type_field: ClassVar[str] = "QueryRouteType"
     flux_json_query_route_get_type_field_val: ClassVar[str] = "GET"
@@ -742,7 +743,7 @@ class BaseProtoPlugin(ABC):
                 output_str = "import logging\n"
                 output_str += "import os\n\n"
                 output_str += 'if (model_type := os.getenv("ModelType")) is None or len(model_type) == 0:\n'
-                output_str += '    err_str = f"env var DBType must not be {model_type}"\n'
+                output_str += '    err_str = f"env var ModelType must not be {model_type}"\n'
                 output_str += '    logging.exception(err_str)\n'
                 output_str += '    raise Exception(err_str)\n'
                 output_str += 'else:\n'

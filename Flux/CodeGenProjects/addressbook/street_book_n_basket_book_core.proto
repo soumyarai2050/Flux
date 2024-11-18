@@ -92,24 +92,42 @@ message CancelChore{
 message BarterSimulatorProcessNewChore{
   option (FluxMsgJsonQuery) = {
     QueryName: "barter_simulator_place_new_chore",
-    QueryParams: "px",
-    QueryParamsDataType: "float",
-    QueryParams: "qty",
-    QueryParamsDataType: "int",
-    QueryParams: "side",
-    QueryParamsDataType: "Side",
-    QueryParams: "bartering_sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "system_sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "symbol_type",
-    QueryParamsDataType: "str",
-    QueryParams: "underlying_account",
-    QueryParamsDataType: "str",
-    QueryParams: "exchange",
-    QueryParamsDataType: "str | None = None",
-    QueryParams: "internal_ord_id",
-    QueryParamsDataType: "str | None = None"
+    QueryParams: {
+      QueryParamName: "px",
+      QueryParamDataType: "float"
+    },
+    QueryParams: {
+      QueryParamName: "qty",
+      QueryParamDataType: "int"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side"
+    },
+    QueryParams: {
+      QueryParamName: "bartering_sec_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "system_sec_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "symbol_type",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "underlying_account",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "exchange",
+      QueryParamDataType: "str | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "internal_ord_id",
+      QueryParamDataType: "str | None = None"
+    }
   };
   required bool resp = 1;
 }
@@ -141,10 +159,14 @@ message FillsJournal{
   option (FluxMsgJsonQuery) = {
       QueryName: "get_symbol_side_underlying_account_cumulative_fill_qty",
       AggregateVarName: "get_symbol_side_underlying_account_cumulative_fill_qty",
-      QueryParams: "symbol",
-      QueryParams: "side",
-      QueryParamsDataType: "str",
-      QueryParamsDataType: "str"
+      QueryParams: {
+        QueryParamName: "symbol",
+        QueryParamDataType: "str"
+      },
+      QueryParams: {
+        QueryParamName: "side",
+        QueryParamDataType: "str"
+      }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_fills_journal_from_cache"
@@ -185,10 +207,14 @@ message UnderlyingAccountNCumFillQty{
 message UnderlyingAccountCumFillQty{
   option (FluxMsgJsonQuery) = {
       QueryName: "get_underlying_account_cumulative_fill_qty",
-      QueryParams: "symbol",
-      QueryParams: "side",
-      QueryParamsDataType: "str",
-      QueryParamsDataType: "str"
+      QueryParams: {
+        QueryParamName: "symbol",
+        QueryParamDataType: "str"
+      },
+      QueryParams: {
+        QueryParamName: "side",
+        QueryParamDataType: "str"
+      }
   };
   repeated UnderlyingAccountNCumFillQty underlying_account_n_cumulative_fill_qty = 1;
 }
@@ -197,16 +223,26 @@ message UnderlyingAccountCumFillQty{
 message BarterSimulatorProcessCxlChore{
   option (FluxMsgJsonQuery) = {
     QueryName: "barter_simulator_place_cxl_chore",
-    QueryParams: "chore_id",
-    QueryParamsDataType: "str",
-    QueryParams: "side",
-    QueryParamsDataType: "Side | None = None",
-    QueryParams: "bartering_sec_id",
-    QueryParamsDataType: "str | None = None",
-    QueryParams: "system_sec_id",
-    QueryParamsDataType: "str | None = None",
-    QueryParams: "underlying_account",
-    QueryParamsDataType: "str | None = None"
+    QueryParams: {
+      QueryParamName: "chore_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "bartering_sec_id",
+      QueryParamDataType: "str | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "system_sec_id",
+      QueryParamDataType: "str | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "underlying_account",
+      QueryParamDataType: "str | None = None"
+    }
   };
   required bool resp = 1;
 }
@@ -214,18 +250,30 @@ message BarterSimulatorProcessCxlChore{
 message BarterSimulatorProcessChoreAck{
   option (FluxMsgJsonQuery) = {
     QueryName: "barter_simulator_process_chore_ack",
-    QueryParams: "chore_id",
-    QueryParamsDataType: "str",
-    QueryParams: "px",
-    QueryParamsDataType: "float",
-    QueryParams: "qty",
-    QueryParamsDataType: "int",
-    QueryParams: "side",
-    QueryParamsDataType: "Side",
-    QueryParams: "sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "underlying_account",
-    QueryParamsDataType: "str"
+    QueryParams: {
+      QueryParamName: "chore_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "px",
+      QueryParamDataType: "float"
+    },
+    QueryParams: {
+      QueryParamName: "qty",
+      QueryParamDataType: "int"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side"
+    },
+    QueryParams: {
+      QueryParamName: "sec_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "underlying_account",
+      QueryParamDataType: "str"
+    }
   };
   required bool resp = 1;
 }
@@ -233,20 +281,34 @@ message BarterSimulatorProcessChoreAck{
 message BarterSimulatorProcessFill{
   option (FluxMsgJsonQuery) = {
     QueryName: "barter_simulator_process_fill",
-    QueryParams: "chore_id",
-    QueryParamsDataType: "str",
-    QueryParams: "px",
-    QueryParamsDataType: "float",
-    QueryParams: "qty",
-    QueryParamsDataType: "int",
-    QueryParams: "side",
-    QueryParamsDataType: "Side",
-    QueryParams: "sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "underlying_account",
-    QueryParamsDataType: "str",
-    QueryParams: "use_exact_passed_qty",
-    QueryParamsDataType: "bool | None = None"
+    QueryParams: {
+      QueryParamName: "chore_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "px",
+      QueryParamDataType: "float"
+    },
+    QueryParams: {
+      QueryParamName: "qty",
+      QueryParamDataType: "int"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side"
+    },
+    QueryParams: {
+      QueryParamName: "sec_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "underlying_account",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "use_exact_passed_qty",
+      QueryParamDataType: "bool | None = None"
+    }
   };
   required bool resp = 1;
 }
@@ -254,20 +316,34 @@ message BarterSimulatorProcessFill{
 message BarterSimulatorProcessAmendReq{
   option (FluxMsgJsonQuery) = {
     QueryName: "barter_simulator_process_amend_req",
-    QueryParams: "chore_id",
-    QueryParamsDataType: "str",
-    QueryParams: "side",
-    QueryParamsDataType: "Side",
-    QueryParams: "sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "underlying_account",
-    QueryParamsDataType: "str",
-    QueryParams: "chore_event",
-    QueryParamsDataType: "ChoreEventType",
-    QueryParams: "px",
-    QueryParamsDataType: "float | None = None",
-    QueryParams: "qty",
-    QueryParamsDataType: "int | None = None",
+    QueryParams: {
+      QueryParamName: "chore_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side"
+    },
+    QueryParams: {
+      QueryParamName: "sec_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "underlying_account",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "chore_event",
+      QueryParamDataType: "ChoreEventType"
+    },
+    QueryParams: {
+      QueryParamName: "px",
+      QueryParamDataType: "float | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "qty",
+      QueryParamDataType: "int | None = None"
+    }
   };
   required bool resp = 1;
 }
@@ -275,14 +351,22 @@ message BarterSimulatorProcessAmendReq{
 message BarterSimulatorProcessAmendAck{
   option (FluxMsgJsonQuery) = {
     QueryName: "barter_simulator_process_amend_ack",
-    QueryParams: "chore_id",
-    QueryParamsDataType: "str",
-    QueryParams: "side",
-    QueryParamsDataType: "Side",
-    QueryParams: "sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "underlying_account",
-    QueryParamsDataType: "str"
+    QueryParams: {
+      QueryParamName: "chore_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side"
+    },
+    QueryParams: {
+      QueryParamName: "sec_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "underlying_account",
+      QueryParamDataType: "str"
+    }
   };
   required bool resp = 1;
 }
@@ -290,14 +374,22 @@ message BarterSimulatorProcessAmendAck{
 message BarterSimulatorProcessAmendREJ{
   option (FluxMsgJsonQuery) = {
     QueryName: "barter_simulator_process_amend_rej",
-    QueryParams: "chore_id",
-    QueryParamsDataType: "str",
-    QueryParams: "side",
-    QueryParamsDataType: "Side",
-    QueryParams: "sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "underlying_account",
-    QueryParamsDataType: "str"
+    QueryParams: {
+      QueryParamName: "chore_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side"
+    },
+    QueryParams: {
+      QueryParamName: "sec_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "underlying_account",
+      QueryParamDataType: "str"
+    }
   };
   required bool resp = 1;
 }
@@ -305,16 +397,26 @@ message BarterSimulatorProcessAmendREJ{
 message BarterSimulatorProcessLapse{
   option (FluxMsgJsonQuery) = {
     QueryName: "barter_simulator_process_lapse",
-    QueryParams: "chore_id",
-    QueryParamsDataType: "str",
-    QueryParams: "side",
-    QueryParamsDataType: "Side",
-    QueryParams: "sec_id",
-    QueryParamsDataType: "str",
-    QueryParams: "underlying_account",
-    QueryParamsDataType: "str",
-    QueryParams: "qty",
-    QueryParamsDataType: "int | None = None",
+    QueryParams: {
+      QueryParamName: "chore_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side"
+    },
+    QueryParams: {
+      QueryParamName: "sec_id",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "underlying_account",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "qty",
+      QueryParamDataType: "int | None = None"
+    }
   };
   required bool resp = 1;
 }

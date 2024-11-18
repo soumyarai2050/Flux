@@ -3837,22 +3837,23 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         return output_str
 
-    def _get_query_params_str_n_query_params_with_type_str(self, query_params_option_val: str,
-                                                           query_params_data_types_option_val: str):
+    def _get_query_params_str_n_query_params_with_type_str(self, query_params_name_n_param_type_tuple_list: List[Tuple[str, str]]):
         query_params_str = ""
         query_params_with_type_str = ""
-        if query_params_option_val:
+        if query_params_name_n_param_type_tuple_list:
             param_to_type_str_list = []
             list_type_params: List[Tuple[str, str]] = []
-            for param, param_type in zip(query_params_option_val, query_params_data_types_option_val):
+            params_name_list: List[str] = []
+            for param_name, param_type in query_params_name_n_param_type_tuple_list:
+                params_name_list.append(param_name)
                 if "List" not in param_type:
-                    param_to_type_str_list.append(f"{param}: {param_type}")
+                    param_to_type_str_list.append(f"{param_name}: {param_type}")
                 else:
-                    list_type_params.append((param, param_type))
-            for param, param_type in list_type_params:
-                param_to_type_str_list.append(f"{param}: {param_type} = Query()")
+                    list_type_params.append((param_name, param_type))
+            for param_name, param_type in list_type_params:
+                param_to_type_str_list.append(f"{param_name}: {param_type} = Query()")
             query_params_with_type_str = ", ".join(param_to_type_str_list)
-            query_params_str = ", ".join(query_params_option_val)
+            query_params_str = ", ".join(params_name_list)
         return query_params_str, query_params_with_type_str
 
     def _handle_query_methods(self, message: protogen.Message, model_type: ModelType = ModelType.Beanie) -> str:
@@ -3862,14 +3863,13 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         for aggregate_value in aggregate_value_list:
             query_name = aggregate_value[FastapiHttpRoutesFileHandler.query_name_key]
             query_params = aggregate_value[FastapiHttpRoutesFileHandler.query_params_key]
-            query_params_data_types = aggregate_value[FastapiHttpRoutesFileHandler.query_params_data_types_key]
             query_type_value = aggregate_value[FastapiHttpRoutesFileHandler.query_type_key]
             query_type = str(query_type_value).lower() if query_type_value is not None else None
             query_route_value = aggregate_value[FastapiHttpRoutesFileHandler.query_route_type_key]
             query_route_type = query_route_value if query_route_value is not None else None
 
             query_params_str, query_params_with_type_str = (
-                self._get_query_params_str_n_query_params_with_type_str(query_params, query_params_data_types))
+                self._get_query_params_str_n_query_params_with_type_str(query_params))
 
             if query_type is None or query_type == "http" or query_type == "both":
                 output_str += self._handle_http_query_str(message, query_name, query_params_str,
@@ -3976,10 +3976,15 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         query_type_value = query_data.get(FastapiHttpRoutesFileHandler.flux_json_query_type_field)
         query_type = str(query_type_value).lower() if query_type_value is not None else None
         query_params = query_data.get(FastapiHttpRoutesFileHandler.flux_json_query_params_field)
-        query_params_data_types = query_data.get(FastapiHttpRoutesFileHandler.flux_json_query_params_data_type_field)
 
+        query_param_name_n_param_type_list = []
+        if query_params:
+            for query_param in query_params:
+                query_param_name = query_param.get(FastapiHttpRoutesFileHandler.flux_json_query_params_name_field)
+                query_param_type = query_param.get(FastapiHttpRoutesFileHandler.flux_json_query_params_data_type_field)
+                query_param_name_n_param_type_list.append((query_param_name, query_param_type))
         query_params_str, query_params_with_type_str = (
-            self._get_query_params_str_n_query_params_with_type_str(query_params, query_params_data_types))
+            self._get_query_params_str_n_query_params_with_type_str(query_param_name_n_param_type_list))
 
         if query_type is None or query_type == "http" or query_type == "both":
             query_route_value = query_data.get(FastapiHttpRoutesFileHandler.flux_json_query_route_type_field)

@@ -120,8 +120,8 @@ class ColorType(StrEnum):
 
 
 class ButtonState(StrEnum):
-    HIDE = auto()
-    SHOW = auto()
+    HIDE = "Hide"
+    SHOW = "Show"
 
 
 class FieldType(StrEnum):

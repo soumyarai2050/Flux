@@ -54,21 +54,33 @@ message StratAlert {
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "create_or_update_strat_alert"
-      QueryParams: "strat_id"
-      QueryParamsDataType: "int"
-      QueryParams: "severity"
-      QueryParamsDataType: "str"
-      QueryParams: "alert_brief"
-      QueryParamsDataType: "str"
-      QueryParams: "alert_details"
-      QueryParamsDataType: "str | None = None"
+      QueryParams: {
+        QueryParamName: "strat_id",
+        QueryParamDataType: "int"
+      }
+      QueryParams: {
+        QueryParamName: "severity",
+        QueryParamDataType: "str"
+      }
+      QueryParams: {
+        QueryParamName: "alert_brief",
+        QueryParamDataType: "str"
+      }
+      QueryParams: {
+        QueryParamName: "alert_details",
+        QueryParamDataType: "str | None = None"
+      }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "filtered_strat_alert_by_strat_id",
-      QueryParams: "strat_id",
-      QueryParamsDataType: "int",
-      QueryParams: "limit_obj_count",
-      QueryParamsDataType: "int | None = None",
+      QueryParams: {
+        QueryParamName: "strat_id",
+        QueryParamDataType: "int"
+      }
+      QueryParams: {
+        QueryParamName: "limit_obj_count",
+        QueryParamDataType: "int | None = None"
+      }
       QueryType: BOTH
   };
   option (FluxMsgStringLength) = 128;
@@ -125,12 +137,18 @@ message PortfolioAlert {
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "create_or_update_portfolio_alert"
-      QueryParams: "severity"
-      QueryParamsDataType: "str"
-      QueryParams: "alert_brief"
-      QueryParamsDataType: "str"
-      QueryParams: "alert_details"
-      QueryParamsDataType: "str | None = None"
+      QueryParams: {
+        QueryParamName: "severity",
+        QueryParamDataType: "str"
+      }
+      QueryParams: {
+        QueryParamName: "alert_brief",
+        QueryParamDataType: "str"
+      }
+      QueryParams: {
+        QueryParamName: "alert_details",
+        QueryParamDataType: "str | None = None"
+      }
   };
   option (FluxMsgButtonQuery) = {
     query_data: {
@@ -212,29 +230,37 @@ message ExecutorEventJournal {
 
 message RemoveStratAlertsForStratId {
   option (FluxMsgJsonQuery) = {
-      QueryName: "remove_strat_alerts_for_strat_id"
-      QueryParams: "strat_id"
-      QueryParamsDataType: "int"
+    QueryName: "remove_strat_alerts_for_strat_id"
+    QueryParams: {
+      QueryParamName: "strat_id",
+      QueryParamDataType: "int"
+    }
   };
   optional bool temp = 1;
 }
 
 message LogBookRestartTail {
   option (FluxMsgJsonQuery) = {
-      QueryName: "log_book_restart_tail"
-      QueryParams: "log_file_name"
-      QueryParamsDataType: "str"
-      QueryParams: "start_timestamp"
-      QueryParamsDataType: "str"
+    QueryName: "log_book_restart_tail"
+    QueryParams: {
+      QueryParamName: "log_file_name",
+      QueryParamDataType: "str"
+    }
+    QueryParams: {
+      QueryParamName: "start_timestamp",
+      QueryParamDataType: "str"
+    }
   };
   optional bool temp = 1;
 }
 
 message LogBookForceKillTailExecutor {
   option (FluxMsgJsonQuery) = {
-      QueryName: "log_book_force_kill_tail_executor"
-      QueryParams: "log_file_path"
-      QueryParamsDataType: "str"
+    QueryName: "log_book_force_kill_tail_executor"
+    QueryParams: {
+      QueryParamName: "log_file_path",
+      QueryParamDataType: "str"
+    }
   };
   optional bool temp = 1;
 }
@@ -242,8 +268,10 @@ message LogBookForceKillTailExecutor {
 message LogBookRemoveFileFromCreatedCache {
     option (FluxMsgJsonQuery) = {
       QueryName: "log_book_remove_file_from_created_cache"
-      QueryParams: "log_file_path_list"
-      QueryParamsDataType: "List[str]"
+      QueryParams: {
+        QueryParamName: "log_file_path_list",
+        QueryParamDataType: "List[str]"
+      }
   };
   optional bool temp = 1;
 }
@@ -251,8 +279,10 @@ message LogBookRemoveFileFromCreatedCache {
 message HandlePortfolioAlertsFromTailExecutor {
     option (FluxMsgJsonQuery) = {
       QueryName: "handle_portfolio_alerts_from_tail_executor"
-      QueryParams: "portfolio_alert_data_list"
-      QueryParamsDataType: "List[Dict]"
+      QueryParams: {
+        QueryParamName: "portfolio_alert_data_list",
+        QueryParamDataType: "List[Dict]"
+      }
       QueryRouteType: PATCH
   };
   optional bool temp = 1;
@@ -261,8 +291,10 @@ message HandlePortfolioAlertsFromTailExecutor {
 message HandleStratAlertsFromTailExecutor {
     option (FluxMsgJsonQuery) = {
       QueryName: "handle_strat_alerts_from_tail_executor"
-      QueryParams: "strat_alert_data_list"
-      QueryParamsDataType: "List[Dict]"
+      QueryParams: {
+        QueryParamName: "strat_alert_data_list",
+        QueryParamDataType: "List[Dict]"
+      }
       QueryRouteType: PATCH
   };
   optional bool temp = 1;
@@ -271,19 +303,25 @@ message HandleStratAlertsFromTailExecutor {
 message PortfolioAlertFailLogger {
     option (FluxMsgJsonQuery) = {
       QueryName: "portfolio_alert_fail_logger"
-      QueryParams: "log_msg"
-      QueryParamsDataType: "str"
+      QueryParams: {
+        QueryParamName: "log_msg",
+        QueryParamDataType: "str"
+      }
   };
   optional bool temp = 1;
 }
 
 message DismissStratAlertByBriefStr {
   option (FluxMsgJsonQuery) = {
-      QueryName: "dismiss_strat_alert_by_brief_str"
-      QueryParams: "strat_id"
-      QueryParamsDataType: "int"
-      QueryParams: "brief_str"
-      QueryParamsDataType: "str"
+    QueryName: "dismiss_strat_alert_by_brief_str"
+    QueryParams: {
+      QueryParamName: "strat_id",
+      QueryParamDataType: "int"
+    },
+    QueryParams: {
+      QueryParamName: "brief_str",
+      QueryParamDataType: "str"
+    }
   };
   optional bool temp = 1;
 }
@@ -297,60 +335,78 @@ message ShutDownLogBook {
 
 message StratAlertIdToObjCache {
   option (FluxMsgJsonQuery) = {
-      QueryName: "verify_strat_alert_id_in_strat_alert_id_to_obj_cache_dict"
-      QueryParams: "strat_alert_id"
-      QueryParamsDataType: "int"
+    QueryName: "verify_strat_alert_id_in_strat_alert_id_to_obj_cache_dict"
+    QueryParams: {
+      QueryParamName: "strat_alert_id",
+      QueryParamDataType: "int"
+    }
   };
   optional bool is_id_present = 1;
 }
 
 message PortfolioAlertIdToObjCache {
   option (FluxMsgJsonQuery) = {
-      QueryName: "verify_portfolio_alert_id_in_get_portfolio_alert_id_to_obj_cache_dict"
-      QueryParams: "portfolio_alert_id"
-      QueryParamsDataType: "int"
+    QueryName: "verify_portfolio_alert_id_in_get_portfolio_alert_id_to_obj_cache_dict"
+    QueryParams: {
+      QueryParamName: "portfolio_alert_id",
+      QueryParamDataType: "int"
+    }
   };
   optional bool is_id_present = 1;
 }
 
 message StratAlertCacheDictByStratIdDict {
   option (FluxMsgJsonQuery) = {
-      QueryName: "verify_strat_alert_id_in_strat_alert_cache_dict_by_strat_id_dict"
-      QueryParams: "strat_id"
-      QueryParamsDataType: "int"
-      QueryParams: "strat_cache_key"
-      QueryParamsDataType: "str"
+    QueryName: "verify_strat_alert_id_in_strat_alert_cache_dict_by_strat_id_dict"
+    QueryParams: {
+      QueryParamName: "strat_id",
+      QueryParamDataType: "int"
+    },
+    QueryParams: {
+      QueryParamName: "strat_cache_key",
+      QueryParamDataType: "str"
+    }
   };
   optional bool is_key_present = 1;
 }
 
 message PortfolioAlertCacheDict {
   option (FluxMsgJsonQuery) = {
-      QueryName: "verify_portfolio_alerts_cache_dict"
-      QueryParams: "strat_cache_key"
-      QueryParamsDataType: "str"
+    QueryName: "verify_portfolio_alerts_cache_dict"
+    QueryParams: {
+      QueryParamName: "strat_cache_key",
+      QueryParamDataType: "str"
+    }
   };
   optional bool is_key_present = 1;
 }
 
 message StratIdInStratAlertCacheDictByStratIdDict {
   option (FluxMsgJsonQuery) = {
-      QueryName: "verify_strat_id_in_strat_alert_cache_dict_by_strat_id_dict"
-      QueryParams: "strat_id"
-      QueryParamsDataType: "int"
+    QueryName: "verify_strat_id_in_strat_alert_cache_dict_by_strat_id_dict"
+    QueryParams: {
+      QueryParamName: "strat_id",
+      QueryParamDataType: "int"
+    }
   };
   optional bool is_id_present = 1;
 }
 
 message StratStateUpdateMatcher {
   option (FluxMsgJsonQuery) = {
-      QueryName: "strat_state_update_matcher"
-      QueryParams: "strat_id"
-      QueryParamsDataType: "int"
-      QueryParams: "message"
-      QueryParamsDataType: "str"
-      QueryParams: "log_file_path"
-      QueryParamsDataType: "str"
+    QueryName: "strat_state_update_matcher"
+    QueryParams: {
+      QueryParamName: "strat_id",
+      QueryParamDataType: "int"
+    },
+    QueryParams: {
+      QueryParamName: "message",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "log_file_path",
+      QueryParamDataType: "str"
+    }
   };
   optional bool temp = 1;
 }

@@ -291,8 +291,6 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                 query_name = aggregate_value[FastapiCallbackOverrideFileHandler.query_name_key]
                 aggregate_var_name = aggregate_value[FastapiCallbackOverrideFileHandler.query_aggregate_var_name_key]
                 query_params = aggregate_value[FastapiCallbackOverrideFileHandler.query_params_key]
-                query_params_data_types = aggregate_value[
-                    FastapiCallbackOverrideFileHandler.query_params_data_types_key]
                 query_route_path = aggregate_value.get(FastapiCallbackOverrideFileHandler.query_route_type_key)
                 if query_route_path is None:
                     query_route_path = "GET"
@@ -300,12 +298,16 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                 routes_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
                 aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
 
+                query_params_name_list = []
+                if query_params:
+                    for query_param_name, _ in query_params:
+                        query_params_name_list.append(query_param_name)
+
                 if query_route_path == FastapiCallbackOverrideFileHandler.flux_json_query_route_get_type_field_val:
                     if query_params:
                         agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
-                                                              for param, param_type in zip(query_params,
-                                                                                           query_params_data_types)])
-                        agg_params_str = ", ".join(query_params)
+                                                              for param, param_type in query_params])
+                        agg_params_str = ", ".join(query_params_name_list)
 
                         output_str += f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
                                       f"Type[{msg_name}], {agg_params_with_type_str}):\n"

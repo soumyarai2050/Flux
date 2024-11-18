@@ -56,9 +56,11 @@ message RawPerformanceData{
 
 message RawPerformanceDataOfCallable{
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_raw_performance_data_of_callable",
-      QueryParams: "callable_name",
-      QueryParamsDataType: "str"
+    QueryName: "get_raw_performance_data_of_callable",
+    QueryParams: {
+        QueryParamName: "callable_name",
+        QueryParamDataType: "str"
+      }
   };
   repeated RawPerformanceData raw_performance_data = 1;
 }

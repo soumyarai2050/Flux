@@ -120,11 +120,15 @@ enum QueryRouteTypeEnum{
   POST = 2;
 }
 
+message QueryParamData{
+  required string QueryParamName = 3;  // param required for aggregation
+  required string QueryParamDataType = 4;  // python type-hint of param
+}
+
 message MessageJsonQuery{
   required string QueryName = 1;
   optional string AggregateVarName = 2; // name of variable from file to be used
-  repeated string QueryParams = 3;  // list of params required for aggregation
-  repeated string QueryParamsDataType = 4;  // list of data types of respective params in AggregateParams field
+  repeated QueryParamData QueryParams = 3;  // list of params required for aggregation
   optional QueryTypeEnum QueryType = 5 [default=HTTP];
   optional QueryRouteTypeEnum QueryRouteType = 6 [default=GET];
   optional bool RequireJsSliceChanges = 7 [default=false];

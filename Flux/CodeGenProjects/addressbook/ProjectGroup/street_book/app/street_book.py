@@ -770,6 +770,7 @@ class StreetBook(BaseBook):
                                          instance_id=str(pair_strat.id))
         os.chmod(generation_start_file_path, stat.S_IRWXU)
         subprocess.Popen([f"{generation_start_file_path}"])
+        time.sleep(3)
 
     def _mark_strat_state_as_error(self, pair_strat: PairStratBaseModel):
         alert_str: str = \
@@ -825,6 +826,10 @@ class StreetBook(BaseBook):
             logging.error(err_str_)
 
     def run(self):
+        db_name = os.environ["DB_NAME"]
+        md_shared_memory_name = f"/dev/shm/{db_name}_shm"
+        shared_memory_semaphore_name = f"{db_name}_sem"
+
         ret_val: int = -5000
         # Getting pre-requisites ready before strat active runs
         run_coro = StreetBook.underlying_handle_strat_activate_query_http()
@@ -896,14 +901,11 @@ class StreetBook(BaseBook):
                 return -6000
             self.check_n_pause_strat_before_run_if_portfolio_limit_breached()
 
-            db_name = os.environ["DB_NAME"]
-            md_shared_memory_name = f"/dev/shm/{db_name}_shm"
-            shared_memory_semaphore_name = f"/{db_name}_sem"
             shared_memory_found = False
             while 1:
                 if not shared_memory_found:
-                    shared_memory_found = SymbolCacheContainer.check_if_shared_memory_exists(md_shared_memory_name,
-                                                                                             shared_memory_semaphore_name)
+                    shared_memory_found = SymbolCacheContainer.check_if_shared_memory_exists(
+                        md_shared_memory_name, f"/{shared_memory_semaphore_name}")
                     if not shared_memory_found:
                         time.sleep(1)
                         continue
@@ -961,6 +963,43 @@ class StreetBook(BaseBook):
                 err_str_ = (f"exception occurred for pair_strat_key: {log_key} while deleting md scripts;;;"
                             f"exception: {e}")
                 logging.exception(err_str_)
+
+            # checking if shared_memory and semaphore are detached
+            # checking shm first
+            while True:
+                result = subprocess.run(
+                    ['ls', '-l', md_shared_memory_name],
+                    text=True,  # Capture text output
+                    stdout=subprocess.PIPE,  # Capture standard output
+                    stderr=subprocess.PIPE  # Capture standard error
+                )
+                if not result.stdout:
+                    # if no result found - shared memory is detached successfully
+                    logging.info(f"Shared Memory: {md_shared_memory_name}, detached successfully")
+                    break
+                else:
+                    time.sleep(0.1)
+                    logging.warning(f"Shared Memory: {md_shared_memory_name} still exists post stop script call - "
+                                    f"lopping till it is detached")
+
+            # checking semaphore
+            sem_loc_path = f"/dev/shm/sem.{shared_memory_semaphore_name}"
+            while True:
+                result = subprocess.run(
+                    ['ls', '-l', sem_loc_path],
+                    text=True,  # Capture text output
+                    stdout=subprocess.PIPE,  # Capture standard output
+                    stderr=subprocess.PIPE  # Capture standard error
+                )
+                if not result.stdout:
+                    # if no result found - shared memory is detached successfully
+                    logging.info(f"Posix semaphore: {sem_loc_path}, detached successfully")
+                    break
+                else:
+                    time.sleep(0.1)
+                    logging.warning(f"Posix semaphore: {sem_loc_path} still exists post stop script call - "
+                                    f"lopping till it is detached")
+
         logging.info(f"Executor returning from run")
         return ret_val
 

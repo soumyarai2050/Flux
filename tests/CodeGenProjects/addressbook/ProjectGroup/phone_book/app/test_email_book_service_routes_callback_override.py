@@ -6658,6 +6658,9 @@ def test_unload_reload_strat_from_collection(
          f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
     print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
+    time.sleep(5)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
@@ -6874,6 +6877,9 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
          f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
     print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
+    time.sleep(5)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
@@ -6965,7 +6971,8 @@ def _check_all_strat_pause_by_system_control_ui_button_update(
 
     # Simulating all strat pause - initiating all start pause using pause_all_strats field update in system_control
     if update_type.lower() == "patch":
-        system_control_obj = SystemControlBaseModel(id=1, kill_switch=False, pause_all_strats=True)
+        system_control_obj = SystemControlBaseModel(id=1, kill_switch=False, pause_all_strats=True, 
+                                                    load_buffer_strats=False, cxl_baskets=False)
         updated_system_control = email_book_service_native_web_client.patch_system_control_client(
             system_control_obj.to_json_dict(exclude_none=True))
         assert updated_system_control == system_control_obj, \

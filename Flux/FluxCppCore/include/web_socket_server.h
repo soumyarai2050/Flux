@@ -124,17 +124,14 @@ namespace FluxCppCore {
             }
         }
 
-        void start_connection(int32_t retry_count = 1) {
+        void start_connection() {
             try {
                 m_acceptor_ = std::make_unique<tcp::acceptor>(m_io_context_,
                     tcp::endpoint{asio::ip::make_address(km_host_), static_cast<port_type>(km_port_)});
             } catch (const boost::system::system_error& error) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to start server: {} in function: {}", error.what(), __func__);
                 LOG_INFO_IMPL(GetCppAppLogger(), "Retrying server initialization in function: {}", __func__);
-                if (retry_count != m_ws_retry_count_ or m_ws_retry_count_ > retry_count) {
-                    ++retry_count;
-                    start_connection(retry_count);
-                } // else not required: Retry logic: We only attempt retries up to m_ws_retry_count_. If it's '0', we perform a single attempt.
+                throw std::runtime_error(error.what());
             }
         }
 

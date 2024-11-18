@@ -1,11 +1,16 @@
 import os.path
 import subprocess
 import concurrent.futures
+import time
+
 import pytest
 import signal
 
 from FluxPythonUtils.scripts.utility_functions import get_pid_from_port
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
+
+
+frmt_date = datetime.datetime.now().strftime("%Y%m%d")
 
 
 def restart_phone_book():
@@ -943,3 +948,72 @@ def test_recover_kill_switch_when_bartering_server_has_disabled(
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
         # updating simulator's configs
         email_book_service_native_web_client.log_simulator_reload_config_query_client()
+
+
+@pytest.mark.recovery
+def test_cpp_app_recovery(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_,
+        symbol_overview_obj_list, last_barter_fixture_list, max_loop_count_per_side,
+        market_depth_basemodel_list, refresh_sec_update_fixture):
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    max_loop_count_per_side = 1
+
+    buy_symbol, sell_symbol, created_pair_strat, executor_web_client = (
+        place_sanity_chores(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+                            symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+                            max_loop_count_per_side, refresh_sec_update_fixture))
+
+    log_file_path = str(STRAT_EXECUTOR / "log" / f"street_book_{created_pair_strat.id}_logs_{frmt_date}.log")
+    test_log = "Log added by test_cpp_app_recovery: ignore it"
+    echo_cmd = f'echo "{test_log}" >> {log_file_path}'
+    os.system(echo_cmd)
+
+    # killing cpp app
+    result = subprocess.run(
+        f'ps -ef | grep "mobile_book_executable.*executor_{created_pair_strat.id}_simulate_config"',
+        text=True,  # Capture text output
+        stdout=subprocess.PIPE,  # Capture standard output
+        stderr=subprocess.PIPE,  # Capture standard error
+        shell=True  # Allow shell features like pipes
+    )
+    for res in result.stdout.split('\n'):
+        if "Flux/CodeGenProjects/AddressBook/ProjectGroup/base_book/app/mobile_book_executable" in res:
+            process_id = res.split("  ")[1]
+            os.kill(parse_to_int(process_id), signal.SIGKILL)
+            print(f"Killed cpp process - {process_id=}")
+            time.sleep(2)
+            break
+    else:
+        assert False, \
+            (f"Can't find cpp process with strat_id: {created_pair_strat.id} running, "
+             f"process check output: {result.stdout}")
+
+    scripts_dir = STRAT_EXECUTOR / "scripts"
+    # start file generator
+    start_sh_file_path = scripts_dir / f"start_ps_id_{created_pair_strat.id}_md.sh"
+    subprocess.Popen([f"{start_sh_file_path}"])
+
+    time.sleep(10)
+
+    expected_log_line = "Couldn't find matching shm signature, ignoring this internal run cycle"
+    count = 0
+    found_start = False
+    with open(log_file_path, 'r') as file:
+        for line in file:
+            # Check if we've reached the start line
+            if not found_start and test_log in line:
+                found_start = True
+                continue  # Move to the next line after finding the start line
+
+            # If start line has been found, count occurrences of the target line
+            if found_start and expected_log_line in line:
+                count += 1
+
+    # since cpp when restarts does semaphore release 5 times to notify python for restart
+    assert count >= 5, \
+        "Mismatched number of times log msg "
+
+    _check_place_chores_post_pair_strat_n_executor_recovery(
+        created_pair_strat, last_barter_fixture_list, refresh_sec_update_fixture, total_chore_count_for_each_side=2)

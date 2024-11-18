@@ -26,10 +26,14 @@ message SymbolSideSnapshot{
   option (FluxMsgJsonQuery) = {
       QueryName: "get_symbol_side_snapshot_from_symbol_side",
       AggregateVarName: "get_symbol_side_snapshot_from_symbol_side",
-      QueryParams: "security_id",
-      QueryParams: "side",
-      QueryParamsDataType: "str",
-      QueryParamsDataType: "str",
+      QueryParams: {
+        QueryParamName: "security_id",
+        QueryParamDataType: "str"
+      }
+      QueryParams: {
+        QueryParamName: "side",
+        QueryParamDataType: "str"
+      }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_symbol_side_snapshots_from_cache"
@@ -111,12 +115,18 @@ message StratStatus{
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "update_residuals",
-    QueryParams: "security_id",
-    QueryParamsDataType: "str",
-    QueryParams: "side",
-    QueryParamsDataType: "Side",
-    QueryParams: "residual_qty",
-    QueryParamsDataType: "int"
+    QueryParams: {
+      QueryParamName: "security_id",
+      QueryParamDataType: "str"
+    }
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "Side"
+    }
+    QueryParams: {
+      QueryParamName: "residual_qty",
+      QueryParamDataType: "int"
+    }
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "put_strat_to_snooze",
@@ -229,13 +239,19 @@ message StratLimits{
 
 message ExecutorCheckSnapshot{
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_executor_check_snapshot",
-      QueryParams: "symbol",
-      QueryParams: "side",
-      QueryParams: "last_n_sec",
-      QueryParamsDataType: "str",
-      QueryParamsDataType: "str",
-      QueryParamsDataType: "int"
+    QueryName: "get_executor_check_snapshot",
+    QueryParams: {
+      QueryParamName: "symbol",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "side",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "last_n_sec",
+      QueryParamDataType: "int"
+    }
   };
   optional int32 last_n_sec_barter_qty = 1;
   optional int32 last_n_sec_chore_qty = 2;
@@ -245,10 +261,14 @@ message LastNSecMarketBarterVol{
   option (FluxMsgJsonQuery) = {
     QueryName: "get_last_n_sec_total_barter_qty",
     AggregateVarName: "get_last_n_sec_total_barter_qty",
-    QueryParams: "symbol",
-    QueryParams: "last_n_sec",
-    QueryParamsDataType: "str",
-    QueryParamsDataType: "int"
+    QueryParams: {
+      QueryParamName: "symbol",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "last_n_sec",
+      QueryParamDataType: "int"
+    }
   };
   optional int64 last_n_sec_barter_vol = 1;
 }

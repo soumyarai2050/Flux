@@ -421,7 +421,6 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         for aggregate_value in aggregate_value_list:
             query_name = aggregate_value[FastapiWsRoutesFileHandler.query_name_key]
             query_params = aggregate_value[FastapiWsRoutesFileHandler.query_params_key]
-            query_params_data_types = aggregate_value[FastapiWsRoutesFileHandler.query_params_data_types_key]
             query_type_value = aggregate_value[FastapiWsRoutesFileHandler.query_type_key]
             query_type = str(query_type_value).lower() if query_type_value is not None else None
             query_route_value = aggregate_value[FastapiWsRoutesFileHandler.query_route_type_key]
@@ -433,7 +432,9 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if query_params:
                 param_to_type_str_list = []
                 list_type_params = []
-                for param, param_type in zip(query_params, query_params_data_types):
+                query_params_name_list = []
+                for param, param_type in query_params:
+                    query_params_name_list.append(param)
                     if "List" not in param_type:
                         param_to_type_str_list.append(f"{param}: {param_type}")
                     else:
@@ -441,8 +442,8 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 for param, param_type in list_type_params:
                     param_to_type_str_list.append(f"{param}: {param_type} = Query()")
                 query_params_with_type_str = ", ".join(param_to_type_str_list)
-                query_params_str = ", ".join(query_params)
-                query_args_str = ', '.join([f'"{param}": {param}' for param in query_params])
+                query_params_str = ", ".join(query_params_name_list)
+                query_args_str = ', '.join([f'"{param}": {param}' for param in query_params_name_list])
                 query_args_dict_str = "{" + f"{query_args_str}" + "}"
             if query_type == "ws" or query_type == "both":
                 output_str += self._handle_ws_query_str(message, query_name, query_params_str,

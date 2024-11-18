@@ -16,18 +16,28 @@ message PortfolioStatusUpdatesContainer {
 
 message CheckPortfolioLimits{
   option (FluxMsgJsonQuery) = {
-      QueryName: "check_portfolio_limits",
-      QueryParams: "strat_id",
-      QueryParamsDataType: "int"
-      QueryParams: "chore_journal",
-      QueryParamsDataType: "ChoreJournalBaseModel",
-      QueryParams: "chore_snapshot",
-      QueryParamsDataType: "ChoreSnapshotBaseModel",
-      QueryParams: "strat_brief",
-      QueryParamsDataType: "StratBriefBaseModel",
-      QueryParams: "portfolio_status_updates",
-      QueryParamsDataType: "PortfolioStatusUpdatesContainer"
-      QueryRouteType: PATCH
+    QueryName: "check_portfolio_limits",
+    QueryParams: {
+      QueryParamName: "strat_id",
+      QueryParamDataType: "int"
+    }
+    QueryParams: {
+      QueryParamName: "chore_journal",
+      QueryParamDataType: "ChoreJournalBaseModel"
+    }
+    QueryParams: {
+      QueryParamName: "chore_snapshot",
+      QueryParamDataType: "ChoreSnapshotBaseModel"
+    }
+    QueryParams: {
+      QueryParamName: "strat_brief",
+      QueryParamDataType: "StratBriefBaseModel"
+    }
+    QueryParams: {
+      QueryParamName: "portfolio_status_updates",
+      QueryParamDataType: "PortfolioStatusUpdatesContainer"
+    }
+    QueryRouteType: PATCH
   };
   required bool check_result = 1;
 }

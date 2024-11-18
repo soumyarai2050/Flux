@@ -38,8 +38,10 @@ message TopOfBook {
   option (FluxMsgJsonQuery) = {
     QueryName: "get_top_of_book_from_symbol",
     AggregateVarName: "get_top_of_book_from_symbol",
-    QueryParams: "symbol",
-    QueryParamsDataType: "str"
+    QueryParams: {
+        QueryParamName: "symbol",
+        QueryParamDataType: "str"
+      }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_tob_of_book_from_cache"
@@ -92,8 +94,10 @@ message MarketDepth {
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "get_market_depths",
-    QueryParams: "symbol_side_tuple_list",
-    QueryParamsDataType: "List[Tuple[str, TickType]]",
+    QueryParams: {
+        QueryParamName: "symbol_side_tuple_list",
+        QueryParamDataType: "List[Tuple[str, TickType]]"
+      }
     QueryRouteType: PATCH
   };
   option (FluxMsgStringLength) = 128;

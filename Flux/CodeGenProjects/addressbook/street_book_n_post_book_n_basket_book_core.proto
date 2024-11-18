@@ -68,10 +68,14 @@ message ChoreJournal {
   option (FluxMsgJsonQuery) = {
       QueryName: "get_last_n_sec_chores_by_events",
       AggregateVarName: "get_last_n_sec_chores_by_event",
-      QueryParams: "last_n_sec",
-      QueryParams: "chore_event_list",
-      QueryParamsDataType: "int",
-      QueryParamsDataType: "List[str]"
+      QueryParams: {
+        QueryParamName: "last_n_sec",
+        QueryParamDataType: "int"
+      }
+      QueryParams: {
+        QueryParamName: "chore_event_list",
+        QueryParamDataType: "List[str]"
+      }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_chore_journals_from_cache"

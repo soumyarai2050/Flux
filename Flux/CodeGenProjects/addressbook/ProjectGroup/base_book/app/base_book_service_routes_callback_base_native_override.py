@@ -1732,7 +1732,10 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
             get_objs_from_symbol(symbol))
 
     async def handle_delete_symbol_overview_pre(self, obj_id: int):
-        self.strat_cache.clear_symbol_overview(obj_id)
+        symbol_overview: SymbolOverview = \
+            await self.derived_class_type.underlying_read_symbol_overview_by_id_http(obj_id)
+        symbol_cache = SymbolCacheContainer.get_symbol_cache(symbol_overview.symbol)
+        symbol_cache.so = None
 
     #########################
     # Barter Simulator Queries

@@ -64,8 +64,10 @@ message StratView{
 message ProcessPairStratAPIOps{
     option (FluxMsgJsonQuery) = {
       QueryName: "process_strat_view_updates"
-      QueryParams: "kwargs"
-      QueryParamsDataType: "List[Dict]"
+      QueryParams: {
+        QueryParamName: "kwargs",
+        QueryParamDataType: "List[Dict]"
+      }
       QueryRouteType: PATCH
   };
   optional bool temp = 1;

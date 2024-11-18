@@ -2,7 +2,7 @@
 #include <string>
 
 #include "cpp_app_shared_resource.h"
-#include "base_web_server.h"
+#include "../include/base_web_server.h"
 #include "../include/config_parser.h"
 #include "mobile_book_consumer.h"
 
