@@ -29,7 +29,7 @@ namespace FluxCppCore {
         boost::asio::steady_timer timer_;
 
         void reset_timer() {
-            timer_.expires_after(std::chrono::seconds(60));
+            timer_.expires_after(std::chrono::seconds(mobile_book_handler::connection_timeout));
             timer_.async_wait([this](const boost::system::error_code& ec) {
                 if (!ec) {
                     stop_accepting_ = true;
@@ -88,7 +88,6 @@ namespace FluxCppCore {
 
         void run() {
             try {
-                // Initialize the timer with 60 seconds
                 reset_timer();
 
                 // Start accepting connections asynchronously
@@ -100,5 +99,10 @@ namespace FluxCppCore {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error: {}", e.what());
             }
         }
+
+        void cleanup() {
+            m_ioc_.stop();
+        }
+
     };
 }

@@ -765,6 +765,8 @@ class StreetBook(BaseBook):
             process = subprocess.Popen([f"{generation_stop_file_path}"])
             # wait for scripts to complete execution and delete existing stop and start scripts
             process.wait()
+            logging.debug("Called Stop script - found start script existing already")
+            time.sleep(1)
 
         create_start_cpp_md_shell_script(str(generation_start_file_path), str(config_file_path),
                                          instance_id=str(pair_strat.id))

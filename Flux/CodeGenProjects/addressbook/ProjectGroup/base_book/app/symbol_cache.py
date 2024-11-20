@@ -93,6 +93,7 @@ class SymbolCacheContainer:
     shared_memory = None
     shared_memory_semaphore = None
     EXPECTED_SHM_SIGNATURE: Final[hex] = 0xFAFAFAFAFAFAFAFA    # hard-coded: cpp puts same value
+    shm_signature_mismatch_counts:  int = 0
     symbol_to_symbol_cache_dict: Dict[str, SymbolCache] = {}
     semaphore = threading.Semaphore(0)
     print_shm_snapshot: bool | None = executor_config_yaml_dict.get('print_shm_snapshot')
@@ -145,11 +146,24 @@ class SymbolCacheContainer:
         if md_shared_memory_container.shm_update_signature != SymbolCacheContainer.EXPECTED_SHM_SIGNATURE:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
-            logging.warning("Couldn't find matching shm signature, ignoring this internal run cycle - sleeping for "
-                            f"{sleep_sec}(s) and retrying on next semaphore release, "
-                            f"{SymbolCacheContainer.EXPECTED_SHM_SIGNATURE=}, "
-                            f"found {md_shared_memory_container.shm_update_signature}")
+            SymbolCacheContainer.shm_signature_mismatch_counts += 1
+
             time.sleep(1)
+            log_str = ("Couldn't find matching shm signature, ignoring this internal run cycle - sleeping for "
+                       f"{sleep_sec}(s) and retrying on next semaphore release, "
+                       f"{SymbolCacheContainer.EXPECTED_SHM_SIGNATURE=}, "
+                       f"found {md_shared_memory_container.shm_update_signature}")
+            # logging is done based on num of mismatch counts - 1 time it happens in all cpp app start up since
+            # cpp sets empty shm without setting signature and then releases semaphore. Apart from it cpp app will
+            # also release semaphore when signature is not set 5 times when cpp app is recovered from crash to
+            # notify python so that it can get ready to use new shm. More than 1 + 5 = 6 times is not expected so
+            # kept in error state
+            if SymbolCacheContainer.shm_signature_mismatch_counts <= 4:
+                logging.info(log_str)
+            elif SymbolCacheContainer.shm_signature_mismatch_counts <= 6:
+                logging.warning(log_str)
+            else:
+                logging.error(log_str)
             return None
         # else not required: all good
 

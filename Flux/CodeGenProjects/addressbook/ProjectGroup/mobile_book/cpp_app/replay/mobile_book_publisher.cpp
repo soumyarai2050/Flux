@@ -179,8 +179,7 @@ void MobileBookPublisher::update_shm_cache(MarketDepthQueueElement& kr_market_de
 			m_shm_symbol_cache_.m_leg_1_data_shm_cache_);
 		if (kr_market_depth_queue_element.side_ == 'B') {
 			mobile_book_handler::compute_cumulative_fields_from_market_depth_elements(
-				m_shm_symbol_cache_.m_leg_1_data_shm_cache_.bid_market_depths_, 'B',
-				kr_market_depth_queue_element.symbol_);
+				m_shm_symbol_cache_.m_leg_1_data_shm_cache_, kr_market_depth_queue_element);
 			auto md = m_shm_symbol_cache_.m_leg_1_data_shm_cache_.bid_market_depths_[kr_market_depth_queue_element.position_];
 			kr_market_depth_queue_element.cumulative_notional_ = md.cumulative_notional_;
 			kr_market_depth_queue_element.is_cumulative_notional_set_ = md.is_cumulative_notional_set_;
@@ -190,8 +189,7 @@ void MobileBookPublisher::update_shm_cache(MarketDepthQueueElement& kr_market_de
 			kr_market_depth_queue_element.is_cumulative_avg_px_set_ = md.is_cumulative_avg_px_set_;
 		} else {
 			mobile_book_handler::compute_cumulative_fields_from_market_depth_elements(
-				m_shm_symbol_cache_.m_leg_1_data_shm_cache_.ask_market_depths_, 'A',
-				kr_market_depth_queue_element.symbol_);
+				m_shm_symbol_cache_.m_leg_1_data_shm_cache_, kr_market_depth_queue_element);
 			auto md = m_shm_symbol_cache_.m_leg_1_data_shm_cache_.ask_market_depths_[kr_market_depth_queue_element.position_];
 			kr_market_depth_queue_element.cumulative_notional_ = md.cumulative_notional_;
 			kr_market_depth_queue_element.is_cumulative_notional_set_ = md.is_cumulative_notional_set_;
@@ -208,8 +206,7 @@ void MobileBookPublisher::update_shm_cache(MarketDepthQueueElement& kr_market_de
 			m_shm_symbol_cache_.m_leg_2_data_shm_cache_);
 		if (kr_market_depth_queue_element.side_ == 'B') {
 			mobile_book_handler::compute_cumulative_fields_from_market_depth_elements(
-				m_shm_symbol_cache_.m_leg_2_data_shm_cache_.bid_market_depths_, 'B',
-				kr_market_depth_queue_element.symbol_);
+				m_shm_symbol_cache_.m_leg_2_data_shm_cache_, kr_market_depth_queue_element);
 			auto md = m_shm_symbol_cache_.m_leg_2_data_shm_cache_.bid_market_depths_[kr_market_depth_queue_element.position_];
 			kr_market_depth_queue_element.cumulative_notional_ = md.cumulative_notional_;
 			kr_market_depth_queue_element.is_cumulative_notional_set_ = md.is_cumulative_notional_set_;
@@ -219,8 +216,7 @@ void MobileBookPublisher::update_shm_cache(MarketDepthQueueElement& kr_market_de
 			kr_market_depth_queue_element.is_cumulative_avg_px_set_ = md.is_cumulative_avg_px_set_;
 		} else {
 			mobile_book_handler::compute_cumulative_fields_from_market_depth_elements(
-				m_shm_symbol_cache_.m_leg_2_data_shm_cache_.ask_market_depths_, 'A',
-				kr_market_depth_queue_element.symbol_);
+				m_shm_symbol_cache_.m_leg_2_data_shm_cache_, kr_market_depth_queue_element);
 			auto md = m_shm_symbol_cache_.m_leg_2_data_shm_cache_.ask_market_depths_[kr_market_depth_queue_element.position_];
 			kr_market_depth_queue_element.cumulative_notional_ = md.cumulative_notional_;
 			kr_market_depth_queue_element.is_cumulative_notional_set_ = md.is_cumulative_notional_set_;
@@ -332,7 +328,6 @@ void MobileBookPublisher::update_last_barter_cache(const LastBarterQueueElement&
 }
 
 void MobileBookPublisher::create_or_update_market_depth_db(mobile_book::MarketDepth &kr_market_depth) {
-	std::cout << kr_market_depth.DebugString() << std::endl;
 	std::string side;
 	if (kr_market_depth.side() == mobile_book::TickType::BID) {
 		side = "BID";
@@ -403,9 +398,9 @@ void MobileBookPublisher::last_barter_consumer_thread() {
 	LastBarterQueueElement lt;
 	mobile_book::LastBarter last_barter;
 	mobile_book::TopOfBook tob;
-	while(!shutdown_db_n_ws_thread.load())
+	while(!shutdown_flag_)
 	{
-		auto status = mon_lt.pop(lt);
+		auto status = mon_lt.pop(lt, std::chrono::milliseconds(100));
 		if (status == FluxCppCore::QueueStatus::DATA_CONSUMED)
 		{
 			if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::POST) {
@@ -467,8 +462,8 @@ void MobileBookPublisher::md_consumer_thread() {
 	MarketDepthQueueElement md;
 	mobile_book::MarketDepth market_depth;
 	mobile_book::TopOfBook top_of_book;
-	while(!shutdown_db_n_ws_thread.load()) {
-		auto status = mon_md.pop(md);
+	while(!shutdown_flag_) {
+		auto status = mon_md.pop(md, std::chrono::milliseconds(100));
 		if (status == FluxCppCore::QueueStatus::DATA_CONSUMED) {
 
 			if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::POST) {

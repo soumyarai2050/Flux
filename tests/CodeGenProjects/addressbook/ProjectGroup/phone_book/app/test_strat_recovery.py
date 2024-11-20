@@ -129,6 +129,10 @@ def _test_executor_crash_recovery(
         new_executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
             updated_pair_strat.host, updated_pair_strat.port)
         try:
+            time.sleep(10)
+            config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+            config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
@@ -311,6 +315,7 @@ def test_pair_strat_n_executor_crash_recovery(
             active_pair_strat_id = pair_strat.id
     recovered_active_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat_id)
     total_chore_count_for_each_side = 1
+    time.sleep(10)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_active_strat,
                                    deepcopy(last_barter_fixture_list), residual_wait_sec,
@@ -522,6 +527,7 @@ def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
         recovered_active_strat_list.append(recovered_active_strat)
 
     total_chore_count_for_each_side = 1
+    time.sleep(10)
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(recovered_active_strat_list)) as executor:
         results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_pair_strat,
                                    deepcopy(last_barter_fixture_list), residual_wait_sec,
@@ -538,6 +544,7 @@ def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
     # checking all cache computes
     check_all_cache(pair_strat_n_strat_state_tuple_list)
 
+    time.sleep(10)
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_n_strat_state_tuple_list)) as executor:
         results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_pair_strat,
                                    deepcopy(last_barter_fixture_list), residual_wait_sec,
@@ -967,24 +974,23 @@ def test_cpp_app_recovery(
 
     log_file_path = str(STRAT_EXECUTOR / "log" / f"street_book_{created_pair_strat.id}_logs_{frmt_date}.log")
     test_log = "Log added by test_cpp_app_recovery: ignore it"
+    # putting this log line in executor log to use it later in test as a point from which new cpp_app's
+    # released semaphore's log will get logged
     echo_cmd = f'echo "{test_log}" >> {log_file_path}'
     os.system(echo_cmd)
 
     # killing cpp app
     result = subprocess.run(
-        f'ps -ef | grep "mobile_book_executable.*executor_{created_pair_strat.id}_simulate_config"',
+        [f'pgrep', '-f', f'mobile_book_executable.*executor_{created_pair_strat.id}_simulate_config'],
         text=True,  # Capture text output
         stdout=subprocess.PIPE,  # Capture standard output
         stderr=subprocess.PIPE,  # Capture standard error
-        shell=True  # Allow shell features like pipes
     )
-    for res in result.stdout.split('\n'):
-        if "Flux/CodeGenProjects/AddressBook/ProjectGroup/base_book/app/mobile_book_executable" in res:
-            process_id = res.split("  ")[1]
-            os.kill(parse_to_int(process_id), signal.SIGKILL)
-            print(f"Killed cpp process - {process_id=}")
-            time.sleep(2)
-            break
+    if result.stdout:
+        process_id = parse_to_int(result.stdout.strip())
+        os.kill(parse_to_int(process_id), signal.SIGKILL)
+        print(f"Killed cpp process - {process_id=}")
+        time.sleep(2)
     else:
         assert False, \
             (f"Can't find cpp process with strat_id: {created_pair_strat.id} running, "
@@ -997,6 +1003,7 @@ def test_cpp_app_recovery(
 
     time.sleep(10)
 
+    # counting all 'Couldn't find matching shm signature' logs after log which we added in this test for reference
     expected_log_line = "Couldn't find matching shm signature, ignoring this internal run cycle"
     count = 0
     found_start = False
@@ -1011,9 +1018,10 @@ def test_cpp_app_recovery(
             if found_start and expected_log_line in line:
                 count += 1
 
-    # since cpp when restarts does semaphore release 5 times to notify python for restart
-    assert count >= 5, \
-        "Mismatched number of times log msg "
+    # since cpp when restarts does semaphore release 5 times to notify python for restart +
+    # once when cpp app sets shm with empty data
+    assert count == 6, \
+        f"Mismatched number of times log msg must exists, expected 6, found {count}"
 
     _check_place_chores_post_pair_strat_n_executor_recovery(
         created_pair_strat, last_barter_fixture_list, refresh_sec_update_fixture, total_chore_count_for_each_side=2)

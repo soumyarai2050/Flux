@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     }
     std::string config_file = argv[1];
     Config config(config_file); // Use std::string directly
-    auto mobile_book_consumer = std::make_unique<MobileBookConsumer>(config);
+    mobile_book_consumer = std::make_unique<MobileBookConsumer>(config);
     FluxCppCore::BaseWebServer http_server(host, config.m_http_server_port_, *mobile_book_consumer);
     std::thread http_server_thread{&FluxCppCore::BaseWebServer::run, &http_server};
     mobile_book_consumer->go();
@@ -25,6 +25,7 @@ int main(int argc, char *argv[]) {
      while (!shutdown_db_n_ws_thread.load()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));  // Prevent busy-waiting
     }
+    http_server.cleanup();
     http_server_thread.join();
     return 0; // Return success code
 }

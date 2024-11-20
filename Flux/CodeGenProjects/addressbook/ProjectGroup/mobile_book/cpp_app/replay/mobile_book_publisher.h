@@ -14,7 +14,6 @@
 #include "mobile_book_web_socket_server.h"
 #include "queue_handler.h"
 #include "mobile_book_service_shared_data_structure.h"
-#include "cpp_app_shared_resource.h"
 #include "../include/shm_symbol_cache.h"
 
 
@@ -49,13 +48,15 @@ public:
 		m_symbols_manager_.write_to_shared_memory(m_shm_symbol_cache_);
 	}
 
-	virtual ~MobileBookPublisher() {
+	void cleanup() {
 		shutdown_flag_ = true;
-		m_symbols_manager_.~SharedMemoryManager();
-		if (md_thread_.joinable() && lt_thread_.joinable()) {
-			md_thread_.join();
-			lt_thread_.join();
-		}
+		m_symbols_manager_.clean_shm();
+		// m_symbols_manager_.~SharedMemoryManager();
+		md_thread_.join();
+		lt_thread_.join();
+		m_top_of_book_web_socket_server_.value().clean_ws();
+		m_market_depth_web_socket_server_.value().clean_ws();
+		m_last_barter_web_socket_server_.value().clean_ws();
 	};
 
 	// virtual void go() = 0;

@@ -66,7 +66,6 @@ namespace FluxCppCore {
             } else {
                 auto err = std::format("Failed Decoding {};;; error: {};;; json: {}",
                           RootModelType::GetDescriptor()->name(), status.message(), kr_json);
-                std::cout << err << std::endl;
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Failed Decoding {};;; error: {};;; json: {}",
                           RootModelType::GetDescriptor()->name(), status.message(), kr_json);
                 return false;

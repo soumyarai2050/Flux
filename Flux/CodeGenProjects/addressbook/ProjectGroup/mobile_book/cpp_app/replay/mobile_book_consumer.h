@@ -17,6 +17,10 @@ public:
         m_mobile_book_publisher_.process_last_barter(e);
     }
 
+	void cleanup() {
+	    m_mobile_book_publisher_.cleanup();
+    }
+
 	void process_market_depth(std::string &md_str) {
 
     	mobile_book::MarketDepth market_depth;

@@ -45,9 +45,13 @@ namespace FluxCppCore {
         }
 
         virtual ~WebSocketServer(){
-            m_ws_run_thread_.join();
-            m_shutdown_ = true;
             ws_vector_.clear();
+        }
+
+        void clean_ws() {
+            m_shutdown_ = true;
+            m_io_context_.stop();
+            m_ws_run_thread_.join();
         }
 
         bool publish(const std::string &kr_send_string, const int32_t k_new_client_ws_id  = -1)
@@ -130,8 +134,9 @@ namespace FluxCppCore {
                     tcp::endpoint{asio::ip::make_address(km_host_), static_cast<port_type>(km_port_)});
             } catch (const boost::system::system_error& error) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to start server: {} in function: {}", error.what(), __func__);
-                LOG_INFO_IMPL(GetCppAppLogger(), "Retrying server initialization in function: {}", __func__);
-                throw std::runtime_error(error.what());
+                std::string kill_command = "kill -9 $(lsof -t -i :" + std::to_string(km_port_) + ")";
+                system(kill_command.c_str());
+                start_connection();
             }
         }
 

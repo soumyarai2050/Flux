@@ -71,9 +71,7 @@ struct Config
             throw std::runtime_error("LOG_DIR_PATH env is not set");
         }
         m_log_directory_ = getenv("LOG_DIR_PATH");
-        std::cout << "log_directory: " << m_log_directory_ << std::endl;
         m_binary_log_path_ = m_log_directory_ + "/bin_" + m_db_name_ + ".bin";
-        m_raw_log_path_ = m_log_directory_ + "/raw_" + m_db_name_ + ".log";
 
         m_top_of_book_ws_port_ = get_value_of.template operator()<int32_t>("top_of_book_ws_port",
             false).value_or(0);

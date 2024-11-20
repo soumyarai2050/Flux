@@ -177,7 +177,7 @@ class Quote(Structure):
             if not hasattr(self, "_last_update_date_time"):
                 self._last_update_date_time = DTShadowFields()
 
-            if self.last_update_date_time_ != self._last_update_date_time:
+            if self.last_update_date_time_ != self._last_update_date_time.original_val:
                 self._last_update_date_time.original_val = self.last_update_date_time_
             return self._last_update_date_time.manufactured_val
         return None
@@ -256,7 +256,7 @@ class TopOfBook(Structure):
             if not hasattr(self, "_tob_last_update_date_time"):
                 self._tob_last_update_date_time = DTShadowFields()
 
-            if self.last_update_date_time_ != self._tob_last_update_date_time:
+            if self.last_update_date_time_ != self._tob_last_update_date_time.original_val:
                 self._tob_last_update_date_time.original_val = self.last_update_date_time_
             return self._tob_last_update_date_time.manufactured_val
         return None
@@ -302,39 +302,21 @@ class MarketDepth(Structure):
 
     @property
     def exch_time(self):
-        if self.side == TickType.BID:
-            if not hasattr(self, "_bid_market_depth_list"):
-                self._bid_market_depth_list = [(
-                                                   DTShadowFields(),
-                                                   DTShadowFields()) * 10]
-            cached_exch_time: DTShadowFields = self._bid_market_depth_list[self.position][0]
-        else:
-            if not hasattr(self, "_ask_market_depth_list"):
-                self._ask_market_depth_list = [(
-                                                   DTShadowFields(),
-                                                   DTShadowFields()) * 10]
-            cached_exch_time: DTShadowFields = self._ask_market_depth_list[self.position][0]
-        if cached_exch_time.original_val != self.exch_time_:
-            cached_exch_time.original_val = self.exch_time_
-        return cached_exch_time.manufactured_val
+        if not hasattr(self, "_exch_time"):
+            self._exch_time = DTShadowFields()
+
+        if self.exch_time_ != self._exch_time.original_val:
+            self._exch_time.original_val = self.exch_time_
+        return self._exch_time.manufactured_val
 
     @property
     def arrival_time(self):
-        if self.side == TickType.BID:
-            if not hasattr(self, "_bid_market_depth_list"):
-                self._bid_market_depth_list = [(
-                                                   DTShadowFields(),
-                                                   DTShadowFields()) * 10]
-            cached_arrival_time: DTShadowFields = self._bid_market_depth_list[self.position][1]
-        else:
-            if not hasattr(self, "_ask_market_depth_list"):
-                self._ask_market_depth_list = [(
-                                                   DTShadowFields(),
-                                                   DTShadowFields()) * 10]
-            cached_arrival_time: DTShadowFields = self._ask_market_depth_list[self.position][1]
-        if cached_arrival_time.original_val != self.exch_time_:
-            cached_arrival_time.original_val = self.exch_time_
-        return cached_arrival_time.manufactured_val
+        if not hasattr(self, "_arrival_time"):
+            self._arrival_time = DTShadowFields()
+
+        if self.arrival_time_ != self._arrival_time.original_val:
+            self._arrival_time.original_val = self.exch_time_
+        return self._arrival_time.manufactured_val
 
 
     @property

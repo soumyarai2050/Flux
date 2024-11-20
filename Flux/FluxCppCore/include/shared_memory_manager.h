@@ -85,8 +85,7 @@ public:
         }
     }
 
-    // Destructor to clean up resources
-    ~SharedMemoryManager() {
+    void clean_shm() {
         pthread_mutex_destroy(&m_shm_data_->mutex); // Destroy mutex
         munmap(m_shm_data_, m_shm_size_); // Unmap shared memory
         sem_close(mp_sem_); // Close semaphore

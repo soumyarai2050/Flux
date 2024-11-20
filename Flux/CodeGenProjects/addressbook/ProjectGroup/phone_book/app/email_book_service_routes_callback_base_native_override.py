@@ -456,7 +456,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         subprocess.Popen([f"{run_fx_symbol_overview_file_path}"])
 
     async def async_recover_existing_executors(self) -> None:
-        loaded_pair_strats: List[PairStrat] = \
+        existing_pair_strats: List[PairStrat] = \
             await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http()
         strat_collection_list: List[Dict] =  \
             await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_collection_http_json_dict()
@@ -472,11 +472,14 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         loaded_pair_strat_id_list.append(get_id_from_strat_key(loaded_strat_key))
 
                 crashed_strats: List[PairStrat] = []
-                for pair_strat in loaded_pair_strats:
+                for pair_strat in existing_pair_strats:
                     if pair_strat.id in loaded_pair_strat_id_list:
                         if pair_strat.port is not None:
-                            street_book_http_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
-                                pair_strat.host, pair_strat.port)
+                            # setting cache for executor client
+                            self._update_port_to_executor_http_client_dict_from_updated_pair_strat(pair_strat.host,
+                                                                                                   pair_strat.port)
+
+                            street_book_http_client = self.port_to_executor_http_client_dict.get(pair_strat.port)
                             try:
                                 # Checking if get-request works
                                 street_book_http_client.get_all_ui_layout_client()
@@ -964,8 +967,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         return check_passed
 
     def _update_port_to_executor_http_client_dict_from_updated_pair_strat(self, host: str, port: int):
-        if (port is not None and
-                port not in self.port_to_executor_http_client_dict):
+        if port is not None and port not in self.port_to_executor_http_client_dict:
             self.port_to_executor_http_client_dict[port] = (
                 StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, port))
 

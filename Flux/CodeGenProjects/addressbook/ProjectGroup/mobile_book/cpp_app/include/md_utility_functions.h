@@ -30,14 +30,16 @@ namespace mobile_book_handler {
         std::format_to(std::back_inserter(buffer), "{:6}  {:10.3f}  {:6}  {:10.3f}  {:6}  {:10.3f}\n\n",
             top_bid_qty, top_bid_px, top_ask_qty, top_ask_px, last_barter_qty, last_barter_px);
 
-        constexpr auto md_format_spec = "{:6}  {:10.3f}       {:10.3f}        {:6}      {:10.3f}          "
-                                     "{:6}  {:10.3f}       {:10.3f}        {:6}      {:10.3f}\n";
+        constexpr auto md_format_spec = "{:10.3f}\t\t\t\t{:6}\t\t\t\t{:10.3f}\t\t\t{:6}\t   {:10.3f}\t{:10.3f}  {:6}"
+                                        "       {:10.3f}\t\t\t\t\t{:6}\t\t\t\t\t{:10.3f}\n";
 
+        // BUY CUM QTY , BUY CUM px , BUY QTY, BUY PX, SELL PX, SELL QTY, SELL CUM PX, SELL CUM QTY
         std::format_to(std::back_inserter(buffer), "{:*^40}\n", "Market Depth");
-        std::format_to(std::back_inserter(buffer), "BID QTY  BID PRICE  CUMULATIVE NOTIONAL  CUMULATIVE QTY  "
-                                                   "CUMULATIVE AVG PX  ASK QTY  ASK PRICE  CUMULATIVE NOTIONAL  "
-                                                   "CUMULATIVE QTY  CUMULATIVE AVG PX\n\n");
-        for (size_t i{0}; i < MARKET_DEPTH_LEVEL; ++i) {
+        std::format_to(std::back_inserter(buffer), "BUY CUMULATIVE NOTIONAL  BUY CUMULATIVE QTY"
+                                                   "  BUY CUMULATIVE AVG PX  BUY QTY    BUY PX\t\tSELL PX  SELL QTY  "
+                                                   "SELL CUMULATIVE NOTIONAL  SELL CUMULATIVE QTY   "
+                                                   "SELL CUMULATIVE AVG PX\n\n");
+       for (size_t i{0}; i < MARKET_DEPTH_LEVEL; ++i) {
             const auto& bid = cache.bid_market_depths_[i];
             const auto& ask = cache.ask_market_depths_[i];
             auto bid_qty = bid.qty_ ;
@@ -47,8 +49,8 @@ namespace mobile_book_handler {
             auto ask_px = ask.px_;
 
             std::format_to(std::back_inserter(buffer), md_format_spec,
-                bid_qty, bid_px, bid.cumulative_notional_, bid.cumulative_qty_,
-                bid.cumulative_avg_px_, ask_qty, ask_px, ask.cumulative_notional_, ask.cumulative_qty_, ask.cumulative_avg_px_);
+                bid.cumulative_notional_, bid.cumulative_qty_, bid.cumulative_avg_px_, bid_qty, bid_px,
+                ask_px, ask_qty, ask.cumulative_notional_, ask.cumulative_qty_, ask.cumulative_avg_px_);
         }
 
     }
@@ -113,4 +115,59 @@ namespace mobile_book_handler {
 
         std::copy(filtered_elements.begin(), filtered_elements.begin() + filtered_count, elements.begin());
     }
+
+    inline void compute_cumulative_fields_from_market_depth_elements(MDContainer& r_container, MarketDepthQueueElement& r_element) {
+        // Select the relevant market depth array based on the side
+        std::array<MarketDepthQueueElement, MARKET_DEPTH_LEVEL>& md_array =
+            (r_element.side_ == 'B') ? r_container.bid_market_depths_ : r_container.ask_market_depths_;
+
+        auto position = r_element.position_;
+
+        md_array[position] = r_element;
+
+        // Initialize cumulative fields
+        double cumulative_notional = 0.0;
+        int64_t cumulative_qty = 0;
+
+        // If there are preceding elements, use their cumulative values as the starting point
+        if (position > 0) {
+            const auto& prev_elem = md_array[position - 1];
+            if (prev_elem.is_cumulative_notional_set_ && prev_elem.is_cumulative_qty_set_) {
+                cumulative_notional = prev_elem.cumulative_notional_;
+                cumulative_qty = prev_elem.cumulative_qty_;
+            }
+        }
+
+        // Update cumulative fields starting from the current position
+        for (size_t i = position; i < md_array.size(); ++i) {
+            auto& elem = md_array[i];
+
+            if (elem.is_px_set_ && elem.is_qty_set_) {
+                double notional = elem.px_ * elem.qty_;
+                cumulative_notional += notional;
+                cumulative_qty += elem.qty_;
+
+                elem.cumulative_notional_ = cumulative_notional;
+                elem.is_cumulative_notional_set_ = true;
+
+                elem.cumulative_qty_ = cumulative_qty;
+                elem.is_cumulative_qty_set_ = true;
+
+                elem.cumulative_avg_px_ = cumulative_qty > 0
+                                               ? cumulative_notional / cumulative_qty
+                                               : 0.0;
+                elem.is_cumulative_avg_px_set_ = true;
+            } else {
+                if (r_element.side_ == 'B') {
+                    r_container.bid_market_depths_ = md_array;
+                } else {
+                    r_container.ask_market_depths_ = md_array;
+                }
+                return;
+            }
+        }
+
+    }
+
+
 }
