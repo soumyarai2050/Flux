@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import _ from 'lodash';
 import { API_PUBLIC_URL, Modes, SCHEMA_AUTOCOMPLETE_XPATH, SCHEMA_DEFINITIONS_XPATH } from '../constants';
-import { createCollections, getParentSchema } from '../utils';
+import { createCollections, getParentSchema, FileOptions } from '../utils';
 
 const initialState = {
     schema: {},
@@ -30,6 +30,12 @@ const schemaSlice = createSlice({
             state.loading = false;
             Object.keys(state.schema).forEach(schemaName => {
                 if ([SCHEMA_AUTOCOMPLETE_XPATH].includes(schemaName)) return;
+                if ('file_options' === schemaName) {
+                    for (const option in state.schema[schemaName]) {
+                        FileOptions[option] = state.schema[schemaName][option];
+                    }
+                    return;
+                }
                 let schema = state.schema;
                 let currentSchema = _.get(schema, schemaName);
                 let isJsonRoot = currentSchema.json_root ? currentSchema.json_root : false;

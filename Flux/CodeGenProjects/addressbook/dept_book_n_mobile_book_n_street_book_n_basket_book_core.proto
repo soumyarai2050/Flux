@@ -57,7 +57,7 @@ message SymbolOverview {
   optional float low = 12;
   optional int64 volume = 13;
   optional float tick_size = 14 [(FluxFldNumberFormat) = ".3"];
-  optional string last_update_date_time = 15 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 15 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
   optional bool force_publish = 16 [(FluxFldHide) = "True"];
 }
 

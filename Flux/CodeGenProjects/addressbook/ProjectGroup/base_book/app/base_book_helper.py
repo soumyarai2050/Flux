@@ -2,12 +2,14 @@ import logging
 import threading
 from typing import List, Final
 import math
+import sys
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import ChoreStatusType
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager, SecurityRecord
 from Flux.CodeGenProjects.AddressBook.Pydantic.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
 
 def chore_has_terminal_state(chore_snapshot: ChoreSnapshot) -> bool:
@@ -135,3 +137,15 @@ def check_n_update_conv_px(ticker: str, conv_px: float | None, security_record: 
                           f"{conv_px}, proceeding with static data conv_px for {security_record.ticker}")
             conv_px = security_record.conv_px
     return conv_px
+
+
+def get_pair_strat_id_from_cmd_argv() -> int:
+    if len(sys.argv) > 2:
+        pair_strat_id = sys.argv[1]
+        return parse_to_int(pair_strat_id)
+    else:
+        err_str_ = ("Can't find pair_strat_id as cmd argument, "
+                    "Usage: python launch_beanie_fastapi.py <PAIR_STRAT_ID>, "
+                    f"current args: {sys.argv}")
+        logging.error(err_str_)
+        raise Exception(err_str_)

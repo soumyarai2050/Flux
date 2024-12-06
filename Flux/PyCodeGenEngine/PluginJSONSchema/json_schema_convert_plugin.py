@@ -29,7 +29,21 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
-    # Used to be added as property
+    # Use to be added as property
+    flx_file_simple_non_repeated_attribute_options: List[str] = [
+        BaseProtoPlugin.flux_file_date_time_granularity,
+        BaseProtoPlugin.flux_file_date_time_print_timezone
+    ]
+    flx_file_simple_repeated_attribute_options: List[str] = [
+        # put this category's options here
+    ]
+    flx_file_complex_non_repeated_attribute_options: List[str] = [
+        # put this category's options here
+    ]
+    flx_file_complex_repeated_attribute_options: List[str] = [
+        # put this category's options here
+    ]
+    # Use to be added as property
     flx_fld_simple_non_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_fld_help,
         BaseProtoPlugin.flux_fld_hide,
@@ -78,17 +92,17 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_progress_bar,
     ]
     flx_fld_complex_repeated_attribute_options: List[str] = [
-        # put this category options here
+        # put this category's options here
     ]
     flx_msg_simple_non_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_msg_server_populate,
         BaseProtoPlugin.flux_msg_ui_get_all_limit
     ]
     flx_msg_simple_repeated_attribute_options: List[str] = [
-        # put this category options here
+        # put this category's options here
     ]
     flx_msg_complex_non_repeated_attribute_options: List[str] = [
-        # put this category options here
+        # put this category's options here
     ]
     flx_msg_complex_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_msg_button_query
@@ -103,7 +117,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_mapping_underlying_meta_field,
         BaseProtoPlugin.flux_fld_mapping_src
     ]
-    # used to handle option fields having msg_n_field names in set value
+    # use to handle option fields having msg_n_field names in set value
     flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val = ["alert_bubble_source", "alert_bubble_color", "bind_id_fld", "dynamic_widget_title_fld", "query_param_field_src", "query_src_model_name"]
     # @LOW todo: query_param_field_src should have same query_src_model_name as src model
 
@@ -447,6 +461,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             flux_prefix_removed_option_name = option_name.removeprefix(fld_standard_prefix)
         elif (msg_standard_prefix := JsonSchemaConvertPlugin.msg_options_standard_prefix) in option_name:
             flux_prefix_removed_option_name = option_name.removeprefix(msg_standard_prefix)
+        elif (file_standard_prefix := JsonSchemaConvertPlugin.file_options_standard_prefix) in option_name:
+            flux_prefix_removed_option_name = option_name.removeprefix(file_standard_prefix)
         else:
             err_str = f"No Standard option prefix found in option {option_name} from option_list"
             logging.exception(err_str)
@@ -454,7 +470,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         return flux_prefix_removed_option_name
 
     def __handle_simple_proto_option_attributes(self, options_list: List[str],
-                                                field_or_message_obj: protogen.Field | protogen.Message,
+                                                field_or_message_obj: protogen.Field | protogen.Message | protogen.File,
                                                 init_space_count: int) -> str:
         """
         Handles both repeated and non-repeated simple type of options
@@ -463,7 +479,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         for option in options_list:
             if self.is_option_enabled(field_or_message_obj, option):
                 if option in (self.flx_fld_simple_non_repeated_attribute_options +
-                              self.flx_msg_simple_non_repeated_attribute_options):
+                              self.flx_msg_simple_non_repeated_attribute_options +
+                              self.flx_file_simple_non_repeated_attribute_options):
                     option_value: str | int | bool | float = (
                         self.get_simple_option_value_from_proto(field_or_message_obj, option))
 
@@ -522,7 +539,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                     (f'"{flux_prefix_removed_option_name_case_styled}": '
                                      f'{self.parse_python_type_to_json_type_str(option_value)},\n')
                 elif option in (self.flx_fld_simple_repeated_attribute_options +
-                                self.flx_msg_simple_repeated_attribute_options):
+                                self.flx_msg_simple_repeated_attribute_options +
+                                self.flx_file_simple_repeated_attribute_options):
                     option_value_list: List = self.get_simple_option_value_from_proto(field_or_message_obj, option,
                                                                                       is_repeated=True)
 
@@ -621,14 +639,15 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         return json_msg_str
 
     def __handle_complex_proto_option_attributes(self, options_list: List[str],
-                                                 field_or_message_obj: protogen.Field | protogen.Message,
+                                                 field_or_message_obj: protogen.Field | protogen.Message | protogen.File,
                                                  init_space_count: int) -> str:
         json_msg_str = ""
         for option in options_list:
 
             if self.is_option_enabled(field_or_message_obj, option):
                 if option in (self.flx_fld_complex_non_repeated_attribute_options +
-                              self.flx_msg_complex_non_repeated_attribute_options):
+                              self.flx_msg_complex_non_repeated_attribute_options +
+                              self.flx_file_complex_non_repeated_attribute_options):
                     option_value_dict: Dict = \
                         self.get_complex_option_value_from_proto(field_or_message_obj, option)
                     # converting flux_option into json attribute name
@@ -647,7 +666,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     # if any field is found having value as string form of bool then it is type-cast to
                     # json bool, to avoid this explicitly value is turned into str bool
                 elif option in (self.flx_fld_complex_repeated_attribute_options +
-                                self.flx_msg_complex_repeated_attribute_options):
+                                self.flx_msg_complex_repeated_attribute_options +
+                                self.flx_file_complex_repeated_attribute_options):
                     option_value_dict: List[Dict] = \
                         self.get_complex_option_value_from_proto(field_or_message_obj, option, is_option_repeated=True)
                     # converting flux_option into json attribute name
@@ -1177,6 +1197,32 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         json_msg_str += f'  "autocomplete": ' + f"{json.dumps(auto_complete_json_dict, indent=4)}\n"
         return json_msg_str
 
+    def handle_file_options_str(self, file: protogen.File):
+        init_space_count = 2
+        json_msg_str = ' ' * init_space_count + f'"file_options": ' + '{\n'
+        # Adding simple type non-repeated options as attributes
+        json_msg_str += \
+            self.__handle_simple_proto_option_attributes(
+                JsonSchemaConvertPlugin.flx_file_simple_non_repeated_attribute_options, file, init_space_count + 2)
+        # Adding simple type repeated options as attributes
+        json_msg_str += \
+            self.__handle_simple_proto_option_attributes(
+                JsonSchemaConvertPlugin.flx_file_simple_repeated_attribute_options, file, init_space_count + 2)
+        # Adding complex type non-repeated options as attributes
+        json_msg_str += \
+            self.__handle_complex_proto_option_attributes(
+                JsonSchemaConvertPlugin.flx_file_complex_non_repeated_attribute_options, file, init_space_count + 2)
+        # Adding complex type repeated options as attributes
+        json_msg_str += \
+            self.__handle_complex_proto_option_attributes(
+                JsonSchemaConvertPlugin.flx_file_complex_repeated_attribute_options, file, init_space_count + 2)
+
+        if json_msg_str.endswith(",\n"):
+            json_msg_str = json_msg_str[:-2] + "\n"
+
+        json_msg_str += " " * init_space_count + "},\n"
+        return json_msg_str
+
     def output_file_generate_handler(self, file_or_file_list: protogen.File | List[protogen.File]):
         if isinstance(file_or_file_list, list):
             file_list: List[protogen.File] = file_or_file_list
@@ -1230,6 +1276,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
         json_msg_str = '{\n'
 
+        # Handling file lvl option val
+        json_msg_str += self.handle_file_options_str(file)
+
         # Handling json layout message schema
         for message in self.__json_layout_message_list:
             json_msg_str += self.__handle_json_layout_message_schema(message)
@@ -1251,7 +1300,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         else:
             json_msg_str += '  },\n'
             json_msg_str += '  "autocomplete": {}\n'
-
         json_msg_str += '}'
 
         file_name = str(file.proto.name).split(".")[0]

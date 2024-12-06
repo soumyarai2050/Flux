@@ -95,7 +95,7 @@ message ChoreJournal {
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional ChoreBrief chore = 2 [(FluxFldPk) = "chore_id"];
-  optional string chore_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
+  optional int64 chore_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
   optional ChoreEventType chore_event = 4 [(FluxFldPk) = "true"];
   optional int32 current_period_chore_count = 8 [ (FluxFldHelp) = "total new chore count within chore_rate(s) applicable_period_seconds"];
 }
@@ -166,7 +166,7 @@ message ChoreSnapshot {
   optional int64 cxled_qty = 18;
   optional float avg_cxled_px = 19;
   optional float cxled_notional = 20 [(FluxFldDisplayType) = "int", (FluxFldTitle) = "cxled $", (FluxFldNumberFormat) = "$"];
-  optional string create_date_time = 21 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
-  optional string last_update_date_time = 22 [(FluxFldValIsDateTime) = true];
+  optional int64 create_date_time = 21 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 22 [(FluxFldValIsDateTime) = true];
   optional int64 last_n_sec_total_qty = 23 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec chore qty
 }

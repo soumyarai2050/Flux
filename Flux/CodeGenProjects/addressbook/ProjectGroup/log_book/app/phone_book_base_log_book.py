@@ -276,20 +276,26 @@ class PhoneBookBaseLogBook(AppLogBook):
         return container_json
 
     def get_update_obj_for_snapshot_type_update(
-            self, pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str,
+            self, msgspec_class_type: Type[MsgspecModel], update_type: str, method_name: str,
             patch_queue: Queue, max_fetch_from_queue: int, err_handler_callable: Callable,
+            update_res: Dict,
             parse_to_pydantic: bool | None = None):
+        if update_res:
+            update_res = update_res.get("update_json_list")
+        else:
+            update_res = []
+
         # blocking function
         update_json_list = get_update_obj_for_snapshot_type_update(
-            pydantic_basemodel_class_type, update_type, method_name, patch_queue,
-            max_fetch_from_queue, err_handler_callable, parse_to_pydantic)
+            msgspec_class_type, update_type, method_name, patch_queue,
+            max_fetch_from_queue, err_handler_callable, update_res, parse_to_pydantic)
 
         # handling interrupt
         if update_json_list == "EXIT":
             return "EXIT"
 
         container_json = {"update_json_list": update_json_list, "update_type": update_type,
-                          "pydantic_basemodel_type_name": pydantic_basemodel_class_type.__name__,
+                          "pydantic_basemodel_type_name": msgspec_class_type.__name__,
                           "method_name": method_name}
         return container_json
 

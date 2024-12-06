@@ -100,7 +100,10 @@ class CppConstantsHandlerPlugin(BaseProtoPlugin):
         output_content += "\n\n"
 
         for field_name in self.field:
-            output_content += f'\tconst std::string {field_name}_fld_name = "{field_name}";\n'
+            if field_name == "id":
+                output_content += f'\tconst std::string {field_name}_fld_name = "_{field_name}";\n'
+            else:
+                output_content += f'\tconst std::string {field_name}_fld_name = "{field_name}";\n'
         return output_content
 
     @staticmethod

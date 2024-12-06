@@ -1,5 +1,6 @@
 # standard imports
 import datetime
+import logging
 import time
 import queue
 from threading import Thread, current_thread
@@ -186,8 +187,8 @@ def should_retry_due_to_server_down(exception: Exception) -> bool:
 
 def get_update_obj_list_for_journal_type_update(
         pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
-        max_fetch_from_queue: int, parse_to_pydantic: bool | None = None) -> List[Dict] | str:  # blocking function
-    update_dict_list: List[Dict] = []
+        max_fetch_from_queue: int, update_dict_list: List[MsgspecModel | Dict],
+        parse_to_pydantic: bool | None = None) -> List[Dict] | str:  # blocking function
     fetch_counts: int = 0
 
     kwargs: Dict = patch_queue.get()
@@ -232,10 +233,19 @@ def get_obj_id_to_put_as_key(obj_id) -> str:
 
 
 def get_update_obj_for_snapshot_type_update(
-        pydantic_basemodel_class_type: Type[MsgspecBaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
-        max_fetch_from_queue: int, err_handler_callable: Callable,
-        parse_to_pydantic: bool | None = None) -> List[Dict] | str:  # blocking function
+        msgspec_class_type: Type[MsgspecBaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
+        max_fetch_from_queue: int, err_handler_callable: Callable, update_res: List[MsgspecModel | Dict],
+        parse_to_msgspec_obj: bool | None = None) -> List[Dict] | List[MsgspecModel] | str:  # blocking function
     id_to_obj_dict = {}
+    if update_res:
+        for snapshot_obj in update_res:
+            if parse_to_msgspec_obj:
+                id_to_obj_dict[snapshot_obj.id] = snapshot_obj
+            else:   # dict case
+                id_to_obj_dict[snapshot_obj.get('_id')] = snapshot_obj
+
+    # else not required: if no snapshot exists already to be send through client then nothing to add in id_to_obj_dict
+
     fetch_counts: int = 0
 
     kwargs: Dict = patch_queue.get()
@@ -246,17 +256,29 @@ def get_update_obj_for_snapshot_type_update(
         logging.info(f"Exiting get_update_obj_for_snapshot_type_update")
         return "EXIT"
 
-    # _id from the kwargs dict is of string type which may or may not be same as datatype of pydantic_object.id
+    # _id from the kwargs dict is of string type which may or may not be same as datatype of msgspec_object.id
     # use obj_id to store/fetch item from dict for consistency
     obj_id = kwargs.get("_id")
 
     if obj_id is not None:
         obj_id = get_obj_id_to_put_as_key(obj_id)
-        if parse_to_pydantic:
-            pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs, strict=False)
-            id_to_obj_dict[obj_id] = pydantic_object
+        if parse_to_msgspec_obj:
+            msgspec_object = msgspec_class_type.from_dict(kwargs, strict=False)
+            if obj_id not in id_to_obj_dict:
+                id_to_obj_dict[obj_id] = msgspec_object
+            else:
+                msgspec_object = msgspec_class_type.from_dict(kwargs, strict=False)
+                for key, val in kwargs.items():
+                    if key == "_id":
+                        key = "id"
+                    cached_msgspec_object = id_to_obj_dict[obj_id]
+                    setattr(cached_msgspec_object, key, getattr(msgspec_object, key))
         else:
-            id_to_obj_dict[obj_id] = kwargs
+            if obj_id not in id_to_obj_dict:
+                id_to_obj_dict[obj_id] = kwargs
+            else:
+                cached_kwargs = id_to_obj_dict[obj_id]
+                cached_kwargs.update(kwargs)
     else:
         err_handler_callable()
 
@@ -273,25 +295,25 @@ def get_update_obj_for_snapshot_type_update(
 
         if obj_id is not None:
             obj_id = get_obj_id_to_put_as_key(obj_id)
-            pydantic_object_or_kwargs = id_to_obj_dict.get(obj_id)
+            msgspec_object_or_kwargs = id_to_obj_dict.get(obj_id)
 
-            if pydantic_object_or_kwargs is None:
-                if parse_to_pydantic:
-                    pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs, strict=False)
-                    id_to_obj_dict[obj_id] = pydantic_object
+            if msgspec_object_or_kwargs is None:
+                if parse_to_msgspec_obj:
+                    msgspec_object = msgspec_class_type.from_dict(kwargs, strict=False)
+                    id_to_obj_dict[obj_id] = msgspec_object
                 else:
                     id_to_obj_dict[obj_id] = kwargs
             else:
                 # updating already existing object
-                if parse_to_pydantic:
-                    pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs, strict=False)
+                if parse_to_msgspec_obj:
+                    msgspec_object = msgspec_class_type.from_dict(kwargs, strict=False)
                     for key, val in kwargs.items():
                         if key == "_id":
                             key = "id"
-                        cached_pydantic_object = pydantic_object_or_kwargs
-                        setattr(cached_pydantic_object, key, getattr(pydantic_object, key))
+                        cached_msgspec_object = msgspec_object_or_kwargs
+                        setattr(cached_msgspec_object, key, getattr(msgspec_object, key))
                 else:
-                    cached_kwargs = pydantic_object_or_kwargs
+                    cached_kwargs = msgspec_object_or_kwargs
                     cached_kwargs.update(kwargs)
         else:
             err_handler_callable()
@@ -300,7 +322,7 @@ def get_update_obj_for_snapshot_type_update(
             break
 
     obj_json_list: List[Dict]
-    if parse_to_pydantic:
+    if parse_to_msgspec_obj:
         obj_json_list = []
         for _, obj in id_to_obj_dict.items():
             obj_json_list.append(obj.to_dict(exclude_none=True))
@@ -353,20 +375,21 @@ def handle_dynamic_queue_for_patch_n_patch_all(pydantic_basemodel_type: str, met
     try:
         pydantic_basemodel_class_type: Type[BaseModel] = eval(pydantic_basemodel_type)
 
+        update_res = []
         while 1:
             try:
                 if update_type == UpdateType.JOURNAL_TYPE:
                     # blocking call
                     update_res: List[Any] | Any = (
                         journal_type_handler_callable(pydantic_basemodel_class_type, update_type, method_name, patch_queue,
-                                                      max_fetch_from_queue, parse_to_pydantic))
+                                                      max_fetch_from_queue, update_res, parse_to_pydantic))
 
                 else:  # if update_type is UpdateType.SNAPSHOT_TYPE
                     # blocking call
                     update_res: List[Any] | Any = (
                         snapshot_type_handler_callable(pydantic_basemodel_class_type, update_type, method_name, patch_queue,
                                                        max_fetch_from_queue, snapshot_type_callable_err_handler,
-                                                       parse_to_pydantic))
+                                                       update_res, parse_to_pydantic))
 
                 if update_res == "EXIT":
                     return
@@ -376,9 +399,11 @@ def handle_dynamic_queue_for_patch_n_patch_all(pydantic_basemodel_type: str, met
                         update_handler_callable(update_res)
                         logging.info(f"called {update_handler_callable.__name__} with {update_res=} in "
                                      f"handle_dynamic_queue_for_patch_n_patch_all")
+                        # only gets cleared if client call was successful else keeps data for further updates
+                        update_res = []
                         break
                     except Exception as e:
-                        if not should_retry_due_to_server_down(e):
+                        if not should_retry_due_to_server_down(e):  # stays within loop if server is down
                             logging.exception(e)
                             raise Exception(e)
             except Exception as e:

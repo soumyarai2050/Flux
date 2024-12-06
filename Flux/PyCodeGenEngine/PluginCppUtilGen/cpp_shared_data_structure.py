@@ -104,11 +104,11 @@ class CppSharedDataStructure(BaseProtoPlugin):
             char_size = str_val if str_val is not None else 64
             output_content += "struct " + i.proto.name + "QueueElement {\n"
             for fld in i.fields:
-                if fld.proto.name.lower().endswith("time"):
-                    output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
-                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
-                elif fld.kind.name.lower() == "float":
+                # if fld.proto.name.lower().endswith("time"):
+                #     output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
+                #     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                if fld.kind.name.lower() == "float":
                     output_content += "\tdouble " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
@@ -140,11 +140,11 @@ class CppSharedDataStructure(BaseProtoPlugin):
             char_size = str_val if str_val is not None else 64
             output_content += "struct " + i.proto.name + "QueueElement {\n"
             for fld in i.fields:
-                if fld.proto.name.lower().endswith("time"):
-                    output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
-                    if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
-                        output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
-                elif fld.kind.name.lower() == "float":
+                # if fld.proto.name.lower().endswith("time"):
+                #     output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
+                #     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                if fld.kind.name.lower() == "float":
                     output_content += "\tdouble " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"

@@ -27,6 +27,10 @@ class CppProjectIncludePlugin(BaseProtoPlugin):
     def header_generate_handler(package_name: str):
         output_content: str = ""
         output_content += "#pragma once\n\n"
+        output_content += f'#include "../../../{package_name}/generated/CppUtilGen/{package_name}_object_to_json.h"\n'
+        output_content += f'#include "../../../{package_name}/generated/CppCodec/{package_name}_mongo_db_codec.h"\n'
+        output_content += f'#include "../../../{package_name}/generated/CppUtilGen/{package_name}_key_handler.h"\n'
+        output_content += f'#include "../../../{package_name}/generated/CppUtilGen/{package_name}_json_to_object.h"\n'
         output_content += f'#include "../../../{package_name}/generated/CppUtilGen' \
                           f'/{package_name}_constants.h"\n\n'
         return output_content

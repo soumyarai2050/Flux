@@ -12,7 +12,7 @@ import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
     getHoverTextType, getValueFromReduxStoreFromXpath, floatToInt,
     validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase, getReducerArrrayFromCollections,
-    getDataSourceColor
+    getDataSourceColor, getDateTimeFromInt
 } from '../utils';
 import { ColorTypes, DataTypes, Modes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
@@ -26,8 +26,6 @@ import CopyToClipboard from './CopyToClipboard';
 import AlertBubble from './AlertBubble';
 dayjs.extend(utc);
 dayjs.extend(timezone);
-
-const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const Cell = (props) => {
     const {
@@ -253,19 +251,20 @@ const Cell = (props) => {
         if (value === null) {
             value = '';
         }
+        if (type === DataTypes.DATE_TIME) {
+            if (value !== '') {
+                const dateTimeWithTimezone = getDateTimeFromInt(value);
+                if (collection.displayType === 'datetime') {
+                    value = dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+                } else {
+                    value = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format('HH:mm:ss.SSS') : dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+                }
+            }
+        }
         let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, value);
         value = v;
         if (typeof value === DataTypes.NUMBER) {
             value = value.toLocaleString();
-        } else if (type === DataTypes.DATE_TIME) {
-            if (value !== '') {
-                const localDateTime = dayjs.utc(value).tz(localTimezone);
-                if (collection.displayType === 'datetime') {
-                    value = localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
-                } else {
-                    value = localDateTime.isSame(dayjs(), 'day') ? localDateTime.format('HH:mm:ss.SSS') : localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
-                }
-            }
         }
         const classesStr = `${classes.cell} ${selectedClass} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`;
         return (
@@ -524,9 +523,9 @@ const Cell = (props) => {
             // default input format
             let inputFormat = 'YYYY-MM-DD HH:mm:ss'
             if (value) {
-                const localDateTime = dayjs.utc(value).tz(localTimezone);
+                const dateTimeWithTimezone = getDateTimeFromInt(value);
                 if (collection.displayType !== 'datetime') {
-                    if (localDateTime.isSame(dayjs(), 'day')) {
+                    if (dateTimeWithTimezone.isSame(dayjs(), 'day')) {
                         inputFormat = 'HH:mm:ss';
                     }
                     // else - use default input format
@@ -927,25 +926,26 @@ const Cell = (props) => {
     if (value === null) {
         value = '';
     }
-    let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, value);
-    value = v;
-    if (typeof value === DataTypes.NUMBER) {
-        value = value.toLocaleString();
-    }
-    let text, linkText = null;
+    
     if (collection.type === DataTypes.DATE_TIME) {
+        let text, linkText = null;
         linkText = value;
         if (!linkText) {
             text = null;
         } else {
-            const localDateTime = dayjs.utc(linkText).tz(localTimezone);
+            const dateTimeWithTimezone = getDateTimeFromInt(linkText);
             if (collection.displayType === 'datetime') {
-                text = localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
+                text = dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
             } else {
-                text = localDateTime.isSame(dayjs(), 'day') ? localDateTime.format('HH:mm:ss.SSS') : localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
+                text = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format('HH:mm:ss.SSS') : dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
             }
         }
         value = text;
+    }
+    let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, value);
+    value = v;
+    if (typeof value === DataTypes.NUMBER) {
+        value = value.toLocaleString();
     }
     let dataModified = previousValue !== currentValue;
     // if (tableCellColorClass) {

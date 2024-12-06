@@ -152,6 +152,13 @@ message FluxImportFileModel {
 }
 
 
+enum DateTimeGranularity {
+  MILLI_SEC = 0;
+  MICRO_SEC = 1;
+  NANO_SEC = 2;
+}
+
+
 extend google.protobuf.FileOptions 
 {
   //General Options - 51
@@ -163,6 +170,8 @@ extend google.protobuf.FileOptions
   optional string FluxFileCRUDHost = 55253;
   optional int32 FluxFileCRUDPortOffset = 55254;
   repeated FluxImportFileModel FluxFileImportDependencyModel = 55255;
+  optional DateTimeGranularity FluxFileDateTimeGranularity = 55256 [default=MILLI_SEC];
+  optional string FluxFileDateTimePrintTimezone = 55257; // to know what should be tz of datetime that we show through any medium
 
 }
 

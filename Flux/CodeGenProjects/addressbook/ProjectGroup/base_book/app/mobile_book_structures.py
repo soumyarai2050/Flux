@@ -9,26 +9,35 @@ import pendulum
 from FluxPythonUtils.scripts.pthread_shm_mutex import pthread_mutex_t, PThreadShmMutex
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
     TickType)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_ts_utils import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import get_pair_strat_id_from_cmd_argv
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import email_book_service_http_client
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import executor_config_yaml_dict
 
 MAX_STRING_LENGTH: Final[int] = 128
+pair_strat_id = get_pair_strat_id_from_cmd_argv()
+pair_strat = email_book_service_http_client.get_pair_strat_client(pair_strat_id)
+exch_id = pair_strat.pair_strat_params.strat_leg1.exch_id
+exch_to_market_depth_lvl_dict = executor_config_yaml_dict.get("exch_to_market_depth_lvl", {})
+DEPTH_LVL: Final[int] = exch_to_market_depth_lvl_dict.get(exch_id, 10)
 
 
 class ShadowFields:
     def __init__(self):
-        self._original_val: bytes | None = None
+        self._original_val: Any = None
         self.manufactured_val: Any = None
 
 
 class DTShadowFields(ShadowFields):
 
     @property
-    def original_val(self) -> bytes:
+    def original_val(self) -> int:
         return self._original_val
 
     @original_val.setter
-    def original_val(self, val: bytes):
+    def original_val(self, val: int):
         self._original_val = val
-        self.manufactured_val = pendulum.parse(self._original_val.decode())
+        self.manufactured_val = get_pendulum_dt_from_epoch(val)
 
 
 class MarketBarterVolume(Structure):
@@ -89,8 +98,8 @@ class SymbolNExchId(Structure):
 
 class LastBarter(Structure):
     _fields_ = (
-        ("id", c_int32), ('symbol_n_exch_id', SymbolNExchId), ('exch_time_', c_char * MAX_STRING_LENGTH),
-        ('arrival_time_',  c_char * MAX_STRING_LENGTH), ('px', c_double), ('qty', c_int64),
+        ("id", c_int32), ('symbol_n_exch_id', SymbolNExchId), ('exch_time_', c_int64),
+        ('arrival_time_',  c_int64), ('px', c_double), ('qty', c_int64),
         ('premium_', c_double), ('is_premium_set_', c_bool),
         ('market_barter_volume_', MarketBarterVolume), ('is_market_barter_volume_set_', c_bool)
     )
@@ -144,7 +153,7 @@ class Quote(Structure):
         ("is_qty_set_", c_bool),
         ("premium_", c_double),
         ("is_premium_set_", c_bool),
-        ("last_update_date_time_", c_char * MAX_STRING_LENGTH),
+        ("last_update_date_time_", c_int64),
         ("is_last_update_date_time_set_", c_bool)
     ]
 
@@ -197,7 +206,7 @@ class TopOfBook(Structure):
         ("is_total_bartering_security_size_set_", c_bool),
         ("market_barter_volume_", MarketBarterVolume),
         ("is_market_barter_volume_set_", c_bool),
-        ("last_update_date_time_", c_char * MAX_STRING_LENGTH),
+        ("last_update_date_time_", c_int64),
         ("is_last_update_date_time_set_", c_bool)
     ]
 
@@ -265,8 +274,8 @@ class TopOfBook(Structure):
 class MarketDepth(Structure):
     _fields_ = (
         ("id", c_int32), ('symbol_', c_char * MAX_STRING_LENGTH),
-        ('exch_time_', c_char * MAX_STRING_LENGTH),
-        ('arrival_time_', c_char * MAX_STRING_LENGTH),
+        ('exch_time_', c_int64),
+        ('arrival_time_', c_int64),
         ('side_', c_char),
         ('px_', c_double),
         ('is_px_set_', c_bool),
@@ -370,8 +379,8 @@ class MDContainer(Structure):
         ("symbol_", c_char * MAX_STRING_LENGTH),
         ("last_barter", LastBarter),
         ("top_of_book", TopOfBook),
-        ("bid_market_depth_list", MarketDepth * 10),
-        ("ask_market_depth_list", MarketDepth * 10)
+        ("bid_market_depth_list", MarketDepth * DEPTH_LVL),
+        ("ask_market_depth_list", MarketDepth * DEPTH_LVL)
     ]
 
     def __str__(self):

@@ -11,7 +11,8 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 
 import protogen
 from Flux.PyCodeGenEngine.PluginPydentic.dataclass_model_plugin import DataclassModelPlugin, main, IdType
-from FluxPythonUtils.scripts.utility_functions import convert_to_capitalized_camel_case
+from FluxPythonUtils.scripts.utility_functions import (
+    convert_to_capitalized_camel_case, convert_camel_case_to_specific_case)
 
 
 class MsgspecModelPlugin(DataclassModelPlugin):
@@ -19,6 +20,8 @@ class MsgspecModelPlugin(DataclassModelPlugin):
     Plugin script to convert proto schema to json schema
     """
     default_id_type_var_name = "ObjectId"
+    datetime_to_epoch: str = "DateTimeToEpoch"
+    epoch_to_datetime: str = "EpochToDateTime"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -219,7 +222,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
             output_str += self._underlying_handle_none_default_fields(message, has_id_field)
 
             output_str += (
-                self._handle_post_init_in_basemodel_versions(auto_gen_id_type,
+                self._handle_post_init_in_basemodel_versions(message, auto_gen_id_type,
                                                              alias_name_dict=kwargs.get("alias_name_dict", {})))
             output_str += "\n\n"
         return output_str
@@ -235,6 +238,96 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str += ' ' * 4 + f"    super().__setattr__(name, value)\n"
         return output_str
 
+    def _handle_dt_fields_to_be_int(self, message: protogen.Message, indent_count: int,
+                                    dict_name: str, epoch_to_dt_or_dt_to_epoch: str) -> str:
+        output_str = ''
+        for field in message.fields:
+            field_name = field.proto.name
+            if field.message is not None:
+                for field_ in field.message.fields:
+                    if self.is_bool_option_enabled(field_, MsgspecModelPlugin.flux_fld_val_is_datetime):
+                        break
+                else:
+                    # else not required: ignoring messages not having any date_time field
+                    continue
+
+                # reaches here only if msg has any datetime field
+                output_str += ' ' * indent_count + f"    {dict_name}_{field_name} = {dict_name}.get('{field_name}')\n"
+                output_str += ' ' * indent_count + f"    if {dict_name}_{field_name} is not None:\n"
+                is_repeated = field.cardinality.name.lower() == "repeated"
+
+                if is_repeated:
+                    output_str += ' ' * (indent_count+4) + f"    for {dict_name}_{field_name}_ in {dict_name}_{field_name}:\n"
+                    output_str += self._handle_dt_fields_to_be_int(field.message, indent_count + 8,
+                                                               f"{dict_name}_{field_name}_",
+                                                                   epoch_to_dt_or_dt_to_epoch)
+                else:
+                    output_str += self._handle_dt_fields_to_be_int(field.message, indent_count + 4,
+                                                                   f"{dict_name}_{field_name}",
+                                                                   epoch_to_dt_or_dt_to_epoch)
+
+            elif self.is_bool_option_enabled(field, MsgspecModelPlugin.flux_fld_val_is_datetime):
+                output_str += ' ' * indent_count + f"    {field_name} = {dict_name}.get('{field_name}')\n"
+                output_str += ' ' * indent_count + f"    if {field_name} is not None:\n"
+                if epoch_to_dt_or_dt_to_epoch == MsgspecModelPlugin.datetime_to_epoch:
+                    output_str += ' ' * indent_count + f"        if isinstance({field_name}, DateTime):\n"
+                    output_str += ' ' * indent_count + f"            {dict_name}['{field_name}'] = get_epoch_from_pendulum_dt({field_name})\n"
+                    output_str += ' ' * indent_count + f"        elif isinstance({field_name}, datetime.datetime):\n"
+                    output_str += ' ' * indent_count + f"            {dict_name}['{field_name}'] = get_epoch_from_standard_dt({field_name})\n"
+                else:
+                    output_str += ' ' * indent_count + f"        if isinstance({field_name}, int):\n"
+                    output_str += ' ' * indent_count + f"            {dict_name}['{field_name}'] = get_pendulum_dt_from_epoch({field_name})\n"
+
+        return output_str
+
+    def _handle_override_enc_n_dec_hook_in_(self, indent_count: int):
+        output_str = ' ' * indent_count + f"@classmethod\n"
+        output_str += ' ' * indent_count + f"def dec_hook(cls, type: Type, obj: Any):\n"
+        output_str += ' ' * indent_count + f"    if type == DateTime and isinstance(obj, int):\n"
+        output_str += ' ' * indent_count + f"        return get_pendulum_dt_from_epoch(obj)\n"
+        output_str += ' ' * indent_count + f"    else:\n"
+        output_str += ' ' * indent_count + f"        return super().dec_hook(type, obj)\n\n"
+        output_str += ' ' * indent_count + f"@classmethod\n"
+        output_str += ' ' * indent_count + f"def enc_hook(cls, obj: Any):\n"
+        output_str += ' ' * indent_count + f"    if isinstance(obj, DateTime):\n"
+        output_str += ' ' * indent_count + f"        return get_epoch_from_pendulum_dt(obj)\n"
+        output_str += ' ' * indent_count + f"    elif isinstance(obj, datetime.datetime):\n"
+        output_str += ' ' * indent_count + f"        return get_epoch_from_standard_dt(obj)\n"
+        output_str += ' ' * indent_count + f"    elif isinstance(obj, Timestamp):\n"
+        output_str += ' ' * indent_count + f"        return get_epoch_from_pandas_timestamp(obj)\n"
+        return output_str
+
+    def _handle_convert_to_dict_for_db_op(self, message: protogen.Message):
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+        indent_count = 4
+        output_str = ' ' * indent_count + "@staticmethod\n"
+        output_str += ' ' * indent_count + (f"def convert_ts_fields_from_datetime_to_epoch_int("
+                                            f"{message_name_snake_cased}_dict_obj: Dict):\n")
+        output_str_ = self._handle_dt_fields_to_be_int(message, indent_count,
+                                                       f"{message_name_snake_cased}_dict_obj",
+                                                       MsgspecModelPlugin.datetime_to_epoch)
+        if output_str_:
+            output_str += output_str_ + "\n"
+        else:
+            output_str += ' ' * indent_count + "    pass\n\n"
+
+        output_str += ' ' * indent_count + "@staticmethod\n"
+        output_str += ' ' * indent_count + (f"def convert_ts_fields_from_epoch_to_datetime_obj("
+                                            f"{message_name_snake_cased}_dict_obj: Dict):\n")
+        output_str_ = self._handle_dt_fields_to_be_int(message, indent_count,
+                                                       f"{message_name_snake_cased}_dict_obj",
+                                                       MsgspecModelPlugin.epoch_to_datetime)
+        if output_str_:
+            output_str += output_str_ + "\n"
+        else:
+            output_str += ' ' * indent_count + "    pass\n\n"
+
+        output_str += self._handle_override_enc_n_dec_hook_in_(indent_count)
+
+        return output_str
+
     def _handle_post_init_handling(self, message: protogen.Message, auto_gen_id_type: IdType, **kwargs):
         output_str = ""
 
@@ -247,9 +340,13 @@ class MsgspecModelPlugin(DataclassModelPlugin):
             output_str += ' ' * 4 + f"        self.id = {message.proto.name}.next_id()\n\n"
 
             output_str += self._handle_alias_setattr_output_in_model(alias_name_dict)
+
+        output_str += "\n"
+        output_str += self._handle_convert_to_dict_for_db_op(message)
+
         return output_str, ""
 
-    def _handle_post_init_in_basemodel_versions(self, auto_gen_id_type: IdType, **kwargs):
+    def _handle_post_init_in_basemodel_versions(self, message: protogen.Message, auto_gen_id_type: IdType, **kwargs):
         output_str = ""
 
         alias_name_dict = kwargs.get("alias_name_dict", {})
@@ -257,6 +354,9 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         if auto_gen_id_type in [IdType.INT_ID, IdType.STR_ID]:
             output_str += "\n"
             output_str += self._handle_alias_setattr_output_in_model(alias_name_dict)
+
+        output_str += "\n"
+        output_str += self._handle_convert_to_dict_for_db_op(message)
 
         return output_str
 
@@ -269,8 +369,8 @@ class MsgspecModelPlugin(DataclassModelPlugin):
             if alias_name:
                 alias_name_dict[field.proto.name] = alias_name
 
-        output_str, datetime_field_list = self._handle_post_init_handling(message, auto_gen_id_type,
-                                                                          alias_name_dict=alias_name_dict)
+        output_str, _ = self._handle_post_init_handling(message, auto_gen_id_type,
+                                                        alias_name_dict=alias_name_dict)
         output_str += "\n\n"
 
         # Adding other versions for root pydantic class
@@ -355,7 +455,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
                 output_str += self._handle_unique_id_required_fields(message, auto_gen_id_type)
             else:
                 output_str += ' '*4 + self.handle_field_output(field)
-        # output_str += "\n\n"
+
         output_str += self._handle_config_class_and_other_root_class_versions(message, auto_gen_id_type)
 
         return output_str
@@ -372,7 +472,8 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         for message in self.root_message_list:
             if message in file.messages:
                 output_str += f'class {message.proto.name}BaseModelList(ListModelMsgspec):\n'
-                output_str += f'    root: List[{message.proto.name}BaseModel]\n'
+                output_str += f'    root: List[{message.proto.name}BaseModel]\n\n'
+                output_str += self._handle_override_enc_n_dec_hook_in_(indent_count=4)
                 output_str += f'\n\n'
         return output_str
 
@@ -406,6 +507,9 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str += f"from {generic_utils_import_path} import validate_pendulum_datetime\n"
         output_str += f"from FluxPythonUtils.scripts.async_rlock import AsyncRLock\n"
         output_str += f"from FluxPythonUtils.scripts.model_base_utils import *\n"
+        base_strat_cache_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
+                                                                     f"{self.proto_file_name}_ts_utils")
+        output_str += f"from {base_strat_cache_import_path} import *\n"
 
         output_str += "\n\n"
         return output_str

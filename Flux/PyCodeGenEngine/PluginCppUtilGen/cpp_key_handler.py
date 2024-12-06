@@ -47,7 +47,7 @@ class CppKeyHandlerPlugin(BaseProtoPlugin):
         output_content: str = ""
         output_content += "#pragma once\n\n"
         output_content += "#include <iostream>\n\n"
-        output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n\n'
+        output_content += f'#include "../CppDataStructures/{file_name}.h"\n\n'
         return output_content
 
     @staticmethod
@@ -58,14 +58,14 @@ class CppKeyHandlerPlugin(BaseProtoPlugin):
         output_content: str = ""
 
         output_content += f"\n\t\tstatic inline void get" \
-                          f"_key_list(const {package_name}::{message_name}List &kr_{message_name_snake_cased}_list_obj, " \
+                          f"_key_list(const {message_name}List &kr_{message_name_snake_cased}_list_obj, " \
                           f"std::vector< std::string > &r_{message_name_snake_cased}_key_list_out) {{\n"
 
-        output_content += f'\t\t\tfor (int i = 0; i < kr_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_size(); ' \
+        output_content += f'\t\t\tfor (size_t i = 0; i < kr_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.size(); ' \
                           f'++i) {{\n'
         output_content += f'\t\t\t\tstd::string key;\n'
-        output_content += (f'\t\t\t\tget_key_out(kr_{message_name_snake_cased}_list_obj.'
-                           f'{message_name_snake_cased}(i), key);\n')
+        output_content += (f'\t\t\t\tget_key_out(kr_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i), '
+                           f'key);\n')
         output_content += f'\t\t\t\tr_{message_name_snake_cased}_key_list_out.emplace_back(std::move(key));\n'
         output_content += '\t\t\t}\n'
 
@@ -85,20 +85,20 @@ class CppKeyHandlerPlugin(BaseProtoPlugin):
                                               (field, CppKeyHandlerPlugin.flux_fld_PK))
                     flux_fld_pk_value_list = flux_fld_pk_value.split(".")
                     output += (f"\t\t\tr_{message_name_snake_cased}_key_out = r_{message_name_snake_cased}_key_out + "
-                               f"kr_{message_name_snake_cased}_obj.{field_name_snake_cased}()")
+                               f"kr_{message_name_snake_cased}_obj.{field_name_snake_cased}_")
                     for flx_fld_val in flux_fld_pk_value_list:
                         clean_fld_val = flx_fld_val.strip('\'"')
-                        output += f'.{clean_fld_val}()'
+                        output += f'.{clean_fld_val}_'
                     output += ";\n"
                     output += f'\t\t\tr_{message_name_snake_cased}_key_out += "_";\n'
                 else:
-                    if field.kind.name.lower() != "string":
+                    if field.kind.name.lower() == "int32" or field.kind.name.lower() == "int64":
                         output += (f"\t\t\tr_{message_name_snake_cased}_key_out = r_{message_name_snake_cased}_key_out + "
-                                   f"std::to_string(kr_{message_name_snake_cased}_obj.{field_name_snake_cased}());\n")
+                                   f"std::to_string(kr_{message_name_snake_cased}_obj.{field_name_snake_cased}_);\n")
                         output += f'\t\t\tr_{message_name_snake_cased}_key_out += "_";\n'
                     else:
                         output += (f"\t\t\tr_{message_name_snake_cased}_key_out = r_{message_name_snake_cased}_key_out + "
-                                   f"kr_{message_name_snake_cased}_obj.{field_name_snake_cased}();\n")
+                                   f"kr_{message_name_snake_cased}_obj.{field_name_snake_cased}_;\n")
                         output += f'\t\t\tr_{message_name_snake_cased}_key_out += "_";\n'
 
         return output
@@ -179,7 +179,7 @@ class CppKeyHandlerPlugin(BaseProtoPlugin):
                     field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
                     if CppKeyHandlerPlugin.is_option_enabled(field, self.flux_fld_PK):
                         # message_name = message.proto.name
-                        output_content += f"\n\t\tstatic inline void get_key_out(const {package_name}::" \
+                        output_content += f"\n\t\tstatic inline void get_key_out(const " \
                                           f"{message_name} &kr_{message_name_snake_cased}_obj, std::string &" \
                                           f"r_{message_name_snake_cased}_key_out)"
                         output_content += "{\n"

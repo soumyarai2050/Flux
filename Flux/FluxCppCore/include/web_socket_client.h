@@ -11,9 +11,7 @@
 #include <boost/asio.hpp>
 #include <boost/asio/deadline_timer.hpp>
 
-#include "json_codec.h"
-#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/ProtoGenCc/market_data_service.pb.h"
-#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_constants.h"
+#include "project_includes.h"
 #include "cpp_app_logger.h"
 
 

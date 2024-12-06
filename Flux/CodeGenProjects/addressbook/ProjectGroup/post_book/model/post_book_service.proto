@@ -7,6 +7,9 @@ import "street_book_n_post_book_n_basket_book_core.proto";
 
 package post_book;
 
+option (FluxFileDateTimeGranularity) = MILLI_SEC;
+option (FluxFileDateTimePrintTimezone) = "LOCAL";
+
 message PortfolioStatusUpdatesContainer {
   optional float buy_notional_update = 1;
   optional float sell_notional_update = 2;

@@ -83,7 +83,6 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
         output += f'#include "{class_name}_max_id_handler.h"\n'
         output += f'#include "../../FluxCppCore/include/RandomDataGen.h"\n'
         output += '#include "../../FluxCppCore/include/base_web_client.h"\n'
-        output += '#include "../../FluxCppCore/include/json_codec.h"\n'
         output += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
         return output
 

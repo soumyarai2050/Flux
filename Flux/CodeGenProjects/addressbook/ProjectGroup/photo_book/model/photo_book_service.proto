@@ -5,6 +5,8 @@ import "projects_core.proto";
 
 package photo_book;
 
+option (FluxFileDateTimeGranularity) = MILLI_SEC;
+option (FluxFileDateTimePrintTimezone) = "LOCAL";
 
 message StratView{
   option (FluxMsgJsonRoot) = {

@@ -38,8 +38,9 @@ class CppWebSocketServerPlugin(BaseProtoPlugin):
         output_content += "#pragma once\n\n"
         output_content += "#include <chrono>\n\n"
         output_content += f'#include "../../../../../../FluxCppCore/include/web_socket_server.h"\n'
-        output_content += f'#include "../../../../../../FluxCppCore/include/json_codec.h"\n'
-        output_content += f'#include "../../generated/ProtoGenCc/market_data_service.pb.h"\n\n'
+        output_content += f'#include "../../../../../../FluxCppCore/include/mongo_db_codec.h"\n'
+        # output_content += f'#include "../../../../../../FluxCppCore/include/json_codec.h"\n'
+        output_content += f'#include "../../generated/CppDataStructures/market_data_service.h"\n\n'
         return output_content
 
     def dependency_message_proto_msg_handler(self, file: protogen.File):
@@ -97,6 +98,9 @@ class CppWebSocketServerPlugin(BaseProtoPlugin):
         output_content += f"namespace {package_name}_handler{{\n\n"
         for message in self.root_message_list:
             message_name: str = message.proto.name
+            limit = self.get_simple_option_value_from_proto(message,"FluxMsgUIGetAllLimit")
+            if limit is None:
+                limit = 0
             message_name_snake_cased: str = convert_camel_case_to_specific_case(message_name)
             if (CppWebSocketServerPlugin.is_option_enabled(message, CppWebSocketServerPlugin.flux_msg_json_root) or
                     CppWebSocketServerPlugin.is_option_enabled(message, CppWebSocketServerPlugin.flux_msg_json_root_time_series)):
@@ -106,16 +110,19 @@ class CppWebSocketServerPlugin(BaseProtoPlugin):
                     if CppWebSocketServerPlugin.is_option_enabled(field, CppWebSocketServerPlugin.flux_fld_PK):
                         output_content += "\ttemplate <typename UserDataType>\n"
                         output_content += f"\tclass {class_name}{message_name}WebSocketServer : public " \
-                                          f"FluxCppCore::WebSocketServer<{package_name}::{message_name}, " \
-                                          f"{package_name}::{message_name}List, UserDataType> {{\n"
-                        output_content += f"\t\tusing BaseClass = FluxCppCore::WebSocketServer<{package_name}::{message_name}, " \
-                                          f"{package_name}::{message_name}List, UserDataType>;\n"
+                                          f"FluxCppCore::WebSocketServer<{message_name}, " \
+                                          f"{message_name}List, UserDataType> {{\n"
+                        output_content += f"\t\tusing BaseClass = FluxCppCore::WebSocketServer<{message_name}, " \
+                                          f"{message_name}List, UserDataType>;\n"
                         output_content += "\tpublic:\n"
                         output_content += (f'\t\texplicit {class_name}{message_name}WebSocketServer(UserDataType '
-                                           f'&user_data, const std::string k_host = "127.0.0.1", const int32_t '
+                                           f'&user_data, FluxCppCore::MongoDBCodec<{message_name}, '
+                                           f'{message_name}List>& mongo_db_codec,'
+                                           f'const std::string k_host = "127.0.0.1", const int32_t '
                                            f'k_web_socket_server_port = 8083, const std::chrono::seconds k_read_timeout'
-                                           f' = std::chrono::seconds(60)) : BaseClass(user_data, k_host, '
-                                           f'k_web_socket_server_port, k_read_timeout) {{}}\n\n')
+                                           f' = std::chrono::seconds(60), const int32_t db_fetch_limit = {limit}) : '
+                                           f'BaseClass(user_data, mongo_db_codec, db_fetch_limit, '
+                                           f'k_host, k_web_socket_server_port, k_read_timeout) {{}}\n\n')
 
                         output_content += "\t\tbool NewClientCallBack(UserDataType &user_data, int16_t " \
                                           "new_client_web_socket_id) override {\n"
@@ -126,16 +133,19 @@ class CppWebSocketServerPlugin(BaseProtoPlugin):
 
                         output_content += "\ttemplate <typename UserDataType>\n"
                         output_content += f"\tclass {class_name}{message_name}ListWebSocketServer : public " \
-                                          f"FluxCppCore::WebSocketServer<{package_name}::{message_name}, " \
-                                          f"{package_name}::{message_name}List, UserDataType> {{\n"
-                        output_content += f"\t\tusing BaseClass = FluxCppCore::WebSocketServer<{package_name}::{message_name}, " \
-                                          f"{package_name}::{message_name}List, UserDataType>;\n"
+                                          f"FluxCppCore::WebSocketServer<{message_name}, " \
+                                          f"{message_name}List, UserDataType> {{\n"
+                        output_content += f"\t\tusing BaseClass = FluxCppCore::WebSocketServer<{message_name}, " \
+                                          f"{message_name}List, UserDataType>;\n"
                         output_content += "\tpublic:\n"
                         output_content += (f'\t\texplicit {class_name}{message_name}ListWebSocketServer(UserDataType '
-                                           f'&user_data, const std::string k_host = "127.0.0.1", const int32_t '
-                                           f'k_web_socket_server_port = 8083, const std::chrono::seconds k_read_timeout '
-                                           f'= std::chrono::seconds(60))'
-                                           f' : BaseClass(user_data, k_host, k_web_socket_server_port, k_read_timeout'
+                                           f'&user_data, FluxCppCore::MongoDBCodec<{message_name},{message_name}List>& '
+                                           f'mongo_db_codec, const std::string k_host '
+                                           f'= "127.0.0.1", const int32_t k_web_socket_server_port = 8083, '
+                                           f'const std::chrono::seconds k_read_timeout '
+                                           f'= std::chrono::seconds(60), const int32_t db_fetch_limit = {limit})'
+                                           f' : BaseClass(user_data, mongo_db_codec, db_fetch_limit, '
+                                           f'k_host, k_web_socket_server_port, k_read_timeout'
                                            f') {{}}\n\n')
 
                         output_content += "\t\tbool NewClientCallBack(UserDataType &user_data, int16_t " \

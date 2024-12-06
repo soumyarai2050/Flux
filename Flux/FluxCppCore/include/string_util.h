@@ -1,14 +1,20 @@
 #pragma once
 
-#include <bsoncxx/types.hpp>
 #include <chrono>
 #include <sstream>
 #include <ctime>
+#include <cstring>
+
+#include <bsoncxx/types.hpp>
 #include <date/date.h>
 
 namespace FluxCppCore {
 
-    inline std::string get_local_time_microseconds() {
+    template<typename T>
+    T get_local_time_microseconds();
+
+    template<>
+    inline std::string get_local_time_microseconds<std::string>() {
         // Get the current time
         auto now = std::chrono::system_clock::now();
 
@@ -21,6 +27,14 @@ namespace FluxCppCore {
         << '.' << std::setfill('0') << std::setw(6) << microseconds // Print microseconds (6 digits)
         << "+00:00";
         return ss.str();
+    }
+
+    template<>
+    inline int64_t get_local_time_microseconds<int64_t>() {
+        // Get the current system time
+        auto now = std::chrono::system_clock::now();
+        auto duration = now.time_since_epoch();
+        return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
     }
 
     inline int64_t parse_time(const std::string& time_str) {
@@ -144,6 +158,10 @@ namespace FluxCppCore {
             std::chrono::system_clock::time_point tp;
             ss >> date::parse("%FT%T%z", tp);
             return bsoncxx::types::b_date{tp};
+        }
+
+        static inline bsoncxx::types::b_date convert_utc_string_to_b_date(const int64_t& timestamp_ms) {
+            return bsoncxx::types::b_date{std::chrono::milliseconds(timestamp_ms)};
         }
 
         static void inline setString(char* dest, const char* src, const size_t size) {

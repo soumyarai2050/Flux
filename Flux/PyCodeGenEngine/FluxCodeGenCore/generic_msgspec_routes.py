@@ -26,7 +26,7 @@ from FluxPythonUtils.scripts.utility_functions import (
     execute_tasks_list_with_all_completed, handle_ws, compare_n_patch_dict,
     compare_n_patch_list, non_jsonable_types_handler)
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_route_utils import get_aggregate_pipeline, generic_perf_benchmark
-from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel, enc_hook, remove_none_values
+from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel, remove_none_values
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import get_non_stored_ids
 
 """
@@ -72,6 +72,9 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
             db_obj_dict_list = await get_obj_list(msgspec_class_type, db_obj_id_list,
                                                   filter_agg_pipeline=filter_agg_pipeline,
                                                   has_links=has_links, is_projection_type=True)
+            for obj_json in db_obj_dict_list:
+                # handling all datetime fields - converting to epoch int values before passing to ws network
+                msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
         # else not required: passing provided list of dict if ws_data is not of projection type
 
         json_str = orjson.dumps(db_obj_dict_list, default=non_jsonable_types_handler).decode('utf-8')
@@ -95,6 +98,9 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
             db_obj_dict = await get_obj(msgspec_class_type, db_obj_id,
                                         filter_agg_pipeline=filter_agg_pipeline,
                                         has_links=has_links, is_projection_type=True)
+            # handling all datetime fields - converting to epoch int values before passing to ws network
+            msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(db_obj_dict)
+
         # else not required: passing provided db_obj_dict if ws_data is not of projection type
 
         json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
@@ -217,6 +223,10 @@ async def execute_update_agg_pipeline(msgspec_class_type: Type[MsgspecModel],
             else:
                 await collection_obj.bulk_write(update_req_list)
         # else not required: avoiding db calls if collection is empty
+
+        for obj_json in aggregated_dict_list:
+            # handling all datetime fields - converting to epoch int values before passing to ws network
+            msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
         await publish_ws_all(msgspec_class_type, id_list, aggregated_dict_list, update_ws_with_id=True)
 
 
@@ -238,6 +248,10 @@ async def generic_post_http(msgspec_class_type: Type[MsgspecModel],
 
     if update_agg_pipeline or filter_agg_pipeline:
         obj_json = await get_obj(msgspec_class_type, insert_one_result.inserted_id, filter_agg_pipeline, has_links)
+
+    # handling all datetime fields - converting to epoch int values - caller of this function will handle
+    # these fields back if required
+    msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
 
     await publish_ws(msgspec_class_type, insert_one_result.inserted_id, obj_json, has_links)
     return obj_json
@@ -262,6 +276,10 @@ async def generic_post_all_http(msgspec_class_type: Type[MsgspecModel], proto_pa
     if update_agg_pipeline or filter_agg_pipeline:
         obj_json_list = await get_obj_list(msgspec_class_type, insert_many_result.inserted_ids, filter_agg_pipeline, has_links)
 
+    for obj_json in obj_json_list:
+        # handling all datetime fields - converting to epoch int values - caller of this function will handle
+        # these fields back if required
+        msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
     await publish_ws_all(msgspec_class_type, insert_many_result.inserted_ids, obj_json_list, has_links)
     return obj_json_list
 
@@ -292,6 +310,10 @@ async def _underlying_patch_n_put(msgspec_class_type: Type[MsgspecModel], proto_
 
     if update_agg_pipeline or filter_agg_pipeline:
         updated_json_obj_dict = await get_obj(msgspec_class_type, _id, filter_agg_pipeline, has_links)
+
+    # handling all datetime fields - converting to epoch int values - caller of this function will handle
+    # these fields back if required
+    msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(updated_json_obj_dict)
 
     await publish_ws(msgspec_class_type, _id, updated_json_obj_dict, has_links, update_ws_with_id=True)
     return updated_json_obj_dict
@@ -336,6 +358,10 @@ async def _underlying_patch_n_put_all(msgspec_class_type: Type[MsgspecModel], pr
     if update_agg_pipeline or filter_agg_pipeline:
         updated_json_obj_dict_list = await get_obj_list(msgspec_class_type, updated_obj_id_list, filter_agg_pipeline, has_links)
 
+    for obj_json in updated_json_obj_dict_list:
+        # handling all datetime fields - converting to epoch int values - caller of this function will handle
+        # these fields back if required
+        msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
     await publish_ws_all(msgspec_class_type, updated_obj_id_list, updated_json_obj_dict_list,
                          has_links, update_ws_with_id=True)
     return updated_json_obj_dict_list, missing_ids
@@ -701,6 +727,10 @@ async def _generic_read_ws(msgspec_class_type: Type[MsgspecModel], ws: WebSocket
         if need_initial_snapshot is None or need_initial_snapshot:
             json_obj_list = \
                 await get_obj_list(msgspec_class_type, filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
+            for obj_json in json_obj_list:
+                # handling all datetime fields - converting to epoch int values - caller of this function will handle
+                # these fields back if required
+                msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
             json_obj_list_str = json.dumps(json_obj_list, default=non_jsonable_types_handler)
             await msgspec_class_type.read_ws_path_ws_connection_manager. \
                 send_json_to_websocket(json_obj_list_str, ws)
@@ -787,6 +817,10 @@ async def generic_projection_query_ws(ws: WebSocket, project_name: str, msgspec_
 
             json_obj_list = await get_obj_list(msgspec_class_type,
                                                filter_agg_pipeline=projection_agg_pipeline)
+            for obj_json in json_obj_list:
+                # handling all datetime fields - converting to epoch int values - caller of this function will handle
+                # these fields back if required
+                msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
             json_str = json.dumps(json_obj_list, default=non_jsonable_types_handler)
             await msgspec_class_type.read_ws_path_ws_connection_manager. \
                 send_json_to_websocket(json_str, ws)
@@ -858,6 +892,9 @@ async def generic_read_by_id_ws(ws: WebSocket, project_name: str, msgspec_class_
                 raise HTTPException(status_code=404, detail=id_not_found.format_msg(msgspec_class_type.__name__,
                                                                                     db_obj_id))
             else:
+                # handling all datetime fields - converting to epoch int values - caller of this function will handle
+                # these fields back if required
+                msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(fetched_json_obj)
                 fetched_obj_json_str = json.dumps(fetched_json_obj, default=non_jsonable_types_handler)
                 await msgspec_class_type.read_ws_path_with_id_ws_connection_manager.send_json_to_websocket(
                     fetched_obj_json_str, ws)
@@ -931,7 +968,7 @@ async def get_obj_list(msgspec_class_type: Type[MsgspecModel], find_ids: List[An
         return json_list
 
 
-# {'aggregate': }
+
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def projection_read_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
@@ -1007,7 +1044,7 @@ async def get_max_val(model_class_type: Type[MsgspecModel]):
     return max_val
 
 
-def generic_encoder(obj_to_encode: Any, exclude_none: bool = False, by_alias: bool = False) -> Any:
+def generic_encoder(obj_to_encode: Any, enc_hook: Callable, exclude_none: bool = False, by_alias: bool = False) -> Any:
     # IMPO: using enc_hook to convert DateTime to str since generic_encoder is used in converting msg_obj to python
     # dict which needs to be passed to request's json parameter and DateTime is not json serializable
     updated_dict = msgspec.to_builtins(obj_to_encode, enc_hook=enc_hook)

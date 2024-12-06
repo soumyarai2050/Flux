@@ -59,6 +59,10 @@ class StratViewUpdateCont(MsgspecBaseModel):
     total_objects: int | None = None
     highest_priority_severity: Severity | None = None
 
+    @staticmethod
+    def convert_ts_fields_in_db_fetched_dict(dict_obj: Dict):
+        return dict_obj
+
 
 class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallback):
     debug_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (" \
@@ -1176,7 +1180,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def strat_state_update_matcher_query_pre(
             self, strat_state_update_matcher_class_type: Type[StratStateUpdateMatcher], strat_id: int,
             message: str, log_file_path: str):
-        # self._handle_strat_state_update_mismatch(strat_id, message, log_file_path)
+        self._handle_strat_state_update_mismatch(strat_id, message, log_file_path)
         return []
 
     async def dismiss_all_portfolio_alerts_query_pre(self, portfolio_alert_class_type: Type[PortfolioAlert]):

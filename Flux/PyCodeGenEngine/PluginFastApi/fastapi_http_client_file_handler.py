@@ -305,12 +305,14 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             if route_type is None or route_type == FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val:
                 output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
                 output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
+                                         f"{message_name}.enc_hook, "
                                          "exclude_none=True)   # removes none values from dict\n")
                 output_str += " " * 4 + f"    return generic_http_get_query_client(self.query_{query_name}_url, " \
                                         f"query_params_data, {container_model_name})\n\n"
             else:
                 output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
                 output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
+                                         f"{message_name}.enc_hook, "
                                          "exclude_none=True)   # removes none values from dict\n")
                 if route_type == FastapiHttpClientFileHandler.flux_json_query_route_patch_type_field_val:
                     output_str += " " * 4 + (f"    return generic_http_patch_query_client(self.query_{query_name}"
@@ -340,7 +342,8 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             params_dict_str = \
                 ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
             output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
-            output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
+            output_str += " " * 4 + (f"    query_params_data = generic_encoder(query_params_dict, "
+                                     f"{message_name}.enc_hook, "
                                      "exclude_none=True)   # removes none values from dict\n")
             output_str += " " * 4 + f"    return generic_http_file_query_client(self.query_{query_name}_url, " \
                                     f"file_path, query_params_data, {container_model_name})\n\n"

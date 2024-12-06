@@ -7,8 +7,12 @@ import "barter_core.proto";
 import "mobile_book_n_street_book_n_basket_book_core.proto";
 import "dept_book_n_mobile_book_n_street_book_n_basket_book_core.proto";
 import "street_book_n_post_book_core.proto";
+import "street_book_n_post_book_n_basket_book_core.proto";
 
 package mobile_book;
+
+option (FluxFileDateTimeGranularity) = MILLI_SEC;
+option (FluxFileDateTimePrintTimezone) = "LOCAL";
 
 option (FluxFileImportDependencyModel) = {
   ImportFileName: "mobile_book_n_street_book_n_basket_book_core.proto",
@@ -20,12 +24,12 @@ option (FluxFileImportDependencyModel) = {
   ImportModelName: "LastBarterList",
   ImportModelName: "RawLastBarterHistory",
   ImportModelName: "RawLastBarterHistoryList",
-    ImportModelName: "SymbolOverview",
+  ImportModelName: "SymbolOverview",
   ImportModelName: "SymbolOverviewList"
 };
 
 option (FluxFileImportDependencyModel) = {
-    ImportFileName: "street_book_n_post_book_core.proto",
+    ImportFileName: "street_book_n_post_book_n_basket_book_core.proto",
     ImportModelName: "ChoreJournal",
     ImportModelName: "ChoreJournalList",
 
@@ -60,7 +64,7 @@ message MobileBookBrief{
   required int32 id = 1;
   required Security security = 2;
   required Side side = 3;
-  required string last_update_date_time = 4 [(FluxFldValIsDateTime) = true];
+  required int64 last_update_date_time = 4 [(FluxFldValIsDateTime) = true];
   optional SideSpecificMobileBookBrief buy_mobile_book_brief = 5;
   optional SideSpecificMobileBookBrief sell_mobile_book_brief = 6;
 }
@@ -80,9 +84,9 @@ message TickByTickBBO {
 
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true];
-  required string exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required int64 exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
   required TickType tick_type = 4;
-  required string arrival_time = 5 [(FluxFldValIsDateTime) = true];
+  required int64 arrival_time = 5 [(FluxFldValIsDateTime) = true];
   optional float px = 6;
   optional int64 qty = 7;
 }
@@ -110,8 +114,8 @@ message RawMarketDepthHistory {
 
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true];
-  required string exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
-  required string arrival_time = 4 [(FluxFldValIsDateTime) = true];
+  required int64 exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required int64 arrival_time = 4 [(FluxFldValIsDateTime) = true];
   required int32 position = 5;
   required int32 operation = 6;
   required TickType side = 7;

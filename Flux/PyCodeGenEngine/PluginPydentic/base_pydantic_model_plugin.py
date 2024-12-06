@@ -61,6 +61,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         self.model_file_suffix: str = ""
         self.generic_routes_file_name: str = ""
         self.model_import_file_name: str = ""
+        self.ts_utils_import_file_name: str = ""
         self.reentrant_lock_non_required_msg: List[protogen.Message] = []
 
     def enum_type_validator(self):
@@ -625,6 +626,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         self.proto_file_name = str(file.proto.name).split('.')[0]
         self.proto_package_name = str(file.proto.package)
         self.model_import_file_name = f'{self.proto_file_name}_model_imports'
+        self.ts_utils_import_file_name = f'{self.proto_file_name}_ts_utils'
 
     def get_dependency_protogen_files(self, file: protogen.File,
                                       all_dependency_protogen_file_list: List[protogen.File]) -> None:
@@ -635,6 +637,21 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                 all_dependency_protogen_file_list.append(file_)
                 self.load_root_and_non_root_messages_in_dicts(file_.messages)
 
+    def handle_ts_utils_import_file_gen(self, file: protogen.File):
+        if BasePydanticModelPlugin.is_option_enabled(file, BasePydanticModelPlugin.flux_file_date_time_granularity):
+            option_val = BasePydanticModelPlugin.get_simple_option_value_from_proto(
+                            file, BasePydanticModelPlugin.flux_file_date_time_granularity)
+            if option_val == "MICRO_SEC":
+                output_str = f"from FluxPythonUtils.ts_utils.micro_sec_ts_utils import *\n"
+            elif option_val == "NANO_SEC":
+                output_str = f"from FluxPythonUtils.ts_utils.nano_sec_ts_utils import *\n"
+            else:
+                output_str = f"from FluxPythonUtils.ts_utils.milli_sec_ts_utils import *\n"
+        else:
+            output_str = f"from FluxPythonUtils.ts_utils.milli_sec_ts_utils import *\n"
+
+        return output_str
+
     def output_file_generate_handler(self, file: protogen.File):
         # time.sleep(10)
         self.assign_required_data_members(file)
@@ -642,7 +659,10 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
         output_dict = {
             # Adding model import file
-            self.model_import_file_name + ".py": self.handle_model_import_file_gen()
+            self.model_import_file_name + ".py": self.handle_model_import_file_gen(),
+
+            # Adding ts_utils import file
+            self.ts_utils_import_file_name + ".py": self.handle_ts_utils_import_file_gen(file)
         }
 
         all_dependency_protogen_file_list: List[protogen.File] = []

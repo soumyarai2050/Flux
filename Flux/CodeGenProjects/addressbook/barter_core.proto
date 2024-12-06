@@ -254,7 +254,7 @@ message Quote {
   optional float px = 1;
   optional int64 qty = 2 [(FluxFldNoCommonKey) = true];
   optional float premium = 3;
-  optional string last_update_date_time = 4[(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 4[(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
 }
 
 message ChoreBrief {

@@ -14,8 +14,9 @@ import json
 import urllib.parse
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import log_n_except, http_response_as_class_type, HTTPRequestType
-from FluxPythonUtils.scripts.model_base_utils import dec_hook
+from FluxPythonUtils.scripts.utility_functions import (
+    log_n_except, http_response_as_class_type, HTTPRequestType, ClientError)
+
 
 if (model_type := os.getenv("ModelType")) is None or len(model_type) == 0:
 	err_str = f"env var ModelType must not be {model_type}"
@@ -48,7 +49,7 @@ def generic_http_post_client(url: str, pydantic_obj, pydantic_type, return_copy_
     if pydantic_obj is not None:
         # create don't need to delete any field: model default should handle that,
         # so: exclude_unset=True, exclude_none=True
-        json_data = generic_encoder(pydantic_obj, by_alias=True, exclude_none=True)
+        json_data = generic_encoder(pydantic_obj, pydantic_type.enc_hook, by_alias=True, exclude_none=True)
 
     # When used for queries like get last date query, as there is no pydantic obj in case of query
     else:
@@ -67,14 +68,14 @@ def generic_http_file_query_client(url: str, file_path: str | PurePath, query_pa
             response: requests.Response = requests.post(url, files=files, params=query_params_dict)
             return http_response_as_class_type(url, response, 201, pydantic_type, HTTPRequestType.POST)
     else:
-        raise Exception(f"Can't find file path: {file_path}")
+        raise ClientError(f"Can't find file path: {file_path}")
 
 
 @log_n_except
 def generic_http_post_all_client(url: str, pydantic_obj_list, pydantic_type, return_copy_obj: bool | None = True):
     # When used for routes
     if pydantic_obj_list is not None:
-        json_data = generic_encoder(pydantic_obj_list, by_alias=True, exclude_none=True)
+        json_data = generic_encoder(pydantic_obj_list, pydantic_type.enc_hook, by_alias=True, exclude_none=True)
 
     # When used for queries like get last date query, as there is no pydantic obj in case of query
     else:
@@ -101,7 +102,7 @@ def generic_http_get_client(url: str, query_param: Any, pydantic_type):
 def generic_http_put_client(url: str, pydantic_obj, pydantic_type, return_copy_obj: bool | None = True):
     if pydantic_obj is not None:
         # When used for routes
-        json_data = generic_encoder(pydantic_obj, by_alias=True)
+        json_data = generic_encoder(pydantic_obj, pydantic_type.enc_hook, by_alias=True)
     else:
         # When used for queries like get last date query, as there is no pydantic obj in case of query
         json_data = None
@@ -113,7 +114,7 @@ def generic_http_put_client(url: str, pydantic_obj, pydantic_type, return_copy_o
 def generic_http_put_all_client(url: str, pydantic_obj_list, pydantic_type, return_copy_obj: bool | None = True):
     if pydantic_obj_list is not None:
         # When used for routes
-        json_data = generic_encoder(pydantic_obj_list, by_alias=True)
+        json_data = generic_encoder(pydantic_obj_list, pydantic_type.enc_hook, by_alias=True)
     else:
         # When used for queries like get last date query, as there is no pydantic obj in case of query
         json_data = None
@@ -123,6 +124,7 @@ def generic_http_put_all_client(url: str, pydantic_obj_list, pydantic_type, retu
 
 @log_n_except
 def generic_http_patch_client(url: str, pydantic_obj_json, pydantic_type, return_copy_obj: bool | None = True):
+    pydantic_obj_json = generic_encoder(pydantic_obj_json, pydantic_type.enc_hook, by_alias=True)
     response: requests.Response = requests.patch(url, json=pydantic_obj_json,
                                                  params={"return_obj_copy": return_copy_obj})
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PATCH)
@@ -130,6 +132,7 @@ def generic_http_patch_client(url: str, pydantic_obj_json, pydantic_type, return
 
 @log_n_except
 def generic_http_patch_all_client(url: str, pydantic_obj_json_list, pydantic_type, return_copy_obj: bool | None = True):
+    pydantic_obj_json_list = generic_encoder(pydantic_obj_json_list, pydantic_type.enc_hook, by_alias=True)
     response: requests.Response = requests.patch(url, json=pydantic_obj_json_list,
                                                  params={"return_obj_copy": return_copy_obj})
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PATCH)

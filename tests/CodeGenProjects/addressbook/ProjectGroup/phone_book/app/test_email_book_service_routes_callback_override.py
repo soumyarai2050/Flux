@@ -1,5 +1,5 @@
 # standard imports
-
+import copy
 import math
 import concurrent.futures
 import random
@@ -264,7 +264,7 @@ def test_patch_all(clean_and_set_limits, web_client):
                 broker.id = f"{broker_obj_id}"
                 broker.bkr_priority = broker_obj_id
                 obj.eligible_brokers.append(broker)
-            portfolio_limits_objects_json_list.append(generic_encoder(obj, exclude_none=True))
+            portfolio_limits_objects_json_list.append(obj.to_dict(exclude_none=True))
 
         return_value = web_client.patch_all_portfolio_limits_client(portfolio_limits_objects_json_list,
                                                                     return_obj_copy=return_value_type)
@@ -283,7 +283,7 @@ def test_patch_all(clean_and_set_limits, web_client):
         delete_broker.id = "1"
 
         delete_obj = PortfolioLimitsBaseModel.from_kwargs(_id=4 + (index * 3), eligible_brokers=[delete_broker])
-        delete_obj_json = generic_encoder(delete_obj, exclude_none=True)
+        delete_obj_json = delete_obj.to_dict(exclude_none=True)
 
         web_client.patch_all_portfolio_limits_client([delete_obj_json])
 
@@ -466,7 +466,7 @@ def test_patch_all_time_series_model(clean_and_set_limits, web_client):
             formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
             obj.date = pendulum.parse(formatted_dt_utc)
 
-        sample_ts_model_objects_json_list = [generic_encoder(obj, exclude_none=True)
+        sample_ts_model_objects_json_list = [obj.to_dict(exclude_none=True)
                                              for obj in sample_ts_model_objects_list]
         return_value = web_client.patch_all_sample_ts_model_client(sample_ts_model_objects_json_list,
                                                                    return_obj_copy=return_value_type)
@@ -1089,7 +1089,7 @@ def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
 
     portfolio_limits_basemodel = PortfolioLimitsBaseModel.from_kwargs(_id=1, eligible_brokers=[broker])
     email_book_service_native_web_client.patch_portfolio_limits_client(
-        generic_encoder(portfolio_limits_basemodel, exclude_none=True))
+        portfolio_limits_basemodel.to_dict(exclude_none=True))
 
     stored_portfolio_limits_ = email_book_service_native_web_client.get_portfolio_limits_client(1)
     for stored_broker in stored_portfolio_limits_.eligible_brokers:
@@ -1118,6 +1118,11 @@ def test_strat_gets_deleted_even_when_symbol_overview_is_not_found(
     delete_res = email_book_service_native_web_client.delete_pair_strat_client(created_pair_strat.id)
     assert delete_res == expected_delete_res, \
         f"Mismatch: expected delete response: {expected_delete_res}, got {delete_res}"
+
+    # cleanup before leaving this test - since strat is deleted any test after this will not be able to know that
+    # its tail executor also needs to be handled to handling it now
+    # force killing all tails
+    kill_tail_executor_for_strat_id(created_pair_strat.id)
 
 
 @pytest.mark.nightly1
@@ -1176,7 +1181,7 @@ def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
     overall_sell_fill_notional = 0
 
     leg1_leg2_symbol_list = []
-    total_strats = 1
+    total_strats = 10
     pair_strat_list = []
     for i in range(1, total_strats + 1):
         leg1_symbol = f"CB_Sec_{i}"
@@ -1857,6 +1862,157 @@ def test_sell_buy_pair_chore(
 
 
 @pytest.mark.nightly
+@pytest.mark.parametrize("market_depth_basemodel_list", [5, 10, 20], indirect=True)
+def test_multiple_market_depths_in_strats(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    overall_buy_notional = 0
+    overall_sell_notional = 0
+    overall_buy_fill_notional = 0
+    overall_sell_fill_notional = 0
+
+    exch_to_market_depth_lvl_dict = executor_config_yaml_dict.get("exch_to_market_depth_lvl", {})
+    parametrized_val = int(len(market_depth_basemodel_list)/4)
+    for key, val in exch_to_market_depth_lvl_dict.items():
+        if val == parametrized_val:
+            exch_id = key
+            break
+    else:
+        assert False, (f"Can't find exch_id with depth lvl matching with this test run's {parametrized_val=} in "
+                       f"executor config file")
+
+    leg1_leg2_symbol_list = []
+    total_strats = 10
+    pair_strat_list = []
+    for i in range(1, total_strats + 1):
+        leg1_symbol = f"CB_Sec_{i}"
+        leg2_symbol = f"EQT_Sec_{i}"
+        leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
+
+        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+
+        # setting exch_id based on parametrized value explicitly post strat create - create time exch_id is
+        # taken from static data so gets overrided by static data value
+        stored_pair_strat_basemodel.pair_strat_params.strat_leg1.exch_id = exch_id
+        stored_pair_strat_basemodel.pair_strat_params.strat_leg2.exch_id = exch_id
+        updated_pair_strat_basemodel = email_book_service_native_web_client.put_pair_strat_client(stored_pair_strat_basemodel)
+        pair_strat_list.append(updated_pair_strat_basemodel)
+        time.sleep(2)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
+        results = [executor.submit(handle_test_buy_sell_pair_chore, leg1_leg2_symbol[0], leg1_leg2_symbol[1],
+                                   max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
+                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(expected_sell_chore_snapshot_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_strat_list[idx],
+                                   copy.deepcopy(expected_strat_limits_),
+                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
+                                   copy.deepcopy(market_depth_basemodel_list), False)
+                   for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
+            else:
+                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
+                overall_buy_notional += strat_buy_notional
+                overall_sell_notional += strat_sell_notional
+                overall_buy_fill_notional += strat_buy_fill_notional
+                overall_sell_fill_notional += strat_sell_fill_notional
+
+    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
+    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
+    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_portfolio_status(expected_portfolio_status_)
+
+
+@pytest.mark.nightly
+def test_asymmetric_market_depths_in_strats(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    overall_buy_notional = 0
+    overall_sell_notional = 0
+    overall_buy_fill_notional = 0
+    overall_sell_fill_notional = 0
+
+    leg1_leg2_symbol_list = []
+    total_strats = 10
+    pair_strat_list = []
+    for i in range(1, total_strats + 1):
+        leg1_symbol = f"CB_Sec_{i}"
+        leg2_symbol = f"EQT_Sec_{i}"
+        leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
+
+        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        pair_strat_list.append(stored_pair_strat_basemodel)
+        time.sleep(2)
+
+    # keeping bid side length=3 and ask side length=4
+    market_depth_basemodel_list_ = (market_depth_basemodel_list[:3] +    # cb_sec bid
+                                    market_depth_basemodel_list[5:9] +  # cb_sec ask
+                                    market_depth_basemodel_list[10:13] +  # eqt_sec bid
+                                    market_depth_basemodel_list[15:19])    # eqt_sec ask
+    # updating last positions - same code is used in other tests also and
+    # last position px and qty is used in executor calculations
+    market_depth_basemodel_list_[2] = market_depth_basemodel_list[4]
+    market_depth_basemodel_list_[2].position = 2
+    market_depth_basemodel_list_[6] = market_depth_basemodel_list[9]
+    market_depth_basemodel_list_[6].position = 3
+    market_depth_basemodel_list_[9] = market_depth_basemodel_list[14]
+    market_depth_basemodel_list_[9].position = 2
+    market_depth_basemodel_list_[13] = market_depth_basemodel_list[19]
+    market_depth_basemodel_list_[13].position = 3
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
+        results = [executor.submit(handle_test_buy_sell_pair_chore, leg1_leg2_symbol[0], leg1_leg2_symbol[1],
+                                   max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
+                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(expected_sell_chore_snapshot_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_strat_list[idx],
+                                   copy.deepcopy(expected_strat_limits_),
+                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
+                                   copy.deepcopy(market_depth_basemodel_list_), False)
+                   for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
+            else:
+                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
+                overall_buy_notional += strat_buy_notional
+                overall_sell_notional += strat_sell_notional
+                overall_buy_fill_notional += strat_buy_fill_notional
+                overall_sell_fill_notional += strat_sell_fill_notional
+
+    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
+    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
+    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_portfolio_status(expected_portfolio_status_)
+
+
+@pytest.mark.nightly
 def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                         expected_strat_limits_, expected_strat_status_,
                                         symbol_overview_obj_list, last_barter_fixture_list,
@@ -1893,7 +2049,7 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
     # negative test
     system_control = SystemControlBaseModel.from_kwargs(_id=1, kill_switch=True)
     updated_system_control = email_book_service_native_web_client.patch_system_control_client(
-        generic_encoder(system_control, exclude_none=True))
+        system_control.to_dict(exclude_none=True))
     assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
 
     # validating if bartering_link.trigger_kill_switch got called
@@ -1957,7 +2113,7 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
     # negative test
     system_control = SystemControlBaseModel.from_kwargs(_id=1, kill_switch=True)
     updated_system_control = email_book_service_native_web_client.patch_system_control_client(
-        generic_encoder(system_control, exclude_none=True))
+        system_control.to_dict(exclude_none=True))
     assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
 
     # validating if bartering_link.trigger_kill_switch got called
@@ -2007,7 +2163,7 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     # positive test
     system_control = SystemControlBaseModel.from_kwargs(_id=1, kill_switch=True)
     updated_system_control = email_book_service_native_web_client.patch_system_control_client(
-        generic_encoder(system_control, exclude_none=True))
+        system_control.to_dict(exclude_none=True))
     assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
 
     bid_buy_top_market_depth = None
@@ -2042,7 +2198,7 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     # negative test
     system_control = SystemControlBaseModel.from_kwargs(_id=1, kill_switch=False)
     updated_system_control = email_book_service_native_web_client.patch_system_control_client(
-        generic_encoder(system_control, exclude_none=True))
+        system_control.to_dict(exclude_none=True))
     assert not updated_system_control.kill_switch, "Unexpected: kill_switch is True, expected to be False"
 
     # validating if bartering_link.trigger_kill_switch got called
@@ -2095,7 +2251,7 @@ def test_trigger_switch_fail(
         try:
             system_control = SystemControlBaseModel.from_kwargs(_id=1, kill_switch=True)
             email_book_service_native_web_client.patch_system_control_client(
-                generic_encoder(system_control, exclude_none=True))
+                system_control.to_dict(exclude_none=True))
         except Exception as e:
             if "bartering_link.trigger_kill_switch failed" not in str(e):
                 raise Exception("Something went wrong while enabling kill_switch kill switch")
@@ -2127,7 +2283,7 @@ def test_revoke_switch_fail(
 
     system_control = SystemControlBaseModel.from_kwargs(_id=1, kill_switch=True)
     updated_system_control = email_book_service_native_web_client.patch_system_control_client(
-        generic_encoder(system_control, exclude_none=True))
+        system_control.to_dict(exclude_none=True))
     assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
     try:
         # updating yaml_configs according to this test
@@ -2140,7 +2296,7 @@ def test_revoke_switch_fail(
         try:
             system_control = SystemControlBaseModel.from_kwargs(_id=1, kill_switch=False)
             email_book_service_native_web_client.patch_system_control_client(
-                generic_encoder(system_control, exclude_none=True))
+                system_control.to_dict(exclude_none=True))
         except Exception as e:
             if "bartering_link.revoke_kill_switch_n_resume_bartering failed" not in str(e):
                 raise Exception("Something went wrong while disabling kill_switch kill switch")
@@ -3145,7 +3301,7 @@ def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, leg1_
         strat_limits: StratLimitsBaseModel = StratLimitsBaseModel.from_kwargs(_id=active_pair_strat.id,
                                                                               eligible_brokers=[broker])
         updated_strat_limits = executor_http_client.patch_strat_limits_client(
-            generic_encoder(strat_limits, exclude_none=True))
+            strat_limits.to_dict(exclude_none=True))
 
         assert broker in updated_strat_limits.eligible_brokers, f"couldn't find {broker} in " \
                                                                 f"eligible_brokers list " \
@@ -3158,7 +3314,7 @@ def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, leg1_
         strat_limits: StratLimitsBaseModel = StratLimitsBaseModel.from_kwargs(_id=active_pair_strat.id,
                                                                   eligible_brokers=[delete_intended_broker])
         updated_strat_limits = executor_http_client.patch_strat_limits_client(
-            generic_encoder(strat_limits, exclude_none=True))
+            strat_limits.to_dict(exclude_none=True))
 
         broker_id_list = [broker.id for broker in updated_strat_limits.eligible_brokers]
         assert broker_id not in broker_id_list, f"Unexpectedly found broker_id {broker_id} in broker_id list " \
@@ -3465,7 +3621,7 @@ def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_l
             PairStratBaseModel.from_kwargs(_id=activated_strat.id,
                                pair_strat_params=PairStratParamsBaseModel(common_premium=index))
         updates_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
-            generic_encoder(pair_strat, exclude_none=True))
+            pair_strat.to_dict(exclude_none=True))
         assert updates_pair_strat.pair_strat_params_update_seq_num == \
                activated_strat.pair_strat_params_update_seq_num + 1, (
                 f"Mismatched pair_strat_params_update_seq_num: expected "
@@ -3478,7 +3634,7 @@ def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_l
         # updating strat_limits
         strat_limits = StratLimitsBaseModel.from_kwargs(_id=activated_strat.id, max_concentration=index)
         updates_strat_limits = executor_http_client.patch_strat_limits_client(
-            generic_encoder(strat_limits, exclude_none=True))
+            strat_limits.to_dict(exclude_none=True))
         assert updates_strat_limits.strat_limits_update_seq_num == \
                strat_limits_obj.strat_limits_update_seq_num + 1, (
                 f"Mismatched strat_limits_update_seq_num: expected "
@@ -3491,7 +3647,7 @@ def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_l
         # updating strat_status
         strat_status = StratStatusBaseModel.from_kwargs(_id=activated_strat.id, average_premuim=index)
         updates_strat_status = executor_http_client.patch_strat_status_client(
-            generic_encoder(strat_status, exclude_none=True))
+            strat_status.to_dict(exclude_none=True))
         assert updates_strat_status.strat_status_update_seq_num == \
                strat_status_obj.strat_status_update_seq_num + 1, (
                 f"Mismatched strat_limits_update_seq_num: expected "
@@ -6067,9 +6223,8 @@ def test_alert_agg_sequence_in_portfolio_alerts(clean_and_set_limits, sample_ale
 
         portfolio_alerts.append(alert)
         log_book_web_client.handle_portfolio_alerts_from_tail_executor_query_client(
-            generic_encoder([{"severity": alert.severity, "alert_brief": alert.alert_brief,
-                               "alert_meta": AlertMetaBaseModel(first_detail="Sample detail")}],
-                             exclude_none=True))
+            [{"severity": alert.severity, "alert_brief": alert.alert_brief,
+                          "alert_meta": AlertMetaBaseModel(first_detail="Sample detail").to_dict(exclude_none=True)}])
 
     # sorting alert list for this test comparison
     portfolio_alerts.sort(key=lambda x: x.last_update_analyzer_time, reverse=False)
@@ -6121,9 +6276,8 @@ def test_alert_agg_sequence_in_strat_alert(static_data_, clean_and_set_limits, l
 
         new_strat_alerts.append(alert)
         log_book_web_client.handle_strat_alerts_from_tail_executor_query_client(
-            generic_encoder([{"strat_id": active_pair_strat.id, "severity": alert.severity, "alert_brief": alert.alert_brief,
-                                           "alert_meta": AlertMetaBaseModel(first_detail="Sample detail")}],
-                                         exclude_none=True))
+            [{"strat_id": active_pair_strat.id, "severity": alert.severity, "alert_brief": alert.alert_brief,
+                          "alert_meta": AlertMetaBaseModel(first_detail="Sample detail").to_dict(exclude_none=True)}])
 
     time.sleep(5)
 
@@ -6593,8 +6747,8 @@ def test_unload_reload_strat_from_collection(
         # Unloading Strat
         # making this strat DONE
         email_book_service_native_web_client.patch_pair_strat_client(
-            generic_encoder(PairStratBaseModel.from_kwargs(_id=created_pair_strat.id, strat_state=StratState.StratState_DONE),
-                             exclude_none=True))
+            PairStratBaseModel.from_kwargs(_id=created_pair_strat.id,
+                                           strat_state=StratState.StratState_DONE).to_dict(exclude_none=True))
 
         strat_key = get_strat_key_from_pair_strat(created_pair_strat)
 
@@ -6651,8 +6805,8 @@ def test_unload_reload_strat_from_collection(
          f"pair_strat: {pair_strat}")
 
     pair_strat = PairStratBaseModel.from_kwargs(_id=created_pair_strat.id, strat_state=StratState.StratState_ACTIVE)
-    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(generic_encoder(
-        pair_strat, exclude_none=True))
+    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
+        pair_strat.to_dict(exclude_none=True))
     assert activated_pair_strat.strat_state == StratState.StratState_ACTIVE, \
         (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
          f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
@@ -6789,7 +6943,13 @@ def test_unload_multiple_strats_from_strat_view_unload_ui_button(
             f"Mismatch: strat_state must be {StratState.StratState_SNOOZED}, found {pair_strat.strat_state=}"
         assert pair_strat.port is None, \
             f"Mismatch: pair_strat.port must be None, found {pair_strat.port=}"
-        
+
+    # cleanup before leaving this test - since strats are unloaded any test after this will not be able to know that
+    # its tail executors also needs to be handled to handling them now
+    # force killing all tails
+    for pair_strat in pair_strats:
+        kill_tail_executor_for_strat_id(pair_strat.id)
+    
 
 @pytest.mark.nightly
 def test_recycle_strat_from_strat_view_recycle_ui_button(
@@ -6870,8 +7030,8 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
          f"pair_strat: {loaded_pair_strat}")
 
     pair_strat = PairStratBaseModel.from_kwargs(_id=created_pair_strat.id, strat_state=StratState.StratState_ACTIVE)
-    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(generic_encoder(
-        pair_strat, exclude_none=True))
+    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
+        pair_strat.to_dict(exclude_none=True))
     assert activated_pair_strat.strat_state == StratState.StratState_ACTIVE, \
         (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
          f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
@@ -7293,13 +7453,13 @@ def test_reactivate_after_pause_strat(
         pause_pair_strat = PairStratBaseModel.from_kwargs(_id=activated_pair_strat.id,
                                               strat_state=StratState.StratState_PAUSED)
         email_book_service_native_web_client.patch_pair_strat_client(
-            generic_encoder(pause_pair_strat, exclude_none=True))
+            pause_pair_strat.to_dict(exclude_none=True))
 
         time.sleep(2)
         reactivate_pair_strat = PairStratBaseModel.from_kwargs(_id=activated_pair_strat.id,
                                                    strat_state=StratState.StratState_ACTIVE)
         email_book_service_native_web_client.patch_pair_strat_client(
-            generic_encoder(reactivate_pair_strat, exclude_none=True))
+            reactivate_pair_strat.to_dict(exclude_none=True))
 
         time.sleep(2)
         total_chore_count_for_each_side = 2
@@ -7336,8 +7496,8 @@ def test_pause_done_n_unload_strat(static_data_, clean_and_set_limits, leg1_leg2
         active_strat_list.append(activated_pair_strat)
 
     email_book_service_native_web_client.patch_pair_strat_client(
-        generic_encoder(PairStratBaseModel.from_kwargs(_id=active_strat_list[-1].id, strat_state=StratState.StratState_READY),
-                         exclude_none=True))
+        PairStratBaseModel.from_kwargs(_id=active_strat_list[-1].id,
+                                       strat_state=StratState.StratState_READY).to_dict(exclude_none=True))
 
     time.sleep(5)
 
@@ -7345,13 +7505,13 @@ def test_pause_done_n_unload_strat(static_data_, clean_and_set_limits, leg1_leg2
 
         if active_strat != active_strat_list[-1]:
             email_book_service_native_web_client.patch_pair_strat_client(
-                generic_encoder(PairStratBaseModel.from_kwargs(_id=active_strat.id, strat_state=StratState.StratState_PAUSED),
-                                 exclude_none=True))
+                PairStratBaseModel.from_kwargs(_id=active_strat.id,
+                                               strat_state=StratState.StratState_PAUSED).to_dict(exclude_none=True))
 
             time.sleep(5)
             email_book_service_native_web_client.patch_pair_strat_client(
-                generic_encoder(PairStratBaseModel.from_kwargs(_id=active_strat.id, strat_state=StratState.StratState_DONE),
-                                 exclude_none=True))
+                PairStratBaseModel.from_kwargs(_id=active_strat.id,
+                                               strat_state=StratState.StratState_DONE).to_dict(exclude_none=True))
 
             time.sleep(5)
         strat_key = get_strat_key_from_pair_strat(active_strat)
@@ -7405,7 +7565,7 @@ def _frequent_update_strat_view_in_strat(buy_symbol, sell_symbol, pair_strat_,
             strat_view_obj = StratViewBaseModel.from_kwargs(_id=created_pair_strat.id, market_premium=i)
         else:
             strat_view_obj = StratViewBaseModel.from_kwargs(_id=created_pair_strat.id, balance_notional=i)
-        photo_book_web_client.patch_strat_view_client(generic_encoder(strat_view_obj, exclude_none=True))
+        photo_book_web_client.patch_strat_view_client(strat_view_obj.to_dict(exclude_none=True))
 
     updated_strat_view = photo_book_web_client.get_strat_view_client(created_pair_strat.id)
     assert updated_strat_view.market_premium == loop_count-2, \

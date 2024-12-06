@@ -402,7 +402,7 @@ class ChoreControl:
             for lvl in range(max_px_level - 1, -1, -1):
                 # lvl reducing from max_px_level to 0
                 market_depth = market_depths[lvl]
-                if market_depth is not None:
+                if market_depth is not None and market_depth.symbol:
                     px_by_max_level = market_depth.px
                     break
 

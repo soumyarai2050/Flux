@@ -43,9 +43,9 @@ message NewChore{
   optional ChoreSubmitType chore_submit_state = 13 [(FluxFldServerPopulate) = true];
   optional string algo = 14 [(FluxFldOrmNoUpdate) = true];
   optional float pov = 15 [(FluxFldOrmNoUpdate) = true, (FluxFldTitle) = "Pov", (FluxFldNumberFormat) = "%"]; // percentage of volume
-  optional string activate_dt = 16 [(FluxFldOrmNoUpdate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Activate", (FluxFldHide) = "True"];
-  optional string deactivate_dt = 17 [(FluxFldOrmNoUpdate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Deactivate", (FluxFldHide) = "True"];
-  optional string ord_entry_time = 18 [(FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Chore Entry", (FluxFldHide) = "True"];
+  optional int64 activate_dt = 16 [(FluxFldOrmNoUpdate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Activate", (FluxFldHide) = "True"];
+  optional int64 deactivate_dt = 17 [(FluxFldOrmNoUpdate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Deactivate", (FluxFldHide) = "True"];
+  optional int64 ord_entry_time = 18 [(FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Chore Entry", (FluxFldHide) = "True"];
   optional string text = 19 [(FluxFldTitle) = "Text", (FluxFldAbbreviated) = "JSON", (FluxFldServerPopulate) = true];
   optional int64 pending_amd_qty = 20 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldHelp) = "used internally for amend qty support - also helps prevent second amend trigger unless prior is completed - px and qty simultaneous amend is allowed"];
   optional float pending_amd_px = 21 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldHelp) = "used internally for amend px support - also helps prevent second amend trigger unless prior amend is completed - px and qty simultaneous amend is allowed"];
@@ -191,7 +191,7 @@ message FillsJournal{
   optional string fill_bartering_symbol = 7 [(FluxFldIndex) = true, (FluxFldHide) = "True", (FluxFldFilterEnable) = true, (FluxFldHelp) = "System Symbol"];
   optional Side fill_side = 8;
   required string underlying_account = 9;
-  optional string fill_date_time = 10 [(FluxFldValIsDateTime) = true];
+  optional int64 fill_date_time = 10 [(FluxFldValIsDateTime) = true];
   required string fill_id = 11;
   optional int64 underlying_account_cumulative_fill_qty = 12 [(FluxFldHide) = "True"]; // used by executor query at strat start
   optional string user_data = 13;

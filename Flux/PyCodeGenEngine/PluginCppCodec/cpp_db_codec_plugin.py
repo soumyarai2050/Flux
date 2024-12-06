@@ -96,9 +96,9 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         # output_content += f'#include "../CppUtilGen/{class_name}_max_id_handler.h"\n'
         output_content += f'#include <bsoncxx/builder/basic/document.hpp>\n'
         output_content += f'#include "mongo_db_handler.h"\n\n'
-        output_content += f'#include "../../../../../../FluxCppCore/include/json_codec.h"\n'
-        output_content += f'#include "../CppUtilGen/market_data_get_str_from_enum.h"\n'
-        output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n\n'
+        output_content += '#include "string_util.h"\n\n'
+        # output_content += f'#include "../CppDataStructures/{file_name}.h"\n\n'
+        # output_content += f'#include "../CppUtilGen/{class_name}_constants.h"\n\n'
         return output_content
 
     def generate_repeated_nested_fields(self, message: protogen.Message, field_name, package_name,
@@ -110,23 +110,23 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         parent_field = field.proto.name
 
         if parent_field != field_name:
-            output += f'\t\t\tif (kr_{message_name_snake_cased}_obj.{parent_field}().{field_name}_size() > 0) {{\n'
+            output += f'\t\t\tif (kr_{message_name_snake_cased}_obj.{parent_field}_.{field_name}_.size() > 0) {{\n'
             output += f'\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n'
-            output += f'\t\t\t\tfor (const auto& {field_name}_doc : kr_{message_name_snake_cased}_obj.{parent_field}().' \
-                      f'{field_name}()) {{\n'
+            output += f'\t\t\t\tfor (const auto& {field_name}_doc : kr_{message_name_snake_cased}_obj.{parent_field}_.' \
+                      f'{field_name}_) {{\n'
             output += f'\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
         else:
             if initial_parent == parent_field and parent_field == field_name:
-                output += f'\t\tif (kr_{message_name_snake_cased}_obj.{parent_field}_size() > 0) {{\n'
+                output += f'\t\tif (kr_{message_name_snake_cased}_obj.is_{parent_field}_set_) {{\n'
                 output += f'\t\t\tbsoncxx::builder::basic::array {parent_field}_list;\n'
-                output += f'\t\t\tfor (const auto& {field_name}_doc : kr_{message_name_snake_cased}_obj.{parent_field}()) {{\n'
+                output += f'\t\t\tfor (const auto& {field_name}_doc : kr_{message_name_snake_cased}_obj.{parent_field}_) {{\n'
                 output += f'\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
             else:
-                output += "\t"*num_of_tabs + f'if ({initial_parent}_doc.{parent_field}_size() > 0) {{\n'
+                output += "\t"*num_of_tabs + f'if ({initial_parent}_doc.is_{parent_field}_set_) {{\n'
                 num_of_tabs += 1
                 output += "\t"*num_of_tabs + f'bsoncxx::builder::basic::array {parent_field}_list;\n'
                 num_of_tabs += 1
-                output += "\t"*num_of_tabs + f'for (const auto& {parent_field}_doc : {initial_parent}_doc.{parent_field}()) {{\n'
+                output += "\t"*num_of_tabs + f'for (const auto& {parent_field}_doc : {initial_parent}_doc.{parent_field}_) {{\n'
                 num_of_tabs += 1
                 output += "\t"*num_of_tabs + f'bsoncxx::builder::basic::document {parent_field}_document;\n'
 
@@ -140,96 +140,96 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                         if message_field_name == "id":
                             if field_type == "required":
                                 output += f'\t\t\t\t\t{field_name}_document.append(FluxCppCore::kvp("' \
-                                          f'_id", {field_name}_doc.{message_field_name}()));\n'
+                                          f'_id", {field_name}_doc.{message_field_name}_));\n'
                             else:
-                                output += f'\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
+                                output += f'\t\t\t\t\tif ({field_name}_doc.is_{message_field_name}_set_)\n'
                                 output += f'\t\t\t\t\t\t{field_name}_document.append(FluxCppCore::kvp("' \
-                                          f'_id", {field_name}_doc.{message_field_name}()));\n'
+                                          f'_id", {field_name}_doc.{message_field_name}_));\n'
                         else:
                             if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                                 if field_type == "required":
                                     output += f'\t\t\t\t\t{field_name}_document.append(FluxCppCore::kvp(' \
                                               f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc' \
-                                              f'.{message_field_name}()));\n'
+                                              f'.{message_field_name}_));\n'
                                 else:
-                                    output += f'\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
+                                    output += f'\t\t\t\t\tif ({field_name}_doc.is_{message_field_name}set_)\n'
                                     output += f'\t\t\t\t\t\t{field_name}_document.append(FluxCppCore::kvp(' \
                                               f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc' \
-                                              f'.{message_field_name}()));\n'
+                                              f'.{message_field_name}_));\n'
                             else:
                                 if field_type == "required":
                                     output += f'\t\t\t\t\t{field_name}_document.append(FluxCppCore::kvp(' \
                                               f'{package_name}_handler::{message_field_name}_fld_name, convert_int64_to_b_date({field_name}_doc' \
-                                              f'.{message_field_name}())));\n'
+                                              f'.{message_field_name}_)));\n'
                                 else:
                                     output += f'\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
                                     output += f'\t\t\t\t\t\t{field_name}_document.append(FluxCppCore::kvp(' \
                                               f'{package_name}_handler::{message_field_name}_fld_name, FluxCppCore'\
                                                f'::convert_int64_to_b_date({field_name}_doc' \
-                                              f'.{message_field_name}())));\n'
+                                              f'.{message_field_name}_)));\n'
                     else:
                         if initial_parent == parent_field and parent_field == field_name:
                             if message_field_name == "id":
                                 if field_type == "required":
                                     output += f'\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp("' \
-                                              f'_id", {parent_field}_doc.{message_field_name}()));\n'
+                                              f'_id", {parent_field}_doc.{message_field_name}_));\n'
                                 else:
-                                    output += f'\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
+                                    output += f'\t\t\t\tif ({parent_field}_doc.is_{message_field_name}_)\n'
                                     output += f'\t\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp("' \
-                                              f'_id", {parent_field}_doc.{message_field_name}()));\n'
+                                              f'_id", {parent_field}_doc.{message_field_name}_));\n'
                             else:
                                 if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                                     if field_type == "required":
                                         output += f'\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp(' \
                                                   f'{package_name}_handler::{message_field_name}_fld_name, {parent_field}_doc.' \
-                                                  f'{message_field_name}()));\n'
+                                                  f'{message_field_name}_));\n'
                                     else:
-                                        output += f'\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
+                                        output += f'\t\t\t\tif ({parent_field}_doc.is_{message_field_name}_set_)\n'
                                         output += f'\t\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp(' \
                                                   f'{package_name}_handler::{message_field_name}_fld_name, {parent_field}_doc.' \
-                                                  f'{message_field_name}()));\n'
+                                                  f'{message_field_name}_));\n'
                                 else:
                                     if field_type == "required":
                                         # output += f"\t\t\t\tstd::string {message_field_name};\n"
                                         # output += f"\t\t\t\tFluxCppCore::format_time({parent_field}_doc.{message_field_name}(), {message_field_name});\n"
                                         output += f'\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp(' \
                                                   f'{package_name}_handler::{message_field_name}_fld_name, '\
-                                                   f'FluxCppCore::StringUtil::convert_utc_string_to_b_date({parent_field}_doc.{message_field_name}())));\n'
+                                                   f'FluxCppCore::StringUtil::convert_utc_string_to_b_date({parent_field}_doc.{message_field_name}_)));\n'
                                     else:
-                                        output += f'\t\t\t\tif ({parent_field}_doc.has_{message_field_name}()) {{\n'
+                                        output += f'\t\t\t\tif ({parent_field}_doc.is_{message_field_name}_set_) {{\n'
                                         # output += f"\t\t\t\t\tstd::string {message_field_name};\n"
                                         # output += f"\t\t\t\t\tFluxCppCore::format_time({parent_field}_doc.{message_field_name}(), {message_field_name});\n"
                                         output += f'\t\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp(' \
                                                   f'{package_name}_handler::{message_field_name}_fld_name, '\
-                                                   f'FluxCppCore::StringUtil::convert_utc_string_to_b_date({parent_field}_doc.{message_field_name}())));\n'
+                                                   f'FluxCppCore::StringUtil::convert_utc_string_to_b_date({parent_field}_doc.{message_field_name}_)));\n'
                                         output += "\t\t\t\t}\n"
                         else:
                             if message_field_name == "id":
                                 if field_type == "required":
                                     output += "\t" * local_num_of_tabs + f'{parent_field}_document.append(FluxCppCore'\
                                                                           f'::kvp("_id", {parent_field}' \
-                                                                         f'_doc.{message_field_name}()));\n'
+                                                                         f'_doc.{message_field_name}_));\n'
                                 else:
-                                    output += "\t" * local_num_of_tabs + f'if ({parent_field}_doc.has_' \
-                                                                         f'{message_field_name}())\n'
+                                    output += "\t" * local_num_of_tabs + f'if ({parent_field}_doc.is_' \
+                                                                         f'{message_field_name}_set_)\n'
                                     local_num_of_tabs += 1
                                     output += "\t" * local_num_of_tabs + f'{parent_field}_document.append(FluxCppCore' \
                                                                          f'::kvp("_id", {parent_field}' \
-                                                                         f'_doc.{message_field_name}()));\n'
+                                                                         f'_doc.{message_field_name}_));\n'
                             else:
                                 if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                                     if field_type == "required":
                                         output += "\t" * local_num_of_tabs + f'{parent_field}_document.append(FluxCppCore' \
                                                                              f'::kvp({package_name}_handler::' \
                                                                              f'{message_field_name}_fld_name, ' \
-                                                                             f'{parent_field}_doc.{message_field_name}()));\n'
+                                                                             f'{parent_field}_doc.{message_field_name}_));\n'
                                     else:
-                                        output += "\t"*local_num_of_tabs + f'if ({parent_field}_doc.has_{message_field_name}())\n'
+                                        output += "\t"*local_num_of_tabs + f'if ({parent_field}_doc.is_{message_field_name}_set_)\n'
                                         local_num_of_tabs += 1
                                         output += "\t"*local_num_of_tabs + f'{parent_field}_document.append(FluxCppCore' \
                                                                            f'::kvp({package_name}_handler::' \
                                                                            f'{message_field_name}_fld_name, ' \
-                                                                           f'{parent_field}_doc.{message_field_name}()));\n'
+                                                                           f'{parent_field}_doc.{message_field_name}_));\n'
                                 else:
                                     if field_type == "required":
                                         output += "\t" * local_num_of_tabs + f'{parent_field}_document.append(FluxCppCore' \
@@ -238,9 +238,9 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                                                              f'FluxCppCore::StringUtil::'\
                                                                               f'convert_int64_to_b_date('\
                                                                               f'{parent_field}_doc.'\
-                                                                              f'{message_field_name}())));\n'
+                                                                              f'{message_field_name}_)));\n'
                                     else:
-                                        output += "\t"*local_num_of_tabs + f'if ({parent_field}_doc.has_{message_field_name}())\n'
+                                        output += "\t"*local_num_of_tabs + f'if ({parent_field}_doc.is_{message_field_name}_)\n'
                                         local_num_of_tabs += 1
                                         output += "\t"*local_num_of_tabs + f'{parent_field}_document.append(FluxCppCore' \
                                                                            f'::kvp({package_name}_handler::' \
@@ -248,12 +248,12 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                                                            f'FluxCppCore::StringUtil::'\
                                                                             f'convert_int64_to_b_date('\
                                                                             f'{parent_field}_doc.'\
-                                                                            f'{message_field_name}())));\n'
+                                                                            f'{message_field_name}_)));\n'
                 else:
-                    output += f'\t\t\t\tif ({parent_field}_doc.{message_field_name}_size() > 0) {{\n'
+                    output += f'\t\t\t\tif ({parent_field}_doc.is_{message_field_name}_set_) {{\n'
                     output += f'\t\t\t\t\tbsoncxx::builder::basic::array {message_field_name}_list;\n'
                     output += f'\t\t\t\t\tfor (const auto& {message_field_name}_doc : {parent_field}_doc.' \
-                              f'{message_field_name}()){{\n'
+                              f'{message_field_name}_){{\n'
                     output += f'\t\t\t\t\t\t{message_field_name}_list.append({message_field_name}_doc);\n'
                     output += "\t\t\t\t\t}\n"
                     output += f'\t\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp' \
@@ -274,7 +274,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     field_cardinality = field.cardinality.name.lower()
                     # if field_cardinality == "required":
                     output += "\t" * num_of_tabs + f"{message_field_name}_document.append(FluxCppCore::kvp({field_name1}_fld_name, " \
-                                                   f"{parent_field}_doc.{message_field_name}().{field_name1}()));\n"
+                                                   f"{parent_field}_doc.{message_field_name}_.{field_name1}_));\n"
                 output += "\t" * num_of_tabs + f"{parent_field}_document.append(FluxCppCore::kvp({message_field_name}_fld_name, " \
                                                f"{message_field_name}_document));\n"
 
@@ -311,26 +311,26 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         parent_field = field.proto.name
 
         if parent_field != field_name:
-            output += f'\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{parent_field}' \
-                      f'().{field_name}_size() > 0) {{\n'
+            output += f'\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{parent_field}' \
+                      f'_.{field_name}_.size() > 0) {{\n'
             output += f'\t\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n'
             output += f'\t\t\t\t\tfor (const auto& {field_name}_doc : r_{message_name_snake_cased}_list_obj.' \
-                      f'{message_name_snake_cased}(i).{parent_field}().{field_name}()) {{\n'
+                      f'{message_name_snake_cased}_.at(i).{parent_field}_.{field_name}_) {{\n'
             output += f'\t\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
         else:
             if initial_parent == parent_field and parent_field == field_name:
-                output += f'\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{parent_field}' \
-                          f'_size() > 0) {{\n'
+                output += f'\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).is_{parent_field}' \
+                          f'_set_) {{\n'
                 output += f'\t\t\t\tbsoncxx::builder::basic::array {parent_field}_list;\n'
                 output += f'\t\t\t\tfor (const auto& {field_name}_doc : r_{message_name_snake_cased}_list_obj.' \
-                          f'{message_name_snake_cased}(i).{parent_field}()) {{\n'
+                          f'{message_name_snake_cased}_.at(i).{parent_field}_) {{\n'
                 output += f'\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
             else:
-                output += "\t"*num_of_tabs + f'if ({initial_parent}_doc.{parent_field}_size() > 0) {{\n'
+                output += "\t"*num_of_tabs + f'if ({initial_parent}_doc.is_{parent_field}_set_) {{\n'
                 num_of_tabs += 1
                 output += "\t"*num_of_tabs + f'bsoncxx::builder::basic::array {parent_field}_list;\n'
                 num_of_tabs += 1
-                output += "\t"*num_of_tabs + f'for (const auto& {parent_field}_doc : {initial_parent}_doc.{parent_field}()) {{\n'
+                output += "\t"*num_of_tabs + f'for (const auto& {parent_field}_doc : {initial_parent}_doc.{parent_field}_) {{\n'
                 num_of_tabs += 1
                 output += "\t"*num_of_tabs + f'bsoncxx::builder::basic::document {parent_field}_document;\n'
 
@@ -344,68 +344,68 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                         if message_field_name == "id":
                             if field_type == "required":
                                 output += f'\t\t\t\t\t\t{field_name}_document.append(FluxCppCore::kvp("' \
-                                          f'_id", {field_name}_doc.{message_field_name}()));\n'
+                                          f'_id", {field_name}_doc.{message_field_name}_));\n'
                             else:
-                                output += f'\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
+                                output += f'\t\t\t\t\t\tif ({field_name}_doc.is_{message_field_name}_set_)\n'
                                 output += f'\t\t\t\t\t\t\t{field_name}_document.append(FluxCppCore::kvp("' \
-                                          f'_id", {field_name}_doc.{message_field_name}()));\n'
+                                          f'_id", {field_name}_doc.{message_field_name}_));\n'
                         else:
                             if field_type == "required":
                                 output += f'\t\t\t\t\t{field_name}_document.append(FluxCppCore::kvp(' \
                                           f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc.' \
-                                          f'{message_field_name}()));\n'
+                                          f'{message_field_name}_));\n'
                             else:
-                                output += f'\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
+                                output += f'\t\t\t\t\t\tif ({field_name}_doc.is_{message_field_name}_set_)\n'
                                 output += f'\t\t\t\t\t\t\t{field_name}_document.append(FluxCppCore::kvp(' \
                                           f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc.' \
-                                          f'{message_field_name}()));\n'
+                                          f'{message_field_name}_));\n'
                     else:
                         if initial_parent == parent_field and parent_field == field_name:
                             if message_field_name == "id":
                                 if field_type == "required":
                                     output += f'\t\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp("' \
-                                              f'_id", {parent_field}_doc.{message_field_name}()));\n'
+                                              f'_id", {parent_field}_doc.{message_field_name}_));\n'
                                 else:
-                                    output += f'\t\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
+                                    output += f'\t\t\t\t\tif ({parent_field}_doc.is_{message_field_name}_set_)\n'
                                     output += f'\t\t\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp("' \
-                                              f'_id", {parent_field}_doc.{message_field_name}()));\n'
+                                              f'_id", {parent_field}_doc.{message_field_name}_));\n'
                             else:
                                 if field_type == "required":
                                     output += f'\t\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp' \
                                               f'({package_name}_handler::{message_field_name}_fld_name, {parent_field}_doc.' \
-                                              f'{message_field_name}()));\n'
+                                              f'{message_field_name}_));\n'
                                 else:
-                                    output += f'\t\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
+                                    output += f'\t\t\t\t\tif ({parent_field}_doc.is_{message_field_name}_set_)\n'
                                     output += f'\t\t\t\t\t\t{parent_field}_document.append(FluxCppCore::kvp' \
                                               f'({package_name}_handler::{message_field_name}_fld_name, {parent_field}_doc.' \
-                                              f'{message_field_name}()));\n'
+                                              f'{message_field_name}_));\n'
                         else:
                             if message_field_name == "_id":
                                 if field_type == "required":
                                     output += "\t" * local_num_of_tabs + f'{parent_field}_document.append(FluxCppCore' \
                                                                          f'::kvp("_id", {parent_field}_doc.' \
-                                                                         f'{message_field_name}()));\n'
+                                                                         f'{message_field_name}_));\n'
                                 else:
-                                    output += "\t"*local_num_of_tabs + f'if ({parent_field}_doc.has_{message_field_name}())\n'
+                                    output += "\t"*local_num_of_tabs + f'if ({parent_field}_doc.is_{message_field_name}_set_)\n'
                                     local_num_of_tabs += 1
                                     output += "\t"*local_num_of_tabs + f'{parent_field}_document.append(FluxCppCore' \
                                                                        f'::kvp("_id", {parent_field}_doc.' \
-                                                                       f'{message_field_name}()));\n'
+                                                                       f'{message_field_name}_));\n'
                             else:
                                 if field_type == "required":
                                     output += "\t" * local_num_of_tabs + f'{parent_field}_document.append(FluxCppCore' \
                                                                          f'::kvp({package_name}_handler::' \
                                                                          f'{message_field_name}_fld_name, {parent_field}_doc' \
-                                                                         f'.{message_field_name}()));\n'
+                                                                         f'.{message_field_name}_));\n'
                                 else:
-                                    output += "\t" * local_num_of_tabs + f'if ({parent_field}_doc.has_{message_field_name}())\n'
+                                    output += "\t" * local_num_of_tabs + f'if ({parent_field}_doc.is_{message_field_name}_set_)\n'
                                     local_num_of_tabs += 1
                                     output += "\t" * local_num_of_tabs + f'{parent_field}_document.append(FluxCppCore' \
                                                                          f'::kvp({package_name}_handler::' \
                                                                          f'{message_field_name}_fld_name, {parent_field}_doc' \
-                                                                         f'.{message_field_name}()));\n'
+                                                                         f'.{message_field_name}_));\n'
                 else:
-                    output += f'\t\t\t\t\tif ({parent_field}_doc.{message_field_name}_size() > 0) {{\n'
+                    output += f'\t\t\t\t\tif ({parent_field}_doc.{message_field_name}_.size() > 0) {{\n'
                     output += f'\t\t\t\t\t\tbsoncxx::builder::basic::array {message_field_name}_list;\n'
                     output += f'\t\t\t\t\t\tfor (const auto& {message_field_name}_doc : {parent_field}_doc.' \
                               f'{message_field_name}()){{\n'
@@ -428,7 +428,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     field_cardinality = field.cardinality.name.lower()
                     # if field_cardinality == "required":
                     output += "\t" * num_of_tabs + f"{message_field_name}_document.append(FluxCppCore::kvp({field_name1}_fld_name, " \
-                                                   f"{parent_field}_doc.{message_field_name}().{field_name1}()));\n"
+                                                   f"{parent_field}_doc.{message_field_name}_.{field_name1}_));\n"
                 output += "\t" * num_of_tabs + f"{parent_field}_document.append(FluxCppCore::kvp({message_field_name}_fld_name, " \
                                                f"{message_field_name}_document));\n"
 
@@ -473,94 +473,112 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                             if field_type == "required":
                                 output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
                                           f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.' \
-                                          f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
+                                          f'{initial_parent_field}_.{parent_feild}_.{field_name}_.{message_field_name}_));\n'
                             else:
-                                output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
-                                          f"{parent_feild}().{field_name}().has_{message_field_name}())\n"
+                                output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}_." \
+                                          f"{parent_feild}_.{field_name}_.is_{message_field_name}_set_)\n"
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
                                           f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.' \
-                                          f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
+                                          f'{initial_parent_field}_.{parent_feild}_.{field_name}_.{message_field_name}_));\n'
                         else:
                             if field_type == "required":
                                 # output += f"\t\t\t\tstd::string {message_field_name};\n"
                                 # output += f"\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}(), {message_field_name})\n"
                                 output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}())));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{initial_parent_field}_.{parent_feild}_.{field_name}_.{message_field_name}_)));\n'
                             else:
-                                output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
-                                          f"{parent_feild}().{field_name}().has_{message_field_name}()) {{\n"
+                                output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}_." \
+                                          f"{parent_feild}_.{field_name}_.is_{message_field_name}_set_) {{\n"
                                 # output += f"\t\t\t\t\tstd::string {message_field_name};\n"
                                 # output += f"\t\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}())));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{initial_parent_field}_.{parent_feild}_.{field_name}_.{message_field_name}_)));\n'
                                 output += "\t\t\t\t}\n"
                     else:
                         if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                             if field_type == "required":
                                 output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
                                           f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.' \
-                                          f'{initial_parent_field}().{field_name}().{message_field_name}()));\n'
+                                          f'{initial_parent_field}_.{field_name}_.{message_field_name}_));\n'
                             else:
-                                output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
-                                          f"{field_name}().has_{message_field_name}())\n"
+                                output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}_." \
+                                          f"{field_name}_.is_{message_field_name}_set_)\n"
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
                                           f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.' \
-                                          f'{initial_parent_field}().{field_name}().{message_field_name}()));\n'
+                                          f'{initial_parent_field}_.{field_name}_.{message_field_name}_));\n'
                         else:
                             if field_type == "required":
                                 # output += f"\t\t\t\tstd::string {message_field_name};\n"
                                 # output += f"\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{field_name}().{message_field_name}()))));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{initial_parent_field}_.{field_name}_.{message_field_name}_))));\n'
                             else:
-                                output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
-                                          f"{field_name}().has_{message_field_name}())\n"
+                                output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}_." \
+                                          f"{field_name}_.is_{message_field_name}_set_)\n"
                                 # output += f"\t\t\t\t\tstd::string {message_field_name};\n"
                                 # output += f"\t\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{initial_parent_field}().{field_name}().{message_field_name}()))));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{initial_parent_field}_.{field_name}_.{message_field_name}_))));\n'
                                 output += "\t\t\t\t}\n"
                 else:
                     if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                         if field_type == "required":
                             output += f'\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
                                       f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.{field_name}' \
-                                      f'().{message_field_name}()));\n'
+                                      f'_.{message_field_name}_));\n'
                         else:
-                            output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}().has_{message_field_name}())\n"
+                            output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}_.is_{message_field_name}_set_)\n"
                             output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
                                       f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.{field_name}' \
-                                      f'().{message_field_name}()));\n'
+                                      f'_.{message_field_name}_));\n'
                     else:
                         if field_type == "required":
                             # output += f"\t\t\tstd::string {message_field_name};\n"
                             # output += f"\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}().{message_field_name}());\n"
                             output += f'\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{field_name}().{message_field_name}())));\n'
+                                      f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{field_name}_.{message_field_name}_)));\n'
                         else:
-                            output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}().has_{message_field_name}()) {{\n"
+                            output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}_.is_{message_field_name}_set_) {{\n"
                             # output +=f"\t\t\t\tstd::string {message_field_name};\n"
                             # output +=f"\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}().{message_field_name}(), {message_field_name});\n"
                             output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{field_name}().{message_field_name}())));\n'
+                                      f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{field_name}_.is_{message_field_name}_set_)));\n'
                             output += "\t\t\t}\n"
             elif message_field.message is not None and field_type != "repeated":
-                if field_name != initial_parent_field:
-                    output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
-                              f"{field_name}().has_{message_field_name}()) "
-                    output += f"{{\n"
-                    output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
-                    output += self.generate_nested_fields(message_field.message, message_field_name,
-                                                          message_name_snake_cased, package_name, field, field_name)
+                if field_type != "required":
+                    if field_name != initial_parent_field:
+                        output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}_." \
+                                  f"{field_name}_.is_{message_field_name}_set_) "
+                        output += f"{{\n"
+                        output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                        output += self.generate_nested_fields(message_field.message, message_field_name,
+                                                              message_name_snake_cased, package_name, field, field_name)
+                    else:
+                        output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}_.is_{message_field_name}_set_) "
+                        output += f"{{\n"
+                        output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                        output += self.generate_nested_fields(message_field.message, message_field_name,
+                                                              message_name_snake_cased, package_name, field, field_name)
+                    output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler::' \
+                              f'{message_field_name}_fld_name, {message_field_name}_doc));\n'
+                    output += f"\t\t\t}}\n"
                 else:
-                    output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}().has_{message_field_name}()) "
-                    output += f"{{\n"
-                    output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
-                    output += self.generate_nested_fields(message_field.message, message_field_name,
-                                                          message_name_snake_cased, package_name, field, field_name)
-                output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler::' \
-                          f'{message_field_name}_fld_name, {message_field_name}_doc));\n'
-                output += f"\t\t\t}}\n"
+                    if field_name != initial_parent_field:
+                        # output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}_." \
+                        #           f"{field_name}_.is_{message_field_name}_set_) "
+                        # output += f"{{\n"
+                        output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                        output += self.generate_nested_fields(message_field.message, message_field_name,
+                                                              message_name_snake_cased, package_name, field, field_name)
+                    else:
+                        # output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}_.is_{message_field_name}_set_) "
+                        # output += f"{{\n"
+                        output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                        output += self.generate_nested_fields(message_field.message, message_field_name,
+                                                              message_name_snake_cased, package_name, field, field_name)
+                    output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler::' \
+                              f'{message_field_name}_fld_name, {message_field_name}_doc));\n'
+                    # output += f"\t\t\t}}\n"
             elif message_field.message is not None and field_type == "repeated":
                 output += self.generate_repeated_nested_fields(message_field.message, message_field_name, package_name,
                                                                message_name_snake_cased, field, field_name, 5)
@@ -583,103 +601,133 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                             if field_type == "required":
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
                                           f'_handler::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.' \
-                                          f'{message_name_snake_cased}(i).' \
-                                          f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
+                                          f'{message_name_snake_cased}_.at(i).' \
+                                          f'{initial_parent_field}_.{parent_feild}_.{field_name}_.{message_field_name}_));\n'
                             else:
-                                output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                          f"{initial_parent_field}().{parent_feild}().{field_name}()." \
-                                          f"has_{message_field_name}())\n"
+                                output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                          f"{initial_parent_field}_.{parent_feild}_.{field_name}_." \
+                                          f"is_{message_field_name}_set_)\n"
                                 output += f'\t\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
                                           f'_handler::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.' \
-                                          f'{message_name_snake_cased}(i).' \
-                                          f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
+                                          f'{message_name_snake_cased}_.at(i).' \
+                                          f'{initial_parent_field}_.{parent_feild}_.{field_name}_.{message_field_name}_));\n'
                         else:
                             if field_type == "required":
                                 # output += f"\t\t\t\t\t std::string {message_field_name};\n"
                                 # output += f"\t\t\t\t\t FluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}())));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{initial_parent_field}_.{parent_feild}_.{field_name}_.{message_field_name}_)));\n'
                             else:
-                                output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                          f"{initial_parent_field}().{parent_feild}().{field_name}()." \
-                                          f"has_{message_field_name}()) {{\n"
+                                output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                          f"{initial_parent_field}_.{parent_feild}_.{field_name}_." \
+                                          f"is_{message_field_name}_set_) {{\n"
                                 # output += f"\t\t\t\t\t\tstd::string {message_field_name};\n"
                                 # output += f"\t\t\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}())));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{initial_parent_field}_.{parent_feild}_.{field_name}_.{message_field_name}_)));\n'
                                 output += "\t\t\t\t\t}\n"
                     else:
                         if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                             if field_type == "required":
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
                                           f'_handler::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.' \
-                                          f'{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().' \
-                                          f'{message_field_name}()));\n'
+                                          f'{message_name_snake_cased}_.at(i).{initial_parent_field}_.{field_name}_.' \
+                                          f'{message_field_name}_));\n'
                             else:
-                                output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                          f"{initial_parent_field}().{field_name}().has_{message_field_name}())\n"
+                                output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                          f"{initial_parent_field}_.{field_name}_.is_{message_field_name}_set_)\n"
                                 output += f'\t\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
                                           f'_handler::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.' \
-                                          f'{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().' \
-                                          f'{message_field_name}()));\n'
+                                          f'{message_name_snake_cased}_.at(i).{initial_parent_field}_.{field_name}_.' \
+                                          f'{message_field_name}_));\n'
                         else:
                             if field_type == "required":
                                 # output += f"\t\t\t\t\tstd::string {message_field_name};\n"
                                 # output += f"\t\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().{message_field_name}())));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{initial_parent_field}_.{field_name}_.{message_field_name}_)));\n'
                             else:
-                                output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                          f"{initial_parent_field}().{field_name}().has_{message_field_name}()) {{\n"
+                                output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                          f"{initial_parent_field}_.{field_name}_.is_{message_field_name}_set_) {{\n"
                                 # output += f"\t\t\t\t\t\tstd::string {message_field_name};\n"
                                 # output += f"\t\t\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().{message_field_name}(), {message_field_name});\n"
                                 output += f'\t\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().{message_field_name}())));\n'
+                                          f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{initial_parent_field}_.{field_name}_.{message_field_name}_)));\n'
                                 output += "\t\t\t\t\t}\n"
                 else:
                     if (not CppDbHandlerPlugin.is_option_enabled(message_field, CppDbHandlerPlugin.flux_fld_val_is_datetime)):
                         if field_type == "required":
                             output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler' \
-                                      f'::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
-                                      f'(i).{field_name}().{message_field_name}()));\n'
+                                      f'::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at' \
+                                      f'(i).{field_name}_.{message_field_name}_));\n'
                         else:
-                            output += f"\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                      f"{field_name}().has_{message_field_name}())\n"
+                            output += f"\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                      f"{field_name}_.is_{message_field_name}_set_)\n"
                             output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler' \
                                       f'::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
-                                      f'(i).{field_name}().{message_field_name}()));\n'
+                                      f'_.at(i).{field_name}_.{message_field_name}_));\n'
                     else:
                         if field_type == "required":
                             # output += f"\t\t\t\tstd::string {message_field_name};\n"
                             # output += f"\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}().{message_field_name}(), {message_field_name});\n"
                             output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler' \
-                                      f'::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}().{message_field_name}())));\n'
+                                      f'::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{field_name}_.{message_field_name}_)));\n'
                         else:
-                            output += f"\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                      f"{field_name}().has_{message_field_name}()) {{\n"
+                            output += f"\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                      f"{field_name}_.is_{message_field_name}_set_) {{\n"
                             # output += f"\t\t\t\t\tstd::string {message_field_name};\n"
                             # output += (f"\t\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}().{message_field_name}(), {message_field_name});\n")
                             output += f'\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler' \
-                                      f'::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}().{message_field_name}())));\n'
+                                      f'::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{field_name}_.{message_field_name}_)));\n'
                             output += "\t\t\t\t}\n"
             elif message_field.message is not None and field_type != "repeated":
-                if field_name != initial_parent_field:
-                    output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                              f"{initial_parent_field}().{field_name}().has_{message_field_name}()) "
-                    output += f"{{\n"
-                    output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
-                    output += self.generate_msg_nested_fields(message_field.message, message_field_name,
-                                                              message_name_snake_cased, package_name, field, field_name)
+                if field_type == "optional":
+                    if field_name != initial_parent_field:
+                        output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                  f"{initial_parent_field}_.{field_name}_.is_{message_field_name}_set_) "
+                        output += f"{{\n"
+                        output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                        output += self.generate_msg_nested_fields(message_field.message, message_field_name,
+                                                                  message_name_snake_cased, package_name, field,
+                                                                  field_name)
+                        output += f"\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler::" \
+                                  f"{message_field_name}_fld_name, {message_field_name}_doc));\n"
+                        output += f"\t\t\t\t}}\n"
+                    else:
+                        output += f"\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{field_name}_" \
+                                  f".is_{message_field_name}_set_) "
+                        output += f"{{\n"
+                        output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                        output += self.generate_msg_nested_fields(message_field.message, message_field_name,
+                                                                  message_name_snake_cased, package_name, field,
+                                                                  field_name)
+                        output += f"\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler::" \
+                                  f"{message_field_name}_fld_name, {message_field_name}_doc));\n"
+                        output += f"\t\t\t\t}}\n"
                 else:
-                    output += f"\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}()" \
-                              f".has_{message_field_name}()) "
-                    output += f"{{\n"
-                    output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
-                    output += self.generate_msg_nested_fields(message_field.message, message_field_name,
-                                                              message_name_snake_cased, package_name, field, field_name)
-                output += f"\t\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler::" \
-                          f"{message_field_name}_fld_name, {message_field_name}_doc));\n"
-                output += f"\t\t\t\t}}\n"
+                    pass
+                    if field_name != initial_parent_field:
+                        # output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                        #           f"{initial_parent_field}_.{field_name}_.is_{message_field_name}_set_) "
+                        # output += f"{{\n"
+                        output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                        output += self.generate_msg_nested_fields(message_field.message, message_field_name,
+                                                                  message_name_snake_cased, package_name, field,
+                                                                  field_name)
+                        output += f"\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler::" \
+                                  f"{message_field_name}_fld_name, {message_field_name}_doc));\n"
+                        # output += f"\t\t\t}}\n"
+                    else:
+                        # output += f"\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{field_name}_" \
+                        #           f".is_{message_field_name}_set_) "
+                        # output += f"{{\n"
+                        output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                        output += self.generate_msg_nested_fields(message_field.message, message_field_name,
+                                                                  message_name_snake_cased, package_name, field,
+                                                                  field_name)
+                        output += f"\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}_handler::" \
+                                  f"{message_field_name}_fld_name, {message_field_name}_doc));\n"
+                        # output += f"\t\t\t}}\n"
             elif message_field.message is not None and field_type == "repeated":
                 output += self.generate_msg_repeated_nested_fields(message_field.message, message_field_name, package_name,
                                                                    message_name_snake_cased, field, field_name)
@@ -689,7 +737,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                              package_name: str, message_name: str):
         output_content: str = ""
         # output_content += f"\tprotected:\n\n"
-        output_content += f"\tinline void prepare_doc(const {package_name}::{message_name} " \
+        output_content += f"\tinline void prepare_doc(const {message_name} " \
                           f"&kr_{message_name_snake_cased}_obj, bsoncxx::builder::basic::document " \
                           f"&r_{message_name_snake_cased}_document) "
         output_content += " {\n"
@@ -708,55 +756,64 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                 if field.kind.name != "ENUM":
                                     output_content += (f"\t\tr_{message_name_snake_cased}_document.append(FluxCppCore"
                                                        f"::kvp({package_name}_handler::{field_name}_fld_name, "
-                                                       f"kr_{message_name_snake_cased}_obj.{field_name}()));\n")
+                                                       f"kr_{message_name_snake_cased}_obj.{field_name}_));\n")
                                 else:
                                     output_content += (f"\t\tr_{message_name_snake_cased}_document.append(FluxCppCore"
                                                        f"::kvp({package_name}_handler::{field_name}_fld_name, "
-                                                       f"get_str_from_enum(kr_{message_name_snake_cased}_obj.{field_name}())));\n")
+                                                       f"kr_{message_name_snake_cased}_obj.{field_name}_));\n")
                             else:
-                                output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.has_{field_name}())\n"
+                                output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.is_{field_name}_set_)\n"
                                 output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::" \
                                                   f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                                  f"kr_{message_name_snake_cased}_obj.{field_name}()));\n"
+                                                  f"kr_{message_name_snake_cased}_obj.{field_name}_));\n"
                         else:
                             if field_type == "required":
                                 # output_content += f"\t\tstd::string {field_name};\n"
                                 # output_content += f"\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}(), {field_name});\n"
                                 output_content += (f"\t\tr_{message_name_snake_cased}_document.append(FluxCppCore"
                                                    f"::kvp({package_name}_handler::{field_name}_fld_name, "
-                                                   f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{field_name}())));\n")
+                                                   f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{field_name}_)));\n")
                             else:
-                                output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.has_{field_name}()) {{\n"
+                                output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.is_{field_name}_set_) {{\n"
                                 # output_content += f"\t\tstd::string {field_name};\n"
                                 # output_content += f"\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}(), {field_name});\n"
                                 output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::" \
                                                   f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                                  f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{field_name}())));\n"
+                                                  f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{field_name}_)));\n"
                                 output_content += "\t\t}\n"
 
                 else:
-                    output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.{field_name}_size() > 0)\n"
+                    output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.is_{field_name}_set_)\n"
                     output_content += f"\t\t{{\n"
                     output_content += f"\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n"
-                    output_content += f"\t\t\tfor (int i = 0; i < kr_{message_name_snake_cased}_obj.{field_name}_size(); ++i)\n"
-                    output_content += f"\t\t\t\t{field_name}_list.append(kr_{message_name_snake_cased}_obj.{field_name}(i));\n"
+                    output_content += f"\t\t\tfor (size_t i = 0; i < kr_{message_name_snake_cased}_obj.{field_name}_.size(); ++i)\n"
+                    output_content += f"\t\t\t\t{field_name}_list.append(kr_{message_name_snake_cased}_obj.at(i));\n"
                     output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::kvp" \
                                       f"({package_name}_handler::{field_name}_fld_name, {field_name}_list));\n"
                     output_content += f"\t\t}}\n"
 
             else:
                 if field_type != "repeated":
-                    output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.has_{field_name}())"
-                    output_content += f" {{\n"
-                    output_content += f"\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
-                    # print(f".............{field.proto.name}...............")
-                    output_content += self.generate_nested_fields(field_type_message, field_name,
-                                                                  message_name_snake_cased, package_name, field,
-                                                                  field_name)
-                    output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::kvp(" \
-                                      f"{package_name}_handler::{field_name}_fld_name, {field_name}_doc));\n"
-                    output_content += f"\t\t}}\n"
-
+                    if field_type == "optional":
+                        output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.is_{field_name}_set_)"
+                        output_content += f" {{\n"
+                        output_content += f"\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
+                        # print(f".............{field.proto.name}...............")
+                        output_content += self.generate_nested_fields(field_type_message, field_name,
+                                                                      message_name_snake_cased, package_name, field,
+                                                                      field_name)
+                        output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::kvp(" \
+                                          f"{package_name}_handler::{field_name}_fld_name, {field_name}_doc));\n"
+                        output_content += f"\t\t}}\n"
+                    else:
+                        output_content += f"\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
+                        # print(f".............{field.proto.name}...............")
+                        output_content += self.generate_nested_fields(field_type_message, field_name,
+                                                                      message_name_snake_cased, package_name, field,
+                                                                      field_name)
+                        output_content += f"\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::kvp(" \
+                                          f"{package_name}_handler::{field_name}_fld_name, {field_name}_doc));\n"
+                        # output_content += f"\t\t}}\n"
                 else:
                     output_content += self.generate_repeated_nested_fields(field_type_message, field_name,
                                                                            package_name, message_name_snake_cased,
@@ -767,11 +824,11 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                               package_name: str, message_name: str):
 
         output_content: str = ""
-        output_content += f"\tinline void prepare_list_doc(const {package_name}::{message_name}List " \
+        output_content += f"\tinline void prepare_list_doc(const {message_name}List " \
                           f"&r_{message_name_snake_cased}_list_obj, std::vector<bsoncxx::builder::basic::document> " \
                           f"&r_{message_name_snake_cased}_document_list) "
         output_content += " {\n"
-        output_content += f"\t\tfor (int i =0; i < r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_size(); " \
+        output_content += f"\t\tfor (size_t i =0; i < r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.size(); " \
                           f"++i) {{\n"
         output_content += f"\t\t\tbsoncxx::builder::basic::document r_{message_name_snake_cased}_document;\n"
 
@@ -787,30 +844,30 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                             if field_type == "required":
                                 output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::" \
                                                   f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                                  f"r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                                  f"{field_name}()));\n"
+                                                  f"r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                                  f"{field_name}_));\n"
                             else:
-                                output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                                  f"has_{field_name}())\n"
+                                output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                                  f"is_{field_name}_set_)\n"
                                 output_content += f"\t\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::" \
                                                   f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                                  f"r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                                  f"{field_name}()));\n"
+                                                  f"r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                                  f"{field_name}_));\n"
                     else:
                         if field_type == "required":
                             # output_content += f"\t\t\tstd::string {field_name};\n"
                             # output_content += f"\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}(), {field_name});\n"
                             output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::" \
                                               f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                              f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}())));\n"
+                                              f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{field_name}_)));\n"
                         else:
-                            output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                              f"has_{field_name}()) {{\n"
+                            output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                              f"is_{field_name}_set_) {{\n"
                             # output_content += f"\t\t\t\tstd::string {field_name};\n"
                             # output_content += f"\t\t\t\tFluxCppCore::format_time(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}(), {field_name});\n"
                             output_content += f"\t\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::" \
                                               f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                              f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}())));\n"
+                                              f"FluxCppCore::StringUtil::convert_utc_string_to_b_date(r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i).{field_name}_)));\n"
                             output_content += "\t\t\t}\n"
                     # else:
                     #     if field_type == "required":
@@ -827,31 +884,44 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     #                           f'{message_name_snake_cased}(i).{field_name}()));\n'
                     #     output_content += "\t\t\t\t}\n"
                 else:
-                    output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                      f"{field_name}_size() > 0)\n"
+                    output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                      f"is_{field_name}_set_)\n"
                     output_content += f"\t\t\t{{\n"
                     output_content += f"\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n"
-                    output_content += f"\t\t\t\tfor (int i = 0; i < r_{message_name_snake_cased}_list_obj." \
-                                      f"{message_name_snake_cased}(i).{field_name}_size(); ++i)\n"
+                    output_content += f"\t\t\t\tfor (size_t i = 0; i < r_{message_name_snake_cased}_list_obj." \
+                                      f"{message_name_snake_cased}_.at(i).{field_name}_.size(); ++i)\n"
                     output_content += f"\t\t\t\t\t{field_name}_list.append(r_{message_name_snake_cased}_list_obj." \
-                                      f"{message_name_snake_cased}(i).{field_name}(i));\n"
+                                      f"{message_name_snake_cased}_.at(i).{field_name}_.at(i));\n"
                     output_content += f"\t\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::kvp" \
                                       f"({package_name}_handler::{field_name}_fld_name, {field_name}_list));\n"
                     output_content += f"\t\t\t}}\n"
 
             else:
                 if field_type != "repeated":
-                    output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
-                                      f"has_{field_name}())"
-                    output_content += f" {{\n"
-                    output_content += f"\t\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
-                    # print(f".............{field.proto.name}...............")
-                    output_content += self.generate_msg_nested_fields(field_type_message, field_name,
-                                                                      message_name_snake_cased, package_name, field,
-                                                                      field_name)
-                    output_content += f"\t\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::kvp(" \
-                                      f"{package_name}_handler::{field_name}_fld_name, {field_name}_doc));\n"
-                    output_content += f"\t\t\t}}\n"
+                    if field_type == "optional":
+                        output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                                          f"is_{field_name}_set_)"
+                        output_content += f" {{\n"
+                        output_content += f"\t\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
+                        # print(f".............{field.proto.name}...............")
+                        output_content += self.generate_msg_nested_fields(field_type_message, field_name,
+                                                                          message_name_snake_cased, package_name, field,
+                                                                          field_name)
+                        output_content += f"\t\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::kvp(" \
+                                          f"{package_name}_handler::{field_name}_fld_name, {field_name}_doc));\n"
+                        output_content += f"\t\t\t}}\n"
+                    else:
+                        # output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_.at(i)." \
+                        #                   f"is_{field_name}_set_)"
+                        # output_content += f" {{\n"
+                        output_content += f"\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
+                        # print(f".............{field.proto.name}...............")
+                        output_content += self.generate_msg_nested_fields(field_type_message, field_name,
+                                                                          message_name_snake_cased, package_name, field,
+                                                                          field_name)
+                        output_content += f"\t\t\tr_{message_name_snake_cased}_document.append(FluxCppCore::kvp(" \
+                                          f"{package_name}_handler::{field_name}_fld_name, {field_name}_doc));\n"
+                        # output_content += f"\t\t\t}}\n"
 
                 else:
                     output_content += self.generate_msg_repeated_nested_fields(field_type_message, field_name,

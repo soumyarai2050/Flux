@@ -1,10 +1,8 @@
 #pragma once
 
-
-#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppCodec/market_data_mongo_db_codec.h"
-#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_key_handler.h"
 #include "mongo_db_handler.h"
-#include "json_codec.h"
+#include "project_includes.h"
+#include "cpp_app_logger.h"
 
 using namespace market_data_handler;
 
@@ -69,7 +67,7 @@ namespace FluxCppCore {
         int32_t insert_or_update(RootModelType &kr_root_model_obj) {
     	    int32_t r_new_generated_id_out{-1};
             std::string root_model_key;
-    	    kr_root_model_obj.set_id(r_new_generated_id_out);
+    	    kr_root_model_obj.id_ = r_new_generated_id_out;
             if(CheckInitializedAndGetKey(kr_root_model_obj, root_model_key)){
         	    insert_or_update(kr_root_model_obj, root_model_key, r_new_generated_id_out);
             }
@@ -180,18 +178,19 @@ namespace FluxCppCore {
         void update_root_model_key_to_db_id(const RootModelType &kr_root_model_obj) {
             std::string root_model_key;
             MarketDataKeyHandler::get_key_out(kr_root_model_obj, root_model_key);
-            m_root_model_key_to_db_id[root_model_key] = kr_root_model_obj.id();
+            m_root_model_key_to_db_id[root_model_key] = kr_root_model_obj.id_;
         }
 
         static bool process_element(const bsoncxx::document::element &element, bsoncxx::builder::basic::document &new_doc) {
             if (element.type() == bsoncxx::type::k_date) {
-                auto date_value = element.get_date();
-                auto duration_since_epoch = std::chrono::duration_cast<std::chrono::microseconds>(date_value.value);
+                auto date_value = element.get_date().value;
 
-                std::chrono::system_clock::time_point tp(duration_since_epoch);
-                std::string iso_date_str = date::format("%FT%T%z", tp);
-
-                new_doc.append(bsoncxx::builder::basic::kvp(element.key(), iso_date_str));
+                // auto duration_since_epoch = std::chrono::duration_cast<std::chrono::microseconds>(date_value.value);
+                //
+                // std::chrono::system_clock::time_point tp(duration_since_epoch);
+                // std::string iso_date_str = date::format("%FT%T%z", tp);
+                //
+                new_doc.append(bsoncxx::builder::basic::kvp(element.key(), date_value.count()));
             } else if (element.type() == bsoncxx::type::k_document) {
                 bsoncxx::builder::basic::document inner_doc;
                 for (const auto& inner_element : element.get_document().view()) {
@@ -274,7 +273,7 @@ namespace FluxCppCore {
                 mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
                 auto m_mongo_db_collection_ = db[get_root_model_name()];
                 auto cursor = m_mongo_db_collection_.find({});
-
+                all_data_from_db_json_string += "[";
                 for (const auto &bson_doc : cursor) {
                     bsoncxx::builder::basic::document new_doc;
                     for (const auto &element: bson_doc) {
@@ -282,13 +281,13 @@ namespace FluxCppCore {
                     }
 
                     std::string doc_view = bsoncxx::to_json(new_doc.view());
-                    size_t pos = doc_view.find("_id");
-                    while (pos != std::string::npos) {
-                        if (!isalpha(doc_view[pos - 1])) {
-                            doc_view.erase(pos, 1);
-                        }
-                        pos = doc_view.find("_id", pos + 1);
-                    }
+                    // size_t pos = doc_view.find("_id");
+                    // while (pos != std::string::npos) {
+                    //     if (!isalpha(doc_view[pos - 1])) {
+                    //         doc_view.erase(pos, 1);
+                    //     }
+                    //     pos = doc_view.find("_id", pos + 1);
+                    // }
 
                     all_data_from_db_json_string += doc_view;
                     all_data_from_db_json_string += ",";
@@ -296,12 +295,56 @@ namespace FluxCppCore {
 
                 if (all_data_from_db_json_string.back() == ',') {
                     all_data_from_db_json_string.pop_back();
+                    all_data_from_db_json_string += "]";
                 } // else not required: all_data_from_db_json_string is empty so need to perform any operation
-                r_root_model_list_obj_out.Clear();
 
-                if (!all_data_from_db_json_string.empty())
-                    return FluxCppCore::RootModelListJsonCodec<RootModelListType>::decode_model_list(
-                        r_root_model_list_obj_out, all_data_from_db_json_string);
+                if (!all_data_from_db_json_string.empty()) {
+                    MarketDataJsonToObject::json_to_object(all_data_from_db_json_string, r_root_model_list_obj_out);
+                }
+            } catch (const std::exception& e) {
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error {}, function{}", e.what(), __func__);
+            }
+            return false;
+        }
+
+        bool get_data_from_collection_with_limit(RootModelListType &r_root_model_list_obj_out, const int32_t limit) {
+            try {
+                std::string all_data_from_db_json_string;
+                auto client = m_sp_mongo_db_->get_pool_client();
+                mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                auto m_mongo_db_collection_ = db[get_root_model_name()];
+                mongocxx::options::find find_options;
+                find_options.sort(bsoncxx::builder::basic::make_document(bsoncxx::builder::basic::kvp("_id", -1)));
+                find_options.limit(std::abs(limit));
+                auto cursor = m_mongo_db_collection_.find({}, find_options);
+                all_data_from_db_json_string += "[";
+                for (const auto &bson_doc : cursor) {
+                    bsoncxx::builder::basic::document new_doc;
+                    for (const auto &element: bson_doc) {
+                        process_element(element, new_doc);
+                    }
+
+                    std::string doc_view = bsoncxx::to_json(new_doc.view());
+                    // size_t pos = doc_view.find("_id");
+                    // while (pos != std::string::npos) {
+                    //     if (!isalpha(doc_view[pos - 1])) {
+                    //         doc_view.erase(pos, 1);
+                    //     }
+                    //     pos = doc_view.find("_id", pos + 1);
+                    // }
+
+                    all_data_from_db_json_string += doc_view;
+                    all_data_from_db_json_string += ",";
+                }
+
+                if (all_data_from_db_json_string.back() == ',') {
+                    all_data_from_db_json_string.pop_back();
+                    all_data_from_db_json_string += "]";
+                } // else not required: all_data_from_db_json_string is empty so need to perform any operation
+
+                if (!all_data_from_db_json_string.empty()) {
+                    MarketDataJsonToObject::json_to_object(all_data_from_db_json_string, r_root_model_list_obj_out);
+                }
             } catch (const std::exception& e) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error {}, function{}", e.what(), __func__);
             }
@@ -339,7 +382,7 @@ namespace FluxCppCore {
             }
         }
 
-        bool get_data_by_id_from_collection(RootModelType &r_root_model_obj_out, const int32_t &kr_root_model_doc_id) {
+        bool get_data_by_id_from_collection([[maybe_unused]] RootModelType &r_root_model_obj_out, const int32_t &kr_root_model_doc_id) {
             bool status = false;
             try {
                 auto client = m_sp_mongo_db_->get_pool_client();
@@ -364,7 +407,7 @@ namespace FluxCppCore {
                         pos = new_bson_doc.find("_id", pos + 1);
                     }
 
-                    status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, new_bson_doc);
+                    // status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, new_bson_doc);
                 }
             } catch (const std::exception& e) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error {}, function {}", e.what(), __func__);
@@ -449,8 +492,7 @@ namespace FluxCppCore {
             auto found = m_root_model_key_to_db_id.find(kr_key);
             if (found == m_root_model_key_to_db_id.end()) {
                 const std::string error = "Error!" + get_root_model_name() +
-                        "key not found in m_root_model_key_to_db_id map;;; r_root_model_obj: "
-                        + kr_proto_model_obj.DebugString() + "map: " + KeyToDbIdAsString();
+                        "key not found in m_root_model_key_to_db_id map;;; map: " + KeyToDbIdAsString();
                 throw std::runtime_error(error);
             }
             return found;
@@ -467,20 +509,13 @@ namespace FluxCppCore {
             return result;
         }
 
-        auto get_root_model_name() const {
-            auto meta_data = root_model_type_.GetMetadata();
-            return meta_data.descriptor->name();
+        std::string get_root_model_name() const {
+            auto meta_data = root_model_type_.get_name();
+            return meta_data;
         }
 
-        bool IsInitialized(const RootModelType &kr_root_model_obj) const {
-            // return true, if the object is initialized and has all the required fields (false otherwise)
-            if (!kr_root_model_obj.IsInitialized()) {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Required fields is not initialized in {};;; obj: {}",
-                          get_root_model_name(), kr_root_model_obj.DebugString());
-                return false;
-            } else {
-                return true;
-            }
+        bool IsInitialized([[maybe_unused]] const RootModelType &kr_root_model_obj) const {
+            return true;
         }
 
         bool CheckInitializedAndGetKey(const RootModelType &kr_root_model_obj, std::string &root_model_key_out) const {

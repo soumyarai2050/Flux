@@ -27,7 +27,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.
     EmailBookServiceHttpClient
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 from FluxPythonUtils.scripts.utility_functions import clean_mongo_collections, YAMLConfigurationManager, parse_to_int, \
-    get_mongo_db_list, drop_mongo_database, avg_of_new_val_sum_to_avg, run_gbd_terminal_with_pid, get_pid_from_port
+    get_mongo_db_list, drop_mongo_database, avg_of_new_val_sum_to_avg, run_gbd_terminal_with_pid, get_pid_from_port, \
+    ClientError
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
@@ -2246,7 +2247,7 @@ def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side,
         tob_obj.ask_quote.px = px
         tob_obj.ask_quote.last_update_date_time = update_date_time
         tob_obj.last_update_date_time = update_date_time
-    updated_tob_obj = executor_web_client.patch_top_of_book_client(generic_encoder(tob_obj, exclude_none=True))
+    updated_tob_obj = executor_web_client.patch_top_of_book_client(tob_obj.to_json_dict(exclude_none=True))
 
     for market_barter_vol in updated_tob_obj.market_barter_volume:
         market_barter_vol.id = None
@@ -2456,15 +2457,6 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
     assert updated_pair_strat.port is not None, (
         "Once pair_strat is partially running it also must contain executor port, updated object has "
         f"port field as None, updated pair_strat: {updated_pair_strat}")
-    assert updated_pair_strat.top_of_book_port is not None, (
-        "Once pair_strat is partially running it also must contain top_of_book_port, updated object has "
-        f"port field as None, updated pair_strat: {updated_pair_strat}")
-    assert updated_pair_strat.market_depth_port is not None, (
-        "Once pair_strat is partially running it also must contain market_depth_port, updated object has "
-        f"port field as None, updated pair_strat: {updated_pair_strat}")
-    assert updated_pair_strat.last_barter_port is not None, (
-        "Once pair_strat is partially running it also must contain last_barter_port, updated object has "
-        f"port field as None, updated pair_strat: {updated_pair_strat}")
 
     executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
         updated_pair_strat.host, updated_pair_strat.port)
@@ -2586,6 +2578,15 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
     assert updated_pair_strat.is_executor_running, \
         f"is_executor_running state must be True, found false, pair_strat: {updated_pair_strat}"
     print(f"is_executor_running is True, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    assert updated_pair_strat.top_of_book_port is not None, (
+        "Once pair_strat is running it also must contain top_of_book_port, updated object has "
+        f"port field as None, updated pair_strat: {updated_pair_strat}")
+    assert updated_pair_strat.market_depth_port is not None, (
+        "Once pair_strat is running it also must contain market_depth_port, updated object has "
+        f"port field as None, updated pair_strat: {updated_pair_strat}")
+    assert updated_pair_strat.last_barter_port is not None, (
+        "Once pair_strat is running it also must contain last_barter_port, updated object has "
+        f"port field as None, updated pair_strat: {updated_pair_strat}")
     assert updated_pair_strat.strat_state == StratState.StratState_READY, \
         (f"StratState Mismatched, expected StratState: {StratState.StratState_READY}, "
          f"received pair_strat's strat_state: {updated_pair_strat.strat_state}")
@@ -2597,7 +2598,7 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
     # activating strat
     pair_strat = PairStratBaseModel.from_kwargs(_id=stored_pair_strat_basemodel.id,
                                                 strat_state=StratState.StratState_ACTIVE)
-    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(generic_encoder(pair_strat, exclude_none=True))
+    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(pair_strat.to_dict(exclude_none=True))
     assert activated_pair_strat.strat_state == StratState.StratState_ACTIVE, \
         (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
          f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
@@ -2770,7 +2771,7 @@ def manage_strat_creation_and_activation(leg1_symbol: str, leg2_symbol: str,
 
     # activating strat
     pair_strat = PairStratBaseModel.from_kwargs(_id=stored_pair_strat_basemodel.id, strat_state=strat_state)
-    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(generic_encoder(pair_strat, exclude_none=True))
+    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(pair_strat.to_dict(exclude_none=True))
     assert activated_pair_strat.strat_state == strat_state, \
         (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
          f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
@@ -2829,7 +2830,7 @@ def run_symbol_overview(buy_symbol: str, sell_symbol: str,
 def create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list: List[MarketDepthBaseModel],
                         executor_web_client: StreetBookServiceHttpClient):
     for index, market_depth_basemodel in enumerate(market_depth_basemodel_list):
-        if index < 10:
+        if index < len(market_depth_basemodel_list)/2:
             market_depth_basemodel.symbol = buy_symbol
         else:
             market_depth_basemodel.symbol = sell_symbol
@@ -2901,6 +2902,15 @@ def renew_strat_collection():
         email_book_service_native_web_client.put_strat_collection_client(strat_collection)
 
 
+def kill_tail_executor_for_strat_id(pair_strat_id: int):
+    datetime_str = datetime.datetime.now().strftime("%Y%m%d")
+    log_simulator_log_file = str(STRAT_EXECUTOR / "log" / f"log_simulator_{pair_strat_id}_logs_{datetime_str}.log")
+    log_book_web_client.log_book_force_kill_tail_executor_query_client(log_simulator_log_file)
+    street_book_log_file = str(STRAT_EXECUTOR / "log" /
+                                  f"street_book_{pair_strat_id}_logs_{datetime_str}.log")
+    log_book_web_client.log_book_force_kill_tail_executor_query_client(street_book_log_file)
+
+
 def clean_executors_and_today_activated_symbol_side_lock_file():
     datetime_str = datetime.datetime.now().strftime("%Y%m%d")
     intraday_bartering_chores_file = str(STRAT_EXECUTOR / "data" / f"intraday_bartering_chores_{datetime_str}.csv")
@@ -2908,28 +2918,34 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
         os.remove(intraday_bartering_chores_file)
     existing_pair_strat = email_book_service_native_web_client.get_all_pair_strat_client()
     for pair_strat in existing_pair_strat:
-        # force killing all tails
-        log_simulator_log_file = str(STRAT_EXECUTOR / "log" / f"log_simulator_{pair_strat.id}_logs_{datetime_str}.log")
-        if os.path.exists(log_simulator_log_file):
-            log_book_web_client.log_book_force_kill_tail_executor_query_client(log_simulator_log_file)
-        street_book_log_file = str(STRAT_EXECUTOR / "log" /
-                                      f"street_book_{pair_strat.id}_logs_{datetime_str}.log")
-        if os.path.exists(street_book_log_file):
-            log_book_web_client.log_book_force_kill_tail_executor_query_client(street_book_log_file)
+        photo_book_web_client.patch_strat_view_client({'_id': pair_strat.id, 'unload_strat': True})
         time.sleep(1)
 
-        photo_book_web_client.patch_strat_view_client({'_id': pair_strat.id, 'unload_strat': True})
-
-    try_count = 30
-    for _ in range(try_count):
-        time.sleep(2)
-        strat_collection_list = email_book_service_native_web_client.get_all_strat_collection_client()
-        strat_collection = strat_collection_list[0]
-        if not strat_collection.loaded_strat_keys:
-            break
+    if len(existing_pair_strat) == 40:
+        wait_time_sec = 60 * 10
     else:
-        raise Exception(f"Strat Collection found having loaded strats even after {try_count} retries - "
-                        "all must have got unloaded")
+        wait_time_sec = 60
+
+    start_time = DateTime.utcnow()
+    while True:
+        try:
+            time.sleep(2)
+            strat_collection_list = email_book_service_native_web_client.get_all_strat_collection_client()
+            strat_collection = strat_collection_list[0]
+            if not strat_collection.loaded_strat_keys:
+                break
+            else:
+                if time_consumed := (DateTime.utcnow() - start_time).total_seconds() > wait_time_sec:
+                    raise Exception(f"Strat Collection found having loaded strats even after retries till "
+                                    f"{time_consumed} secs - all must have got unloaded")
+                else:
+                    continue
+        except ClientError as e:
+            if time_consumed := (DateTime.utcnow() - start_time).total_seconds() > wait_time_sec:
+                raise Exception(f"Client error while retrying get_all_strat_collection_client till "
+                                f"{time_consumed} secs, exception:{e}")
+            else:
+                continue
 
     # deleting all strats if all unloaded
     for pair_strat in existing_pair_strat:
@@ -2938,6 +2954,8 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
             AdminControlBaseModel.from_kwargs(command_type=CommandType.CLEAR_STRAT,
                                               datetime=DateTime.utcnow()))
         email_book_service_native_web_client.create_admin_control_client(admin_control_obj)
+        kill_tail_executor_for_strat_id(pair_strat.id)
+        time.sleep(1)
         email_book_service_native_web_client.delete_pair_strat_client(pair_strat.id)
 
         time.sleep(1)
@@ -3221,8 +3239,8 @@ def update_tob_through_market_depth_to_place_buy_chore(executor_web_client: Stre
     bid_buy_market_depth_obj.exch_time = get_utc_date_time()
     bid_buy_market_depth_obj.arrival_time = get_utc_date_time()
 
-    buy_market_depth_json = generic_encoder(bid_buy_market_depth_obj, exclude_none=True)
-    sell_market_depth_json = generic_encoder(ask_sell_market_depth_obj, exclude_none=True)
+    buy_market_depth_json = bid_buy_market_depth_obj.to_dict(exclude_none=True)
+    sell_market_depth_json = ask_sell_market_depth_obj.to_dict(exclude_none=True)
 
     # update to not trigger place chore
     executor_web_client.patch_market_depth_client(sell_market_depth_json)
@@ -3236,8 +3254,8 @@ def update_tob_through_market_depth_to_place_buy_chore(executor_web_client: Stre
     bid_buy_market_depth_obj.exch_time = get_utc_date_time()
     bid_buy_market_depth_obj.arrival_time = get_utc_date_time()
 
-    buy_market_depth_json = generic_encoder(bid_buy_market_depth_obj, exclude_none=True)
-    sell_market_depth_json = generic_encoder(ask_sell_market_depth_obj, exclude_none=True)
+    buy_market_depth_json = bid_buy_market_depth_obj.to_dict(exclude_none=True)
+    sell_market_depth_json = ask_sell_market_depth_obj.to_dict(exclude_none=True)
 
     # update to trigger place chore
     buy_market_depth_json["px"] = 100
@@ -3254,8 +3272,8 @@ def update_tob_through_market_depth_to_place_sell_chore(executor_web_client: Str
     sell_market_depth_obj.exch_time = get_utc_date_time()
     sell_market_depth_obj.arrival_time = get_utc_date_time()
 
-    sell_market_depth_json = generic_encoder(sell_market_depth_obj, exclude_none=True)
-    buy_market_depth_json = generic_encoder(buy_market_depth_obj, exclude_none=True)
+    sell_market_depth_json = sell_market_depth_obj.to_dict(exclude_none=True)
+    buy_market_depth_json = buy_market_depth_obj.to_dict(exclude_none=True)
 
     # update to not trigger place chore
     executor_web_client.patch_market_depth_client(buy_market_depth_json)
@@ -3270,8 +3288,8 @@ def update_tob_through_market_depth_to_place_sell_chore(executor_web_client: Str
     sell_market_depth_obj.exch_time = get_utc_date_time()
     sell_market_depth_obj.arrival_time = get_utc_date_time()
 
-    sell_market_depth_json = generic_encoder(sell_market_depth_obj, exclude_none=True)
-    buy_market_depth_json = generic_encoder(buy_market_depth_obj, exclude_none=True)
+    sell_market_depth_json = sell_market_depth_obj.to_json_dict(exclude_none=True)
+    buy_market_depth_json = buy_market_depth_obj.to_dict(exclude_none=True)
     sell_market_depth_json["px"] = 120
     executor_web_client.patch_market_depth_client(buy_market_depth_json)
     time.sleep(1)
@@ -3468,7 +3486,7 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received buy TOB")
         else:
             # placing new non-systematic new_chore
-            qty = random.randint(100, 110)
+            qty = random.randint(95, 105)
             px = random.randint(100, 110)
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client, sell_inst_type)
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
@@ -3734,7 +3752,7 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         else:
             # placing new non-systematic new_chore
             qty = random.randint(85, 95)
-            px = random.randint(90, 100)
+            px = random.randint(95, 100)
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client, buy_inst_type)
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
@@ -3771,7 +3789,7 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
         buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(90, 100)
+        buy_fill_journal_obj.fill_px = random.randint(95, 100)
         executor_web_client.barter_simulator_process_fill_query_client(
             chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
             Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
@@ -4644,7 +4662,7 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
         else:
             # placing new non-systematic new_chore
             qty = random.randint(85, 95)
-            px = random.randint(90, 100)
+            px = random.randint(95, 100)
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client, buy_inst_type)
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
@@ -4687,7 +4705,7 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
         buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(90, 100)
+        buy_fill_journal_obj.fill_px = random.randint(95, 100)
         executor_web_client.barter_simulator_process_fill_query_client(
             chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
             Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
@@ -5019,7 +5037,7 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         else:
             # placing new non-systematic new_chore
             qty = random.randint(85, 95)
-            px = random.randint(90, 100)
+            px = random.randint(95, 100)
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client, buy_inst_type)
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
@@ -5060,7 +5078,7 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
         buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(90, 100)
+        buy_fill_journal_obj.fill_px = random.randint(95, 100)
         executor_web_client.barter_simulator_process_fill_query_client(
             chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
             Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
@@ -5226,7 +5244,7 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         else:
             # placing new non-systematic new_chore
             qty = random.randint(85, 95)
-            px = random.randint(90, 100)
+            px = random.randint(95, 100)
             place_new_chore(buy_symbol1, Side.BUY, px, qty, executor_web_client1, buy1_inst_type)
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Created new_chore obj")
             time.sleep(2)
@@ -5269,7 +5287,7 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
         buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(90, 100)
+        buy_fill_journal_obj.fill_px = random.randint(95, 100)
         executor_web_client1.barter_simulator_process_fill_query_client(
             buy_chore_id1, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
             Side.BUY, buy_symbol1, buy_fill_journal_obj.underlying_account)
@@ -5550,7 +5568,7 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         else:
             # placing new non-systematic new_chore
             qty = random.randint(85, 95)
-            px = random.randint(90, 100)
+            px = random.randint(95, 100)
             place_new_chore(buy_symbol2, Side.BUY, px, qty, executor_web_client2, buy2_inst_type)
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Created new_chore obj")
             time.sleep(2)
@@ -5591,7 +5609,7 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
         buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(90, 100)
+        buy_fill_journal_obj.fill_px = random.randint(95, 100)
         executor_web_client2.barter_simulator_process_fill_query_client(
             buy_chore_id2, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
             Side.BUY, buy_symbol2, buy_fill_journal_obj.underlying_account)

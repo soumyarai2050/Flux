@@ -4,7 +4,6 @@
 ui_port: "3050"
 
 # server specific configs
-market_depth_levels: 10
 server_host: "127.0.0.1"
 main_server_beanie_port: "8040"
 main_server_cache_port: "8035"
@@ -41,3 +40,9 @@ inst_id: "SIM"  # instance id for simulator
 
 pause_fulfill_post_chore_dod: False   # if true pauses strat which gets chore update to make any chore_snapshot fully filled post chore is DOD
 max_spread_in_bips: 50
+
+# market depth lvl map
+exch_to_market_depth_lvl:
+  NYSE: 10
+  SGX: 20
+  SSE: 5

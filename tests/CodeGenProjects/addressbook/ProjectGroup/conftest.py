@@ -52,7 +52,27 @@ def leg1_leg2_symbol_list():
         ("CB_Sec_17", "EQT_Sec_17"),
         ("CB_Sec_18", "EQT_Sec_18"),
         ("CB_Sec_19", "EQT_Sec_19"),
-        ("CB_Sec_20", "EQT_Sec_20")
+        ("CB_Sec_20", "EQT_Sec_20"),
+        ("CB_Sec_21", "EQT_Sec_21"),
+        ("CB_Sec_22", "EQT_Sec_22"),
+        ("CB_Sec_23", "EQT_Sec_23"),
+        ("CB_Sec_24", "EQT_Sec_24"),
+        ("CB_Sec_25", "EQT_Sec_25"),
+        ("CB_Sec_26", "EQT_Sec_26"),
+        ("CB_Sec_27", "EQT_Sec_27"),
+        ("CB_Sec_28", "EQT_Sec_28"),
+        ("CB_Sec_29", "EQT_Sec_29"),
+        ("CB_Sec_30", "EQT_Sec_30"),
+        ("CB_Sec_31", "EQT_Sec_31"),
+        ("CB_Sec_32", "EQT_Sec_32"),
+        ("CB_Sec_33", "EQT_Sec_33"),
+        ("CB_Sec_34", "EQT_Sec_34"),
+        ("CB_Sec_35", "EQT_Sec_35"),
+        ("CB_Sec_36", "EQT_Sec_36"),
+        ("CB_Sec_37", "EQT_Sec_37"),
+        ("CB_Sec_38", "EQT_Sec_38"),
+        ("CB_Sec_39", "EQT_Sec_39"),
+        ("CB_Sec_40", "EQT_Sec_40")
     ]
 
 
@@ -95,68 +115,26 @@ def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, exp
 
 
 @pytest.fixture()
-def market_depth_basemodel_list():
+def market_depth_basemodel_list(request):
     input_data = []
+    position_lvl = getattr(request, "param", 5)
 
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
         for side, px, qty, dev in [("BID", 99, 90, -1), ("ASK", 121, 70, 1)]:
-            input_data.extend([
-                {
-                    "symbol": symbol,
-                    "exch_time": get_utc_date_time(),
-                    "arrival_time": get_utc_date_time(),
-                    "side": side,
-                    "px": px,
-                    "qty": qty+10,
-                    "position": 0,
-                    "market_maker": "string",
-                    "is_smart_depth": False
-                },
-                {
-                    "symbol": symbol,
-                    "exch_time": get_utc_date_time(),
-                    "arrival_time": get_utc_date_time(),
-                    "side": side,
-                    "px": px+(dev*1),
-                    "qty": qty-20,
-                    "position": 1,
-                    "market_maker": "string",
-                    "is_smart_depth": False
-                },
-                {
-                    "symbol": symbol,
-                    "exch_time": get_utc_date_time(),
-                    "arrival_time": get_utc_date_time(),
-                    "side": side,
-                    "px": px+(dev*2),
-                    "qty": qty+10,
-                    "position": 2,
-                    "market_maker": "string",
-                    "is_smart_depth": False
-                },
-                {
-                    "symbol": symbol,
-                    "exch_time": get_utc_date_time(),
-                    "arrival_time": get_utc_date_time(),
-                    "side": side,
-                    "px": px+(dev*3),
-                    "qty": qty-20,
-                    "position": 3,
-                    "market_maker": "string",
-                    "is_smart_depth": False
-                },
-                {
-                    "symbol": symbol,
-                    "exch_time": get_utc_date_time(),
-                    "arrival_time": get_utc_date_time(),
-                    "side": side,
-                    "px": px+(dev*4),
-                    "qty": qty+20,
-                    "position": 4,
-                    "market_maker": "string",
-                    "is_smart_depth": False
-                }
-            ])
+            for pos in range(position_lvl):
+                qty = qty+20 if pos == position_lvl-1 else (qty + 10 if pos % 2 != 0 else qty-20)
+                input_data.append(
+                    {
+                        "symbol": symbol,
+                        "exch_time": get_utc_date_time(),
+                        "arrival_time": get_utc_date_time(),
+                        "side": side,
+                        "px": px+(dev*pos),
+                        "qty": qty,
+                        "position": pos,
+                        "market_maker": "string",
+                        "is_smart_depth": False
+                    })
 
     market_depth_basemodel_list = [MarketDepthBaseModel.from_dict(market_depth_json) for market_depth_json in input_data]
 
@@ -193,14 +171,14 @@ def pair_strat_(pair_securities_with_sides_):
             "strat_mode": StratMode.StratMode_Normal,
             "strat_type": StratType.Premium,
             "strat_leg1": StratLegBaseModel.from_dict({
-              "exch_id": "SSE",
+              "exch_id": "NYSE",
               "sec": pair_securities_with_sides_["security1"],
               "side": pair_securities_with_sides_["side1"],
               "fallback_broker": "ZERODHA",
               "fallback_route": "BR_QFII"
             }),
             "strat_leg2": StratLegBaseModel.from_dict({
-              "exch_id": "SSE",
+              "exch_id": "NYSE",
               "sec": pair_securities_with_sides_["security2"],
               "side": pair_securities_with_sides_["side2"],
               "fallback_broker": "ZERODHA",

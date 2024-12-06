@@ -9,6 +9,8 @@ import "street_book_n_post_book_n_basket_book_core.proto";
 
 package basket_book;
 
+option (FluxFileDateTimeGranularity) = MILLI_SEC;
+option (FluxFileDateTimePrintTimezone) = "LOCAL";
 
 message BasketChore{
   option (FluxMsgJsonRoot) = {

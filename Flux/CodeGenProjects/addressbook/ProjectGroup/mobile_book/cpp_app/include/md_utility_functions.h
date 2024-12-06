@@ -1,7 +1,8 @@
 #pragma once
 
 namespace mobile_book_handler {
-    inline void format_data(MDContainer const& cache, std::vector<char>& buffer) {
+    template<size_t N>
+    inline void format_data(MDContainer<N> const& cache, std::vector<char>& buffer) {
 
         std::format_to(std::back_inserter(buffer), "\n{:*^40}\n\n", std::string_view(cache.symbol_));
 
@@ -116,9 +117,10 @@ namespace mobile_book_handler {
         std::copy(filtered_elements.begin(), filtered_elements.begin() + filtered_count, elements.begin());
     }
 
-    inline void compute_cumulative_fields_from_market_depth_elements(MDContainer& r_container, MarketDepthQueueElement& r_element) {
+    template<size_t N>
+    inline void compute_cumulative_fields_from_market_depth_elements(MDContainer<N>& r_container, const MarketDepthQueueElement& r_element) {
         // Select the relevant market depth array based on the side
-        std::array<MarketDepthQueueElement, MARKET_DEPTH_LEVEL>& md_array =
+        std::array<MarketDepthQueueElement, N>& md_array =
             (r_element.side_ == 'B') ? r_container.bid_market_depths_ : r_container.ask_market_depths_;
 
         auto position = r_element.position_;

@@ -72,8 +72,6 @@ class StreetBook(BaseBook):
     underlying_handle_strat_activate_query_http: Callable[..., Any] | None = None
     underlying_update_residuals_query_http: Callable[..., Any] | None = None
 
-    mobile_book_provider: ctypes.CDLL
-
     @classmethod
     def initialize_underlying_http_routes(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes_imports import (
@@ -181,6 +179,7 @@ class StreetBook(BaseBook):
         self.sym_ovrw_getter: Callable = self.strat_cache.get_symbol_overview_from_symbol_obj
         self.buy_leg_single_lot_usd_notional: int | None = None
         self.sell_leg_single_lot_usd_notional: int | None = None
+        self.last_set_unack_call_date_time: DateTime | None = None
 
         self._system_control_update_date_time: DateTime | None = None
         self._strat_brief_update_date_time: DateTime | None = None
@@ -370,6 +369,7 @@ class StreetBook(BaseBook):
             return leg1_tob, leg2_tob
 
     def set_unack(self, system_symbol: str, unack_state: bool, internal_ord_id: str):
+        self.last_set_unack_call_date_time: DateTime = DateTime.utcnow()
         if self.strat_cache._pair_strat.pair_strat_params.strat_leg1.sec.sec_id == system_symbol:
             self.strat_cache.set_has_unack_leg1(unack_state, internal_ord_id)
         if self.strat_cache._pair_strat.pair_strat_params.strat_leg2.sec.sec_id == system_symbol:
@@ -1345,6 +1345,17 @@ class StreetBook(BaseBook):
         if has_unack_leg:
             if log_error:  # [chore impact not applied yet]
                 logging.debug(f"blocked opportunity search, has unack leg and {open_chore_count} open chore(s)")
+            if open_chore_count == 0:
+                secs_till_last_ser_unack_call = (DateTime.utcnow() - self.last_set_unack_call_date_time).total_seconds()
+                acceptable_secs_btw_unack_and_chore_snapshot_open_count_update = 2  # secs
+                if secs_till_last_ser_unack_call > acceptable_secs_btw_unack_and_chore_snapshot_open_count_update:
+                    logging.exception(f"Found {open_chore_count=} but found some chore's either leg set as unack, "
+                                      f"last unack was set {secs_till_last_ser_unack_call} secs ago, acceptable is <="
+                                      f"{acceptable_secs_btw_unack_and_chore_snapshot_open_count_update} secs")
+                else:
+                    logging.info(f"Found {open_chore_count=} along with some chore's either leg set as unack but "
+                                 f"last unack was set {secs_till_last_ser_unack_call} secs ago, which is <="
+                                 f"expected {acceptable_secs_btw_unack_and_chore_snapshot_open_count_update} secs")
             return False
         if not self.strat_limit.max_open_chores_per_side:
             logging.debug(f"blocked opportunity search, {self.strat_limit.max_open_chores_per_side=} not set")

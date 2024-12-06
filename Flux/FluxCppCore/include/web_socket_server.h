@@ -8,11 +8,10 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/asio.hpp>
-#include "quill/Quill.h"
 
-#include "json_codec.h"
 #include "utility_functions.h"
-#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_constants.h"
+#include "project_includes.h"
+#include "mongo_db_codec.h"
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -27,15 +26,16 @@ namespace FluxCppCore {
     template <typename RootModelType, typename RootModelListType, typename UserDataType>
     class WebSocketServer {
     public:
-        explicit WebSocketServer(UserDataType &user_data, const std::string& kr_host = market_data_handler::host,
-                                 const int32_t k_web_socket_server_port = stoi(market_data_handler::port),
-                                 const std::chrono::seconds k_read_timeout =
-                                 std::chrono::seconds(market_data_handler::connection_timeout)) :
-        m_user_data(user_data), km_host_(kr_host), km_port_(k_web_socket_server_port),
+        explicit WebSocketServer(UserDataType &user_data, MongoDBCodec<RootModelType, RootModelListType>& mongo_db_codec,
+            const int32_t db_limit, const std::string& kr_host = market_data_handler::host,
+            const int32_t k_web_socket_server_port = stoi(market_data_handler::port),
+            const std::chrono::seconds k_read_timeout = std::chrono::seconds(market_data_handler::connection_timeout)) :
+        m_user_data(user_data), m_mongo_db_codec_(mongo_db_codec), m_db_fetch_limit_(db_limit),
+        km_host_(kr_host), km_port_(k_web_socket_server_port),
         km_read_timeout_seconds_(std::chrono::duration_cast<std::chrono::seconds>(k_read_timeout).count()),
         m_timer_(m_io_context_, km_read_timeout_seconds_) {
             start_connection();
-            m_ws_run_thread_ = std::thread([this]() {
+            m_ws_run_thread_ = std::jthread([this]() {
                 run();
             });
         }
@@ -51,26 +51,18 @@ namespace FluxCppCore {
         void clean_ws() {
             m_shutdown_ = true;
             m_io_context_.stop();
-            m_ws_run_thread_.join();
         }
 
         bool publish(const std::string &kr_send_string, const int32_t k_new_client_ws_id  = -1)
         {
             boost::system::error_code error_code;
-            std::string string_to_send = kr_send_string;
-
-            std::size_t found = string_to_send.find("id");
-            if (found != std::string::npos) {
-                // Replace "id" with "_id"
-                string_to_send.replace(found, 2, "_id");
-            }
 
             if(-1 == k_new_client_ws_id){
                 for(auto &ws_ptr: ws_vector_){
-                    ws_ptr->write(asio::buffer(string_to_send), error_code);
+                    ws_ptr->write(asio::buffer(kr_send_string), error_code);
                 }
             } else{
-                ws_vector_[k_new_client_ws_id]->write(asio::buffer(string_to_send), error_code);
+                ws_vector_[k_new_client_ws_id]->write(asio::buffer(kr_send_string), error_code);
             }
 
             if (!error_code) {
@@ -82,23 +74,25 @@ namespace FluxCppCore {
         }
 
         bool publish(const RootModelType &kr_root_model_type_obj, const int16_t k_new_client_ws_id  = -1) {
-            std::string json;
-            bool status = FluxCppCore::RootModelJsonCodec<RootModelType>::encode_model(kr_root_model_type_obj, json);
-            if (has_ws_clients_connected() and status) {
-                status = publish(json, k_new_client_ws_id);
+            boost::json::object json_object;
+            MarketDataObjectToJson::object_to_json(kr_root_model_type_obj, json_object);
+            if (has_ws_clients_connected()) {
+                publish(boost::json::serialize(json_object), k_new_client_ws_id);
             }
-            return status;
+            return true;
         }
 
         bool publish(const RootModelListType &kr_root_model_list_type_obj, const int16_t k_new_client_ws_id  = -1) {
-            std::string json;
-            bool status = FluxCppCore::RootModelListJsonCodec<RootModelListType>::encode_model_list
-                    (kr_root_model_list_type_obj, json);
-            if (has_ws_clients_connected() and status) {
-                status = publish(json, k_new_client_ws_id);
+            boost::json::object json_object;
+            std::string key;
+            MarketDataObjectToJson::object_to_json(kr_root_model_list_type_obj, json_object);
+            if (has_ws_clients_connected()) {
+                for (const auto &obj : json_object) {
+                    key = std::string(obj.key());
+                }
+                publish(boost::json::serialize(json_object[key].as_array()), k_new_client_ws_id);
             }
-
-            return status;
+            return true;
         }
 
         void shutdown(){
@@ -120,7 +114,9 @@ namespace FluxCppCore {
                 }
                 // Send the HTTP response body to the WebSocket client
                 ws_vector_.push_back(std::move(ws_ptr));
-                NewClientCallBack(m_user_data, ws_vector_.size()-1);
+                RootModelListType list_user_data;
+                m_mongo_db_codec_.get_data_from_collection_with_limit(list_user_data, m_db_fetch_limit_);
+                publish(list_user_data, ws_vector_.size()-1);
                 // invoke callback to let user know of this new client with index
             }
             catch (std::exception const& error) {
@@ -167,7 +163,9 @@ namespace FluxCppCore {
             m_io_context_.run();
         }
 
-        UserDataType m_user_data;
+        UserDataType& m_user_data;
+        MongoDBCodec<RootModelType, RootModelListType>& m_mongo_db_codec_;
+        int32_t m_db_fetch_limit_;
         std::string km_host_;
         int32_t km_port_;
         int32_t m_ws_retry_count_{3};
@@ -180,7 +178,7 @@ namespace FluxCppCore {
         // interval to timeout read if no data and handle any shutdown if requested
         boost::asio::deadline_timer m_timer_;
         std::unique_ptr<tcp::acceptor> m_acceptor_;
-        std::thread m_ws_run_thread_;
+        std::jthread m_ws_run_thread_;
     };
 
 }

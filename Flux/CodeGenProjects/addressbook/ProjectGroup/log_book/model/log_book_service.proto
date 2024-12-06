@@ -6,13 +6,16 @@ import "projects_core.proto";
 
 package log_book;
 
+option (FluxFileDateTimeGranularity) = MILLI_SEC;
+option (FluxFileDateTimePrintTimezone) = "LOCAL";
+
 message AlertMeta {
   option (FluxMsgStringLength) = 128;
 
   optional string component_file_path = 1;
   optional string source_file_name = 2;
   optional int32 line_num = 3;
-  optional string alert_create_date_time = 4 [(FluxFldValIsDateTime) = true];
+  optional int64 alert_create_date_time = 4 [(FluxFldValIsDateTime) = true];
   optional string first_detail = 5;
   optional string latest_detail = 6;
 }
@@ -107,7 +110,7 @@ message StratAlert {
   required string alert_brief = 6 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left", (FluxFldOrmNoUpdate) = true];
   // must prefix strat:<strat-name> for strat alerts
   optional AlertMeta alert_meta = 7 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
-  optional string last_update_analyzer_time = 8 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
+  optional int64 last_update_analyzer_time = 8 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
 }
 
 message PortfolioAlert {
@@ -187,7 +190,7 @@ message PortfolioAlert {
   optional int32 alert_count = 4 [(FluxFldOrmNoUpdate) = true, (FluxFldColumnSize) = "small"];
   required string alert_brief = 5 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left", (FluxFldOrmNoUpdate) = true];
   optional AlertMeta alert_meta = 6 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
-  optional string last_update_analyzer_time = 7 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
+  optional int64 last_update_analyzer_time = 7 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
 }
 
 message ExecutorEventMeta {
@@ -223,7 +226,7 @@ message ExecutorEventJournal {
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required ExecutorEventMeta executor_event_meta = 2 [(FluxFldValMetaField) = true];
-  required string event_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required int64 event_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
   required string event_name = 4 [(FluxFldFilterEnable) = true];
   required string event_detail = 5;
 }

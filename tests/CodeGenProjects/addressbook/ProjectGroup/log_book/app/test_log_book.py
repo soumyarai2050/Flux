@@ -373,7 +373,7 @@ def test_log_to_update_db(
         log_file_path = STRAT_EXECUTOR / "log" / f"street_book_{active_strat.id}_logs_{frmt_date}.log"
 
         # not checking severity and strat_alert_count update since it gets updated very often from code and
-        # test fails - anyways test checks update functionality so if it works for rest fields it is still good
+        # test fails - anyway test checks update functionality so if it works for rest fields it is still good
         db_json_list = [
             {"average_premium": random.randint(1, 100)},
             {"market_premium": random.randint(1, 100)},
@@ -396,6 +396,68 @@ def test_log_to_update_db(
             assert stored_val == expected_val, \
                 (f"Mismatched {list(db_json.keys())[0]} field of strat view, expected: {expected_val}, "
                  f"received: {stored_val}, active_strat: {active_strat}")
+
+
+# @@@ temp test - not working
+@pytest.mark.log_book1
+def test_to_verify_data_is_not_lost_update_db_client_fails(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        market_depth_basemodel_list):
+    """
+    Test to verify if any db update got exception then next successful call consists filing update data - basically
+    checking no data is lost even if client call fails
+    """
+    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:3]
+
+    active_strat_n_executor_list = start_strats_in_parallel(
+        leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        market_depth_basemodel_list)
+    sample_file_name = "sample_file.py"
+    line_no = random.randint(1, 100)
+
+    for active_strat, executor_http_client in active_strat_n_executor_list:
+        log_file_path = STRAT_EXECUTOR / "log" / f"street_book_{active_strat.id}_logs_{frmt_date}.log"
+
+        # not checking severity and strat_alert_count update since it gets updated very often from code and
+        # test fails - anyway test checks update functionality so if it works for rest fields it is still good
+        db_json_list = [
+            {"average_premium": "Wrong_data",
+             "market_premium": random.randint(1, 100),
+             "balance_notional": random.randint(1, 100),
+             "max_single_leg_notional": random.randint(100, 1000)},
+            {"average_premium": random.randint(1, 100)}
+            ]
+
+        for db_json in db_json_list:
+            db_pattern_str = pair_strat_client_call_log_str(
+                StratViewBaseModel, photo_book_web_client.patch_all_strat_view_client,
+                UpdateType.SNAPSHOT_TYPE, _id=active_strat.id, **db_json)
+            log_str = get_log_line_str("DB", sample_file_name, line_no, db_pattern_str)
+
+            add_log_to_file(log_file_path, log_str)
+            time.sleep(1)
+
+        expected_strat_view = StratViewBaseModel.from_kwargs(
+            _id=active_strat.id,
+            market_premium=db_json_list[0].get("market_premium"),
+            balance_notional=db_json_list[0].get("balance_notional"),
+            max_single_leg_notional=db_json_list[0].get("max_single_leg_notional"),
+            average_premium=db_json_list[1].get("average_premium")
+        )
+
+        strat_view = photo_book_web_client.get_strat_view_client(active_strat.id)
+        # updating non checking fields
+        expected_strat_view.strat_alert_count = strat_view.strat_alert_count
+        expected_strat_view.strat_alert_aggregated_severity = strat_view.strat_alert_aggregated_severity
+        expected_strat_view.total_fill_buy_notional = strat_view.total_fill_buy_notional
+        expected_strat_view.total_fill_sell_notional = strat_view.total_fill_sell_notional
+        expected_strat_view.unload_strat = strat_view.unload_strat
+        expected_strat_view.recycle_strat = strat_view.recycle_strat
+        assert strat_view == expected_strat_view, \
+            (f"Mismatched strat view, expected: {expected_strat_view}, "
+             f"received: {strat_view}, active_strat: {active_strat}")
 
 
 @pytest.mark.log_book

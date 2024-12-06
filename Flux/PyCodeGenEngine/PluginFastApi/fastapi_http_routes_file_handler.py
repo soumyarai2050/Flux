@@ -189,7 +189,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f"    else:\n"
             output_str += f"        return return_obj\n\n\n"
 
-            # default version - takes json_str and returns json_dict
+            # default version - takes json_bytes and returns json_dict
             output_str += f"@perf_benchmark\n"
             output_str += (f"async def underlying_create_{message_name_snake_cased}_http_bytes("
                            f"{message_name_snake_cased}_bytes: "
@@ -204,12 +204,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_post_http\n'
             output_str += (f"    {message_name_snake_cased}_msgspec_obj = msgspec.json.decode("
                            f"{message_name_snake_cased}_bytes, type={message.proto.name}, "
-                           f"dec_hook=dec_hook)\n")
+                           f"dec_hook={message.proto.name}.dec_hook)\n")
             output_str += (f"    return_obj = await _underlying_create_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj, filter_agg_pipeline, generic_callable, "
                            f"return_obj_copy)\n")
             output_str += f"    if return_obj_copy:\n"
-            output_str += f"        return_obj_bytes = msgspec.json.encode(return_obj, enc_hook=enc_hook)\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_obj, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=201)\n"
             output_str += f"    else:\n"
             output_str += (f"        return CustomFastapiResponse(content=str(return_obj).encode('utf-8'), "
@@ -563,12 +563,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_post_all_http\n'
             output_str += (f"    {message_name_snake_cased}_msgspec_obj_list = msgspec.json.decode("
                            f"{message_name_snake_cased}_bytes, type=List[{message.proto.name}], "
-                           f"dec_hook=dec_hook)\n")
+                           f"dec_hook={message.proto.name}.dec_hook)\n")
             output_str += (f"    return_val = await _underlying_create_all_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj_list, "
                            f"filter_agg_pipeline, generic_callable, return_obj_copy)\n")
             output_str += f"    if return_obj_copy:\n"
-            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=201)\n"
             output_str += f"    else:\n"
             output_str += (f"        return CustomFastapiResponse(content=str(return_val).encode('utf-8'), "
@@ -969,12 +969,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_put_http\n'
             output_str += (f"    {message_name_snake_cased}_update_msgspec_obj = msgspec.json.decode("
                            f"{message_name_snake_cased}_update_bytes, type={message.proto.name}, "
-                           f"dec_hook=dec_hook)\n")
+                           f"dec_hook={message.proto.name}.dec_hook)\n")
             output_str += (
                 f"    return_val = await _underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
                 f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy)\n")
             output_str += f"    if return_obj_copy:\n"
-            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
             output_str += f"    else:\n"
             output_str += (f"        return CustomFastapiResponse(content=str(return_val).encode('utf-8'), "
@@ -1391,13 +1391,13 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_put_all_http\n'
             output_str += (f"    {message_name_snake_cased}_update_msgspec_obj_list = msgspec.json.decode("
                            f"{message_name_snake_cased}_update_bytes, type=List[{message.proto.name}], "
-                           f"dec_hook=dec_hook)\n")
+                           f"dec_hook={message.proto.name}.dec_hook)\n")
             output_str += (
                 f"    return_val = await _underlying_update_all_{message_name_snake_cased}_http("
                 f"{message_name_snake_cased}_update_msgspec_obj_list, filter_agg_pipeline, generic_callable, "
                 f"return_obj_copy)\n")
             output_str += f"    if return_obj_copy:\n"
-            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
             output_str += f"    else:\n"
             output_str += (f"        return CustomFastapiResponse(content=str(return_val).encode('utf-8'), "
@@ -1621,6 +1621,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
+        output_str += " " * indent_count + (f"    {message.proto.name}.convert_ts_fields_from_epoch_to_datetime_obj("
+                                            f"{message_name_snake_cased}_update_json_dict)\n")
         output_str += " " * indent_count + (f"    handle_missing_id_n_datetime_fields_in_{message_name_snake_cased}_"
                                             f"json({message.proto.name}, {message_name_snake_cased}_update_json_dict, "
                                             f"is_patch_call=True)\n")
@@ -1788,7 +1790,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"{message_name_snake_cased}_update_json_dict, filter_agg_pipeline, "
                            f"generic_callable, return_obj_copy)\n")
             output_str += f"    if return_obj_copy:\n"
-            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
             output_str += f"    else:\n"
             output_str += (f"        return CustomFastapiResponse(content=str(return_val).encode('utf-8'), "
@@ -2303,6 +2305,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += " " * indent_count + f"    obj_id_list = []\n"
         output_str += " " * indent_count + (f"    for {message_name_snake_cased}_update_json_dict in "
                                             f"{message_name_snake_cased}_update_json_dict_list:\n")
+        output_str += " " * indent_count + f"        {message.proto.name}.convert_ts_fields_from_epoch_to_datetime_obj({message_name_snake_cased}_update_json_dict)\n"
         output_str += " " * indent_count + (
             f"        handle_missing_id_n_datetime_fields_in_{message_name_snake_cased}_"
             f"json({message.proto.name}, {message_name_snake_cased}_update_json_dict, "
@@ -2479,7 +2482,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"{message_name_snake_cased}_update_json_dict_list, filter_agg_pipeline, "
                            f"generic_callable, return_obj_copy)\n")
             output_str += f"    if return_obj_copy:\n"
-            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
             output_str += f"    else:\n"
             output_str += (f"        return CustomFastapiResponse(content=str(return_val).encode('utf-8'), "
@@ -2804,7 +2807,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_delete_http\n'
             output_str += (f"    return_val = await _underlying_delete_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_id, generic_callable, return_obj_copy)\n")
-            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += "    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
         else:
             output_str = f"@perf_benchmark\n"
@@ -2980,7 +2983,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_delete_all_http\n'
             output_str += (f"    return_val = await _underlying_delete_all_{message_name_snake_cased}_http("
                            f"generic_callable, return_obj_copy)\n")
-            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
 
         else:
@@ -3239,7 +3242,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_read_by_id_http\n'
             output_str += f"    return_val = await _underlying_read_{message_name_snake_cased}_by_id_http(" \
                           f"{message_name_snake_cased}_id, filter_agg_pipeline, generic_callable)\n"
-            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n\n"
         else:
             output_str += f"@perf_benchmark\n"
@@ -3450,7 +3453,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"    return_val = await _underlying_read_{message_name_snake_cased}_http("
                            f"filter_agg_pipeline, generic_callable, projection_model, projection_filter, "
                            f"limit_obj_count)\n")
-            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n\n"
         else:
             output_str = f"@perf_benchmark\n"
@@ -3681,7 +3684,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if model_type == ModelType.Msgspec:
                 output_str += f"async def underlying_{query_name}_query_http_bytes({query_params_with_type_str}):\n"
                 output_str += f"    return_val = await underlying_{query_name}_query_http({query_params_str})\n"
-                output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+                output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
                 output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n\n"
             # else not required: if model_type is not Msgspec then no bytes type underlying variant is created
 
@@ -3731,7 +3734,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if model_type == ModelType.Msgspec:
                 output_str += f"async def underlying_{query_name}_query_http_bytes(payload_dict: Dict[str, Any]):\n"
                 output_str += f"    return_val = await underlying_{query_name}_query_http(payload_dict)\n"
-                output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+                output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
                 output_str += (f"    return CustomFastapiResponse(content=return_obj_bytes, "
                                f"status_code={status_code})\n\n\n")
             # else not required: if model_type is not Msgspec then no bytes type underlying variant is created
@@ -3802,7 +3805,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if query_params_str:
                 output_str += f", {query_params_str}"
             output_str += f")\n"
-            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook=enc_hook)\n"
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=201)\n\n\n"
         # else not required: if model_type is not Msgspec then no bytes type underlying variant is created
 

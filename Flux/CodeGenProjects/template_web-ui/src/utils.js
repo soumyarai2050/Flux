@@ -18,6 +18,7 @@ export const { applyFilter, applyGetAllWebsocketUpdate, floatToInt, getAbbreviat
     getActiveRows, getFilterDict, getIdFromAbbreviatedKey, getLocalizedValueAndSuffix,
     roundNumber, stableSort, sortAlertArray, getColorTypeFromValue, getGroupedTableRows
 } = workerUtils;
+const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 // add utc support for datetime
 dayjs.extend(utc);
@@ -28,6 +29,8 @@ const treeState = {};
 export function setTreeState(xpath, state) {
     treeState[xpath] = state;
 }
+
+export const FileOptions = {};
 
 // support primitive data types
 const primitiveDataTypes = [
@@ -2709,14 +2712,19 @@ export function formatJSONObjectOrArray(json, fieldProps, truncateDateTime = fal
                     formatJSONArray(json[key], fieldProps, truncateDateTime);
                 } else if (json[key] instanceof Object) {
                     formatJSONObjectOrArray(json[key], fieldProps, truncateDateTime);
+                } else if (prop.type === DataTypes.DATE_TIME) {
+                    if (json[key]) {
+                        const dateTimeWithTimezone = getDateTimeFromInt(json[key]);
+                        if (prop.displayType === 'datetime') {
+                            json[key] = dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+                        } else {
+                            json[key] = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format('HH:mm:ss.SSS') : dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+                        }
+                    }
                 } else if (typeof json[key] === DataTypes.NUMBER) {
                     const [suffix, v] = getLocalizedValueAndSuffix(prop, json[key]);
                     json[key] = v.toLocaleString() + suffix;
-                } else if (prop.type === DataTypes.DATE_TIME && truncateDateTime) {
-                    if (json[key]) {
-                        json[key] = dayjs.utc(json[key]).format('YYYY-MM-DD HH:mm');
-                    }
-                }
+                } 
                 if (prop.hide) {
                     delete json[key];
                 }
@@ -3430,10 +3438,14 @@ export function getServerUrl(widgetSchema, linkedObj, runningField, readyField, 
                     let portxpath = port.substring(port.indexOf('.') + 1);
                     if (widgetSchema.widget_ui_data_element.depends_on_model_name_for_port && schemaName) {
                         if (requestType === 'http') {
-                            return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
+                            const port = _.get(linkedObj, portxpath);
+                            if (!port) return null;
+                            return `http://${_.get(linkedObj, hostxpath)}:${port}/${project_name}`;
                         } else if (requestType === 'ws') {
                             portxpath = schemaName + '_port';
-                            return `http:${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}`;
+                            const port = _.get(linkedObj, portxpath);
+                            if (!port) return null;
+                            return `http:${_.get(linkedObj, hostxpath)}:${port}`;
                         }
                     } else {
                         return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
@@ -3979,4 +3991,15 @@ export function getAxiosMethod(queryRouteType) {
         default:
             throw new Error(`Unsupported queryRouteType: ${queryRouteType}`);
     }
+}
+
+export function getDateTimeFromInt(value) {
+    const dateTime = dayjs(value).utc();
+    let dateTimeWithTimezone;
+    if (FileOptions.date_time_print_timezone === 'LOCAL') {
+        dateTimeWithTimezone = dateTime.tz(LOCAL_TZ);
+    } else {
+        dateTimeWithTimezone = dateTime.tz(FileOptions.date_time_print_timezone);
+    }
+    return dateTimeWithTimezone;
 }

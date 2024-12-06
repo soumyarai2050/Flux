@@ -4,8 +4,8 @@
 #include <boost/asio/ip/tcp.hpp>
 
 #include "TemplateUtils.h"
-#include "json_codec.h"
 #include "project_includes.h"
+#include "cpp_app_logger.h"
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -216,19 +216,7 @@ namespace FluxCppCore {
             std::string_view get_client_url_view = mr_client_config.get_client_url_;
             status = send_get_request(get_client_url_view, kr_id, json_out);
             if (status) {
-                std::string modified_json;
-                for (int i = 0; i < json_out.size(); ++i) {
-                    if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' && json_out[i + 2]
-                    == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
-                        // Skip the underscore if `_id` is detected
-                        // Do nothing, and let the loop increment i automatically
-                    } else {
-                        // Copy the character to the modified json
-                        modified_json += json_out[i];
-                    }
-                }
-
-                status =  m_codec_.decode_model(r_obj_out, modified_json);
+                json_to_object(json_out, r_obj_out);
                 return status;
             } else {
                 return status;
@@ -236,131 +224,38 @@ namespace FluxCppCore {
         }
 
         [[nodiscard]] bool create_client (RootModelType &r_obj_in_n_out) {
-            std::string json;
-            bool status = m_codec_.encode_model(r_obj_in_n_out, json);
-            LOG_DEBUG_IMPL(GetCppAppLogger(), "{}: {}: status: {}", __func__, json, status);
+            boost::json::object json;
+            MarketDataObjectToJson::object_to_json(r_obj_in_n_out, json);
+            std::string json_out;
+            std::string_view create_client_url_view = mr_client_config.create_client_url_;
+            auto status = send_post_request(create_client_url_view, boost::json::serialize(json), json_out);
             if (status) {
-                std::string json_out;
-                std::string_view create_client_url_view = mr_client_config.create_client_url_;
-                status = send_post_request(create_client_url_view, json, json_out);
-                if (status) {
-                    std::string modified_json;
-                    for (size_t i = 0; i < json_out.size(); ++i) {
-                        if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' &&
-                        json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
-                            // Skip the underscore if `_id` is detected
-                            // Do nothing, and let the loop increment i automatically
-                        } else {
-                            // Copy the character to the modified json
-                            modified_json += json_out[i];
-                        }
-                    }
-                    r_obj_in_n_out.Clear();
-                    status =  m_codec_.decode_model(r_obj_in_n_out, modified_json);
-                    return status;
-                } else {
-                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while creating {};;; {} url: {}",
-                        RootModelType::GetDescriptor()->name(), json, create_client_url_view);
-                    return false;
-                }
-            } else {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}",
-                    RootModelType::GetDescriptor()->name(), r_obj_in_n_out.DebugString());
-                return false;
+                MarketDataJsonToObject::json_to_object(json_out, r_obj_in_n_out);
+                return status;
             }
-            return status;
+            return false;
         }
 
         [[nodiscard]] bool patch_client (RootModelType &r_obj_in_n_out) const {
-            std::string json;
-            bool status = m_codec_.encode_model(r_obj_in_n_out, json);
+            boost::json::object json;
+            MarketDataObjectToJson::object_to_json(r_obj_in_n_out, json);
+            std::string json_out;
+            std::string_view patch_client_url_view = mr_client_config.patch_client_url_;
+            auto status = send_patch_request(patch_client_url_view, boost::json::serialize(json), json_out);
             if (status) {
-                size_t pos = json.find("id");
-                while (pos != std::string::npos) {
-                    // Check if there's no underscore before `id`
-                    if ((pos == 0 || json[pos - 1] != '_') && (!std::isalpha(json[pos - 1]))) {
-                        // Insert the underscore before `id`
-                        json.insert(pos, "_");
-                        // Move the search position to the end of the inserted underscore
-                        pos += 1;
-                    }
-                    // Find the next occurrence of `id`
-                    pos = json.find("id", pos + 1);
-                }
-
-                std::string json_out;
-                std::string_view patch_client_url_view = mr_client_config.patch_client_url_;
-                status = send_patch_request(patch_client_url_view, json, json_out);
-                if (status) {
-                    std::string modified_json;
-                    for ( size_t i = 0; i < json_out.size(); ++i) {
-                        if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' &&
-                        json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
-                            // Skip the underscore if `_id` is detected
-                            // Do nothing, and let the loop increment i automatically
-                        } else {
-                            // Copy the character to the modified json
-                            modified_json += json_out[i];
-                        }
-                    }
-                    r_obj_in_n_out.Clear();
-                    status =  m_codec_.decode_model(r_obj_in_n_out, modified_json);
-                    return status;
-                } else {
-                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while patch {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
-                    json, patch_client_url_view);
-                    return false;
-                }
-            } else {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
-                          r_obj_in_n_out.DebugString());
-                return false;
+                MarketDataJsonToObject::json_to_object(json_out, r_obj_in_n_out);
             }
             return status;
         }
 
         [[nodiscard]] bool put_client (RootModelType &r_obj_in_n_out) const {
-            std::string json;
-            bool status = m_codec_.encode_model(r_obj_in_n_out, json);
+            boost::json::object json;
+            object_to_json(r_obj_in_n_out, json);
+            std::string json_out;
+            std::string_view put_client_url_view = mr_client_config.put_client_url_;
+            auto status = send_put_request(put_client_url_view, boost::json::serialize(json), json_out);
             if (status) {
-                size_t pos = json.find("id");
-                while (pos != std::string::npos) {
-                    // Check if there's no underscore before `id`
-                    if (pos == 0 || json[pos - 1] != '_' && (!std::isalpha(json[pos - 1]))) {
-                        // Insert the underscore before `id`
-                        json.insert(pos, "_");
-                        // Move the search position to the end of the inserted underscore
-                        pos += 1;
-                    }
-                    // Find the next occurrence of `id`
-                    pos = json.find("id", pos + 1);
-                }
-                std::string json_out;
-                std::string_view put_client_url_view = mr_client_config.put_client_url_;
-                status = send_put_request(put_client_url_view, json, json_out);
-
-                if (status) {
-                    std::string modified_json;
-                    for (int i = 0; i < json_out.size(); ++i) {
-                        if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i'
-                        && json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
-                            // Skip the underscore if `_id` is detected
-                            // Do nothing, and let the loop increment i automatically
-                        } else {
-                            // Copy the character to the modified json
-                            modified_json += json_out[i];
-                        }
-                    }
-                    status =  m_codec_.decode_model(r_obj_in_n_out, modified_json);
-                } else {
-                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while put {};;; {} url: {}", RootModelType::GetDescriptor()->name(),
-                              json, put_client_url_view);
-                    return false;
-                }
-            } else {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelType::GetDescriptor()->name(),
-                          r_obj_in_n_out.DebugString());
-                return false;
+                json_to_object(json_out, r_obj_in_n_out);
             }
             return status;
         }
@@ -378,214 +273,212 @@ namespace FluxCppCore {
         }
 
     protected:
-        RootModelJsonCodec<RootModelType> m_codec_;
         const ClientConfig& mr_client_config;
     };
 
-    template <typename RootModelListType,
-            StringLiteral create_client_url,
-            StringLiteral get_client_url,
-            StringLiteral get_max_id_client_url,
-            StringLiteral put_client_url,
-            StringLiteral patch_client_url,
-            StringLiteral delete_client_url>
-    class RootModelListWebClient : public BaseWebClient {
-    public:
-        RootModelListWebClient(const std::string &kr_host, const std::string &kr_port) : BaseWebClient(kr_host, kr_port) {}
-
-        [[nodiscard]] auto get_max_id_client() const {
-            std::string json_out;
-            int32_t new_max_id = -1;
-            std::string_view get_max_id_client_url_view = get_max_id_client_url.value;
-            if (send_get_request(get_max_id_client_url_view, json_out)) {
-                // Find the starting position of the `max_id_val` within the JSON string and calculate the position
-                // where the value associated with it begins. We add the length of `max_id_val_key` and 2 to skip dual-quote
-                // and the colon character in the string.
-                size_t start_pos = json_out.find(max_id_val_key) +
-                                   max_id_val_key.length() + 2;
-                size_t end_pos = json_out.find_first_of('}', start_pos);
-                if (start_pos != std::string::npos && end_pos != std::string::npos) {
-                    std::string max_id_str = json_out.substr(start_pos, end_pos - start_pos);
-                    try {
-                        new_max_id = std::stoi(max_id_str);
-                    } catch (const std::exception& e) {
-                        LOG_ERROR_IMPL(GetCppAppLogger(), "Error parsing {};;; max_id_val: {}",
-                                  RootModelListType::GetDescriptor()->name(), e.what());
-                    }
-                }
-                return new_max_id;
-            } else {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while performing get {};;; max_id_val request: {}, url: {}",
-                          RootModelListType::GetDescriptor()->name(), json_out, get_max_id_client_url_view);
-                return new_max_id;
-            }
-        }
-
-        [[nodiscard]] bool get_client(RootModelListType &r_obj_out) const {
-            bool status = false;
-            std::string json_out;
-            std::string_view get_client_url_view = get_client_url.value;
-            status = send_get_request(get_client_url_view, json_out);
-            if (status) {
-                std::string modified_json;
-                for (int i = 0; i < json_out.size(); ++i) {
-                    if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' &&
-                    json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
-                        // Skip the underscore if `_id` is detected
-                        // Do nothing, and let the loop increment i automatically
-                    } else {
-                        // Copy the character to the modified json
-                        modified_json += json_out[i];
-                    }
-                }
-
-                status =  m_codec_.decode_model_list(r_obj_out, modified_json);
-                return status;
-            } else {
-                return status;
-            }
-        }
-
-        [[nodiscard]] bool create_client (RootModelListType &r_obj_in_n_out) {
-            std::string json;
-            bool status = m_codec_.encode_model_list(r_obj_in_n_out, json);
-            if (status) {
-                std::string json_out;
-                std::string_view create_client_url_view = create_client_url.value;
-                status = send_post_request(create_client_url_view, json, json_out);
-                if (status) {
-                    std::string modified_json;
-                    for (int i = 0; i < json_out.size(); ++i) {
-                        if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' &&
-                            json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
-                            // Skip the underscore if `_id` is detected
-                            // Do nothing, and let the loop increment i automatically
-                        } else {
-                            // Copy the character to the modified json
-                            modified_json += json_out[i];
-                        }
-                    }
-                    r_obj_in_n_out.Clear();
-                    status =  m_codec_.decode_model_list(r_obj_in_n_out, modified_json);
-                    return status;
-                } else {
-                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while creating {};;;url: {}, Json: {} ",
-                             RootModelListType::GetDescriptor()->name(), create_client_url_view, json);
-                    return false;
-                }
-            } else {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;;{}", RootModelListType::GetDescriptor()->name(),
-                          r_obj_in_n_out.DebugString());
-                return false;
-            }
-            LOG_ERROR_IMPL(GetCppAppLogger(), "Error unreachable code reached {};;;{}", RootModelListType::GetDescriptor()->name(),
-                          r_obj_in_n_out.DebugString());
-            return false;
-        }
-
-        [[nodiscard]] bool patch_client (RootModelListType &r_obj_in_n_out) const {
-            std::string json;
-            std::string modified_json;
-            bool status = m_codec_.encode_model_list(r_obj_in_n_out, json);
-            if (status) {
-                for (size_t i = 0; i < json.size(); ++i) {
-                    if (i + 1 < json.size() && json[i] == 'i' && json[i + 1] == 'd'
-                        && (i == 0 || (i > 0 && !std::isalnum(json[i - 1]) && json[i - 1] != '_'))) {
-                        // Insert an underscore before "id"
-                        modified_json += '_';
-                    }
-
-                    // Copy the character to the modified json
-                    modified_json += json[i];
-                }
-
-                std::string json_out;
-                std::string_view patch_client_url_view = patch_client_url.value;
-                status = send_patch_request(patch_client_url_view, modified_json, json_out);
-                if (status) {
-                    std::string decode_modified_json;
-                    for (int i = 0; i < json_out.size(); ++i) {
-                        if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' &&
-                            json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
-                            // Skip the underscore if `_id` is detected
-                            // Do nothing, and let the loop increment i automatically
-                        } else {
-                            // Copy the character to the modified json
-                            decode_modified_json += json_out[i];
-                        }
-                    }
-                    r_obj_in_n_out.Clear();
-                    status =  m_codec_.decode_model_list(r_obj_in_n_out, decode_modified_json);
-                    return status;
-                } else {
-                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while patch {};;;{} url: {}", RootModelListType::GetDescriptor()->name(),
-                              json, patch_client_url_view);
-                    return false;
-                }
-            } else {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
-                          r_obj_in_n_out.DebugString());
-                return false;
-            }
-        }
-
-        [[nodiscard]] bool put_client (RootModelListType &r_obj_in_n_out) const {
-            std::string json;
-            std::string modified_json;
-            bool status = m_codec_.encode_model_list(r_obj_in_n_out, json);
-            if (status) {
-                for (size_t i = 0; i < json.size(); ++i) {
-                    if (i + 1 < json.size() && json[i] == 'i' && json[i + 1] == 'd'
-                        && (i == 0 || (i > 0 && !std::isalnum(json[i - 1]) && json[i - 1] != '_'))) {
-                        // Insert an underscore before "id"
-                        modified_json += '_';
-                    }
-
-                    // Copy the character to the modified json
-                    modified_json += json[i];
-                }
-                std::string json_out;
-                std::string_view put_client_url_view = put_client_url.value;
-                status = send_put_request(put_client_url_view, modified_json, json_out);
-
-                if (status) {
-                    std::string decode_modified_json;
-                    for (int i = 0; i < json_out.size(); ++i) {
-                        if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i'
-                            && json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
-                            // Skip the underscore if `_id` is detected
-                            // Do nothing, and let the loop increment i automatically
-                        } else {
-                            // Copy the character to the modified json
-                            decode_modified_json += json_out[i];
-                        }
-                    }
-                    status =  m_codec_.decode_model_list(r_obj_in_n_out, decode_modified_json);
-                } else {
-                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while put {};;; {} url: {}", RootModelListType::GetDescriptor()->name(),
-                              json, put_client_url_view);
-                    return false;
-                }
-            } else {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
-                          r_obj_in_n_out.DebugString());
-                return false;
-            }
-            return status;
-        }
-
-        [[nodiscard]] std::string delete_client () const {
-            std::string delete_response_json;
-            std::string_view delete_client_url_view = delete_client_url.value;
-            if (send_delete_request(delete_client_url_view, delete_response_json)) {
-                return delete_response_json;
-            }
-            LOG_ERROR_IMPL(GetCppAppLogger(), "Error while delete {};;; {}, url: {}", RootModelListType::GetDescriptor()->name(),
-                      delete_response_json, delete_client_url_view);
-            return delete_response_json;
-        }
-    protected:
-        RootModelListJsonCodec<RootModelListType> m_codec_;
-    };
+    // template <typename RootModelListType,
+    //         StringLiteral create_client_url,
+    //         StringLiteral get_client_url,
+    //         StringLiteral get_max_id_client_url,
+    //         StringLiteral put_client_url,
+    //         StringLiteral patch_client_url,
+    //         StringLiteral delete_client_url>
+    // class RootModelListWebClient : public BaseWebClient {
+    // public:
+    //     RootModelListWebClient(const std::string &kr_host, const std::string &kr_port) : BaseWebClient(kr_host, kr_port) {}
+    //
+    //     [[nodiscard]] auto get_max_id_client() const {
+    //         std::string json_out;
+    //         int32_t new_max_id = -1;
+    //         std::string_view get_max_id_client_url_view = get_max_id_client_url.value;
+    //         if (send_get_request(get_max_id_client_url_view, json_out)) {
+    //             // Find the starting position of the `max_id_val` within the JSON string and calculate the position
+    //             // where the value associated with it begins. We add the length of `max_id_val_key` and 2 to skip dual-quote
+    //             // and the colon character in the string.
+    //             size_t start_pos = json_out.find(max_id_val_key) +
+    //                                max_id_val_key.length() + 2;
+    //             size_t end_pos = json_out.find_first_of('}', start_pos);
+    //             if (start_pos != std::string::npos && end_pos != std::string::npos) {
+    //                 std::string max_id_str = json_out.substr(start_pos, end_pos - start_pos);
+    //                 try {
+    //                     new_max_id = std::stoi(max_id_str);
+    //                 } catch (const std::exception& e) {
+    //                     LOG_ERROR_IMPL(GetCppAppLogger(), "Error parsing {};;; max_id_val: {}",
+    //                               RootModelListType::GetDescriptor()->name(), e.what());
+    //                 }
+    //             }
+    //             return new_max_id;
+    //         } else {
+    //             LOG_ERROR_IMPL(GetCppAppLogger(), "Error while performing get {};;; max_id_val request: {}, url: {}",
+    //                       RootModelListType::GetDescriptor()->name(), json_out, get_max_id_client_url_view);
+    //             return new_max_id;
+    //         }
+    //     }
+    //
+    //     [[nodiscard]] bool get_client(RootModelListType &r_obj_out) const {
+    //         bool status = false;
+    //         std::string json_out;
+    //         std::string_view get_client_url_view = get_client_url.value;
+    //         status = send_get_request(get_client_url_view, json_out);
+    //         if (status) {
+    //             std::string modified_json;
+    //             for (int i = 0; i < json_out.size(); ++i) {
+    //                 if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' &&
+    //                 json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
+    //                     // Skip the underscore if `_id` is detected
+    //                     // Do nothing, and let the loop increment i automatically
+    //                 } else {
+    //                     // Copy the character to the modified json
+    //                     modified_json += json_out[i];
+    //                 }
+    //             }
+    //
+    //             status =  m_codec_.decode_model_list(r_obj_out, modified_json);
+    //             return status;
+    //         } else {
+    //             return status;
+    //         }
+    //     }
+    //
+    //     [[nodiscard]] bool create_client (RootModelListType &r_obj_in_n_out) {
+    //         std::string json;
+    //         bool status = m_codec_.encode_model_list(r_obj_in_n_out, json);
+    //         if (status) {
+    //             std::string json_out;
+    //             std::string_view create_client_url_view = create_client_url.value;
+    //             status = send_post_request(create_client_url_view, json, json_out);
+    //             if (status) {
+    //                 std::string modified_json;
+    //                 for (int i = 0; i < json_out.size(); ++i) {
+    //                     if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' &&
+    //                         json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
+    //                         // Skip the underscore if `_id` is detected
+    //                         // Do nothing, and let the loop increment i automatically
+    //                     } else {
+    //                         // Copy the character to the modified json
+    //                         modified_json += json_out[i];
+    //                     }
+    //                 }
+    //                 r_obj_in_n_out.Clear();
+    //                 status =  m_codec_.decode_model_list(r_obj_in_n_out, modified_json);
+    //                 return status;
+    //             } else {
+    //                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error while creating {};;;url: {}, Json: {} ",
+    //                          RootModelListType::GetDescriptor()->name(), create_client_url_view, json);
+    //                 return false;
+    //             }
+    //         } else {
+    //             LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;;{}", RootModelListType::GetDescriptor()->name(),
+    //                       r_obj_in_n_out.DebugString());
+    //             return false;
+    //         }
+    //         LOG_ERROR_IMPL(GetCppAppLogger(), "Error unreachable code reached {};;;{}", RootModelListType::GetDescriptor()->name(),
+    //                       r_obj_in_n_out.DebugString());
+    //         return false;
+    //     }
+    //
+    //     [[nodiscard]] bool patch_client (RootModelListType &r_obj_in_n_out) const {
+    //         std::string json;
+    //         std::string modified_json;
+    //         bool status = m_codec_.encode_model_list(r_obj_in_n_out, json);
+    //         if (status) {
+    //             for (size_t i = 0; i < json.size(); ++i) {
+    //                 if (i + 1 < json.size() && json[i] == 'i' && json[i + 1] == 'd'
+    //                     && (i == 0 || (i > 0 && !std::isalnum(json[i - 1]) && json[i - 1] != '_'))) {
+    //                     // Insert an underscore before "id"
+    //                     modified_json += '_';
+    //                 }
+    //
+    //                 // Copy the character to the modified json
+    //                 modified_json += json[i];
+    //             }
+    //
+    //             std::string json_out;
+    //             std::string_view patch_client_url_view = patch_client_url.value;
+    //             status = send_patch_request(patch_client_url_view, modified_json, json_out);
+    //             if (status) {
+    //                 std::string decode_modified_json;
+    //                 for (int i = 0; i < json_out.size(); ++i) {
+    //                     if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i' &&
+    //                         json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
+    //                         // Skip the underscore if `_id` is detected
+    //                         // Do nothing, and let the loop increment i automatically
+    //                     } else {
+    //                         // Copy the character to the modified json
+    //                         decode_modified_json += json_out[i];
+    //                     }
+    //                 }
+    //                 r_obj_in_n_out.Clear();
+    //                 status =  m_codec_.decode_model_list(r_obj_in_n_out, decode_modified_json);
+    //                 return status;
+    //             } else {
+    //                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error while patch {};;;{} url: {}", RootModelListType::GetDescriptor()->name(),
+    //                           json, patch_client_url_view);
+    //                 return false;
+    //             }
+    //         } else {
+    //             LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
+    //                       r_obj_in_n_out.DebugString());
+    //             return false;
+    //         }
+    //     }
+    //
+    //     [[nodiscard]] bool put_client (RootModelListType &r_obj_in_n_out) const {
+    //         std::string json;
+    //         std::string modified_json;
+    //         bool status = m_codec_.encode_model_list(r_obj_in_n_out, json);
+    //         if (status) {
+    //             for (size_t i = 0; i < json.size(); ++i) {
+    //                 if (i + 1 < json.size() && json[i] == 'i' && json[i + 1] == 'd'
+    //                     && (i == 0 || (i > 0 && !std::isalnum(json[i - 1]) && json[i - 1] != '_'))) {
+    //                     // Insert an underscore before "id"
+    //                     modified_json += '_';
+    //                 }
+    //
+    //                 // Copy the character to the modified json
+    //                 modified_json += json[i];
+    //             }
+    //             std::string json_out;
+    //             std::string_view put_client_url_view = put_client_url.value;
+    //             status = send_put_request(put_client_url_view, modified_json, json_out);
+    //
+    //             if (status) {
+    //                 std::string decode_modified_json;
+    //                 for (int i = 0; i < json_out.size(); ++i) {
+    //                     if (json_out[i] == '_' && (i + 1 < json_out.size()) && json_out[i + 1] == 'i'
+    //                         && json_out[i + 2] == 'd' && ( i > 0 && !std::isalnum(json_out[i - 1]))) {
+    //                         // Skip the underscore if `_id` is detected
+    //                         // Do nothing, and let the loop increment i automatically
+    //                     } else {
+    //                         // Copy the character to the modified json
+    //                         decode_modified_json += json_out[i];
+    //                     }
+    //                 }
+    //                 status =  m_codec_.decode_model_list(r_obj_in_n_out, decode_modified_json);
+    //             } else {
+    //                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error while put {};;; {} url: {}", RootModelListType::GetDescriptor()->name(),
+    //                           json, put_client_url_view);
+    //                 return false;
+    //             }
+    //         } else {
+    //             LOG_ERROR_IMPL(GetCppAppLogger(), "Error while encoding {};;; {}", RootModelListType::GetDescriptor()->name(),
+    //                       r_obj_in_n_out.DebugString());
+    //             return false;
+    //         }
+    //         return status;
+    //     }
+    //
+    //     [[nodiscard]] std::string delete_client () const {
+    //         std::string delete_response_json;
+    //         std::string_view delete_client_url_view = delete_client_url.value;
+    //         if (send_delete_request(delete_client_url_view, delete_response_json)) {
+    //             return delete_response_json;
+    //         }
+    //         LOG_ERROR_IMPL(GetCppAppLogger(), "Error while delete {};;; {}, url: {}", RootModelListType::GetDescriptor()->name(),
+    //                   delete_response_json, delete_client_url_view);
+    //         return delete_response_json;
+    //     }
+    // protected:
+    // };
 
 }

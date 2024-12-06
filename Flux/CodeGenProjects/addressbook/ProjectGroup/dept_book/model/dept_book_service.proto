@@ -10,6 +10,8 @@ import "dept_book_core.proto";
 
 package dept_book;
 
+option (FluxFileDateTimeGranularity) = MILLI_SEC;
+option (FluxFileDateTimePrintTimezone) = "LOCAL";
 
 enum BarType {
   OneDay = 1;
@@ -46,7 +48,7 @@ message RTDash {
   optional float avg_max_rate = 13 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%", (FluxFldHelp) = "avg of all avg_rate in the underlying locate requests"];
   optional string cum_strat = 14 [(FluxFldServerPopulate) = true];
   // optional string cum_qty = 12 [(FluxFldServerPopulate) = true, (FluxFldHide) = 'True', (FluxFldHelp) = 'sum of all USD qty of the underlying OR computed cum_qty (cum_usd_notional / sec_last_usd_px) '];
-  optional string last_update_time = 15 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true, (FluxFldHelp) = "most recent of all update_time(s) in the underlying"];
+  optional int64 last_update_time = 15 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true, (FluxFldHelp) = "most recent of all update_time(s) in the underlying"];
   optional string notes = 16 [(FluxFldServerPopulate) = true, (FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "server generated: holds newline concatenated ashare_locate_requests.note field data"];
   repeated InventoryRequest ashare_locate_requests = 17 [(FluxFldAbbreviated) = "JSON"];
   optional InventorySummary indicative_summary = 18 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
@@ -198,8 +200,8 @@ message BarData {
   option (FluxMsgStringLength) = 128;
   required int32 id = 1;
   required BarMetaData bar_meta_data = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
-  required string start_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
-  required string end_time = 4 [(FluxFldValIsDateTime) = true];
+  required int64 start_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required int64 end_time = 4 [(FluxFldValIsDateTime) = true];
   optional float vwap = 5 [(FluxFldProjections) = "1", (FluxFldProjections) = "3", (FluxFldHelp) = "cumulative vwap since SOD, vwap=(sum(vol * px) of all bars from SOD till now) / (total_vol, i.e., sum of vol since SOD)"];
   optional float vwap_change = 6 [(FluxFldProjections) = "2", (FluxFldProjections) = "3", (FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against previous-day close px"];
   optional float premium = 7 [(FluxFldProjections) = "4", (FluxFldProjections) = "6"];
@@ -224,8 +226,8 @@ message ErrorBarData {
   option (FluxMsgStringLength) = 128;
   required int32 id = 1;
   required BarMetaData bar_meta_data = 2 [(FluxFldPk) = "symbol"];
-  required string start_time = 3 [(FluxFldValIsDateTime) = true];
-  required string end_time = 4 [(FluxFldValIsDateTime) = true];
+  required int64 start_time = 3 [(FluxFldValIsDateTime) = true];
+  required int64 end_time = 4 [(FluxFldValIsDateTime) = true];
   optional float vwap = 5;
   optional float vwap_change = 6 [(FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against previous-day close px"];
   optional float premium = 7;
@@ -241,7 +243,7 @@ message ErrorBarData {
   optional int32 bar_count = 17;
   optional string source = 18;
   optional string error_source = 19;
-  optional string current_timestamp = 20 [(FluxFldValIsDateTime) = true];
+  optional int64 current_timestamp = 20 [(FluxFldValIsDateTime) = true];
 }
 
 message ImpliedVolData {
@@ -258,8 +260,8 @@ message ImpliedVolData {
   option (FluxMsgStringLength) = 128;
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
-  required string compute_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
-  required string end_time = 4 [(FluxFldValIsDateTime) = true];
+  required int64 compute_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required int64 end_time = 4 [(FluxFldValIsDateTime) = true];
   optional float vwap = 5 [(FluxFldProjections) = "1", (FluxFldProjections) = "3"];
   optional float underlying_vwap = 6 [(FluxFldProjections) = "2", (FluxFldProjections) = "3"];
   optional float iv = 7 [(FluxFldProjections) = "4", (FluxFldProjections) = "6"];
@@ -270,7 +272,7 @@ message BarDataSymbolNLatestUpdateDateTime{
   option (FluxMsgStringLength) = 128;
 
   required string symbol = 1;
-  required string last_update_datetime = 2 [(FluxFldValIsDateTime) = true];
+  required int64 last_update_datetime = 2 [(FluxFldValIsDateTime) = true];
 }
 
 message BarDataNLatestUpdateDateTime{

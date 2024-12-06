@@ -3,7 +3,8 @@ import { Box, Tooltip, ClickAwayListener, IconButton } from '@mui/material';
 import PropTypes from 'prop-types';
 import {
     clearxpath, getColorTypeFromValue, isValidJsonString, floatToInt, groupCommonKeys,
-    getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray
+    getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray,
+    getDateTimeFromInt
 } from '../utils';
 import { DataTypes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
@@ -151,16 +152,16 @@ const CommonKey = (props) => {
     }
 
     let value = collection.value;
-    if (value && (collection.type === DataTypes.NUMBER || typeof (value) === DataTypes.NUMBER)) {
+    if (collection.type === DataTypes.DATE_TIME && value) {
+        const dateTimeWithTimezone = getDateTimeFromInt(value);
+        if (collection.displayType === 'datetime') {
+            value = dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+        } else {
+            value = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format('HH:mm:ss.SSS') : dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+        }
+    } else if (value && (collection.type === DataTypes.NUMBER || typeof (value) === DataTypes.NUMBER)) {
         if (collection.displayType === DataTypes.INTEGER) {
             value = floatToInt(value);
-        }
-    } else if (collection.type === DataTypes.DATE_TIME && value) {
-        const localDateTime = dayjs.utc(value).tz(localTimezone);
-        if (collection.displayType === 'datetime') {
-            value = localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
-        } else {
-            value = localDateTime.isSame(dayjs(), 'day') ? localDateTime.format('HH:mm:ss.SSS') : localDateTime.format('YYYY-MM-DD HH:mm:ss.SSS');
         }
     } else {
         value = String(value);

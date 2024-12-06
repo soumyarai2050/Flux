@@ -9,7 +9,7 @@
 #include <optional>
 #include <format>
 
-#include "../include/md_container.h"
+#include "md_container.h"
 
 
 enum class PublishPolicy {
@@ -80,6 +80,7 @@ struct Config
         m_last_barter_ws_port_ = get_value_of.template operator()<int32_t>("last_barter_ws_port",
             false).value_or(0);
         m_http_server_port_ = get_value_of.template operator()<int32_t>("cpp_http_port", true).value_or(0);
+        m_market_depth_level_ = get_value_of.template operator()<size_t>("market_depth_level", true).value_or(0);
 
         m_market_depth_db_update_publish_policy_ = static_cast<PublishPolicy>(get_value_of.template operator()<int32_t>(
             "market_depth_db_update_publish_policy", false).value_or(0));
@@ -150,6 +151,7 @@ struct Config
     int32_t m_market_depth_ws_port_;
     int32_t m_last_barter_ws_port_;
     int32_t m_http_server_port_;
+    size_t m_market_depth_level_;
 
     PublishPolicy m_market_depth_db_update_publish_policy_;
     PublishPolicy m_top_of_book_db_update_publish_policy_;

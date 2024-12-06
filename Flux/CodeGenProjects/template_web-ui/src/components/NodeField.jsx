@@ -5,7 +5,7 @@ import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment, To
 import { Error, Clear } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints, getReducerArrrayFromCollections, capitalizeCamelCase } from '../utils';
+import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints, getReducerArrrayFromCollections, capitalizeCamelCase, getDateTimeFromInt } from '../utils';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import classes from './NodeField.module.css';
@@ -313,9 +313,9 @@ const NodeField = (props) => {
         // default input format
         let inputFormat = 'YYYY-MM-DD HH:mm:ss'
         if (value) {
-            const localDateTime = dayjs.utc(value).tz(localTimezone);
+            const dateTimeWithTimezone = getDateTimeFromInt(value);
             if (props.data.displayType !== 'datetime') {
-                if (localDateTime.isSame(dayjs(), 'day')) {
+                if (dateTimeWithTimezone.isSame(dayjs(), 'day')) {
                     inputFormat = 'HH:mm:ss';
                 }
                 // else not same day - use default input format

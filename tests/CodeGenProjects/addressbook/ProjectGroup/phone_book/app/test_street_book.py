@@ -4178,19 +4178,10 @@ def test_all_strat_pause_for_max_reject_limit_breach(
             f"Unexpected, strat_state must be paused, received {pair_strat.strat_state}, pair_strat: {pair_strat}"
 
 
-@pytest.mark.nightly
-def test_place_chore_at_limit_up(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-        pair_strat_, expected_strat_limits_,
+def _place_chore_at_limit_up(
+        leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_strat_status_, symbol_overview_obj_list,
-        last_barter_fixture_list, market_depth_basemodel_list,
-        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    residual_wait_sec = 4 * refresh_sec_update_fixture
-
-    # removing any ask side depth for CB_Sec_1 - limit up don't have any ask side depth or quote
-    market_depth_basemodel_list = market_depth_basemodel_list[:5] + market_depth_basemodel_list[10:]
-
+        last_barter_fixture_list, market_depth_basemodel_list):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_strat_status_, symbol_overview_obj_list,
@@ -4214,7 +4205,6 @@ def test_place_chore_at_limit_up(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        # Positive check
         last_barter_fixture_list[0]['px'] = 145
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
         time.sleep(1)
@@ -4239,7 +4229,7 @@ def test_place_chore_at_limit_up(
 
 
 @pytest.mark.nightly
-def test_place_chore_at_limit_dn(
+def test_place_chore_at_limit_up(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
         pair_strat_, expected_strat_limits_,
         expected_strat_status_, symbol_overview_obj_list,
@@ -4249,8 +4239,42 @@ def test_place_chore_at_limit_dn(
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     # removing any ask side depth for CB_Sec_1 - limit up don't have any ask side depth or quote
-    market_depth_basemodel_list = market_depth_basemodel_list[5:]
+    market_depth_basemodel_list = market_depth_basemodel_list[:5] + market_depth_basemodel_list[10:]
 
+    _place_chore_at_limit_up(
+        leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list)
+
+
+@pytest.mark.nightly
+def test_place_chore_at_limit_up_with_partial_market_depth(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    # removing any ask side depth for CB_Sec_1 - limit up don't have any ask side depth or quote
+    # Also removing last market depth of cb_sec's bid side
+    last_cb_sec_bid_md = market_depth_basemodel_list[4]
+    last_cb_sec_bid_md.position = 3
+    market_depth_basemodel_list = (market_depth_basemodel_list[:3] + [last_cb_sec_bid_md] +     # cb_sec bid md only
+                                   market_depth_basemodel_list[10:])    # eqt_sec bid and ask md
+
+    _place_chore_at_limit_up(
+        leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list)
+
+
+def place_chore_at_limit_dn(
+        leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list):
     sell_symbol, buy_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_strat_status_, symbol_overview_obj_list,
@@ -4297,6 +4321,49 @@ def test_place_chore_at_limit_dn(
         raise Exception(e)
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_place_chore_at_limit_dn(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    # removing any ask side depth for CB_Sec_1 - limit dn don't have any bid side depth or quote
+    market_depth_basemodel_list = market_depth_basemodel_list[5:]
+
+    place_chore_at_limit_dn(
+        leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list)
+
+
+@pytest.mark.nightly
+def test_place_chore_at_limit_dn_with_partial_market_depth(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    # removing any ask side depth for CB_Sec_1 - limit dn don't have any bid side depth or quote
+    last_cb_sec_ask_md = market_depth_basemodel_list[4]
+    last_cb_sec_ask_md.position = 3
+    market_depth_basemodel_list = (market_depth_basemodel_list[5:8] + [last_cb_sec_ask_md] +    # cb_sec bid md only
+                                   market_depth_basemodel_list[10:])    # eqt_sec bid and ask md
+
+    place_chore_at_limit_dn(
+        leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list)
 
 
 # TODO: Add test for missing strat_limits

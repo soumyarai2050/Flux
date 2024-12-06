@@ -6,6 +6,9 @@ import "projects_core.proto";
 
 package performance_benchmark;
 
+option (FluxFileDateTimeGranularity) = MILLI_SEC;
+option (FluxFileDateTimePrintTimezone) = "LOCAL";
+
 message RawPerformanceData{
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 7.0,
