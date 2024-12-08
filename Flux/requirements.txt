@@ -70,3 +70,4 @@ websockets==12.0
 wheel==0.41.2
 yarl==1.9.4
 posix_ipc==1.1.1
+moviepy==2.1.1

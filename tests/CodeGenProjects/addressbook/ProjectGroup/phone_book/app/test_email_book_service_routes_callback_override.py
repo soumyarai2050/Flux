@@ -6898,6 +6898,12 @@ def test_unload_strat_from_strat_view_unload_ui_button(
         assert strat_key in strat_collection.buffered_strat_keys, \
             f"Not Found: expected {strat_key=} in {strat_collection.buffered_strat_keys=}"
 
+        # verifying unload_strat is updated back to default state
+        time.sleep(2)
+        update_strat_view = photo_book_web_client.get_strat_view_client(strat_view_obj.id)
+        assert not update_strat_view.unload_strat, \
+            f"Mismatched strat_view.unload_strat: expected False, found True"
+
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -7003,6 +7009,11 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
               f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
         raise Exception(e)
     # Since config file is removed while unloading - no need to revert changes
+
+    # verifying recycle_strat is updated back to default state
+    update_strat_view = photo_book_web_client.get_strat_view_client(strat_view_obj.id)
+    assert not update_strat_view.recycle_strat, \
+        f"Mismatched strat_view.unload_strat: expected False, found True"
 
     loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
     assert loaded_pair_strat.is_partially_running, \
@@ -25077,6 +25088,94 @@ def test_lapse_post_risky_amend_rej_ack(
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
+
+def looped_update_residuals_query_client_call(buy_symbol, sell_symbol, executor_http_client):
+    while 1:
+        executor_http_client.update_residuals_query_client(buy_symbol, Side.BUY, 1)
+        executor_http_client.update_residuals_query_client(sell_symbol, Side.SELL, 1)
+        time.sleep(0.1)
+
+
+@pytest.mark.nightly
+def test_verify_deadlock_in_update_residuals_query(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_chore_, sell_chore_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_chore_snapshot_,
+        expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_strat_brief_, expected_portfolio_status_,
+        last_barter_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_chore_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
+    """
+    triggers buy & sell pair chore (single buy chore followed by single sell chore) for max_loop_count_per_side times
+    """
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+     config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
+        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        market_depth_basemodel_list)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        # calling update_residual query parallel to chore placed
+        residuals_query_client_call_thread = (
+            threading.Thread(target=looped_update_residuals_query_client_call,
+                             args=(buy_symbol, sell_symbol, executor_http_client,), daemon=True))
+        residuals_query_client_call_thread.start()
+
+        last_buy_chore_id = None
+        last_sell_chore_id = None
+        leg1_last_barter: LastBarterBaseModel | None = None
+        leg2_last_barter: LastBarterBaseModel | None = None
+        for loop_count in range(1, max_loop_count_per_side + 1):
+            if leg1_last_barter is not None:
+                last_barter_fixture_list[0]["market_barter_volume"][
+                    "participation_period_last_barter_qty_sum"] = leg1_last_barter.market_barter_volume.participation_period_last_barter_qty_sum
+            if leg2_last_barter is not None:
+                last_barter_fixture_list[1]["market_barter_volume"][
+                    "participation_period_last_barter_qty_sum"] = leg2_last_barter.market_barter_volume.participation_period_last_barter_qty_sum
+            leg1_last_barter, leg2_last_barter = run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+
+            px = 100
+            qty = 90
+            place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
+            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
+                                                                               executor_http_client,
+                                                                               last_chore_id=last_buy_chore_id)
+            last_buy_chore_id = ack_chore_journal.chore.chore_id
+            latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+                                                                        executor_http_client)
+            time.sleep(2)
+
+            px = 95
+            qty = 110
+            place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
+            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol,
+                                                                               executor_http_client,
+                                                                               last_chore_id=last_sell_chore_id)
+            last_sell_chore_id = ack_chore_journal.chore.chore_id
+            latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+                                                                        executor_http_client)
+
+    except AssertionError as e:
+        print(e)
+        raise e
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 # def test_log_barter_simulator_trigger_kill_switch_and_resume_bartering():
 #     log_dir: PurePath = PurePath(

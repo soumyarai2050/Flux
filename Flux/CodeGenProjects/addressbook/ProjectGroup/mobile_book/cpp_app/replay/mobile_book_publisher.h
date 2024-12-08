@@ -38,9 +38,9 @@ public:
 
     void cleanup();
 
-    void process_market_depth(MarketDepth& kr_market_depth);
+    void process_market_depth(MarketDepthQueueElement& r_market_depth_queue_element);
 
-    void process_last_barter(LastBarter& kr_last_barter);
+    void process_last_barter(const LastBarterQueueElement& kr_last_barter_queue_element);
 
 	void init_shared_memory() {
 		switch (mr_config_.m_market_depth_level_) {
@@ -239,6 +239,6 @@ protected:
     	}
 	}
 
-	void populate_market_depth_queue_element(const MarketDepth& kr_market_depth, MarketDepthQueueElement& r_market_depth_queue_element);
+	void populate_market_depth_queue_element(const MarketDepthQueueElement& kr_market_depth_queue_element, MarketDepth& r_market_depth);
 
 };

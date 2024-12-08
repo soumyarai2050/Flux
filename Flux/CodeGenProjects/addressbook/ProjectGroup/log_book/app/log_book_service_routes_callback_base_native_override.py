@@ -806,25 +806,25 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             StratLogDetail(
                 service="phone_book_unload_strat_event",
                 log_file_path=str(
-                    phone_book_log_dir / f"unload_strat_{datetime_str}.log"),
+                    phone_book_log_dir / f"unload_strat_*_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
-                log_file_path_is_regex=False),
+                log_file_path_is_regex=True),
             StratLogDetail(
                 service="phone_book_recycle_strat_event",
                 log_file_path=str(
-                    phone_book_log_dir / f"recycle_strat_{datetime_str}.log"),
+                    phone_book_log_dir / f"recycle_strat_*_{datetime_str}.log"),
                 critical=True,
                 log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern=
                 log_prefix_regex_pattern_to_log_date_time_regex_pattern,
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern=
                 log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern,
-                log_file_path_is_regex=False),
+                log_file_path_is_regex=True),
             StratLogDetail(
                 service="phone_book_pause_all_active_strat_event",
                 log_file_path=str(
@@ -1137,29 +1137,33 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
     async def remove_strat_alerts_for_strat_id_query_pre(
             self, remove_strat_alerts_for_strat_id_class_type: Type[RemoveStratAlertsForStratId], strat_id: int):
-        async with StratAlert.reentrant_lock:
-            strat_alerts = \
-                await (LogBookServiceRoutesCallbackBaseNativeOverride.
-                       underlying_filtered_strat_alert_by_strat_id_query_http(strat_id))
+        try:
+            async with StratAlert.reentrant_lock:
+                strat_alerts = \
+                    await (LogBookServiceRoutesCallbackBaseNativeOverride.
+                           underlying_filtered_strat_alert_by_strat_id_query_http(strat_id))
 
-            # todo: introduce bulk delete with id list and replace looped deletion here
-            strat_alert: StratAlert
-            for strat_alert in strat_alerts:
-                # cache is also cleaned in delete post call
-                await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_alert_http(strat_alert.id)
+                # todo: introduce bulk delete with id list and replace looped deletion here
+                strat_alert: StratAlert
+                for strat_alert in strat_alerts:
+                    # cache is also cleaned in delete post call
+                    await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_alert_http(strat_alert.id)
 
-        # releasing cache for strat id
-        self.strat_alert_cache_dict_by_strat_id_dict.pop(strat_id, None)
+            # releasing cache for strat id
+            self.strat_alert_cache_dict_by_strat_id_dict.pop(strat_id, None)
 
-        # updating strat_view fields
-        # await self._strat_view_update_handling(strat_id)
-        update_json = {"_id": strat_id,
-                       "strat_alert_aggregated_severity": Severity.Severity_UNSPECIFIED,
-                       "strat_alert_count": 0}
-        payload_dict = {"update_json_list": [update_json], "update_type": UpdateType.SNAPSHOT_TYPE,
-                        "pydantic_basemodel_type_name": StratViewBaseModel.__name__,
-                        "method_name": "patch_all_strat_view_client"}
-        photo_book_service_http_client.process_strat_view_updates_query_client(payload_dict)
+            # updating strat_view fields
+            # await self._strat_view_update_handling(strat_id)
+            update_json = {"_id": strat_id,
+                           "strat_alert_aggregated_severity": Severity.Severity_UNSPECIFIED,
+                           "strat_alert_count": 0}
+            payload_dict = {"update_json_list": [update_json], "update_type": UpdateType.SNAPSHOT_TYPE,
+                            "pydantic_basemodel_type_name": StratViewBaseModel.__name__,
+                            "method_name": "patch_all_strat_view_client"}
+            photo_book_service_http_client.process_strat_view_updates_query_client(payload_dict)
+        except Exception as e_:
+            logging.exception(e_)
+            raise HTTPException(detail=str(e_), status_code=500)
 
         return []
 

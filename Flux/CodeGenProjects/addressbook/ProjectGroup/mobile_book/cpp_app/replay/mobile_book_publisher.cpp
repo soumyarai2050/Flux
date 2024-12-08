@@ -41,30 +41,31 @@ void MobileBookPublisher::cleanup() {
     }
 }
 
-void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
-    if (kr_market_depth.symbol_ != mr_config_.m_leg_1_symbol_ &&
-        kr_market_depth.symbol_ != mr_config_.m_leg_2_symbol_) {
+void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market_depth_queue_element) {
+    if (r_market_depth_queue_element.symbol_ != mr_config_.m_leg_1_symbol_ &&
+        r_market_depth_queue_element.symbol_ != mr_config_.m_leg_2_symbol_) {
         return;
     }
 
-    MarketDepthQueueElement market_depth_queue_element{};
-    populate_market_depth_queue_element(kr_market_depth, market_depth_queue_element);
     // Update symbol-specific caches
     auto update_symbol_cache = [&](auto& symbol_cache) {
         ++symbol_cache.update_counter;
-        update_market_depth_cache(market_depth_queue_element, symbol_cache);
+        update_market_depth_cache(r_market_depth_queue_element, symbol_cache);
         mobile_book_handler::compute_cumulative_fields_from_market_depth_elements(
-            symbol_cache, market_depth_queue_element
+            symbol_cache, r_market_depth_queue_element
         );
     };
+
+    MarketDepth market_depth{};
+    populate_market_depth(r_market_depth_queue_element, market_depth);
 
     switch (mr_config_.m_market_depth_level_) {
         case 1: {
             auto shm_cache = static_cast<ShmSymbolCache<1>*>(m_shm_symbol_cache_);
-            if (kr_market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (kr_market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -75,10 +76,10 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
         }
         case 5: {
             auto shm_cache = static_cast<ShmSymbolCache<5>*>(m_shm_symbol_cache_);
-            if (kr_market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (kr_market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -89,10 +90,10 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
         }
         case 10: {
             auto shm_cache = static_cast<ShmSymbolCache<10>*>(m_shm_symbol_cache_);
-            if (kr_market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (kr_market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -103,10 +104,10 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
         }
         case 15: {
             auto shm_cache = static_cast<ShmSymbolCache<15>*>(m_shm_symbol_cache_);
-            if (kr_market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (kr_market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -117,10 +118,10 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
         }
         case 20: {
             auto shm_cache = static_cast<ShmSymbolCache<20>*>(m_shm_symbol_cache_);
-            if (kr_market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (kr_market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -133,27 +134,27 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
 
     // Update market depth database if PRE policy
     if (mr_config_.m_market_depth_db_update_publish_policy_ == PublishPolicy::PRE) {
-        m_market_depth_codec_.insert_or_update(kr_market_depth);
+        m_market_depth_codec_.insert_or_update(market_depth);
     }
 
     // Handle top of book for first position
-    if (kr_market_depth.position_ == 0) {
+    if (market_depth.position_ == 0) {
         TopOfBook top_of_book;
-        top_of_book.id_ = kr_market_depth.id_;
-        top_of_book.symbol_ = kr_market_depth.symbol_;
-        top_of_book.last_update_date_time_ = kr_market_depth.exch_time_;
+        top_of_book.id_ = market_depth.id_;
+        top_of_book.symbol_ = market_depth.symbol_;
+        top_of_book.last_update_date_time_ = market_depth.exch_time_;
         top_of_book.is_last_update_date_time_set_ = true;
 
-        auto& quote = (kr_market_depth.side_ == "BID") ? top_of_book.bid_quote_ : top_of_book.ask_quote_;
+        auto& quote = (market_depth.side_ == "BID") ? top_of_book.bid_quote_ : top_of_book.ask_quote_;
 
-        quote.px_ = kr_market_depth.px_;
-        quote.qty_ = kr_market_depth.qty_;
+        quote.px_ = market_depth.px_;
+        quote.qty_ = market_depth.qty_;
         quote.is_qty_set_ = true;
         quote.is_px_set_ = true;
         quote.is_last_update_date_time_set_ = true;
-        quote.last_update_date_time_ = kr_market_depth.exch_time_;
+        quote.last_update_date_time_ = market_depth.exch_time_;
 
-        if (kr_market_depth.side_ == "BID") {
+        if (market_depth.side_ == "BID") {
             top_of_book.is_bid_quote_set_ = true;
         } else {
             top_of_book.is_ask_quote_set_ = true;
@@ -193,13 +194,13 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
         switch (mr_config_.m_market_depth_level_) {
             case 1: {
                 auto shm_cache = static_cast<ShmSymbolCache<1>*>(m_shm_symbol_cache_);
-                const auto& md_array = (kr_market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
-                    ((market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
+                const auto& md_array = (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
+                    ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
                         : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_)
-                : ((market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
+                : ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
                     : shm_cache->m_leg_2_data_shm_cache_.ask_market_depths_);
 
-                for (size_t i = market_depth_queue_element.position_; i < md_array.size(); ++i) {
+                for (size_t i = r_market_depth_queue_element.position_; i < md_array.size(); ++i) {
                     if (!md_array[i].is_px_set_) break;
                     m_market_depth_queue_element_list_.push_back(md_array[i]);
                 }
@@ -208,13 +209,13 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
                 break;
             } case 5: {
                 auto shm_cache = static_cast<ShmSymbolCache<5>*>(m_shm_symbol_cache_);
-                const auto& md_array = (kr_market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
-                    ((market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
+                const auto& md_array = (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
+                    ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
                         : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_)
-                : ((market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
+                : ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
                     : shm_cache->m_leg_2_data_shm_cache_.ask_market_depths_);
 
-                for (size_t i = market_depth_queue_element.position_; i < md_array.size(); ++i) {
+                for (size_t i = r_market_depth_queue_element.position_; i < md_array.size(); ++i) {
                     if (!md_array[i].is_px_set_) break;
                     m_market_depth_queue_element_list_.push_back(md_array[i]);
                 }
@@ -224,13 +225,13 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
             }
             case 10: {
                 auto shm_cache = static_cast<ShmSymbolCache<10>*>(m_shm_symbol_cache_);
-                const auto& md_array = (kr_market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
-                    ((market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
+                const auto& md_array = (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
+                    ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
                         : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_)
-                : ((market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
+                : ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
                     : shm_cache->m_leg_2_data_shm_cache_.ask_market_depths_);
 
-                for (size_t i = market_depth_queue_element.position_; i < md_array.size(); ++i) {
+                for (size_t i = r_market_depth_queue_element.position_; i < md_array.size(); ++i) {
                     if (!md_array[i].is_px_set_) break;
                     m_market_depth_queue_element_list_.push_back(md_array[i]);
                 }
@@ -240,13 +241,13 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
             }
             case 15: {
                 auto shm_cache = static_cast<ShmSymbolCache<15>*>(m_shm_symbol_cache_);
-                const auto& md_array = (kr_market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
-                    ((market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
+                const auto& md_array = (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
+                    ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
                         : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_)
-                : ((market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
+                : ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
                     : shm_cache->m_leg_2_data_shm_cache_.ask_market_depths_);
 
-                for (size_t i = market_depth_queue_element.position_; i < md_array.size(); ++i) {
+                for (size_t i = r_market_depth_queue_element.position_; i < md_array.size(); ++i) {
                     if (!md_array[i].is_px_set_) break;
                     m_market_depth_queue_element_list_.push_back(md_array[i]);
                 }
@@ -256,13 +257,13 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
             }
             case 20: {
                 auto shm_cache = static_cast<ShmSymbolCache<20>*>(m_shm_symbol_cache_);
-                const auto& md_array = (kr_market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
-                    ((market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
+                const auto& md_array = (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
+                    ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
                         : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_)
-                : ((market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
+                : ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
                     : shm_cache->m_leg_2_data_shm_cache_.ask_market_depths_);
 
-                for (size_t i = market_depth_queue_element.position_; i < md_array.size(); ++i) {
+                for (size_t i = r_market_depth_queue_element.position_; i < md_array.size(); ++i) {
                     if (!md_array[i].is_px_set_) break;
                     m_market_depth_queue_element_list_.push_back(md_array[i]);
                 }
@@ -274,57 +275,40 @@ void MobileBookPublisher::process_market_depth(MarketDepth& kr_market_depth) {
 	}
 }
 
-void MobileBookPublisher::process_last_barter(LastBarter& r_last_barter) {
-    if (r_last_barter.symbol_n_exch_id_.symbol_ != mr_config_.m_leg_1_symbol_ &&
-        r_last_barter.symbol_n_exch_id_.symbol_ != mr_config_.m_leg_2_symbol_) {
+void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_last_barter_queue_element) {
+    if (kr_last_barter_queue_element.symbol_n_exch_id_.symbol_ != mr_config_.m_leg_1_symbol_ &&
+        kr_last_barter_queue_element.symbol_n_exch_id_.symbol_ != mr_config_.m_leg_2_symbol_) {
         return;
     }
 
-    LastBarterQueueElement r_last_barter_queue_element{};
-    r_last_barter_queue_element.id_ = r_last_barter.id_;
-    FluxCppCore::StringUtil::setString(r_last_barter_queue_element.symbol_n_exch_id_.symbol_,
-        r_last_barter.symbol_n_exch_id_.symbol_.c_str(), sizeof(r_last_barter_queue_element.symbol_n_exch_id_.symbol_));
-    FluxCppCore::StringUtil::setString(r_last_barter_queue_element.symbol_n_exch_id_.exch_id_,
-        r_last_barter.symbol_n_exch_id_.exch_id_.c_str(), sizeof(r_last_barter_queue_element.symbol_n_exch_id_.exch_id_));
-    r_last_barter_queue_element.exch_time_ = r_last_barter.exch_time_;
-    r_last_barter_queue_element.arrival_time_  = r_last_barter.arrival_time_;
-    r_last_barter_queue_element.px_ = r_last_barter.px_;
-    r_last_barter_queue_element.qty_ = r_last_barter.qty_;
-    if (r_last_barter.is_premium_set_) {
-        r_last_barter_queue_element.premium_ = r_last_barter.premium_;
-        r_last_barter_queue_element.is_premium_set_ = true;
-    }
-
-    if (r_last_barter.is_market_barter_volume_set_) {
-        FluxCppCore::StringUtil::setString(r_last_barter_queue_element.market_barter_volume_.id_,
-            r_last_barter.market_barter_volume_.id_.c_str(),
-            sizeof(r_last_barter_queue_element.market_barter_volume_.id_));
-        if (r_last_barter.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_) {
-            r_last_barter_queue_element.market_barter_volume_.participation_period_last_barter_qty_sum_ =
-                r_last_barter.market_barter_volume_.participation_period_last_barter_qty_sum_;
-            r_last_barter_queue_element.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_ = true;
-        }
-
-        if (r_last_barter.market_barter_volume_.is_applicable_period_seconds_set_) {
-            r_last_barter_queue_element.market_barter_volume_.applicable_period_seconds_ =
-                r_last_barter.market_barter_volume_.applicable_period_seconds_;
-            r_last_barter_queue_element.market_barter_volume_.is_applicable_period_seconds_set_ = true;
-        }
-
-        r_last_barter_queue_element.is_market_barter_volume_set_ = true;
-    }
+    LastBarter last_barter{
+        .id_ = kr_last_barter_queue_element.id_,
+        .symbol_n_exch_id_{kr_last_barter_queue_element.symbol_n_exch_id_.symbol_, kr_last_barter_queue_element.symbol_n_exch_id_.exch_id_},
+        .exch_time_ = kr_last_barter_queue_element.exch_time_,
+        .arrival_time_ = kr_last_barter_queue_element.arrival_time_,
+        .px_ = kr_last_barter_queue_element.px_,
+        .qty_ = kr_last_barter_queue_element.qty_,
+        .premium_ = kr_last_barter_queue_element.premium_,
+        .is_premium_set_ = kr_last_barter_queue_element.is_premium_set_,
+        .market_barter_volume_{kr_last_barter_queue_element.market_barter_volume_.id_,
+            kr_last_barter_queue_element.market_barter_volume_.participation_period_last_barter_qty_sum_,
+            kr_last_barter_queue_element.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_,
+            kr_last_barter_queue_element.market_barter_volume_.applicable_period_seconds_,
+            kr_last_barter_queue_element.market_barter_volume_.is_applicable_period_seconds_set_},
+        .is_market_barter_volume_set_ = kr_last_barter_queue_element.is_market_barter_volume_set_
+    };
 
     switch (mr_config_.m_market_depth_level_) {
         case 1: {
             auto shm_cache = static_cast<ShmSymbolCache<1>*>(m_shm_symbol_cache_);
-            if (r_last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_1_symbol_) {
                 ++shm_cache->m_leg_1_data_shm_cache_.update_counter;
-                update_last_barter_cache(r_last_barter_queue_element,
+                update_last_barter_cache(kr_last_barter_queue_element,
                     shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (r_last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_2_symbol_) {
                 ++shm_cache->m_leg_2_data_shm_cache_.update_counter;
-                update_last_barter_cache(r_last_barter_queue_element,
+                update_last_barter_cache(kr_last_barter_queue_element,
                     shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -335,14 +319,14 @@ void MobileBookPublisher::process_last_barter(LastBarter& r_last_barter) {
         }
         case 5: {
             auto shm_cache = static_cast<ShmSymbolCache<5>*>(m_shm_symbol_cache_);
-            if (r_last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_1_symbol_) {
                 ++shm_cache->m_leg_1_data_shm_cache_.update_counter;
-                update_last_barter_cache(r_last_barter_queue_element,
+                update_last_barter_cache(kr_last_barter_queue_element,
                     shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (r_last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_2_symbol_) {
                 ++shm_cache->m_leg_2_data_shm_cache_.update_counter;
-                update_last_barter_cache(r_last_barter_queue_element,
+                update_last_barter_cache(kr_last_barter_queue_element,
                     shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -353,14 +337,14 @@ void MobileBookPublisher::process_last_barter(LastBarter& r_last_barter) {
         }
         case 10: {
             auto shm_cache = static_cast<ShmSymbolCache<10>*>(m_shm_symbol_cache_);
-            if (r_last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_1_symbol_) {
                 ++shm_cache->m_leg_1_data_shm_cache_.update_counter;
-                update_last_barter_cache(r_last_barter_queue_element,
+                update_last_barter_cache(kr_last_barter_queue_element,
                     shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (r_last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_2_symbol_) {
                 ++shm_cache->m_leg_2_data_shm_cache_.update_counter;
-                update_last_barter_cache(r_last_barter_queue_element,
+                update_last_barter_cache(kr_last_barter_queue_element,
                     shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -371,14 +355,14 @@ void MobileBookPublisher::process_last_barter(LastBarter& r_last_barter) {
         }
         case 15: {
             auto shm_cache = static_cast<ShmSymbolCache<15>*>(m_shm_symbol_cache_);
-            if (r_last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_1_symbol_) {
                 ++shm_cache->m_leg_1_data_shm_cache_.update_counter;
-                update_last_barter_cache(r_last_barter_queue_element,
+                update_last_barter_cache(kr_last_barter_queue_element,
                     shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (r_last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_2_symbol_) {
                 ++shm_cache->m_leg_2_data_shm_cache_.update_counter;
-                update_last_barter_cache(r_last_barter_queue_element,
+                update_last_barter_cache(kr_last_barter_queue_element,
                     shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -389,14 +373,14 @@ void MobileBookPublisher::process_last_barter(LastBarter& r_last_barter) {
         }
         case 20: {
             auto shm_cache = static_cast<ShmSymbolCache<20>*>(m_shm_symbol_cache_);
-            if (r_last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_1_symbol_) {
                 ++shm_cache->m_leg_1_data_shm_cache_.update_counter;
-                update_last_barter_cache(r_last_barter_queue_element,
+                update_last_barter_cache(kr_last_barter_queue_element,
                     shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (r_last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (last_barter.symbol_n_exch_id_.symbol_ == mr_config_.m_leg_2_symbol_) {
                 ++shm_cache->m_leg_2_data_shm_cache_.update_counter;
-                update_last_barter_cache(r_last_barter_queue_element,
+                update_last_barter_cache(kr_last_barter_queue_element,
                     shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -408,37 +392,37 @@ void MobileBookPublisher::process_last_barter(LastBarter& r_last_barter) {
     }
 
     if (mr_config_.m_last_barter_db_update_publish_policy_ == PublishPolicy::PRE) {
-        m_last_barter_codec_.insert(r_last_barter);
+        m_last_barter_codec_.insert(last_barter);
     }
 
     if (mr_config_.m_last_barter_ws_update_publish_policy_ == PublishPolicy::PRE) {
-        m_last_barter_web_socket_server_.value().publish(r_last_barter);
+        m_last_barter_web_socket_server_.value().publish(last_barter);
     }
 
     if (mr_config_.m_last_barter_http_update_publish_policy_ == PublishPolicy::PRE) {
-        assert(m_lt_web_client_.value().create_client(r_last_barter));
+        assert(m_lt_web_client_.value().create_client(last_barter));
     }
 
     TopOfBook top_of_book;
-    top_of_book.id_ = r_last_barter.id_;
-    top_of_book.symbol_ = r_last_barter.symbol_n_exch_id_.symbol_;
-    top_of_book.last_update_date_time_ = r_last_barter.exch_time_;
+    top_of_book.id_ = last_barter.id_;
+    top_of_book.symbol_ = last_barter.symbol_n_exch_id_.symbol_;
+    top_of_book.last_update_date_time_ = last_barter.exch_time_;
     top_of_book.is_last_update_date_time_set_ = true;
     top_of_book.total_bartering_security_size_ = std::numeric_limits<int64_t>::min();
     top_of_book.is_total_bartering_security_size_set_ = false;
-    top_of_book.last_barter_.px_ = r_last_barter.px_;
+    top_of_book.last_barter_.px_ = last_barter.px_;
     top_of_book.last_barter_.is_px_set_ = true;
-    top_of_book.last_barter_.qty_ = r_last_barter.qty_;
+    top_of_book.last_barter_.qty_ = last_barter.qty_;
     top_of_book.last_barter_.is_qty_set_ = true;
-    top_of_book.last_barter_.last_update_date_time_ = r_last_barter.exch_time_;
+    top_of_book.last_barter_.last_update_date_time_ = last_barter.exch_time_;
     top_of_book.last_barter_.is_last_update_date_time_set_ = true;
-    if (r_last_barter.is_premium_set_) {
-        top_of_book.last_barter_.premium_ = r_last_barter.premium_;
+    if (last_barter.is_premium_set_) {
+        top_of_book.last_barter_.premium_ = last_barter.premium_;
         top_of_book.last_barter_.is_premium_set_ = true;
     }
 
-    if (r_last_barter.is_market_barter_volume_set_) {
-        top_of_book.market_barter_volume_.push_back(r_last_barter.market_barter_volume_);
+    if (last_barter.is_market_barter_volume_set_) {
+        top_of_book.market_barter_volume_.push_back(last_barter.market_barter_volume_);
     }
 
     if (mr_config_.m_top_of_book_db_update_publish_policy_  == PublishPolicy::PRE) {
@@ -471,7 +455,7 @@ void MobileBookPublisher::process_last_barter(LastBarter& r_last_barter) {
 		mr_config_.m_last_barter_http_update_publish_policy_ == PublishPolicy::POST ||
 		mr_config_.m_last_barter_ws_update_publish_policy_ == PublishPolicy::POST) {
 
-		m_last_barter_monitor_.push(r_last_barter_queue_element);
+		m_last_barter_monitor_.push(kr_last_barter_queue_element);
 	}
 }
 
@@ -944,58 +928,49 @@ void MobileBookPublisher::start_monitor_threads() {
 	m_last_barter_monitor_thread_ = std::jthread([this]() { last_barter_consumer(); });
 }
 
-void MobileBookPublisher::populate_market_depth_queue_element(const MarketDepth& kr_market_depth,
-    MarketDepthQueueElement& r_market_depth_queue_element) {
+void MobileBookPublisher::populate_market_depth_queue_element(const MarketDepthQueueElement& kr_market_depth_queue_element,
+    MarketDepth& r_market_depth) {
 
     const auto current_time = FluxCppCore::get_local_time_microseconds<int64_t>();
-    r_market_depth_queue_element.id_ = kr_market_depth.id_;
-    FluxCppCore::StringUtil::setString(
-        r_market_depth_queue_element.symbol_,
-        kr_market_depth.symbol_.c_str(),
-        sizeof(r_market_depth_queue_element.symbol_)
-    );
-    r_market_depth_queue_element.exch_time_ = current_time;
-    r_market_depth_queue_element.arrival_time_ = current_time;
-    r_market_depth_queue_element.side_ = kr_market_depth.side_[0];
-    r_market_depth_queue_element.position_ = kr_market_depth.position_;
+    r_market_depth.id_ = kr_market_depth_queue_element.id_;
+    r_market_depth.symbol_ = kr_market_depth_queue_element.symbol_;
+    r_market_depth.exch_time_ = current_time;
+    r_market_depth.arrival_time_ = current_time;
 
-    if (kr_market_depth.is_px_set_) {
-        r_market_depth_queue_element.px_ = kr_market_depth.px_;
-        r_market_depth_queue_element.is_px_set_ = true;
+    if (kr_market_depth_queue_element.is_px_set_) {
+        r_market_depth.px_ = kr_market_depth_queue_element.px_;
+        r_market_depth.is_px_set_ = true;
     }
 
-    if (kr_market_depth.is_qty_set_) {
-        r_market_depth_queue_element.qty_ = kr_market_depth.qty_;
-        r_market_depth_queue_element.is_qty_set_ = true;
+    if (kr_market_depth_queue_element.is_qty_set_) {
+        r_market_depth.qty_ = kr_market_depth_queue_element.qty_;
+        r_market_depth.is_qty_set_ = true;
+    }
+    r_market_depth.position_ = kr_market_depth_queue_element.position_;
+
+    if (kr_market_depth_queue_element.is_market_maker_set_) {
+        r_market_depth.market_maker_ = kr_market_depth_queue_element.market_maker_;
+        r_market_depth.is_market_maker_set_ = true;
     }
 
-    if (kr_market_depth.is_market_maker_set_) {
-        FluxCppCore::StringUtil::setString(
-            r_market_depth_queue_element.market_maker_,
-            kr_market_depth.market_maker_.c_str(),
-            sizeof(r_market_depth_queue_element.market_maker_)
-        );
-        r_market_depth_queue_element.is_market_maker_set_ = true;
+    if (kr_market_depth_queue_element.is_is_smart_depth_set_) {
+        r_market_depth.is_smart_depth_ = kr_market_depth_queue_element.is_smart_depth_;
+        r_market_depth.is_is_smart_depth_set_ = true;
     }
 
-    if (kr_market_depth.is_is_smart_depth_set_) {
-        r_market_depth_queue_element.is_smart_depth_ = kr_market_depth.is_smart_depth_;
-        r_market_depth_queue_element.is_is_smart_depth_set_ = true;
+    if (kr_market_depth_queue_element.is_cumulative_notional_set_) {
+        r_market_depth.cumulative_notional_ = kr_market_depth_queue_element.cumulative_notional_;
+        r_market_depth.is_cumulative_notional_set_ = true;
     }
 
-    if (kr_market_depth.is_cumulative_notional_set_) {
-        r_market_depth_queue_element.cumulative_notional_ = kr_market_depth.cumulative_notional_;
-        r_market_depth_queue_element.is_cumulative_notional_set_ = true;
+    if (kr_market_depth_queue_element.is_cumulative_qty_set_) {
+        r_market_depth.cumulative_qty_ = kr_market_depth_queue_element.cumulative_qty_;
+        r_market_depth.is_cumulative_qty_set_ = true;
     }
 
-    if (kr_market_depth.is_cumulative_qty_set_) {
-        r_market_depth_queue_element.cumulative_qty_ = kr_market_depth.cumulative_qty_;
-        r_market_depth_queue_element.is_cumulative_qty_set_ = true;
-    }
-
-    if (kr_market_depth.is_cumulative_avg_px_set_) {
-        r_market_depth_queue_element.cumulative_avg_px_ = kr_market_depth.cumulative_avg_px_;
-        r_market_depth_queue_element.is_cumulative_avg_px_set_ = true;
+    if (kr_market_depth_queue_element.is_cumulative_avg_px_set_) {
+        r_market_depth.cumulative_avg_px_ = kr_market_depth_queue_element.cumulative_avg_px_;
+        r_market_depth.is_cumulative_avg_px_set_ = true;
     }
 
 }

@@ -9,9 +9,14 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, add_logging_levels
 
 PAIR_STRAT_ENGINE_DATA_DIR: PurePath = PAIR_STRAT_ENGINE_DIR / "data"
 PAIR_STRAT_ENGINE_LOG_DIR: PurePath = PAIR_STRAT_ENGINE_DIR / "log"
+config_yaml_path = PurePath(__file__).parent.parent / "data" / f"config.yaml"
+config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
+custom_log_lvls = config_yaml_dict.get("custom_logger_lvls")
+add_logging_levels([] if custom_log_lvls is None else custom_log_lvls)
 
 
 def unload_strat(strat_id: int, force: bool = False):
