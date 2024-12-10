@@ -11,47 +11,9 @@
 #include <cerrno>
 #include <format>
 #include <stdexcept>
-#include "mobile_book_shared_memory_data_structure.h"
 
-// #define SHM_NAME "/my_shm"
-// #define SEM_NAME "/my_sem"
-
-inline void format_data(MobileBookShmCache const& cache, std::vector<char>& buffer) {
-    // std::format_to(std::back_inserter(buffer), "{:*^40}\n{:5} {:10.5f}  {:10.5f} {:5}\n", "GOOG", 1202, 22.86, 22.9, 1386);
-
-    std::format_to(std::back_inserter(buffer), "{:*^40}\n", std::string_view(cache.symbol_));
-
-    std::format_to(std::back_inserter(buffer), "Last Barter: {} {}@{} CumQty: {} ExchTs: {} ArrTs: {}\n\n",
-        std::string_view(cache.last_barter_.symbol_n_exch_id_.symbol_), cache.last_barter_.qty_, cache.last_barter_.px_,
-        cache.last_barter_.market_barter_volume_.participation_period_last_barter_qty_sum_, cache.last_barter_.exch_time_,
-        cache.last_barter_.arrival_time_);
-
-    const auto top_bid_qty = (int)cache.top_of_book_.bid_quote_.qty_; // cache.top_of_book_.is_bid_quote_set_ ? cache.top_of_book_.bid_quote_.qty_ : 0;
-    const auto top_bid_px = (float)cache.top_of_book_.bid_quote_.px_; //cache.top_of_book_.is_bid_quote_set_? cache.top_of_book_.bid_quote_.px_ : 0;
-
-    const auto top_ask_qty = (int)cache.top_of_book_.ask_quote_.qty_; //cache.top_of_book_.is_ask_quote_set_? cache.top_of_book_.ask_quote_.qty_ : 0;
-    const auto top_ask_px = (float)cache.top_of_book_.ask_quote_.px_; //cache.top_of_book_.is_ask_quote_set_? cache.top_of_book_.ask_quote_.px_ : 0;
-
-    const auto last_barter_qty = (int)cache.top_of_book_.last_barter_.qty_; //cache.last_barter_.is_qty_set_? cache.last_barter_.qty
-    const auto last_barter_px = (float)cache.top_of_book_.last_barter_.px_; //cache.last_barter_.is_px_set_? cache.last_barter_.px_ : 0;
-
-    std::format_to(std::back_inserter(buffer), "Top of Book: {:6} {:10.5f}  {:10.5f} {:6}\n", top_bid_qty, top_bid_px, top_ask_px, top_ask_qty );
-    std::format_to(std::back_inserter(buffer), "Last Price: {}@{} cumQty: {} updateTs: {}\n\n", last_barter_px, last_barter_qty,
-        "Not Set", cache.top_of_book_.last_barter_.last_update_date_time_);
-
-    std::format_to(std::back_inserter(buffer), "{:*^40}\n", "Market Depth");
-    for (size_t i{0}; i < MARKET_DEPTH_LEVEL; ++i) {
-        const auto& bid = cache.bid_market_depths_[i];
-        const auto& ask = cache.ask_market_depths_[i];
-        auto bid_qty = bid.qty_ ; //bid.is_qty_set_ ? bid.qty_ : 0;
-        auto bid_px = bid.px_; //bid.is_px_set_? bid.px_ : 0;
-
-        auto ask_qty = ask.qty_; //ask.is_qty_set_? ask.qty_ : 0;
-        auto ask_px = ask.px_; // ask.is_px_set_? ask.px_ : 0;
-
-        std::format_to(std::back_inserter(buffer), "{:6} {:10.5f}  {:10.5f} {:6}\n", bid_qty, bid_px, ask_px, ask_qty);
-    }
-}
+#include "../include/shm_symbol_cache.h"
+#include "../include/md_utility_functions.h"
 
 
 constexpr mode_t SHM_PERMISSIONS = 0666; // Permissions for shared memory
@@ -149,26 +111,67 @@ protected:
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        std::cout << "Usage: " << argv[0] << " /street_book_1_shm /street_book_1_sem\n";
+        std::cout << "Usage: " << argv[0] << " no. of level(1, 5, 10, 15, 20), /street_book_1_shm /street_book_1_sem\n";
+        return 0;
+    }
+
+    int level = std::stoi(argv[1]);
+    if (level != 1 or level != 5 or level != 10 or level != 15 or level != 20) {
+        std::cout << "Invalid level provided. Supported levels are 1, 5, 10, 15, 20.\n";
+        throw std::runtime_error("Invalid level provided. Supported levels are 1, 5, 10, 15, 20.\n");
         return 0;
     }
 
     try {
-        SharedMemoryManager<ShmSymbolCache> shmManager(argv[1], argv[2]);
-
-        while (1) {
-        //     // Read data from shared memory
-            std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
-            auto d =shmManager.read_from_shared_memory();
-            std::vector<char> buffer;
-            format_data(d.m_leg_1_data_shm_cache_, buffer);
-            std::cout << std::string_view{buffer.begin(), buffer.end()} << '\n';
-            buffer.clear();
-            std::cout << "------------------------------------ LEG 2 ------------------------------------\n";
-            format_data(d.m_leg_2_data_shm_cache_, buffer);
-            std::cout << std::string_view{buffer.begin(), buffer.end()} << '\n';
+        switch (level) {
+            case 1: {
+                SharedMemoryManager<ShmSymbolCache<1>> shmManager(argv[1], argv[2]);
+                while (1) {
+                    std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
+                    auto shm_cache =shmManager.read_from_shared_memory();
+                    mobile_book_handler::shm_snapshot(shm_cache);
+                }
+                break;
+            }
+            case 5: {
+                SharedMemoryManager<ShmSymbolCache<5>> shmManager(argv[1], argv[2]);
+                while (1) {
+                    std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
+                    auto shm_cache =shmManager.read_from_shared_memory();
+                    mobile_book_handler::shm_snapshot(shm_cache);
+                }
+                break;
+            }
+            case 10: {
+                SharedMemoryManager<ShmSymbolCache<10>> shmManager(argv[1], argv[2]);
+                while (1) {
+                    std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
+                    auto shm_cache =shmManager.read_from_shared_memory();
+                    mobile_book_handler::shm_snapshot(shm_cache);
+                }
+                break;
+            }
+            case 15: {
+                SharedMemoryManager<ShmSymbolCache<15>> shmManager(argv[1], argv[2]);
+                while (1) {
+                    std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
+                    auto shm_cache =shmManager.read_from_shared_memory();
+                    mobile_book_handler::shm_snapshot(shm_cache);
+                }
+                break;
+            }
+            case 20: {
+                SharedMemoryManager<ShmSymbolCache<20>> shmManager(argv[1], argv[2]);
+                while (1) {
+                    std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
+                    auto shm_cache =shmManager.read_from_shared_memory();
+                    mobile_book_handler::shm_snapshot(shm_cache);
+                }
+                break;
+            }
+            default:
+                throw std::runtime_error("Invalid level provided. Supported levels are 1, 5, 10, 15, 20.\n");
         }
-
     } catch (const std::exception& ex) {
         std::cerr << ex.what() << std::endl;
         return 1;

@@ -49,12 +49,10 @@ public:
     		.is_cumulative_avg_px_set_ = market_depth.is_cumulative_avg_px_set_
     	};
 
-    	FluxCppCore::StringUtil::setString(market_depth_queue_element.symbol_, market_depth.symbol_.c_str(),
-    		sizeof(market_depth_queue_element.symbol_));
+    	FluxCppCore::StringUtil::setString(market_depth_queue_element.symbol_, market_depth.symbol_);
     	if (market_depth.is_market_maker_set_) {
     		FluxCppCore::StringUtil::setString(market_depth_queue_element.market_maker_,
-                market_depth.market_maker_.c_str(),
-                sizeof(market_depth_queue_element.market_maker_));
+                market_depth.market_maker_);
             market_depth_queue_element.is_market_maker_set_ = true;
     	}
 
@@ -79,15 +77,12 @@ public:
     	};
 
     	FluxCppCore::StringUtil::setString(last_barter_queue_element.symbol_n_exch_id_.symbol_,
-    		last_barter.symbol_n_exch_id_.symbol_.c_str(),
-    		sizeof(last_barter_queue_element.symbol_n_exch_id_.symbol_));
+    		last_barter.symbol_n_exch_id_.symbol_);
     	FluxCppCore::StringUtil::setString(last_barter_queue_element.symbol_n_exch_id_.exch_id_,
-            last_barter.symbol_n_exch_id_.exch_id_.c_str(),
-            sizeof(last_barter_queue_element.symbol_n_exch_id_.exch_id_));
+            last_barter.symbol_n_exch_id_.exch_id_);
 
     	if (last_barter.is_market_barter_volume_set_) {
-    		FluxCppCore::StringUtil::setString(last_barter_queue_element.market_barter_volume_.id_, last_barter.market_barter_volume_.id_.c_str(),
-    			sizeof(last_barter_queue_element.market_barter_volume_.id_));
+    		FluxCppCore::StringUtil::setString(last_barter_queue_element.market_barter_volume_.id_, last_barter.market_barter_volume_.id_);
     		if (last_barter.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_) {
     			last_barter_queue_element.market_barter_volume_.participation_period_last_barter_qty_sum_ =
     				last_barter.market_barter_volume_.participation_period_last_barter_qty_sum_;

@@ -1,11 +1,12 @@
 #pragma once
 
+#include "shm_symbol_cache.h"
+
 namespace mobile_book_handler {
     template<size_t N>
     inline void format_data(MDContainer<N> const& cache, std::vector<char>& buffer) {
 
         std::format_to(std::back_inserter(buffer), "\n{:*^40}\n\n", std::string_view(cache.symbol_));
-
         std::format_to(std::back_inserter(buffer), "{:*^40}\n\n", "Last Barter");
         std::format_to(std::back_inserter(buffer), "SYMBOL      EXCH ID  PRICE      QTY    PREMIUM    EXCH TS          ARR TS\n");
         std::format_to(std::back_inserter(buffer), "{:<10}  {:<7}  {:<10.3f}  {:<6}  {:<8.3f}  {:<14}  {:<14}\n\n",
@@ -31,13 +32,14 @@ namespace mobile_book_handler {
         std::format_to(std::back_inserter(buffer), "{:6}  {:10.3f}  {:6}  {:10.3f}  {:6}  {:10.3f}\n\n",
             top_bid_qty, top_bid_px, top_ask_qty, top_ask_px, last_barter_qty, last_barter_px);
 
-        constexpr auto md_format_spec = "{:10.3f}\t\t\t\t{:6}\t\t\t\t{:10.3f}\t\t\t{:6}\t   {:10.3f}\t{:10.3f}  {:6}"
-                                        "       {:10.3f}\t\t\t\t\t{:6}\t\t\t\t\t{:10.3f}\n";
+        constexpr auto md_format_spec = "{:10.3f}                   {:6}                    {:10.3f}                "
+                                        "{:6}       {:10.3f}     {:10.3f}  {:6}       {:10.3f}                          "
+                                        "{:6}                               {:10.3f}\n";
 
         // BUY CUM QTY , BUY CUM px , BUY QTY, BUY PX, SELL PX, SELL QTY, SELL CUM PX, SELL CUM QTY
         std::format_to(std::back_inserter(buffer), "{:*^40}\n", "Market Depth");
         std::format_to(std::back_inserter(buffer), "BUY CUMULATIVE NOTIONAL  BUY CUMULATIVE QTY"
-                                                   "  BUY CUMULATIVE AVG PX  BUY QTY    BUY PX\t\tSELL PX  SELL QTY  "
+                                                   "  BUY CUMULATIVE AVG PX  BUY QTY    BUY PX          SELL PX  SELL QTY  "
                                                    "SELL CUMULATIVE NOTIONAL  SELL CUMULATIVE QTY   "
                                                    "SELL CUMULATIVE AVG PX\n\n");
        for (size_t i{0}; i < MARKET_DEPTH_LEVEL; ++i) {
@@ -116,6 +118,17 @@ namespace mobile_book_handler {
 
         std::copy(filtered_elements.begin(), filtered_elements.begin() + filtered_count, elements.begin());
     }
+
+    template<size_t N>
+	std::string shm_snapshot(ShmSymbolCache<N> const& cache) {
+		std::vector<char> buffer;
+		format_data(cache.m_leg_1_data_shm_cache_, buffer);
+		std::string data {buffer.begin(), buffer.end()};
+		data += '\n';
+		format_data(cache.m_leg_2_data_shm_cache_, buffer);
+		data.append(buffer.begin(), buffer.end());
+		return data;
+	}
 
     template<size_t N>
     inline void compute_cumulative_fields_from_market_depth_elements(MDContainer<N>& r_container, const MarketDepthQueueElement& r_element) {

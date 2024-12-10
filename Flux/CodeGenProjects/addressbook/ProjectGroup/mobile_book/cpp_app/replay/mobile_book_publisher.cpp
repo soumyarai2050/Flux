@@ -26,7 +26,8 @@ void MobileBookPublisher::cleanup() {
 	        break;
         }
 	    default: {
-	        std::cerr << "Invalid market depth level: " << mr_config_.m_market_depth_level_ << std::endl;
+	        LOG_ERROR_IMPL(GetCppAppLogger(), "Unsupported market depth level: {};;; supported levels are: "
+                                              "1, 5, 10, 15, 20", mr_config_.m_market_depth_level_);
             break;
 	    }
 	}
@@ -41,31 +42,28 @@ void MobileBookPublisher::cleanup() {
     }
 }
 
-void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market_depth_queue_element) {
-    if (r_market_depth_queue_element.symbol_ != mr_config_.m_leg_1_symbol_ &&
-        r_market_depth_queue_element.symbol_ != mr_config_.m_leg_2_symbol_) {
+void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr_market_depth_queue_element) {
+    if (kr_market_depth_queue_element.symbol_ != mr_config_.m_leg_1_symbol_ &&
+        kr_market_depth_queue_element.symbol_ != mr_config_.m_leg_2_symbol_) {
         return;
     }
 
     // Update symbol-specific caches
     auto update_symbol_cache = [&](auto& symbol_cache) {
         ++symbol_cache.update_counter;
-        update_market_depth_cache(r_market_depth_queue_element, symbol_cache);
+        update_market_depth_cache(kr_market_depth_queue_element, symbol_cache);
         mobile_book_handler::compute_cumulative_fields_from_market_depth_elements(
-            symbol_cache, r_market_depth_queue_element
+            symbol_cache, kr_market_depth_queue_element
         );
     };
-
-    MarketDepth market_depth{};
-    populate_market_depth(r_market_depth_queue_element, market_depth);
 
     switch (mr_config_.m_market_depth_level_) {
         case 1: {
             auto shm_cache = static_cast<ShmSymbolCache<1>*>(m_shm_symbol_cache_);
-            if (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (kr_market_depth_queue_element.symbol_ == mr_config_.m_leg_1_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (kr_market_depth_queue_element.symbol_ == mr_config_.m_leg_2_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -76,10 +74,10 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
         }
         case 5: {
             auto shm_cache = static_cast<ShmSymbolCache<5>*>(m_shm_symbol_cache_);
-            if (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (kr_market_depth_queue_element.symbol_ == mr_config_.m_leg_1_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (kr_market_depth_queue_element.symbol_ == mr_config_.m_leg_2_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -90,10 +88,10 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
         }
         case 10: {
             auto shm_cache = static_cast<ShmSymbolCache<10>*>(m_shm_symbol_cache_);
-            if (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (kr_market_depth_queue_element.symbol_ == mr_config_.m_leg_1_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (kr_market_depth_queue_element.symbol_ == mr_config_.m_leg_2_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -104,10 +102,10 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
         }
         case 15: {
             auto shm_cache = static_cast<ShmSymbolCache<15>*>(m_shm_symbol_cache_);
-            if (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (kr_market_depth_queue_element.symbol_ == mr_config_.m_leg_1_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (kr_market_depth_queue_element.symbol_ == mr_config_.m_leg_2_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -118,10 +116,10 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
         }
         case 20: {
             auto shm_cache = static_cast<ShmSymbolCache<20>*>(m_shm_symbol_cache_);
-            if (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) {
+            if (kr_market_depth_queue_element.symbol_ == mr_config_.m_leg_1_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_1_data_shm_cache_);
             }
-            if (market_depth.symbol_ == mr_config_.m_leg_2_symbol_) {
+            if (kr_market_depth_queue_element.symbol_ == mr_config_.m_leg_2_symbol_) {
                 update_symbol_cache(shm_cache->m_leg_2_data_shm_cache_);
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
@@ -130,7 +128,15 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
             }
             break;
         }
+        default: {
+            LOG_ERROR_IMPL(GetCppAppLogger(), "Unsupported market depth level: {};;; supported levels are: "
+                                              "1, 5, 10, 15, 20", mr_config_.m_market_depth_level_);
+            break;
+        }
     }
+
+    MarketDepth market_depth{};
+    populate_market_depth(kr_market_depth_queue_element, market_depth);
 
     // Update market depth database if PRE policy
     if (mr_config_.m_market_depth_db_update_publish_policy_ == PublishPolicy::PRE) {
@@ -178,9 +184,10 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
             // if (m_top_of_book_codec_.m_root_model_key_to_db_id.find())
         }
 
-        if (mr_config_.m_market_depth_db_update_publish_policy_ == PublishPolicy::PRE) {
+        if (mr_config_.m_top_of_book_ws_update_publish_policy_ == PublishPolicy::PRE) {
             auto db_id = m_top_of_book_codec_.get_db_id_from_root_model_obj(top_of_book);
             top_of_book.id_ = db_id;
+            top_of_book.market_barter_volume_.clear();
             m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
             m_top_of_book_web_socket_server_.value().publish(top_of_book);
         }
@@ -195,12 +202,12 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
             case 1: {
                 auto shm_cache = static_cast<ShmSymbolCache<1>*>(m_shm_symbol_cache_);
                 const auto& md_array = (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
-                    ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
-                        : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_)
-                : ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
+                    ((kr_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
+                        : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_) :
+                ((kr_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
                     : shm_cache->m_leg_2_data_shm_cache_.ask_market_depths_);
 
-                for (size_t i = r_market_depth_queue_element.position_; i < md_array.size(); ++i) {
+                for (size_t i = kr_market_depth_queue_element.position_; i < md_array.size(); ++i) {
                     if (!md_array[i].is_px_set_) break;
                     m_market_depth_queue_element_list_.push_back(md_array[i]);
                 }
@@ -210,12 +217,12 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
             } case 5: {
                 auto shm_cache = static_cast<ShmSymbolCache<5>*>(m_shm_symbol_cache_);
                 const auto& md_array = (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
-                    ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
+                    ((kr_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
                         : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_)
-                : ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
+                : ((kr_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
                     : shm_cache->m_leg_2_data_shm_cache_.ask_market_depths_);
 
-                for (size_t i = r_market_depth_queue_element.position_; i < md_array.size(); ++i) {
+                for (size_t i = kr_market_depth_queue_element.position_; i < md_array.size(); ++i) {
                     if (!md_array[i].is_px_set_) break;
                     m_market_depth_queue_element_list_.push_back(md_array[i]);
                 }
@@ -226,12 +233,12 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
             case 10: {
                 auto shm_cache = static_cast<ShmSymbolCache<10>*>(m_shm_symbol_cache_);
                 const auto& md_array = (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
-                    ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
+                    ((kr_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
                         : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_)
-                : ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
+                : ((kr_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
                     : shm_cache->m_leg_2_data_shm_cache_.ask_market_depths_);
 
-                for (size_t i = r_market_depth_queue_element.position_; i < md_array.size(); ++i) {
+                for (size_t i = kr_market_depth_queue_element.position_; i < md_array.size(); ++i) {
                     if (!md_array[i].is_px_set_) break;
                     m_market_depth_queue_element_list_.push_back(md_array[i]);
                 }
@@ -242,12 +249,12 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
             case 15: {
                 auto shm_cache = static_cast<ShmSymbolCache<15>*>(m_shm_symbol_cache_);
                 const auto& md_array = (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
-                    ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
+                    ((kr_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
                         : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_)
-                : ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
+                : ((kr_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
                     : shm_cache->m_leg_2_data_shm_cache_.ask_market_depths_);
 
-                for (size_t i = r_market_depth_queue_element.position_; i < md_array.size(); ++i) {
+                for (size_t i = kr_market_depth_queue_element.position_; i < md_array.size(); ++i) {
                     if (!md_array[i].is_px_set_) break;
                     m_market_depth_queue_element_list_.push_back(md_array[i]);
                 }
@@ -258,17 +265,22 @@ void MobileBookPublisher::process_market_depth(MarketDepthQueueElement& r_market
             case 20: {
                 auto shm_cache = static_cast<ShmSymbolCache<20>*>(m_shm_symbol_cache_);
                 const auto& md_array = (market_depth.symbol_ == mr_config_.m_leg_1_symbol_) ?
-                    ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
+                    ((kr_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_1_data_shm_cache_.bid_market_depths_
                         : shm_cache->m_leg_1_data_shm_cache_.ask_market_depths_)
-                : ((r_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
+                : ((kr_market_depth_queue_element.side_ == 'B') ? shm_cache->m_leg_2_data_shm_cache_.bid_market_depths_
                     : shm_cache->m_leg_2_data_shm_cache_.ask_market_depths_);
 
-                for (size_t i = r_market_depth_queue_element.position_; i < md_array.size(); ++i) {
+                for (size_t i = kr_market_depth_queue_element.position_; i < md_array.size(); ++i) {
                     if (!md_array[i].is_px_set_) break;
                     m_market_depth_queue_element_list_.push_back(md_array[i]);
                 }
                 m_market_depth_monitor_.push(m_market_depth_queue_element_list_);
                 m_market_depth_queue_element_list_.clear();
+                break;
+            }
+            default: {
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Unsupported market depth level: {};;; supported levels are: "
+                                              "1, 5, 10, 15, 20", mr_config_.m_market_depth_level_);
                 break;
             }
         }
@@ -389,6 +401,11 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
             }
             break;
         }
+        default: {
+            LOG_ERROR_IMPL(GetCppAppLogger(), "Unsupported market depth level: {};;; supported levels are: "
+                                              "1, 5, 10, 15, 20", mr_config_.m_market_depth_level_);
+            break;
+        }
     }
 
     if (mr_config_.m_last_barter_db_update_publish_policy_ == PublishPolicy::PRE) {
@@ -423,6 +440,7 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
 
     if (last_barter.is_market_barter_volume_set_) {
         top_of_book.market_barter_volume_.push_back(last_barter.market_barter_volume_);
+        top_of_book.is_market_barter_volume_set_ = true;
     }
 
     if (mr_config_.m_top_of_book_db_update_publish_policy_  == PublishPolicy::PRE) {
@@ -432,6 +450,7 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
     if (mr_config_.m_top_of_book_ws_update_publish_policy_ == PublishPolicy::PRE) {
         auto db_id = m_top_of_book_codec_.get_db_id_from_root_model_obj(top_of_book);
         top_of_book.id_ = db_id;
+        top_of_book.market_barter_volume_.clear();
         m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
         m_top_of_book_web_socket_server_.value().publish(top_of_book);
     }
@@ -461,7 +480,7 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
 
 template<size_t N>
 void MobileBookPublisher::update_market_depth_cache(const MarketDepthQueueElement& kr_market_depth_queue_element,
-	MDContainer<N>& r_mobile_book_cache_out) {
+	MDContainer<N>& r_mobile_book_cache_out) const {
 
     if (kr_market_depth_queue_element.side_ == 'B') {
         r_mobile_book_cache_out.bid_market_depths_[kr_market_depth_queue_element.position_] = kr_market_depth_queue_element;
@@ -473,8 +492,7 @@ void MobileBookPublisher::update_market_depth_cache(const MarketDepthQueueElemen
 
     if (kr_market_depth_queue_element.position_ == 0) {
         r_mobile_book_cache_out.top_of_book_.id_ = kr_market_depth_queue_element.id_;
-        FluxCppCore::StringUtil::setString(r_mobile_book_cache_out.top_of_book_.symbol_,
-            kr_market_depth_queue_element.symbol_, sizeof(r_mobile_book_cache_out.top_of_book_.symbol_));
+        FluxCppCore::StringUtil::setString(r_mobile_book_cache_out.top_of_book_.symbol_,  kr_market_depth_queue_element.symbol_);
         r_mobile_book_cache_out.top_of_book_.last_update_date_time_ = kr_market_depth_queue_element.exch_time_;
         r_mobile_book_cache_out.top_of_book_.is_last_update_date_time_set_ = true;
 
@@ -509,28 +527,46 @@ void MobileBookPublisher::update_market_depth_cache(const MarketDepthQueueElemen
 
 template<size_t N>
 void MobileBookPublisher::update_last_barter_cache(const LastBarterQueueElement& kr_last_barter_queue_element,
-	MDContainer<N>& r_mobile_book_cache_out) {
+	MDContainer<N>& r_mobile_book_cache_out) const {
 	// LastBarter
-		r_mobile_book_cache_out.last_barter_ = kr_last_barter_queue_element;
+	r_mobile_book_cache_out.last_barter_ = kr_last_barter_queue_element;
 
-		// TopOfBook
-		FluxCppCore::StringUtil::setString(r_mobile_book_cache_out.top_of_book_.symbol_,
-			kr_last_barter_queue_element.symbol_n_exch_id_.symbol_, sizeof(r_mobile_book_cache_out.top_of_book_.symbol_));
-		r_mobile_book_cache_out.top_of_book_.last_update_date_time_ = kr_last_barter_queue_element.exch_time_;
+	// TopOfBook
+	FluxCppCore::StringUtil::setString(r_mobile_book_cache_out.top_of_book_.symbol_,
+		kr_last_barter_queue_element.symbol_n_exch_id_.symbol_);
+	r_mobile_book_cache_out.top_of_book_.last_update_date_time_ = kr_last_barter_queue_element.exch_time_;
 
-		r_mobile_book_cache_out.top_of_book_.is_last_update_date_time_set_ = true;
-		r_mobile_book_cache_out.top_of_book_.total_bartering_security_size_ = std::numeric_limits<int64_t>::min();
-		r_mobile_book_cache_out.top_of_book_.is_total_bartering_security_size_set_ = false;
+	r_mobile_book_cache_out.top_of_book_.is_last_update_date_time_set_ = true;
+	r_mobile_book_cache_out.top_of_book_.total_bartering_security_size_ = std::numeric_limits<int64_t>::min();
+	r_mobile_book_cache_out.top_of_book_.is_total_bartering_security_size_set_ = false;
 
-		r_mobile_book_cache_out.top_of_book_.is_last_barter_set_ = true;
-		r_mobile_book_cache_out.top_of_book_.last_barter_.px_ = kr_last_barter_queue_element.px_;
-		r_mobile_book_cache_out.top_of_book_.last_barter_.is_px_set_ = true;
-		r_mobile_book_cache_out.top_of_book_.last_barter_.qty_ = kr_last_barter_queue_element.qty_;
-		r_mobile_book_cache_out.top_of_book_.last_barter_.is_qty_set_ = true;
-		r_mobile_book_cache_out.top_of_book_.last_barter_.premium_ = kr_last_barter_queue_element.premium_;
-		r_mobile_book_cache_out.top_of_book_.last_barter_.is_premium_set_ = kr_last_barter_queue_element.is_premium_set_;
-		r_mobile_book_cache_out.top_of_book_.last_barter_.last_update_date_time_ = kr_last_barter_queue_element.exch_time_;
-		r_mobile_book_cache_out.top_of_book_.last_barter_.is_last_update_date_time_set_ = true;
+	r_mobile_book_cache_out.top_of_book_.is_last_barter_set_ = true;
+	r_mobile_book_cache_out.top_of_book_.last_barter_.px_ = kr_last_barter_queue_element.px_;
+	r_mobile_book_cache_out.top_of_book_.last_barter_.is_px_set_ = true;
+	r_mobile_book_cache_out.top_of_book_.last_barter_.qty_ = kr_last_barter_queue_element.qty_;
+	r_mobile_book_cache_out.top_of_book_.last_barter_.is_qty_set_ = true;
+	r_mobile_book_cache_out.top_of_book_.last_barter_.premium_ = kr_last_barter_queue_element.premium_;
+	r_mobile_book_cache_out.top_of_book_.last_barter_.is_premium_set_ = kr_last_barter_queue_element.is_premium_set_;
+	r_mobile_book_cache_out.top_of_book_.last_barter_.last_update_date_time_ = kr_last_barter_queue_element.exch_time_;
+	r_mobile_book_cache_out.top_of_book_.last_barter_.is_last_update_date_time_set_ = true;
+
+    if (kr_last_barter_queue_element.is_market_barter_volume_set_) {
+        FluxCppCore::StringUtil::setString(r_mobile_book_cache_out.top_of_book_.market_barter_volume_.id_,
+            kr_last_barter_queue_element.market_barter_volume_.id_);
+
+        if (kr_last_barter_queue_element.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_) {
+            r_mobile_book_cache_out.top_of_book_.market_barter_volume_.participation_period_last_barter_qty_sum_ =
+                kr_last_barter_queue_element.market_barter_volume_.participation_period_last_barter_qty_sum_;
+            r_mobile_book_cache_out.top_of_book_.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_ = true;
+        }
+
+        if (kr_last_barter_queue_element.market_barter_volume_.is_applicable_period_seconds_set_) {
+            r_mobile_book_cache_out.top_of_book_.market_barter_volume_.applicable_period_seconds_ =
+                kr_last_barter_queue_element.market_barter_volume_.applicable_period_seconds_;
+            r_mobile_book_cache_out.top_of_book_.market_barter_volume_.is_applicable_period_seconds_set_ = true;
+        }
+        r_mobile_book_cache_out.top_of_book_.is_market_barter_volume_set_  = true;
+    }
 }
 
 void MobileBookPublisher::populate_market_depth(
@@ -608,7 +644,6 @@ void MobileBookPublisher::update_top_of_book_db_cache() {
 
 void MobileBookPublisher::initialize_websocket_servers() {
     if (mr_config_.m_market_depth_ws_update_publish_policy_ != PublishPolicy::OFF) {
-        std::cout << "Websocket starting websocket\n";
         m_market_depth_web_socket_server_.emplace(m_market_depth_list_, m_market_depth_codec_, mobile_book_handler::host,
             mr_config_.m_market_depth_ws_port_,
             std::chrono::seconds(mobile_book_handler::connection_timeout));
@@ -621,7 +656,6 @@ void MobileBookPublisher::initialize_websocket_servers() {
     }
 
     if (mr_config_.m_top_of_book_ws_update_publish_policy_ != PublishPolicy::OFF) {
-        std::cout << "Websocket starting websocket\n";
         m_top_of_book_web_socket_server_.emplace(m_top_of_book_, m_top_of_book_codec_, mobile_book_handler::host,
             mr_config_.m_top_of_book_ws_port_,
             std::chrono::seconds(mobile_book_handler::connection_timeout));
@@ -672,6 +706,11 @@ void MobileBookPublisher::market_depth_consumer() {
                             shm_manger->write_to_shared_memory(*shm_cache);
                             break;
                         }
+                        default: {
+                            LOG_ERROR_IMPL(GetCppAppLogger(), "Unsupported market depth level: {};;; supported levels are: "
+                                              "1, 5, 10, 15, 20", mr_config_.m_market_depth_level_);
+                            break;
+                        }
                     }
                 }
                 populate_market_depth(market_depth_queue_element, market_depth);
@@ -715,6 +754,7 @@ void MobileBookPublisher::market_depth_consumer() {
                     } else {
                         top_of_book.is_ask_quote_set_ = true;
                     }
+                    top_of_book.is_market_barter_volume_set_ = false;
 
                     if (mr_config_.m_top_of_book_db_update_publish_policy_ == PublishPolicy::POST) {
                         m_top_of_book_codec_.insert_or_update(top_of_book);
@@ -734,9 +774,10 @@ void MobileBookPublisher::market_depth_consumer() {
                         // if (m_top_of_book_codec_.m_root_model_key_to_db_id.find())
                     }
 
-                    if (mr_config_.m_market_depth_db_update_publish_policy_ == PublishPolicy::POST) {
+                    if (mr_config_.m_top_of_book_ws_update_publish_policy_ == PublishPolicy::POST) {
                         auto db_id = m_top_of_book_codec_.get_db_id_from_root_model_obj(top_of_book);
                         top_of_book.id_ = db_id;
+                        top_of_book.market_barter_volume_.clear();
                         m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
                         m_top_of_book_web_socket_server_.value().publish(top_of_book);
                     }
@@ -829,6 +870,11 @@ void MobileBookPublisher::last_barter_consumer() {
                         shm_manager->write_to_shared_memory(*shm_cache);
                         break;
                     }
+                    default: {
+                        LOG_ERROR_IMPL(GetCppAppLogger(), "Unsupported market depth level: {};;; supported levels are: "
+                                              "1, 5, 10, 15, 20", mr_config_.m_market_depth_level_);
+                        break;
+                    }
                 }
             }
 
@@ -875,12 +921,12 @@ void MobileBookPublisher::last_barter_consumer() {
 
             TopOfBook top_of_book;
             top_of_book.id_ = last_barter.id_;
-            top_of_book.symbol_ = last_barter_queue_element.symbol_n_exch_id_.symbol_;
-            top_of_book.last_update_date_time_ = last_barter_queue_element.exch_time_;
+            top_of_book.symbol_ = last_barter.symbol_n_exch_id_.symbol_;
+            top_of_book.last_update_date_time_ = last_barter.exch_time_;
             top_of_book.is_last_update_date_time_set_ = true;
             top_of_book.last_barter_.px_ = last_barter.px_;
             top_of_book.last_barter_.qty_ = last_barter.qty_;
-            top_of_book.last_barter_.last_update_date_time_ = last_barter_queue_element.exch_time_;
+            top_of_book.last_barter_.last_update_date_time_ = last_barter.exch_time_;
             top_of_book.last_barter_.is_last_update_date_time_set_ = true;
             top_of_book.is_last_barter_set_ = true;
             top_of_book.last_barter_.is_px_set_ = true;
@@ -915,6 +961,7 @@ void MobileBookPublisher::last_barter_consumer() {
 
             if (mr_config_.m_top_of_book_ws_update_publish_policy_ == PublishPolicy::POST) {
                 auto db_id = m_top_of_book_codec_.get_db_id_from_root_model_obj(top_of_book);
+                top_of_book.market_barter_volume_.clear();
                 top_of_book.id_ = db_id;
                 m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
                 m_top_of_book_web_socket_server_.value().publish(top_of_book);
@@ -929,7 +976,7 @@ void MobileBookPublisher::start_monitor_threads() {
 }
 
 void MobileBookPublisher::populate_market_depth_queue_element(const MarketDepthQueueElement& kr_market_depth_queue_element,
-    MarketDepth& r_market_depth) {
+    MarketDepth& r_market_depth) const {
 
     const auto current_time = FluxCppCore::get_local_time_microseconds<int64_t>();
     r_market_depth.id_ = kr_market_depth_queue_element.id_;

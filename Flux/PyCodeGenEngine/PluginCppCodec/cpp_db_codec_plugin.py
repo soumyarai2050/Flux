@@ -542,7 +542,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                             # output +=f"\t\t\t\tstd::string {message_field_name};\n"
                             # output +=f"\t\t\t\tFluxCppCore::format_time(kr_{message_name_snake_cased}_obj.{field_name}().{message_field_name}(), {message_field_name});\n"
                             output += f'\t\t\t\t{field_name}_doc.append(FluxCppCore::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{field_name}_.is_{message_field_name}_set_)));\n'
+                                      f'_handler::{message_field_name}_fld_name, FluxCppCore::StringUtil::convert_utc_string_to_b_date(kr_{message_name_snake_cased}_obj.{field_name}_.{message_field_name}_)));\n'
                             output += "\t\t\t}\n"
             elif message_field.message is not None and field_type != "repeated":
                 if field_type != "required":

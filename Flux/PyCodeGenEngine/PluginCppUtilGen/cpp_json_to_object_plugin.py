@@ -147,11 +147,22 @@ class CppJsonToObjectPlugin(BaseProtoPlugin):
                 if fld_kind != "message":
                     # Non-message types (handle optional/repeated cases)
                     if fld_cardinality in {"optional", "repeated"}:
-                        val = f'{name_lower}_json["{fld_name}"].as_{kind}();' if fld_kind == "int32" else f'{name_lower}_json["{fld_name}"].as_{kind}();'
-                        output.append(f'{tab}if ({name_lower}_json.if_contains("{fld_name}")) {{')
-                        output.append(f'{tab}\tr_{name_lower}.{fld_name}_ = {val};')
-                        output.append(f'{tab}\tr_{name_lower}.is_{fld_name}_set_ = true;')
-                        output.append(f"{tab}}}")
+                        if fld_kind != "float":
+                            val = f'{name_lower}_json["{fld_name}"].as_{kind}();' if fld_kind == "int32" else f'{name_lower}_json["{fld_name}"].as_{kind}();'
+                            output.append(f'{tab}if ({name_lower}_json.if_contains("{fld_name}")) {{')
+                            output.append(f'{tab}\tr_{name_lower}.{fld_name}_ = {val};')
+                            output.append(f'{tab}\tr_{name_lower}.is_{fld_name}_set_ = true;')
+                            output.append(f"{tab}}}")
+                        else:
+                            val = (f'{name_lower}_json["{fld_name}"].if_double() ? r_{name_lower}.{fld_name}_ = '
+                                   f'{name_lower}_json["{fld_name}"].as_double() : r_{name_lower}.{fld_name}_ = '
+                                   f'{name_lower}_json["{fld_name}"].as_int64();')
+                            # val = f'{name_lower}_json["{fld_name}"].as_{kind}();' if fld_kind == "int32" else f'{name_lower}_json["{fld_name}"].as_{kind}();'
+                            output.append(f'{tab}if ({name_lower}_json.if_contains("{fld_name}")) {{')
+                            output.append(f'{tab}\t{val}')
+                            # output.append(f'{tab}\tr_{name_lower}.{fld_name}_ = {val};')
+                            output.append(f'{tab}\tr_{name_lower}.is_{fld_name}_set_ = true;')
+                            output.append(f"{tab}}}")
                     else:
                         if fld_name == "id":
                             val = f'{name_lower}_json["_{fld_name}"].as_{kind}();' if fld_kind == "int32" and fld_name == "id" else f'{name_lower}_json["_{fld_name}"].as_{kind}();'

@@ -38,7 +38,7 @@ public:
 
     void cleanup();
 
-    void process_market_depth(MarketDepthQueueElement& r_market_depth_queue_element);
+    void process_market_depth(const MarketDepthQueueElement& r_market_depth_queue_element);
 
     void process_last_barter(const LastBarterQueueElement& kr_last_barter_queue_element);
 
@@ -50,12 +50,11 @@ public:
 				shm_cache->m_leg_1_data_shm_cache_.update_counter = 0;
 				shm_cache->m_leg_2_data_shm_cache_.update_counter = 0;
 				FluxCppCore::StringUtil::setString(shm_cache->m_leg_1_data_shm_cache_.symbol_,
-					mr_config_.m_leg_1_symbol_.c_str(),
-					sizeof(shm_cache->m_leg_1_data_shm_cache_.symbol_));
+					mr_config_.m_leg_1_symbol_);
 				FluxCppCore::StringUtil::setString(shm_cache->m_leg_2_data_shm_cache_.symbol_,
-		            mr_config_.m_leg_2_symbol_.c_str(),
-		            sizeof(shm_cache->m_leg_2_data_shm_cache_.symbol_));
+		            mr_config_.m_leg_2_symbol_);
 				shm_manager->write_to_shared_memory(*shm_cache);
+				LOG_INFO_IMPL(GetCppAppLogger(), "{}", mobile_book_handler::shm_snapshot(*shm_cache));
 				break;
 			}
 			case 5: {
@@ -64,12 +63,11 @@ public:
 				shm_cache->m_leg_1_data_shm_cache_.update_counter = 0;
 				shm_cache->m_leg_2_data_shm_cache_.update_counter = 0;
 				FluxCppCore::StringUtil::setString(shm_cache->m_leg_1_data_shm_cache_.symbol_,
-					mr_config_.m_leg_1_symbol_.c_str(),
-					sizeof(shm_cache->m_leg_1_data_shm_cache_.symbol_));
+					mr_config_.m_leg_1_symbol_);
 				FluxCppCore::StringUtil::setString(shm_cache->m_leg_2_data_shm_cache_.symbol_,
-		            mr_config_.m_leg_2_symbol_.c_str(),
-		            sizeof(shm_cache->m_leg_2_data_shm_cache_.symbol_));
+		            mr_config_.m_leg_2_symbol_);
 				shm_manager->write_to_shared_memory(*shm_cache);
+				LOG_INFO_IMPL(GetCppAppLogger(), "{}", mobile_book_handler::shm_snapshot(*shm_cache));
 				break;
 			}
 			case 10: {
@@ -78,12 +76,11 @@ public:
 				shm_cache->m_leg_1_data_shm_cache_.update_counter = 0;
 				shm_cache->m_leg_2_data_shm_cache_.update_counter = 0;
 				FluxCppCore::StringUtil::setString(shm_cache->m_leg_1_data_shm_cache_.symbol_,
-					mr_config_.m_leg_1_symbol_.c_str(),
-					sizeof(shm_cache->m_leg_1_data_shm_cache_.symbol_));
+					mr_config_.m_leg_1_symbol_);
 				FluxCppCore::StringUtil::setString(shm_cache->m_leg_2_data_shm_cache_.symbol_,
-		            mr_config_.m_leg_2_symbol_.c_str(),
-		            sizeof(shm_cache->m_leg_2_data_shm_cache_.symbol_));
+		            mr_config_.m_leg_2_symbol_);
 				shm_manager->write_to_shared_memory(*shm_cache);
+				LOG_INFO_IMPL(GetCppAppLogger(), "{}", mobile_book_handler::shm_snapshot(*shm_cache));
 				break;
 			}
 			case 15: {
@@ -92,12 +89,11 @@ public:
 				shm_cache->m_leg_1_data_shm_cache_.update_counter = 0;
 				shm_cache->m_leg_2_data_shm_cache_.update_counter = 0;
 				FluxCppCore::StringUtil::setString(shm_cache->m_leg_1_data_shm_cache_.symbol_,
-					mr_config_.m_leg_1_symbol_.c_str(),
-					sizeof(shm_cache->m_leg_1_data_shm_cache_.symbol_));
+					mr_config_.m_leg_1_symbol_);
 				FluxCppCore::StringUtil::setString(shm_cache->m_leg_2_data_shm_cache_.symbol_,
-		            mr_config_.m_leg_2_symbol_.c_str(),
-		            sizeof(shm_cache->m_leg_2_data_shm_cache_.symbol_));
+		            mr_config_.m_leg_2_symbol_);
 				shm_manager->write_to_shared_memory(*shm_cache);
+				LOG_INFO_IMPL(GetCppAppLogger(), "{}", mobile_book_handler::shm_snapshot(*shm_cache));
 				break;
 			}
 			case 20: {
@@ -106,15 +102,15 @@ public:
 				shm_cache->m_leg_1_data_shm_cache_.update_counter = 0;
 				shm_cache->m_leg_2_data_shm_cache_.update_counter = 0;
 				FluxCppCore::StringUtil::setString(shm_cache->m_leg_1_data_shm_cache_.symbol_,
-					mr_config_.m_leg_1_symbol_.c_str(),
-					sizeof(shm_cache->m_leg_1_data_shm_cache_.symbol_));
+					mr_config_.m_leg_1_symbol_);
 				FluxCppCore::StringUtil::setString(shm_cache->m_leg_2_data_shm_cache_.symbol_,
-		            mr_config_.m_leg_2_symbol_.c_str(),
-		            sizeof(shm_cache->m_leg_2_data_shm_cache_.symbol_));
+		            mr_config_.m_leg_2_symbol_);
 				shm_manager->write_to_shared_memory(*shm_cache);
+				LOG_INFO_IMPL(GetCppAppLogger(), "{}", mobile_book_handler::shm_snapshot(*shm_cache));
 				break;
 			} default: {
-
+				LOG_ERROR_IMPL(GetCppAppLogger(), "Market Depth level not supported: {};;; supported  levels "
+									  "are: 1, 5, 10, 15, 20", mr_config_.m_market_depth_level_);
 			}
 
 		}
@@ -155,11 +151,11 @@ protected:
 
 	template<size_t N>
     void update_market_depth_cache(const MarketDepthQueueElement& kr_market_depth_queue_element,
-	MDContainer<N>& r_mobile_book_cache_out);
+	MDContainer<N>& r_mobile_book_cache_out) const ;
 
 	template<size_t N>
     void update_last_barter_cache(const LastBarterQueueElement& kr_last_barter_queue_element,
-	MDContainer<N>& r_mobile_book_cache_out);
+	MDContainer<N>& r_mobile_book_cache_out) const ;
 
      static void populate_market_depth(const MarketDepthQueueElement& kr_market_depth_queue_element,
         MarketDepth& r_market_depth);
@@ -176,16 +172,6 @@ protected:
 
     void start_monitor_threads();
 
-	template<size_t N>
-	std::string shm_snapshot(ShmSymbolCache<N> const& cache) {
-		std::vector<char> buffer;
-		format_data(cache.m_leg_1_data_shm_cache_, buffer);
-		std::string data {buffer.begin(), buffer.end()};
-		data += '\n';
-		format_data(cache.m_leg_2_data_shm_cache_, buffer);
-		data.append(buffer.begin(), buffer.end());
-		return data;
-	}
 
 	void initialize_webclient() {
 		if (mr_config_.m_http_host_.empty() or mr_config_.m_http_port_.empty()) {
@@ -239,6 +225,6 @@ protected:
     	}
 	}
 
-	void populate_market_depth_queue_element(const MarketDepthQueueElement& kr_market_depth_queue_element, MarketDepth& r_market_depth);
+	void populate_market_depth_queue_element(const MarketDepthQueueElement& kr_market_depth_queue_element, MarketDepth& r_market_depth) const ;
 
 };

@@ -68,9 +68,8 @@ namespace FluxCppCore {
     	    int32_t r_new_generated_id_out{-1};
             std::string root_model_key;
     	    kr_root_model_obj.id_ = r_new_generated_id_out;
-            if(CheckInitializedAndGetKey(kr_root_model_obj, root_model_key)){
-        	    insert_or_update(kr_root_model_obj, root_model_key, r_new_generated_id_out);
-            }
+            MarketDataKeyHandler::get_key_out(kr_root_model_obj, root_model_key);
+        	insert_or_update(kr_root_model_obj, root_model_key, r_new_generated_id_out);
             return r_new_generated_id_out; // not initialized or missing required fields
         }
 
@@ -126,10 +125,8 @@ namespace FluxCppCore {
         //Patch the data (update specific document)
         bool patch(const RootModelType &kr_root_model_obj) {
             std::string root_model_key;
-            if(CheckInitializedAndGetKey(kr_root_model_obj, root_model_key)){
-                return patch(kr_root_model_obj, root_model_key);
-            }
-            return false; // not initialized or missing required fields
+            MarketDataKeyHandler::get_key_out(kr_root_model_obj, root_model_key);
+            return patch(kr_root_model_obj, root_model_key);
         }
 
         bool patch(const RootModelType &kr_root_model_obj, std::string &r_root_model_key) {
@@ -148,10 +145,8 @@ namespace FluxCppCore {
         //Patch the data (update specific document) and retrieve the updated object
         bool patch(const RootModelType &kr_root_model_obj, RootModelType &r_root_model_obj_out) {
             std::string root_model_key;
-            if(CheckInitializedAndGetKey(kr_root_model_obj, root_model_key)){
-                return patch(kr_root_model_obj, r_root_model_obj_out, root_model_key);
-            }
-            return false; // not initialized or missing required fields
+            MarketDataKeyHandler::get_key_out(kr_root_model_obj, root_model_key);
+            return patch(kr_root_model_obj, r_root_model_obj_out, root_model_key);
         }
 
         bool patch(const RootModelType &kr_root_model_obj, RootModelType &r_root_model_obj_out,
@@ -295,8 +290,8 @@ namespace FluxCppCore {
 
                 if (all_data_from_db_json_string.back() == ',') {
                     all_data_from_db_json_string.pop_back();
-                    all_data_from_db_json_string += "]";
                 } // else not required: all_data_from_db_json_string is empty so need to perform any operation
+                all_data_from_db_json_string += "]";
 
                 if (!all_data_from_db_json_string.empty()) {
                     MarketDataJsonToObject::json_to_object(all_data_from_db_json_string, r_root_model_list_obj_out);
@@ -339,8 +334,9 @@ namespace FluxCppCore {
 
                 if (all_data_from_db_json_string.back() == ',') {
                     all_data_from_db_json_string.pop_back();
-                    all_data_from_db_json_string += "]";
                 } // else not required: all_data_from_db_json_string is empty so need to perform any operation
+
+                all_data_from_db_json_string += "]";
 
                 if (!all_data_from_db_json_string.empty()) {
                     MarketDataJsonToObject::json_to_object(all_data_from_db_json_string, r_root_model_list_obj_out);
@@ -399,15 +395,7 @@ namespace FluxCppCore {
                     }
 
                     std::string new_bson_doc = bsoncxx::to_json(new_doc.view());
-                    size_t pos = new_bson_doc.find("_id");
-                    while (pos != std::string::npos) {
-                        if (!isalpha(new_bson_doc[pos - 1])) {
-                            new_bson_doc.erase(pos, 1);
-                        }
-                        pos = new_bson_doc.find("_id", pos + 1);
-                    }
-
-                    // status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, new_bson_doc);
+                    MarketDataJsonToObject::json_to_object(new_bson_doc, r_root_model_obj_out);
                 }
             } catch (const std::exception& e) {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Error {}, function {}", e.what(), __func__);
@@ -488,7 +476,7 @@ namespace FluxCppCore {
 
     protected:
         template <typename ProtoModelType>
-        auto get_db_id_from_key(const std::string &kr_key, const ProtoModelType &kr_proto_model_obj){
+        auto get_db_id_from_key(const std::string &kr_key, [[maybe_unused]] const ProtoModelType &kr_proto_model_obj){
             auto found = m_root_model_key_to_db_id.find(kr_key);
             if (found == m_root_model_key_to_db_id.end()) {
                 const std::string error = "Error!" + get_root_model_name() +
@@ -512,21 +500,6 @@ namespace FluxCppCore {
         std::string get_root_model_name() const {
             auto meta_data = root_model_type_.get_name();
             return meta_data;
-        }
-
-        bool IsInitialized([[maybe_unused]] const RootModelType &kr_root_model_obj) const {
-            return true;
-        }
-
-        bool CheckInitializedAndGetKey(const RootModelType &kr_root_model_obj, std::string &root_model_key_out) const {
-            // populate root_model_key_out and return true, if the object is initialized and has all required fields
-            if(IsInitialized(kr_root_model_obj)){
-                MarketDataKeyHandler::get_key_out(kr_root_model_obj, root_model_key_out);
-                return true;
-            } else {
-				LOG_ERROR_IMPL(GetCppAppLogger(), "kr_root_model_obj is not initialized: {}", kr_root_model_obj.DebugString());
-                return false; // false otherwise
-            }
         }
 
         static void update_id_in_document(bsoncxx::builder::basic::document &r_bson_doc, const int32_t new_generated_id) {

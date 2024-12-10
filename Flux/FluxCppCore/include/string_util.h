@@ -157,16 +157,40 @@ namespace FluxCppCore {
             std::istringstream ss{utc_time_str};
             std::chrono::system_clock::time_point tp;
             ss >> date::parse("%FT%T%z", tp);
+            // bsoncxx::types::b_decimal128
             return bsoncxx::types::b_date{tp};
         }
 
         static inline bsoncxx::types::b_date convert_utc_string_to_b_date(const int64_t& timestamp_ms) {
             return bsoncxx::types::b_date{std::chrono::milliseconds(timestamp_ms)};
         }
-
+#if 0
         static void inline setString(char* dest, const char* src, const size_t size) {
             strncpy(dest, src, size - 1);
             dest[size - 1] = '\0';
         }
+#endif
+
+        template <size_t DestSize, typename SourceType>
+        static void inline setString(char (&dest)[DestSize], const SourceType& src) {
+            static_assert(DestSize == market_data_handler::MAX_STRING_LENGTH);
+            static_assert(std::is_same_v<SourceType, std::string> || std::is_same_v<SourceType, std::string_view>);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+            std::strncpy(dest, src.data(), src.size());
+#pragma GCC diagnostic pop
+            dest[src.size()] = '\0';
+         }
+
+        template <size_t DestSize>
+        static void inline setString(char (&dest)[DestSize], const char (&src)[DestSize]) {
+            static_assert(DestSize == market_data_handler::MAX_STRING_LENGTH);
+            // static_assert(std::is_same_v<SourceType, std::string> || std::is_same_v<SourceType, std::string_view>);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+            std::strncpy(dest, src, DestSize);
+#pragma GCC diagnostic pop
+            dest[DestSize] = '\0';
+         }
     };
 }
