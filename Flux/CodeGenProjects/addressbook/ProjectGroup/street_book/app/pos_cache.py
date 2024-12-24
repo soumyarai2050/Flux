@@ -6,9 +6,9 @@ from typing import Final, Dict, List, Tuple, ClassVar
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensions import (
     BrokerData, SecPosExtended)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import (
     NewChoreBaseModel, NewChore)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
     Position, Side, Broker, BrokerBaseModel, BrokerRoute)
 from FluxPythonUtils.scripts.utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID

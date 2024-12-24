@@ -1,10 +1,10 @@
 import os
 from fastapi import FastAPI
-# from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
+# from Flux.CodeGenProjects.strat_executor.generated.ORMModel.strat_executor_service_model_imports import *
 # from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_beanie_database import init_db
 #
 # # Below imports are to initialize routes before launching server
-# from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import *
+# from Flux.CodeGenProjects.strat_executor.generated.ORMModel.strat_executor_service_http_routes import *
 from Flux.CodeGenProjects.ws_mux_demux_proxy.app.ws_mux_demux_proxy_service_ws_routes import *
 
 

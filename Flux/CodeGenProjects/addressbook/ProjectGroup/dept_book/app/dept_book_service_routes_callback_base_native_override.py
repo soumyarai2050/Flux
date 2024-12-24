@@ -3,7 +3,7 @@ from threading import Thread
 import time
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.Pydentic.dept_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.dept_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_routes_callback_imports import \
     DeptBookServiceRoutesCallback
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import *
@@ -112,8 +112,8 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
 
     async def get_vwap_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData], symbol: str,
                                                           exch_id: str, bar_type: BarType,
-                                                          start_date_time: DateTime | None = None,
-                                                          end_date_time: DateTime | None = None):
+                                                          start_date_time: int | None = None,
+                                                          end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_vwap_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type, start_date_time, end_date_time),
             projection_read_http, projection_model=BarDataProjectionContainerForVwap)
@@ -124,7 +124,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
 
     async def get_vwap_n_vwap_change_projection_from_bar_data_query_pre(
             self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType,
-            start_date_time: DateTime | None = None, end_date_time: DateTime | None = None):
+            start_date_time: int | None = None, end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type, start_date_time,
                                                                          end_date_time), projection_read_http,
@@ -137,7 +137,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
 
     async def get_vwap_change_projection_from_bar_data_query_pre(
             self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType,
-            start_date_time: DateTime | None = None, end_date_time: DateTime | None = None):
+            start_date_time: int | None = None, end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_vwap_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type,
                                                                   start_date_time, end_date_time),
@@ -150,7 +150,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
 
     async def get_premium_projection_from_bar_data_query_pre(
             self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType,
-            start_date_time: DateTime | None = None, end_date_time: DateTime | None = None):
+            start_date_time: int | None = None, end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_premium_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type, start_date_time, end_date_time),
             projection_read_http, projection_model=BarDataProjectionContainerForPremium)
@@ -161,7 +161,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
 
     async def get_premium_n_premium_change_projection_from_bar_data_query_pre(
             self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType,
-            start_date_time: DateTime | None = None, end_date_time: DateTime | None = None):
+            start_date_time: int | None = None, end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type,
                                                                                start_date_time, end_date_time),
@@ -174,7 +174,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
 
     async def get_premium_change_projection_from_bar_data_query_pre(
             self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType,
-            start_date_time: DateTime | None = None, end_date_time: DateTime | None = None):
+            start_date_time: int | None = None, end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_premium_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type,
                                                                      start_date_time, end_date_time),

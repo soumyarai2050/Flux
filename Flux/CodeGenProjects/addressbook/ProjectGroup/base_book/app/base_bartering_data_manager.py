@@ -4,7 +4,7 @@ from threading import Thread
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_bartering_cache import BaseBarteringCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import BaseStratCache
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
 
 
 BaseBarteringCacheType = TypeVar('BaseBarteringCacheType', bound=BaseBarteringCache)

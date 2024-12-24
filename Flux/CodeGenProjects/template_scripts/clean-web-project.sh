@@ -5,7 +5,7 @@ START_DIR=$PWD
 cd ../../../PyCodeGenEngine/FluxCodeGenCore
 rm -rf ProtoGenPy
 rm -rf ProtoGenCc
-rm -rf Pydantic
+rm -rf ORMModel
 cd -  # back in script dir
 cd .. # parent of script dir
 # clean generated

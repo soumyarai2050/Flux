@@ -7,7 +7,7 @@
 # os.environ["DBType"] = "beanie"
 #
 # # project imports
-# from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.Pydentic.mobile_book_service_model_imports import LastBarterBaseModel
+# from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.ORMModel.mobile_book_service_model_imports import LastBarterBaseModel
 # from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.FastApi.mobile_book_service_http_client import \
 #     MobileBookServiceHttpClient
 # from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *

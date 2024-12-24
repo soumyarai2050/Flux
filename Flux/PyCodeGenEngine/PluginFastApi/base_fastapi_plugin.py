@@ -58,7 +58,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         self.message_to_button_query_data_dict: Dict[protogen.Message, Dict] = {}
         self.non_root_message_list: List[protogen.Message] = []
         self.enum_list: List[protogen.Enum] = []
-        self.model_dir_name: str = "Pydentic"
+        self.model_dir_name: str = "ORMModel"
         self.fastapi_app_name: str = ""
         self.proto_file_name: str = ""
         self.proto_file_package: str = ""

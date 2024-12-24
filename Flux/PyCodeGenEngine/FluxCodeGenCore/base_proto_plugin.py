@@ -564,16 +564,16 @@ class BaseProtoPlugin(ABC):
     def import_path_from_os_path(os_path_env_var_name: str, import_file_name: str):
         # remove projects home prefix from all import paths
         if (project_root_dir := os.getenv("PROJECT_ROOT")) is not None and len(project_root_dir):
-            if (pydantic_path := os.getenv(os_path_env_var_name)) is not None and len(pydantic_path):
-                if pydantic_path is not None and pydantic_path.startswith("/"):
-                    pydantic_path = pydantic_path.removeprefix(project_root_dir)
+            if (file_path := os.getenv(os_path_env_var_name)) is not None and len(file_path):
+                if file_path is not None and file_path.startswith("/"):
+                    file_path = file_path.removeprefix(project_root_dir)
                 else:
-                    raise Exception(f"invalid absolute path: {pydantic_path}")
-                if pydantic_path.startswith("/"):
-                    pydantic_path = pydantic_path[1:]
-                return f'{".".join(pydantic_path.split(os.sep))}.{import_file_name}'
+                    raise Exception(f"invalid absolute path: {file_path}")
+                if file_path.startswith("/"):
+                    file_path = file_path[1:]
+                return f'{".".join(file_path.split(os.sep))}.{import_file_name}'
             else:
-                err_str = f"Env var '{os_path_env_var_name}' received as {pydantic_path}"
+                err_str = f"Env var '{os_path_env_var_name}' received as {file_path}"
                 logging.exception(err_str)
                 raise Exception(err_str)
         else:
@@ -585,12 +585,12 @@ class BaseProtoPlugin(ABC):
     def import_path_from_path_str(path_str: str, import_file_name: str):
         if (project_root_dir := os.getenv("PROJECT_ROOT")) is not None and len(project_root_dir):
             if path_str.startswith("/"):
-                pydantic_path = path_str.removeprefix(project_root_dir)
+                file_path = path_str.removeprefix(project_root_dir)
             else:
                 raise Exception(f"invalid absolute path: {path_str}")
-            if pydantic_path.startswith("/"):
-                pydantic_path = pydantic_path[1:]
-            return f'{".".join(pydantic_path.split(os.sep))}.{import_file_name}'
+            if file_path.startswith("/"):
+                file_path = file_path[1:]
+            return f'{".".join(file_path.split(os.sep))}.{import_file_name}'
         else:
             err_str = f"Env var 'PROJECT_ROOT' received as {project_root_dir}"
             logging.exception(err_str)
@@ -801,7 +801,7 @@ class BaseProtoPlugin(ABC):
                     if file_.proto.name in root_core_proto_files:
                         gen_model_import_path = (
                             self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
-                                                          f"Pydantic.{file_.generated_filename_prefix}_{model_file_suffix}"))
+                                                          f"ORMModel.{file_.generated_filename_prefix}_{model_file_suffix}"))
                     elif file_.proto.name in project_grp_core_proto_files:
                         gen_model_import_path = (
                             self.import_path_from_path_str(str(project_grp_root_dir),
@@ -881,8 +881,8 @@ class BaseProtoPlugin(ABC):
 
 def main(plugin_class):
     if (project_dir_path := os.getenv("PROJECT_DIR")) is not None and len(project_dir_path):
-        pydantic_class_gen_plugin = plugin_class(project_dir_path)
-        pydantic_class_gen_plugin.process()
+        model_class_gen_plugin = plugin_class(project_dir_path)
+        model_class_gen_plugin.process()
     else:
         err_str = f"Env var 'PROJECT_DIR' received as {project_dir_path}"
         logging.exception(err_str)

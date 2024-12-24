@@ -23,6 +23,7 @@ from Flux.PyCodeGenEngine.PluginFastApi.fastapi_launcher_file_handler import Fas
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_http_client_file_handler import FastapiHttpClientFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_client_file_handler import FastapiWSClientFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ui_proxy_config_handler import FastapiUIProxyConfigHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_openapi_schema import FastapiOpenapiSchema
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
     root_core_proto_files, project_grp_core_proto_files, project_dir)
@@ -41,6 +42,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
                            FastapiWsRoutesFileHandler,
                            FastapiLauncherFileHandler,
                            FastapiCallbackOverrideFileHandler,
+                           FastapiOpenapiSchema,
                            FastapiUIProxyConfigHandler):
     """
     Plugin script to generate Beanie enabled fastapi app
@@ -252,7 +254,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
 
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f'from {model_file_path} import *\n'
-        project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+        project_grp_root_dir = PurePath(project_dir).parent.parent / "ORMModel"
         dependency_file_path_list = self.get_dependency_file_path_list(
             file, root_core_proto_files, project_grp_core_proto_files,
             self.model_file_suffix, str(project_grp_root_dir))
@@ -282,12 +284,13 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
         output_str += f"from {routes_file_path} import *\n"
         routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.ws_routes_file_name)
-        output_str += f"from {routes_file_path} import *\n\n"
-
+        output_str += f"from {routes_file_path} import *\n"
+        openapi_schema_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.openapi_schema_file_name)
+        output_str += f"from {openapi_schema_file_path} import *\n"
         # model imports
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f"from {model_file_path} import *\n"
-        project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+        project_grp_root_dir = PurePath(project_dir).parent.parent / "ORMModel"
         dependency_file_path_list = self.get_dependency_file_path_list(
             file, root_core_proto_files, project_grp_core_proto_files,
             self.model_file_suffix, str(project_grp_root_dir))
@@ -300,6 +303,13 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
             output_str += "\n\n"
 
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n\n"
+
+        output_str += "# Customize the entire OpenAPI schema\n"
+        output_str += "def custom_openapi():\n"
+        output_str += f"    {self.fastapi_app_name}.openapi_schema = openapi_schema\n"
+        output_str += f"    return {self.fastapi_app_name}.openapi_schema\n\n\n"
+        output_str += f"{self.fastapi_app_name}.openapi = custom_openapi\n\n\n"
+
         output_str += f'@{self.fastapi_app_name}.on_event("startup")\n'
         output_str += f'async def connect():\n'
         output_str += f'    await init_db()\n'
@@ -370,6 +380,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         super().set_req_data_members(file)
         self.database_file_name = f"{self.proto_file_name}_msgspec_database"
         self.fastapi_file_name = f"{self.proto_file_name}_msgspec_fastapi"
+        self.openapi_schema_file_name = f"{self.proto_file_name}_openapi_schema"
         self.http_routes_file_name = f'{self.proto_file_name}_http_msgspec_routes'
         self.routes_callback_file_name = f"{self.proto_file_name}_routes_msgspec_callback"
         self.base_routes_file_name = f'{self.proto_file_name}_base_msgspec_routes'
@@ -415,22 +426,25 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         self.enum_list.sort(key=lambda message_: message_.proto.name)
 
         output_dict: Dict[str, str] = {
-            # # Adding project´s database.py
+            # Adding project´s database.py
             self.database_file_name+".py": self.handle_database_file_gen(file),
-            #
-            # # Adding project´s fastapi.py
+
+            # Adding project´s schema(s) for openapi swagger ui
+            self.openapi_schema_file_name + ".py": self.handle_openapi_schema_gen(file),
+
+            # Adding project´s fastapi.py
             self.fastapi_file_name + ".py": self.handle_fastapi_initialize_file_gen(file),
-            #
-            # # Adding route's callback class
+
+            # Adding route's callback class
             self.routes_callback_file_name + ".py": self.handle_msgspec_callback_class_file_gen(file, self.model_file_suffix),
-            #
+
             # Adding callback override set_instance file
             self.callback_override_set_instance_file_name + ".py":
                 self.handle_msgspec_callback_override_set_instance_file_gen(),
 
             # Adding dummy callback override class file
-            # "dummy_" + self.beanie_native_override_routes_callback_class_name + ".py":
-            #     self.handle_callback_override_file_gen(),
+            "dummy_" + self.beanie_native_override_routes_callback_class_name + ".py":
+                self.handle_callback_override_file_gen(),
 
             # Adding callback import file
             self.routes_callback_import_file_name + ".py": self.handle_routes_callback_import_file_gen(),

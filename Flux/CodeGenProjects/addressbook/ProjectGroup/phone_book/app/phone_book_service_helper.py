@@ -10,14 +10,14 @@ from typing import Set
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
     get_ongoing_or_all_pair_strats_by_sec_id, get_ongoing_pair_strat_filter)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
     EmailBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_strat_db_updates, UpdateType)
 from FluxPythonUtils.scripts.utility_functions import (
     YAMLConfigurationManager, except_n_log_alert, parse_to_int)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
     StratViewBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensions import BrokerUtil
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecord, SecType
@@ -240,18 +240,18 @@ def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None,
     if eligible_brokers is None:
         eligible_brokers = []
     # else using provided value
-    pydantic_class = PortfolioLimits
+    model_class_type = PortfolioLimits
     if external_source:
-        pydantic_class = PortfolioLimitsBaseModel
+        model_class_type = PortfolioLimitsBaseModel
 
     rolling_max_chore_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
-    portfolio_limits_obj = pydantic_class(id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
-                                          max_gross_n_open_notional=2_400_000,
-                                          rolling_max_chore_count=rolling_max_chore_count,
-                                          rolling_max_reject_count=rolling_max_reject_count,
-                                          eligible_brokers=eligible_brokers,
-                                          eligible_brokers_update_count=0)
+    portfolio_limits_obj = model_class_type(id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
+                                            max_gross_n_open_notional=2_400_000,
+                                            rolling_max_chore_count=rolling_max_chore_count,
+                                            rolling_max_reject_count=rolling_max_reject_count,
+                                            eligible_brokers=eligible_brokers,
+                                            eligible_brokers_update_count=0)
     return portfolio_limits_obj
 
 
@@ -375,7 +375,7 @@ def get_id_from_strat_key(unloaded_strat_key: str) -> int:
     return parse_to_int(parts[-1])
 
 
-def pair_strat_client_call_log_str(pydantic_basemodel_type: Type | None, client_callable: Callable,
+def pair_strat_client_call_log_str(basemodel_type: Type | None, client_callable: Callable,
                                    update_type: UpdateType | None = None, **kwargs) -> str:
     if update_type is None:
         update_type = UpdateType.JOURNAL_TYPE
@@ -384,7 +384,7 @@ def pair_strat_client_call_log_str(pydantic_basemodel_type: Type | None, client_
     val_sep: str = get_key_val_seperator_pattern()
     pair_strat_db_pattern: str = get_pattern_for_pair_strat_db_updates()
     log_str = (f"{pair_strat_db_pattern}"
-               f"{pydantic_basemodel_type.__name__ if pydantic_basemodel_type is not None else 'pydantic_basemodel_type is None'}{fld_sep}{update_type.value}"
+               f"{basemodel_type.__name__ if basemodel_type is not None else 'basemodel_type is None'}{fld_sep}{update_type.value}"
                f"{fld_sep}{client_callable.__name__}{fld_sep}")
     for k, v in kwargs.items():
         log_str += f"{k}{val_sep}{v}"
@@ -394,31 +394,31 @@ def pair_strat_client_call_log_str(pydantic_basemodel_type: Type | None, client_
     return log_str
 
 
-def guaranteed_call_pair_strat_client(pydantic_basemodel_type: MsgspecModel | None, client_callable: Callable,
+def guaranteed_call_pair_strat_client(basemodel_type: MsgspecModel | None, client_callable: Callable,
                                       **kwargs):
     """
     Call phone_book client call but if call fails for connection error or server not ready error logs it
     with specific pattern which is matched by pair_strat_log_book and the call is call from there in loop till
     it is successfully done
-    :param pydantic_basemodel_type: BaseModel of Document type need to update/create,
+    :param basemodel_type: BaseModel of Document type need to update/create,
                                     pass None if callable is query method
     :param client_callable: client callable to be called
-    :param kwargs: params to be set in passed pydantic_basemodel_type to pass in `client_callable` or directly
+    :param kwargs: params to be set in passed basemodel_type to pass in `client_callable` or directly
                    passed to `client_callable` in case client_callable is query type
     :return:
     """
     try:
-        if pydantic_basemodel_type is not None:
+        if basemodel_type is not None:
             # Handling for DB operations: create/update/partial_update
 
-            pydantic_basemodel_type_obj = pydantic_basemodel_type.from_dict(kwargs)
+            basemodel_type_obj = basemodel_type.from_dict(kwargs)
 
             if str(client_callable.__name__).startswith("patch_"):
-                client_callable(pydantic_basemodel_type_obj.to_json_dict(exclude_none=True))
+                client_callable(basemodel_type_obj.to_json_dict(exclude_none=True))
             else:
-                client_callable(pydantic_basemodel_type_obj)
+                client_callable(basemodel_type_obj)
         else:
-            # Handling for query operations - queries doesn't take pydantic_obj as param
+            # Handling for query operations - queries doesn't take model_obj as param
             client_callable(**kwargs)
     except Exception as e:
         curframe = inspect.currentframe()
@@ -440,7 +440,7 @@ def guaranteed_call_pair_strat_client(pydantic_basemodel_type: MsgspecModel | No
         else:
             raise Exception(f"guaranteed_call_pair_strat_client called from {calframe[1][3]} failed "
                             f"with exception: {e}")
-        log_str = pair_strat_client_call_log_str(pydantic_basemodel_type, client_callable, **kwargs)
+        log_str = pair_strat_client_call_log_str(basemodel_type, client_callable, **kwargs)
         logging.db(log_str)
 
 

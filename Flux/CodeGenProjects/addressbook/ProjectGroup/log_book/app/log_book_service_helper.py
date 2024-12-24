@@ -8,9 +8,9 @@ import re
 import threading
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import (
     YAMLConfigurationManager, parse_to_int)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
@@ -186,9 +186,9 @@ def should_retry_due_to_server_down(exception: Exception) -> bool:
 
 
 def get_update_obj_list_for_journal_type_update(
-        pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
+        basemodel_class_type: Type[BaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
         max_fetch_from_queue: int, update_dict_list: List[MsgspecModel | Dict],
-        parse_to_pydantic: bool | None = None) -> List[Dict] | str:  # blocking function
+        parse_to_model: bool | None = None) -> List[Dict] | str:  # blocking function
     fetch_counts: int = 0
 
     kwargs: Dict = patch_queue.get()
@@ -199,9 +199,9 @@ def get_update_obj_list_for_journal_type_update(
         logging.info(f"Exiting get_update_obj_list_for_journal_type_update")
         return "EXIT"
 
-    if parse_to_pydantic:
-        pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs, strict=False)
-        update_dict_list.append(pydantic_object.to_dict(exclude_none=True))
+    if parse_to_model:
+        basemodel_object = basemodel_class_type.from_dict(kwargs, strict=False)
+        update_dict_list.append(basemodel_object.to_dict(exclude_none=True))
     else:
         update_dict_list.append(kwargs)
 
@@ -214,9 +214,9 @@ def get_update_obj_list_for_journal_type_update(
             logging.info(f"Exiting get_update_obj_list_for_journal_type_update")
             return "EXIT"
 
-        if parse_to_pydantic:
-            pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs, strict=False)
-            update_dict_list.append(pydantic_object.to_dict(exclude_none=True))
+        if parse_to_model:
+            basemodel_object = basemodel_class_type.from_dict(kwargs, strict=False)
+            update_dict_list.append(basemodel_object.to_dict(exclude_none=True))
         else:
             update_dict_list.append(kwargs)
 
@@ -234,15 +234,14 @@ def get_obj_id_to_put_as_key(obj_id) -> str:
 
 def get_update_obj_for_snapshot_type_update(
         msgspec_class_type: Type[MsgspecBaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
-        max_fetch_from_queue: int, err_handler_callable: Callable, update_res: List[MsgspecModel | Dict],
+        max_fetch_from_queue: int, err_handler_callable: Callable, pending_updates: List[Dict],
         parse_to_msgspec_obj: bool | None = None) -> List[Dict] | List[MsgspecModel] | str:  # blocking function
     id_to_obj_dict = {}
-    if update_res:
-        for snapshot_obj in update_res:
-            if parse_to_msgspec_obj:
-                id_to_obj_dict[snapshot_obj.id] = snapshot_obj
-            else:   # dict case
-                id_to_obj_dict[snapshot_obj.get('_id')] = snapshot_obj
+    if pending_updates:
+        # adding pending updates to dict that will be used to return from this function - avoids any pending updates
+        # to be missed
+        for snapshot_obj in pending_updates:
+            id_to_obj_dict[snapshot_obj.get('_id')] = snapshot_obj
 
     # else not required: if no snapshot exists already to be send through client then nothing to add in id_to_obj_dict
 
@@ -333,87 +332,87 @@ def get_update_obj_for_snapshot_type_update(
 
 
 def handle_patch_db_queue_updater(
-        update_type: str, pydantic_type_name_to_patch_queue_cache_dict: Dict[str, queue.Queue],
-        pydantic_basemodel_type_name: str, method_name: str, update_data,
+        update_type: str, model_type_name_to_patch_queue_cache_dict: Dict[str, queue.Queue],
+        basemodel_type_name: str, method_name: str, update_data,
         journal_type_handler_callable: Callable, snapshot_type_handler_callable: Callable,
         update_handler_callable: Callable, error_handler_callable: Callable,
         max_fetch_from_queue: int, snapshot_type_callable_err_handler: Callable,
-        parse_to_pydantic: bool | None = None):
+        parse_to_model: bool | None = None):
     if update_type in UpdateType.__members__:
         update_type: UpdateType = UpdateType(update_type)
 
-        update_cache_dict = pydantic_type_name_to_patch_queue_cache_dict
+        update_cache_dict = model_type_name_to_patch_queue_cache_dict
 
-        patch_queue = update_cache_dict.get(pydantic_basemodel_type_name)
+        patch_queue = update_cache_dict.get(basemodel_type_name)
 
         if patch_queue is None:
             patch_queue = queue.Queue()
 
             Thread(target=handle_dynamic_queue_for_patch_n_patch_all,
-                   args=(pydantic_basemodel_type_name, method_name, update_type,
+                   args=(basemodel_type_name, method_name, update_type,
                          patch_queue, journal_type_handler_callable, snapshot_type_handler_callable,
                          update_handler_callable, error_handler_callable, max_fetch_from_queue,
-                         snapshot_type_callable_err_handler, parse_to_pydantic, ),
-                   name=f"{pydantic_basemodel_type_name}_handler").start()
-            logging.info(f"Thread Started: {pydantic_basemodel_type_name}_handler")
+                         snapshot_type_callable_err_handler, parse_to_model,),
+                   name=f"{basemodel_type_name}_handler").start()
+            logging.info(f"Thread Started: {basemodel_type_name}_handler")
 
-            update_cache_dict[pydantic_basemodel_type_name] = patch_queue
+            update_cache_dict[basemodel_type_name] = patch_queue
 
         patch_queue.put(update_data)
     else:
         raise Exception(f"Unsupported {update_type=} in handle_dynamic_queue_updater")
 
 
-def handle_dynamic_queue_for_patch_n_patch_all(pydantic_basemodel_type: str, method_name: str,
+def handle_dynamic_queue_for_patch_n_patch_all(basemodel_type: str, method_name: str,
                                                update_type: UpdateType, patch_queue: queue.Queue,
                                                journal_type_handler_callable: Callable,
                                                snapshot_type_handler_callable: Callable,
                                                update_handler_callable: Callable, error_handler_callable: Callable,
                                                max_fetch_from_queue: int,
                                                snapshot_type_callable_err_handler: Callable,
-                                               parse_to_pydantic: bool | None = None):
+                                               parse_to_model: bool | None = None):
     try:
-        pydantic_basemodel_class_type: Type[BaseModel] = eval(pydantic_basemodel_type)
+        basemodel_class_type: Type[BaseModel] = eval(basemodel_type)
 
-        update_res = []
+        pending_updates = []
         while 1:
             try:
                 if update_type == UpdateType.JOURNAL_TYPE:
                     # blocking call
-                    update_res: List[Any] | Any = (
-                        journal_type_handler_callable(pydantic_basemodel_class_type, update_type, method_name, patch_queue,
-                                                      max_fetch_from_queue, update_res, parse_to_pydantic))
+                    pending_updates: List[Any] | Any = (
+                        journal_type_handler_callable(basemodel_class_type, update_type, method_name, patch_queue,
+                                                      max_fetch_from_queue, pending_updates, parse_to_model))
 
                 else:  # if update_type is UpdateType.SNAPSHOT_TYPE
                     # blocking call
-                    update_res: List[Any] | Any = (
-                        snapshot_type_handler_callable(pydantic_basemodel_class_type, update_type, method_name, patch_queue,
+                    pending_updates: List[Any] | Any = (
+                        snapshot_type_handler_callable(basemodel_class_type, update_type, method_name, patch_queue,
                                                        max_fetch_from_queue, snapshot_type_callable_err_handler,
-                                                       update_res, parse_to_pydantic))
+                                                       pending_updates, parse_to_model))
 
-                if update_res == "EXIT":
+                if pending_updates == "EXIT":
                     return
 
                 while 1:
                     try:
-                        update_handler_callable(update_res)
-                        logging.info(f"called {update_handler_callable.__name__} with {update_res=} in "
+                        update_handler_callable(pending_updates)
+                        logging.info(f"called {update_handler_callable.__name__} with {pending_updates=} in "
                                      f"handle_dynamic_queue_for_patch_n_patch_all")
                         # only gets cleared if client call was successful else keeps data for further updates
-                        update_res = []
+                        pending_updates = []
                         break
                     except Exception as e:
                         if not should_retry_due_to_server_down(e):  # stays within loop if server is down
                             logging.exception(e)
                             raise Exception(e)
             except Exception as e:
-                error_handler_callable(pydantic_basemodel_type, update_type, e)
+                error_handler_callable(basemodel_type, update_type, e)
     except Exception as e:
         logging.exception(e)
         raise Exception(e)
 
 
-def _alert_queue_handler_err_handler(e, pydantic_obj_list, queue_obj, err_handling_callable,
+def _alert_queue_handler_err_handler(e, model_obj_list, queue_obj, err_handling_callable,
                                      web_client_callable, client_connection_fail_retry_secs):
     # Handling patch-all race-condition if some obj got removed before getting updated due to wait
     # pattern1: happens in patch_all and in put_all when stored_obj is fetched before update operation and hence
@@ -430,11 +429,11 @@ def _alert_queue_handler_err_handler(e, pydantic_obj_list, queue_obj, err_handli
         non_existing_id_list: List[int] = [parse_to_int(_id.strip())
                                            for _id in match_list1[0].split(",")]
         non_existing_obj = []
-        for pydantic_obj in pydantic_obj_list:
-            if pydantic_obj.id in non_existing_id_list:
-                non_existing_obj.append(pydantic_obj)
+        for model_obj in model_obj_list:
+            if model_obj.id in non_existing_id_list:
+                non_existing_obj.append(model_obj)
             else:
-                queue_obj.put(pydantic_obj)  # putting back all other existing jsons
+                queue_obj.put(model_obj)  # putting back all other existing jsons
         logging.debug(f"Calling Error handler func provided with param: {non_existing_obj}")
         err_handling_callable(non_existing_obj)
     elif match_list2:
@@ -442,9 +441,9 @@ def _alert_queue_handler_err_handler(e, pydantic_obj_list, queue_obj, err_handli
         non_existing_id_list: List[int] = [parse_to_int(_id.strip())
                                            for _id in match_list1[0].split(",")]
         non_existing_obj = []
-        for pydantic_obj in pydantic_obj_list:
-            if pydantic_obj.id in non_existing_id_list:
-                non_existing_obj.append(pydantic_obj)
+        for model_obj in model_obj_list:
+            if model_obj.id in non_existing_id_list:
+                non_existing_obj.append(model_obj)
             # else not required: if obj's id is not in non-existing list then doing nothing since it got updated
             # already in put_all call (patch_all always belongs to pattern1)
         logging.debug(f"Calling Error handler func provided with param: {non_existing_obj}")
@@ -463,18 +462,18 @@ def _alert_queue_handler_err_handler(e, pydantic_obj_list, queue_obj, err_handli
         logging.exception(
             f"Some Error Occurred while calling {web_client_callable.__name__}, "
             f"sending all updates to err_handling_callable, {str(e)}")
-        err_handling_callable(pydantic_obj_list)
+        err_handling_callable(model_obj_list)
 
 
 def alert_queue_handler_for_create_only(
         run_state: bool, queue_obj: queue.Queue, bulk_transactions_counts_per_call: int,
         bulk_transaction_timeout: int, create_web_client_callable: Callable[..., Any],
         err_handling_callable, client_connection_fail_retry_secs: int | None = None):
-    create_pydantic_obj_list = []
+    create_model_obj_list = []
     queue_fetch_counts: int = 0
     oldest_entry_time: DateTime = DateTime.utcnow()
     while True:
-        if not create_pydantic_obj_list:
+        if not create_model_obj_list:
             remaining_timeout_secs = bulk_transaction_timeout
         else:
             remaining_timeout_secs = (
@@ -488,7 +487,7 @@ def alert_queue_handler_for_create_only(
                     logging.info(f"Exiting alert_queue_handler")
                     return
 
-                create_pydantic_obj_list.append(alert_obj)
+                create_model_obj_list.append(alert_obj)
                 queue_fetch_counts += 1
             except queue.Empty:
                 # since bulk update timeout limit has breached, will call update
@@ -504,19 +503,19 @@ def alert_queue_handler_for_create_only(
             logging.info(f"Found {run_state=} in alert_queue_handler - Exiting while loop")
             return
 
-        if create_pydantic_obj_list:
+        if create_model_obj_list:
 
             # handling create list
             try:
-                res = create_web_client_callable(create_pydantic_obj_list)
+                res = create_web_client_callable(create_model_obj_list)
             except HTTPException as http_e:
-                _alert_queue_handler_err_handler(http_e.detail, create_pydantic_obj_list, queue_obj,
+                _alert_queue_handler_err_handler(http_e.detail, create_model_obj_list, queue_obj,
                                                  err_handling_callable,
                                                  create_web_client_callable, client_connection_fail_retry_secs)
             except Exception as e:
-                _alert_queue_handler_err_handler(e, create_pydantic_obj_list, queue_obj, err_handling_callable,
+                _alert_queue_handler_err_handler(e, create_model_obj_list, queue_obj, err_handling_callable,
                                                  create_web_client_callable, client_connection_fail_retry_secs)
-            create_pydantic_obj_list.clear()  # cleaning list to start fresh cycle
+            create_model_obj_list.clear()  # cleaning list to start fresh cycle
 
         queue_fetch_counts = 0
         oldest_entry_time = DateTime.utcnow()
@@ -534,14 +533,14 @@ async def handle_alert_create_n_update_using_async_submit(
 
                 # handling create list
                 try:
-                    create_pydantic_obj_list = list(alerts_cache_cont.create_alert_obj_dict.values())
-                    res = await underlying_create_all_web_client_callable(create_pydantic_obj_list)
+                    create_model_obj_list = list(alerts_cache_cont.create_alert_obj_dict.values())
+                    res = await underlying_create_all_web_client_callable(create_model_obj_list)
                 except HTTPException as http_e:
-                    _alert_queue_handler_err_handler(http_e.detail, create_pydantic_obj_list, queue_obj,
+                    _alert_queue_handler_err_handler(http_e.detail, create_model_obj_list, queue_obj,
                                                      err_handling_callable,
                                                      underlying_create_all_web_client_callable, client_connection_fail_retry_secs)
                 except Exception as e:
-                    _alert_queue_handler_err_handler(e, create_pydantic_obj_list, queue_obj, err_handling_callable,
+                    _alert_queue_handler_err_handler(e, create_model_obj_list, queue_obj, err_handling_callable,
                                                      underlying_create_all_web_client_callable, client_connection_fail_retry_secs)
                 alerts_cache_cont.create_alert_obj_dict.clear()  # cleaning dict to start fresh cycle
 
@@ -549,14 +548,14 @@ async def handle_alert_create_n_update_using_async_submit(
             if alerts_cache_cont.update_alert_obj_dict:
                 # handling update list
                 try:
-                    update_pydantic_obj_list = list(alerts_cache_cont.update_alert_obj_dict.values())
-                    res = await underlying_update_all_web_client_callable(update_pydantic_obj_list)
+                    update_model_obj_list = list(alerts_cache_cont.update_alert_obj_dict.values())
+                    res = await underlying_update_all_web_client_callable(update_model_obj_list)
                 except HTTPException as http_e:
-                    _alert_queue_handler_err_handler(http_e.detail, update_pydantic_obj_list, queue_obj,
+                    _alert_queue_handler_err_handler(http_e.detail, update_model_obj_list, queue_obj,
                                                      err_handling_callable,
                                                      underlying_update_all_web_client_callable, client_connection_fail_retry_secs)
                 except Exception as e:
-                    _alert_queue_handler_err_handler(e, update_pydantic_obj_list, queue_obj, err_handling_callable,
+                    _alert_queue_handler_err_handler(e, update_model_obj_list, queue_obj, err_handling_callable,
                                                      underlying_update_all_web_client_callable, client_connection_fail_retry_secs)
                 alerts_cache_cont.update_alert_obj_dict.clear()  # cleaning list to start fresh cycle
 
@@ -650,7 +649,7 @@ def alert_queue_handler_for_create_n_update(
 def clean_alert_str(alert_str: str) -> str:
     # remove object hex memory path
     cleaned_alert_str: str = re.sub(r"0x[a-f0-9]*", "", alert_str)
-    # remove any pydantic_object_id (str type id)
+    # remove any model_object_id (str type id)
     cleaned_alert_str = re.sub(r"\'[a-fA-F0-9]{24}\' ", "", cleaned_alert_str)
     # remove all numeric digits
     cleaned_alert_str = re.sub(r"-?[0-9]*", "", cleaned_alert_str)

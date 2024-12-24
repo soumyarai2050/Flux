@@ -4,7 +4,7 @@ import math
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link import (
     get_bartering_link, BarteringLinkBase)
 from FluxPythonUtils.scripts.service import Service
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_bartering_data_manager import BaseBarteringDataManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import BaseStratCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.chore_check import (
@@ -12,8 +12,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.chore_check i
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     get_symbol_side_key)
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_msgspec_model import *
 
 
 BaseStratCacheType = TypeVar('BaseStratCacheType', bound=BaseStratCache)

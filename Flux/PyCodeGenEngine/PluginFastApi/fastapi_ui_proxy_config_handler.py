@@ -14,7 +14,7 @@ class FastapiUIProxyConfigHandler(BaseFastapiPlugin, ABC):
     """
     Currently Only includes WS Get-All and WS Get-By-Id uri(s).
     """
-    beanie_pydantic_model_dir_name = "Pydentic"
+    beanie_pydantic_model_dir_name = "ORMModel"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)

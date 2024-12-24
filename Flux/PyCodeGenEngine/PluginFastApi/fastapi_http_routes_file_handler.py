@@ -21,7 +21,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.shared_lock_name_to_pydentic_class_dict: Dict[str, List[protogen.Message]] = {}
+        self.shared_lock_name_to_model_class_dict: Dict[str, List[protogen.Message]] = {}
         self.shared_lock_name_message_list: List[protogen.Message] = []
         self.message_to_link_messages_dict: Dict[protogen.Message, List[protogen.Message]] = {}
         self._msg_already_generated_str_formatted_int_fields_handler_list: List[protogen.Message] = []
@@ -29,7 +29,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
     def _get_list_of_shared_lock_for_message(self, message: protogen.Message) -> List[str]:
         shared_lock_name_list = []
-        for shared_lock_name, message_list in self.shared_lock_name_to_pydentic_class_dict.items():
+        for shared_lock_name, message_list in self.shared_lock_name_to_model_class_dict.items():
             if message in message_list:
                 shared_lock_name_list.append(shared_lock_name)
         return shared_lock_name_list
@@ -1193,7 +1193,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                 f"extra dependency of fetching stored obj and\n\t\t#passing it to pre "
                                                 f"and post callback calls, if not required in this model then update "
                                                 f"proto file and regenerate\n")
-            output_str += " " * indent_count + f"    obj_id_list = [pydantic_obj.id for pydantic_obj in " \
+            output_str += " " * indent_count + f"    obj_id_list = [model_obj.id for model_obj in " \
                                                f"{message_name_snake_cased}_update_msgspec_obj_list]\n"
             output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_json_dict_list = await "
                                                 f"generic_read_http({message.proto.name}, "
@@ -1435,7 +1435,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + f"    await callback_class.update_all_{message_name_snake_cased}_pre(" \
                                                    f"{message_name_snake_cased}_json_n_dataclass_handler)\n"
             else:
-                output_str += " " * indent_count + f"    obj_id_list = [pydantic_obj.id for pydantic_obj in " \
+                output_str += " " * indent_count + f"    obj_id_list = [model_obj.id for model_obj in " \
                                                    f"{message_name_snake_cased}_updated_list]\n"
                 output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj_list = await " \
                                                    f"generic_read_http({message.proto.name}, " \
@@ -3749,7 +3749,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += f"async def {query_name}_query_http(payload_dict: Dict[str, Any]) -> " \
                               f"List[{return_type_str}]:\n"
             output_str += f'    """\n'
-            output_str += f'    Patch Query of {message.proto.name} with aggregate - {query_name}\n'
+            output_str += f'    {route_type} Query of {message.proto.name} with aggregate - {query_name}\n'
             output_str += f'    """\n'
 
             output_str += f"    try:\n"
@@ -3865,14 +3865,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         for aggregate_value in aggregate_value_list:
             query_name = aggregate_value[FastapiHttpRoutesFileHandler.query_name_key]
-            query_params = aggregate_value[FastapiHttpRoutesFileHandler.query_params_key]
+            query_params_name_n_param_type_tuple_list = aggregate_value[FastapiHttpRoutesFileHandler.query_params_key]
             query_type_value = aggregate_value[FastapiHttpRoutesFileHandler.query_type_key]
             query_type = str(query_type_value).lower() if query_type_value is not None else None
             query_route_value = aggregate_value[FastapiHttpRoutesFileHandler.query_route_type_key]
             query_route_type = query_route_value if query_route_value is not None else None
 
             query_params_str, query_params_with_type_str = (
-                self._get_query_params_str_n_query_params_with_type_str(query_params))
+                self._get_query_params_str_n_query_params_with_type_str(query_params_name_n_param_type_tuple_list))
 
             if query_type is None or query_type == "http" or query_type == "both":
                 output_str += self._handle_http_query_str(message, query_name, query_params_str,
@@ -3934,7 +3934,6 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             field_names_str = "_n_".join(field_name_list)
             field_names_str_camel_cased = convert_to_capitalized_camel_case(field_names_str)
             container_model_name = f"{message.proto.name}ProjectionContainerFor{field_names_str_camel_cased}"
-            projection_model_name = f"{message.proto.name}ProjectionFor{field_names_str_camel_cased}"
 
             query_param_str = ""
             query_param_with_type_str = ""
@@ -3948,12 +3947,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                     query_param_str += f"{meta_field_name}, "
                     query_param_with_type_str += f"{meta_field_name}: {self.proto_to_py_datatype(meta_field_value)}, "
             query_param_str += "start_date_time, end_date_time"
-            if model_type == ModelType.Msgspec:
-                query_param_with_type_str += ("start_date_time: Any | None = None, "
-                                              "end_date_time: Any | None = None")
-            else:
-                query_param_with_type_str += ("start_date_time: DateTime | None = None, "
-                                              "end_date_time: DateTime | None = None")
+            query_param_with_type_str += ("start_date_time: int | None = None, "
+                                          "end_date_time: int | None = None")
 
             # Http Filter Call
             output_str += self._handle_http_query_str(message, query_name, query_param_str, query_param_with_type_str,
@@ -4066,10 +4061,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def handle_msgspec_CRUD_task(self) -> str:
         output_str = ""
         for message in self.root_message_list:
-            if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root):
-                output_str += self._handle_routes_methods(message, model_type=ModelType.Msgspec)
-            elif self.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
-                output_str += self._handle_routes_methods(message, model_type=ModelType.Msgspec)
+            # root_message_list includes both json root and time series messages
+            output_str += self._handle_routes_methods(message, model_type=ModelType.Msgspec)
 
         for message in self.message_to_query_option_list_dict:
             output_str += self._handle_query_methods(message, model_type=ModelType.Msgspec)
@@ -4081,6 +4074,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
+                # returns empty str if message has no field suggesting projection query option set
                 output_str += self._handle_projection_query_methods(message, model_type=ModelType.Msgspec)
         return output_str
 
@@ -4110,7 +4104,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def handle_http_pydantic_routes_file_gen(self) -> str:
         # running pre-requisite method to set shared lock option info
         self._get_messages_having_links()
-        self._set_shared_lock_name_to_pydentic_class_dict()
+        self._set_shared_lock_name_to_model_class_dict()
 
         base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
         output_str = f"from {base_routes_file_path} import *\n\n"
@@ -4121,7 +4115,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def handle_http_dataclass_routes_file_gen(self) -> str:
         # running pre-requisite method to set shared lock option info
         self._get_messages_having_links()
-        self._set_shared_lock_name_to_pydentic_class_dict()
+        self._set_shared_lock_name_to_model_class_dict()
 
         base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
         output_str = f"from dataclasses import dataclass\n\n"
@@ -4134,7 +4128,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def handle_http_msgspec_routes_file_gen(self) -> str:
         # running pre-requisite method to set shared lock option info
         self._get_messages_having_links()
-        self._set_shared_lock_name_to_pydentic_class_dict()
+        self._set_shared_lock_name_to_model_class_dict()
 
         base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
         output_str = f"from {base_routes_file_path} import *\n\n"

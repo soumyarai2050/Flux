@@ -5,10 +5,10 @@ import ctypes
 from abc import abstractmethod
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import (
     chore_has_terminal_state, create_symbol_overview_pre_helper, update_symbol_overview_pre_helper,
     get_bkr_from_underlying_account, partial_update_symbol_overview_pre_helper)
@@ -17,7 +17,7 @@ from FluxPythonUtils.scripts.utility_functions import (
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecordManager)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     is_ongoing_strat, email_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.barter_simulator import (
@@ -1546,6 +1546,9 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
 
     ############################
     # BarteringDataManager updates
+    # Note: Obj passed to bartering_data_manager gte_all_ws methods is also that which is returned by underlying call
+    #       so be careful, if in get_all_ws handling it is updated it would impact obj received by caller of
+    #       underlying or client
     ############################
 
     async def handle_partial_update_chore_journal_post(self, updated_chore_journal_obj_json: Dict[str, Any]):
@@ -1573,7 +1576,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
 
     async def handle_create_new_chore_post(self, new_chore_obj: NewChore):
         # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_new_chore_get_all_ws(new_chore_obj)
+        self.bartering_data_manager.handle_new_chore_get_all_ws(deepcopy(new_chore_obj))
         SymbolCacheContainer.release_semaphore()
 
     async def handle_create_cancel_chore_post(self, cancel_chore_obj: CancelChore):
@@ -1645,18 +1648,18 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
             SymbolCacheContainer.release_semaphore()
 
     async def handle_create_top_of_book_post(self, top_of_book_obj: TopOfBook):
-        self.bartering_data_manager.handle_top_of_book_get_all_ws(top_of_book_obj)
+        self.strat_cache.handle_set_tob_in_symbol_cache(top_of_book_obj)
         # used for basket executor - strat executor releases semaphore from cpp app
         SymbolCacheContainer.release_semaphore()
 
     async def handle_update_top_of_book_post(self, updated_top_of_book_obj: TopOfBook):
-        self.bartering_data_manager.handle_top_of_book_get_all_ws(updated_top_of_book_obj)
+        self.strat_cache.handle_set_tob_in_symbol_cache(updated_top_of_book_obj)
         # used for basket executor - strat executor releases semaphore from cpp app
         SymbolCacheContainer.release_semaphore()
 
     async def handle_partial_update_top_of_book_post(self, updated_top_of_book_obj_json: Dict[str, Any]):
         updated_top_of_book_obj: TopOfBook = TopOfBook.from_dict(updated_top_of_book_obj_json)
-        self.bartering_data_manager.handle_top_of_book_get_all_ws(updated_top_of_book_obj)
+        self.strat_cache.handle_set_tob_in_symbol_cache(updated_top_of_book_obj)
         # used for basket executor - strat executor releases semaphore from cpp app
         SymbolCacheContainer.release_semaphore()
 

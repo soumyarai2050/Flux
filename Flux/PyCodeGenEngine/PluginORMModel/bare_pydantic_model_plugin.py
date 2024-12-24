@@ -6,10 +6,10 @@ from typing import Tuple
 import protogen
 
 # project imports
-from Flux.PyCodeGenEngine.PluginPydentic.base_pydantic_model_plugin import BasePydanticModelPlugin, main
+from Flux.PyCodeGenEngine.PluginORMModel.base_ORM_model_plugin import BaseORMModelPlugin, main
 
 
-class PydanticModelPlugin(BasePydanticModelPlugin):
+class ORMModelPlugin(BaseORMModelPlugin):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -35,7 +35,7 @@ class PydanticModelPlugin(BasePydanticModelPlugin):
             output_str += "\n"
         return output_str
 
-    def _handle_pydantic_class_declaration(self, message: protogen.Message) -> Tuple[str, bool]:
+    def _handle_ORM_class_declaration(self, message: protogen.Message) -> Tuple[str, bool]:
         is_msg_root = False
         if self.response_field_case_style.lower() == "snake":
             if message in self.root_message_list:
@@ -74,7 +74,7 @@ class PydanticModelPlugin(BasePydanticModelPlugin):
         return output_str
 
     def handle_message_output(self, message: protogen.Message) -> str:
-        output_str, is_msg_root = self._handle_pydantic_class_declaration(message)
+        output_str, is_msg_root = self._handle_ORM_class_declaration(message)
 
         # Adding docstring if message lvl comment available
         output_str += self._handle_class_docstring(message)
@@ -132,4 +132,4 @@ class PydanticModelPlugin(BasePydanticModelPlugin):
 
 
 if __name__ == "__main__":
-    main(PydanticModelPlugin)
+    main(ORMModelPlugin)

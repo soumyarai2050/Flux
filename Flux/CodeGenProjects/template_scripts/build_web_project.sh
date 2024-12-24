@@ -36,7 +36,7 @@ python gen_cpp_key_handler.py
 python gen_cpp_project_includes.py
 python gen_cpp_web_socket_server.py
 python gen_cpp_shared_data_structure.py
-python gen_cpp_proto2_model.py
+python gen_cpp_web_server_routes.py
 # NOTE: these plugins are not required. When needed - uncomment:
 #python gen_web_socket_server_util.py
 #python gen_populate_random_values.py

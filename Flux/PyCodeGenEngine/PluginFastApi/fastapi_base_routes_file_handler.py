@@ -26,7 +26,7 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.shared_lock_name_to_pydentic_class_dict: Dict[str, List[protogen.Message]] = {}
+        self.shared_lock_name_to_model_class_dict: Dict[str, List[protogen.Message]] = {}
         self.shared_lock_name_message_list: List[protogen.Message] = []
         self.message_to_link_messages_dict: Dict[protogen.Message, List[protogen.Message]] = {}
 
@@ -39,17 +39,17 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str = f"callback_class = {self.routes_callback_class_name}.get_instance()\n\n\n"
         return output_str
 
-    def _set_shared_lock_name_to_pydentic_class_dict(self):
+    def _set_shared_lock_name_to_model_class_dict(self):
         for message in self.root_message_list:
             # Setting lock for shared_lock option
             if self.is_option_enabled(message, FastapiBaseRoutesFileHandler.flux_msg_crud_shared_lock):
                 shared_lock_name = \
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiBaseRoutesFileHandler.flux_msg_crud_shared_lock)
-                if shared_lock_name not in self.shared_lock_name_to_pydentic_class_dict:
-                    self.shared_lock_name_to_pydentic_class_dict[shared_lock_name] = [message]
+                if shared_lock_name not in self.shared_lock_name_to_model_class_dict:
+                    self.shared_lock_name_to_model_class_dict[shared_lock_name] = [message]
                 else:
-                    self.shared_lock_name_to_pydentic_class_dict[shared_lock_name].append(message)
+                    self.shared_lock_name_to_model_class_dict[shared_lock_name].append(message)
 
                 if message not in self.shared_lock_name_message_list:
                     self.shared_lock_name_message_list.append(message)
@@ -60,7 +60,7 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
             linked_messages: List[protogen.Message] = self.message_to_link_messages_dict.get(message)
             if linked_messages is not None:
                 linked_lock_name = f"{message.proto.name}_link_lock"
-                self.shared_lock_name_to_pydentic_class_dict[linked_lock_name] = [message] + linked_messages
+                self.shared_lock_name_to_model_class_dict[linked_lock_name] = [message] + linked_messages
 
     def _get_messages_having_links(self) -> None:
         for message in self.root_message_list:
@@ -85,7 +85,7 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str = f"from {model_file_path} import *\n"
 
         if file and model_file_suffix:
-            project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+            project_grp_root_dir = PurePath(project_dir).parent.parent / "ORMModel"
             dependency_file_path_list = self.get_dependency_file_path_list(
                 file, root_core_proto_files, project_grp_core_proto_files,
                 model_file_suffix, str(project_grp_root_dir))
@@ -204,7 +204,7 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
 
             override_default_get_all_limit = additional_agg_option_val_dict.get("override_get_all_limit_handling")
             agg_params = additional_agg_option_val_dict.get("agg_params")
-            additional_agg_str = f"{additional_agg_option_val_dict['agg_var_name']}(pydantic_obj"
+            additional_agg_str = f"{additional_agg_option_val_dict['agg_var_name']}(model_obj"
 
             if override_default_get_all_limit:
                 additional_agg_str += ", limit"
@@ -223,7 +223,7 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
 
         if filter_list:
             var_name = self._get_filter_configs_var_name(message, put_param=False)
-            return_str = f"{var_name} = lambda pydantic_obj : " + "{'redact': " + f"{filter_list}"
+            return_str = f"{var_name} = lambda model_obj : " + "{'redact': " + f"{filter_list}"
             if additional_agg_str:
                 return_str += f", 'agg': {additional_agg_str}"
             return_str += "}\n"
@@ -231,23 +231,23 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         elif additional_agg_str:
             var_name = self._get_filter_configs_var_name(message, put_param=False)
             if override_default_get_all_limit:
-                return_str = f"{var_name} = lambda pydantic_obj, limit = None: " + "{'agg': " + f"{additional_agg_str}" + "}\n"
+                return_str = f"{var_name} = lambda model_obj, limit = None: " + "{'agg': " + f"{additional_agg_str}" + "}\n"
             else:
-                return_str = f"{var_name} = lambda pydantic_obj : " + "{'agg': " + f"{additional_agg_str}" + "}\n"
+                return_str = f"{var_name} = lambda model_obj : " + "{'agg': " + f"{additional_agg_str}" + "}\n"
             return return_str
         else:
             return ""
 
     def _handle_CRUD_shared_locks_declaration(self):
         output_str = ""
-        for lock_name in self.shared_lock_name_to_pydentic_class_dict:
+        for lock_name in self.shared_lock_name_to_model_class_dict:
             output_str += f"{lock_name} = AsyncRLock()\n"
         return output_str
 
     def handle_base_routes_file_gen(self, file: protogen.File | None = None, model_suffix: str | None = None) -> str:
         # running pre-requisite method to set shared lock option info
         self._get_messages_having_links()
-        self._set_shared_lock_name_to_pydentic_class_dict()
+        self._set_shared_lock_name_to_model_class_dict()
 
         output_str = ("# Imports in this file are used by importing files so should not be removed "
                       "for being unused in current file\n")

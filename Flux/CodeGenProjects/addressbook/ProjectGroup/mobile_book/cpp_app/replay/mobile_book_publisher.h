@@ -20,9 +20,8 @@
 
 class MobileBookPublisher {
 public:
-    explicit MobileBookPublisher(Config& config) : mr_config_(config),
-    m_sp_mongo_db_handler_(std::make_shared<FluxCppCore::MongoDBHandler>(
-        mr_config_.m_mongodb_uri_, mr_config_.m_db_name_)), m_market_depth_codec_(m_sp_mongo_db_handler_),
+    explicit MobileBookPublisher(Config& config, std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_handler) : mr_config_(config),
+    m_sp_mongo_db_handler_(mongo_db_handler), m_market_depth_codec_(m_sp_mongo_db_handler_),
     m_last_barter_codec_(m_sp_mongo_db_handler_), m_top_of_book_codec_(m_sp_mongo_db_handler_),
     m_raw_market_depth_history_codec_(m_sp_mongo_db_handler_), m_raw_last_barter_history_codec_(m_sp_mongo_db_handler_) {
 

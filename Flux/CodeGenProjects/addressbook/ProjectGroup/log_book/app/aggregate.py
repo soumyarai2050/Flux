@@ -3,7 +3,7 @@ from typing import Dict, Tuple, Type, List, Any
 import os
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import (
     PortfolioAlertBaseModel, StratAlertBaseModel, Severity)
 from FluxPythonUtils.scripts.utility_functions import get_version_from_mongodb_uri
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
@@ -11,19 +11,19 @@ from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 
-def get_pydantic_model_to_dict_for_v5_limit_agg(pydentic_obj_dict: Dict):
-    for key, value in pydentic_obj_dict.items():
-        pydentic_obj_dict[key] = {
+def get_model_to_dict_for_v5_limit_agg(model_obj_dict: Dict):
+    for key, value in model_obj_dict.items():
+        model_obj_dict[key] = {
             "$first": f"${key}"
         }
 
 
-def get_pydantic_model_to_dict_for_limit_agg(pydentic_obj_dict: Dict):
-    for key, value in pydentic_obj_dict.items():
+def get_model_to_dict_for_limit_agg(model_obj_dict: Dict):
+    for key, value in model_obj_dict.items():
         if isinstance(value, dict):
-            get_pydantic_model_to_dict_for_limit_agg(value)
+            get_model_to_dict_for_limit_agg(value)
         else:
-            pydentic_obj_dict[key] = 1
+            model_obj_dict[key] = 1
 
 
 def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
@@ -144,18 +144,18 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #     agg_pipeline.extend(extend_agg_pipeline)
 #
 #
-# def get_limited_alerts_obj_v5(limit: int, pydantic_type: Type[PortfolioAlertBaseModel] | Type[StratAlertBaseModel]):
-#     alert_obj_dict_for_grp_layer = pydantic_type().model_dump()
-#     get_pydantic_model_to_dict_for_v5_limit_agg(alert_obj_dict_for_grp_layer)
+# def get_limited_alerts_obj_v5(limit: int, model_type: Type[PortfolioAlertBaseModel] | Type[StratAlertBaseModel]):
+#     alert_obj_dict_for_grp_layer = model_type().model_dump()
+#     get_model_model_to_dict_for_v5_limit_agg(alert_obj_dict_for_grp_layer)
 #     alert_obj_dict_for_grp_layer["_id"] = "$_id"
-#     # del pydentic_obj_dict["id"]
+#     # del model_obj_dict["id"]
 #     alert_obj_dict_for_grp_layer["alerts"] = {
 #         "$push": "$alerts"
 #     }
 #
 #     limit, sort_direction = get_limit_n_sort_direction(limit)
-#     portfolio_alert_obj_dict_for_project_layer = pydantic_type().model_dump()
-#     get_pydantic_model_to_dict_for_limit_agg(portfolio_alert_obj_dict_for_project_layer)
+#     portfolio_alert_obj_dict_for_project_layer = model_type().model_dump()
+#     get_model_model_to_dict_for_limit_agg(portfolio_alert_obj_dict_for_project_layer)
 #     portfolio_alert_obj_dict_for_project_layer["alerts"] = {
 #             "$slice": ["$alerts", limit]
 #         }
@@ -189,12 +189,12 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #
 # # deprecated
 # def _get_limited_alerts_obj_v6_n_above(limit: int,
-#                                       pydantic_type: Type[PortfolioAlertBaseModel] | Type[StratAlertBaseModel]):
-#     pydantic_type_obj = pydantic_type().model_dump()
-#     get_pydantic_model_to_dict_for_limit_agg(pydantic_type_obj)
+#                                       model_type: Type[PortfolioAlertBaseModel] | Type[StratAlertBaseModel]):
+#     model_type_obj = model_type().model_dump()
+#     get_model_model_to_dict_for_limit_agg(model_type_obj)
 #     limit, sort_direction = get_limit_n_sort_direction(limit)
 #
-#     pydantic_type_obj["alerts"] = {
+#     model_type_obj["alerts"] = {
 #         "$slice": [
 #             {"$sortArray": {
 #                 "input": "$alerts",
@@ -206,11 +206,11 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #
 #     # adding additional field aggregate to update strat_alert_aggregated_severity and strat_alert_count - used
 #     # in updating specific strat_view's fields
-#     add_strat_alert_aggregated_severity_field_n_alert_count(pydantic_type_obj)
+#     add_strat_alert_aggregated_severity_field_n_alert_count(model_type_obj)
 #
 #     agg_pipeline = [
 #         {
-#             "$project": pydantic_type_obj
+#             "$project": model_type_obj
 #         }
 #     ]
 #
@@ -221,13 +221,13 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #
 #
 # def get_limited_alerts_obj_v6_n_above(limit: int,
-#                                       pydantic_type: Type[PortfolioAlertBaseModel] | Type[StratAlertBaseModel],
+#                                       model_type: Type[PortfolioAlertBaseModel] | Type[StratAlertBaseModel],
 #                                       strat_id: int | None = None):
-#     pydantic_type_obj = pydantic_type().model_dump()
-#     get_pydantic_model_to_dict_for_limit_agg(pydantic_type_obj)
+#     model_type_obj = model_type().model_dump()
+#     get_model_model_to_dict_for_limit_agg(model_type_obj)
 #     limit, sort_direction = get_limit_n_sort_direction(limit)
 #
-#     pydantic_type_obj["alerts"] = {
+#     model_type_obj["alerts"] = {
 #         "$slice": [
 #             {"$sortArray": {
 #                 "input": "$alerts",
@@ -239,11 +239,11 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #
 #     # adding additional field aggregate to update strat_alert_aggregated_severity and strat_alert_count - used
 #     # in updating specific strat_view's fields
-#     add_strat_alert_aggregated_severity_field_n_alert_count(pydantic_type_obj)
+#     add_strat_alert_aggregated_severity_field_n_alert_count(model_type_obj)
 #
 #     agg_pipeline = [
 #         {
-#             "$project": pydantic_type_obj
+#             "$project": model_type_obj
 #         }
 #     ]
 #
@@ -261,7 +261,7 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #         return get_limited_alerts_obj_v6_n_above(limit, PortfolioAlertBaseModel)
 #
 #
-# def get_limited_strat_alerts_obj(pydantic_obj, limit: int):
+# def get_limited_strat_alerts_obj(model_obj, limit: int):
 #     mongo_version = get_version_from_mongodb_uri(get_mongo_server_uri())
 #     mongo_version_start_num = mongo_version.split(".")[0]
 #     if int(mongo_version_start_num) < 6:
@@ -381,7 +381,7 @@ def get_total_strat_alert_count_n_highest_severity(strat_id: int):
 
 
 def sort_alerts_based_on_severity_n_last_update_analyzer_time(
-        strat_id_or_pydantic_obj: int | MsgspecBaseModel | None = None, limit: int | None = None):
+        strat_id_or_model_obj: int | MsgspecBaseModel | None = None, limit: int | None = None):
     """
     - $addFields: Adds a new field severityPriority based on the priority mapping defined using $switch.
     - $switch: Evaluates each case expression and returns the value associated with the first case expression that
@@ -423,17 +423,17 @@ def sort_alerts_based_on_severity_n_last_update_analyzer_time(
     ]
 
     # if strat_id exists then adding match layer
-    if strat_id_or_pydantic_obj is not None:
-        if isinstance(strat_id_or_pydantic_obj, int):
-            strat_id: int = strat_id_or_pydantic_obj
+    if strat_id_or_model_obj is not None:
+        if isinstance(strat_id_or_model_obj, int):
+            strat_id: int = strat_id_or_model_obj
             agg_pipeline[1]["$match"] = {
                 'strat_id': strat_id
             }
         else:
-            pydantic_obj = strat_id_or_pydantic_obj
-            if hasattr(pydantic_obj, "strat_id") and pydantic_obj.strat_id is not None:
+            model_obj = strat_id_or_model_obj
+            if hasattr(model_obj, "strat_id") and model_obj.strat_id is not None:
                 agg_pipeline[1]["$match"] = {
-                    'strat_id': pydantic_obj.strat_id
+                    'strat_id': model_obj.strat_id
                 }
 
     counter = len(Severity) - 1  # removing UNSPECIFIED

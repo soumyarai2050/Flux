@@ -30,7 +30,7 @@ class IdType(StrEnum):
     STR_ID = auto()
 
 
-class BasePydanticModelPlugin(BaseProtoPlugin):
+class BaseORMModelPlugin(BaseProtoPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
@@ -82,8 +82,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     self.enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if (self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root) or
-                        self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root_time_series)):
+                if (self.is_option_enabled(field.message, BaseORMModelPlugin.flux_msg_json_root) or
+                        self.is_option_enabled(field.message, BaseORMModelPlugin.flux_msg_json_root_time_series)):
                     if field.message not in self.root_message_list:
                         self.root_message_list.append(field.message)
                     # else not required: avoiding repetition
@@ -93,7 +93,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     # else not required: avoiding repetition
                 self.load_dependency_messages_and_enums_in_dicts(field.message)
 
-                if self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_query):
+                if self.is_option_enabled(field.message, BaseORMModelPlugin.flux_msg_json_query):
                     if field.message not in self.query_message_list:
                         self.query_message_list.append(field.message)
                     # else not required: avoiding repetition
@@ -105,18 +105,18 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         message_list.sort(key=lambda message_: message_.proto.name)     # sorting by name
 
         for message in message_list:
-            if ((is_json_root := self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root)) or
-                    self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series)):
+            if ((is_json_root := self.is_option_enabled(message, BaseORMModelPlugin.flux_msg_json_root)) or
+                    self.is_option_enabled(message, BaseORMModelPlugin.flux_msg_json_root_time_series)):
                 if is_json_root:
                     json_root_msg_option_val_dict = \
-                        self.get_complex_option_value_from_proto(message, BasePydanticModelPlugin.flux_msg_json_root)
+                        self.get_complex_option_value_from_proto(message, BaseORMModelPlugin.flux_msg_json_root)
                 else:
                     json_root_msg_option_val_dict = \
                         self.get_complex_option_value_from_proto(message,
-                                                                 BasePydanticModelPlugin.flux_msg_json_root_time_series)
+                                                                 BaseORMModelPlugin.flux_msg_json_root_time_series)
                 # taking first obj since json root is of non-repeated option
                 if (is_reentrant_required := json_root_msg_option_val_dict.get(
-                        BasePydanticModelPlugin.flux_json_root_set_reentrant_lock_field)) is not None:
+                        BaseORMModelPlugin.flux_json_root_set_reentrant_lock_field)) is not None:
                     if not is_reentrant_required:
                         self.reentrant_lock_non_required_msg.append(message)
                     # else not required: If reentrant field of json root has True then
@@ -132,7 +132,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                         self.non_root_message_list.append(message)
                     # else not required: avoiding repetition
 
-            if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_query):
+            if self.is_option_enabled(message, BaseORMModelPlugin.flux_msg_json_query):
                 if message not in self.query_message_list:
                     self.query_message_list.append(message)
                 # else not required: avoiding repetition
@@ -192,13 +192,13 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str = ""
         if message in self.root_message_list:
             if not has_id_field:
-                output_str += f"    {BasePydanticModelPlugin.default_id_field_name}: " \
-                              f"{BasePydanticModelPlugin.default_id_type_var_name} | None = " \
+                output_str += f"    {BaseORMModelPlugin.default_id_field_name}: " \
+                              f"{BaseORMModelPlugin.default_id_type_var_name} | None = " \
                               f"Field(None, alias='_id')\n"
             # else not required: if id field is present already then will be handled in next for loop
 
         for field in message.fields:
-            if field.proto.name == BasePydanticModelPlugin.default_id_field_name:
+            if field.proto.name == BaseORMModelPlugin.default_id_field_name:
                 if message in self.root_message_list:
                     output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} | None = " \
                                   f"Field(None, alias='_id')\n"
@@ -207,19 +207,19 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             # it's id can be generated if not provided inside root message
 
             if field.message is not None:
-                if self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root):
+                if self.is_option_enabled(field.message, BaseORMModelPlugin.flux_msg_json_root):
                     field_type = f"{field.message.proto.name}BaseModel"
                 else:
                     field_type = field.message.proto.name
 
                 if field.cardinality.name.lower() == "repeated":
-                    if self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root):
+                    if self.is_option_enabled(field.message, BaseORMModelPlugin.flux_msg_json_root):
                         output_str += f"    {field.proto.name}: List[{field_type}] | None = None\n"
                     else:
                         output_str += (f"    {field.proto.name}: List[{field.message.proto.name}Optional] | "
                                        f"List[{field_type}] | None = None\n")
                 else:
-                    if self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root):
+                    if self.is_option_enabled(field.message, BaseORMModelPlugin.flux_msg_json_root):
                         output_str += f"    {field.proto.name}: {field_type} | None = None\n"
                     else:
                         output_str += (f"    {field.proto.name}: {field.message.proto.name}Optional | "
@@ -241,7 +241,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                                           datetime_field_list: List[protogen.Field] | None = None) -> str:
         message_name = message.proto.name
         output_str = f"class {message_name}Optional({message_name}):\n"
-        has_id_field = BasePydanticModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
+        has_id_field = BaseORMModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
 
         output_str += self._underlying_handle_none_default_fields(message, has_id_field)
         if has_id_field:
@@ -258,7 +258,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                                  datetime_field_list: List[protogen.Field] | None = None, **kwargs) -> str:
         message_name = message.proto.name
         output_str = f"class {message_name}BaseModel(PydanticBaseModel):\n"
-        has_id_field = BasePydanticModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
+        has_id_field = BaseORMModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
         output_str += self._underlying_handle_none_default_fields(message, has_id_field)
         output_str += self._add_config_attribute()
         output_str += "\n"
@@ -292,22 +292,22 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def _handle_ws_connection_manager_data_members_override(self, message: protogen.Message) -> str:
         output_str = "    read_ws_path_ws_connection_manager: " \
                      "ClassVar[PathWSConnectionManager] = PathWSConnectionManager()\n"
-        if BasePydanticModelPlugin.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root):
+        if BaseORMModelPlugin.is_option_enabled(message, BaseORMModelPlugin.flux_msg_json_root):
             options_value_dict = \
                 self.get_complex_option_value_from_proto(message,
-                                                         BasePydanticModelPlugin.flux_msg_json_root)
+                                                         BaseORMModelPlugin.flux_msg_json_root)
         else:
             options_value_dict = \
                 self.get_complex_option_value_from_proto(message,
-                                                         BasePydanticModelPlugin.flux_msg_json_root_time_series)
-        if BasePydanticModelPlugin.flux_json_root_read_by_id_websocket_field in options_value_dict:
+                                                         BaseORMModelPlugin.flux_msg_json_root_time_series)
+        if BaseORMModelPlugin.flux_json_root_read_by_id_websocket_field in options_value_dict:
             output_str += "    read_ws_path_with_id_ws_connection_manager: " \
                           "ClassVar[PathWithIdWSConnectionManager] = PathWithIdWSConnectionManager()\n"
         # else not required: Avoid if websocket field in json root option not present
         return output_str
 
     @abstractmethod
-    def _handle_pydantic_class_declaration(self, message: protogen.Message) -> Tuple[str, bool]:
+    def _handle_ORM_class_declaration(self, message: protogen.Message) -> Tuple[str, bool]:
         raise NotImplementedError
 
     def _handle_class_docstring(self, message: protogen.Message) -> str:
@@ -339,13 +339,13 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str = ""
         if is_msg_root:
             for field in message.fields:
-                if BasePydanticModelPlugin.default_id_field_name == field.proto.name:
+                if BaseORMModelPlugin.default_id_field_name == field.proto.name:
                     output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[{self.proto_to_py_datatype(field)}, " \
                                   f"'{message.proto.name}']] = " + "{}\n"
                     break
                 # else not required: If no field is id override then handling default id type in else of for loop
             else:
-                output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[{BasePydanticModelPlugin.default_id_type_var_name}, " \
+                output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[{BaseORMModelPlugin.default_id_type_var_name}, " \
                               f"'{message.proto.name}']] = " + "{}\n"
             output_str += self._handle_ws_connection_manager_data_members_override(message)
         # else not required: Avoid cache override if message is not root
@@ -425,33 +425,33 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def handle_projection_models_output(self, message: protogen.Message):
         output_str = ""
-        if BasePydanticModelPlugin.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series):
+        if BaseORMModelPlugin.is_option_enabled(message, BaseORMModelPlugin.flux_msg_json_root_time_series):
             for field in message.fields:
-                if BasePydanticModelPlugin.is_option_enabled(field, BasePydanticModelPlugin.flux_fld_projections):
+                if BaseORMModelPlugin.is_option_enabled(field, BaseORMModelPlugin.flux_fld_projections):
                     break
             else:
                 # If no field is found having projection enabled
                 return output_str
 
             for field in message.fields:
-                if self.is_bool_option_enabled(field, BasePydanticModelPlugin.flux_fld_val_time_field):
+                if self.is_bool_option_enabled(field, BaseORMModelPlugin.flux_fld_val_time_field):
                     time_field_name = field.proto.name
                     break
             else:
                 err_str = (f"Could not find any time field in {message.proto.name} message having "
-                           f"{BasePydanticModelPlugin.flux_msg_json_root_time_series} option")
+                           f"{BaseORMModelPlugin.flux_msg_json_root_time_series} option")
                 logging.exception(err_str)
                 raise Exception(err_str)
 
             for field in message.fields:
-                if self.is_bool_option_enabled(field, BasePydanticModelPlugin.flux_fld_val_meta_field):
+                if self.is_bool_option_enabled(field, BaseORMModelPlugin.flux_fld_val_meta_field):
                     meta_field_name = field.proto.name
                     meta_field = field
                     meta_field_type = self.proto_to_py_datatype(field)
                     break
             else:
                 err_str = (f"Could not find any time field in {message.proto.name} message having "
-                           f"{BasePydanticModelPlugin.flux_msg_json_root_time_series} option")
+                           f"{BaseORMModelPlugin.flux_msg_json_root_time_series} option")
                 logging.exception(err_str)
                 raise Exception(err_str)
 
@@ -468,7 +468,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         # Making class able to be populated with field name
         output_str += self._add_config_attribute()
 
-        if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series):
+        if self.is_option_enabled(message, BaseORMModelPlugin.flux_msg_json_root_time_series):
             time_field, meta_field, granularity, expire_after_sec = self.get_time_series_data_from_msg(message)
 
             match granularity:
@@ -502,13 +502,13 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         index_field_list: List[protogen.Field] = []
         datetime_field_list: List[protogen.Field] = []
         for field in message.fields:
-            if self.is_option_enabled(field, BasePydanticModelPlugin.flux_fld_index):
+            if self.is_option_enabled(field, BaseORMModelPlugin.flux_fld_index):
                 index_field_list.append(field)
-            if self.is_option_enabled(field, BasePydanticModelPlugin.flux_fld_val_is_datetime):
+            if self.is_option_enabled(field, BaseORMModelPlugin.flux_fld_val_is_datetime):
                 datetime_field_list.append(field)
 
         if index_field_list:
-            if not self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series):
+            if not self.is_option_enabled(message, BaseORMModelPlugin.flux_msg_json_root_time_series):
                 output_str += "\n"
                 output_str += "    class Settings:\n"
             output_str += "        indexes = [\n"
@@ -528,7 +528,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
         output_str += "\n\n"
 
-        # Adding other versions for root pydantic class
+        # Adding other versions for root model class
         output_str += self.handle_message_all_optional_field(message, datetime_field_list)
         if message in self.root_message_list+list(self.query_message_list):
             output_str += self.handle_dummy_message_gen(message, datetime_field_list)
@@ -545,10 +545,10 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str += "    @classmethod\n"
         output_str += f"    def handle_{datetime_field.proto.name}(cls, v):\n"
         date_time_format = None
-        if self.is_option_enabled(datetime_field, BasePydanticModelPlugin.flux_fld_date_time_format):
+        if self.is_option_enabled(datetime_field, BaseORMModelPlugin.flux_fld_date_time_format):
             date_time_format = \
                 self.get_simple_option_value_from_proto(datetime_field,
-                                                        BasePydanticModelPlugin.flux_fld_date_time_format)
+                                                        BaseORMModelPlugin.flux_fld_date_time_format)
         if date_time_format:
             output_str += f"        return validate_pendulum_datetime(v, {date_time_format})\n"
         else:
@@ -571,13 +571,13 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                 output_str += f'    root: List[{message.proto.name}BaseModel]\n\n\n'
         return output_str
 
-    def handle_pydantic_class_gen(self, file: protogen.File, is_main_file: bool | None = None) -> str:
+    def handle_ORM_class_gen(self, file: protogen.File, is_main_file: bool | None = None) -> str:
         if is_main_file is None:
             is_main_file = False
 
         output_str = self.handle_imports()
 
-        project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+        project_grp_root_dir = PurePath(project_dir).parent.parent / "ORMModel"
         dependency_file_path_list = self.get_dependency_file_path_list(
             file, root_core_proto_files, project_grp_core_proto_files,
             self.model_file_suffix, str(project_grp_root_dir))
@@ -588,9 +588,9 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         if dependency_file_path_list:
             output_str += "\n\n"
 
-        output_str += f"{BasePydanticModelPlugin.default_id_type_var_name} = {self.default_id_field_type}\n"
+        output_str += f"{BaseORMModelPlugin.default_id_type_var_name} = {self.default_id_field_type}\n"
         if is_main_file:
-            output_str += f'{BasePydanticModelPlugin.proto_package_var_name} = "{self.proto_package_name}"\n\n'
+            output_str += f'{BaseORMModelPlugin.proto_package_var_name} = "{self.proto_package_name}"\n\n'
 
         for enum in file.enums:
             output_str += self.handle_enum_output(enum, self.enum_type)
@@ -638,9 +638,9 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                 self.load_root_and_non_root_messages_in_dicts(file_.messages)
 
     def handle_ts_utils_import_file_gen(self, file: protogen.File):
-        if BasePydanticModelPlugin.is_option_enabled(file, BasePydanticModelPlugin.flux_file_date_time_granularity):
-            option_val = BasePydanticModelPlugin.get_simple_option_value_from_proto(
-                            file, BasePydanticModelPlugin.flux_file_date_time_granularity)
+        if BaseORMModelPlugin.is_option_enabled(file, BaseORMModelPlugin.flux_file_date_time_granularity):
+            option_val = BaseORMModelPlugin.get_simple_option_value_from_proto(
+                            file, BaseORMModelPlugin.flux_file_date_time_granularity)
             if option_val == "MICRO_SEC":
                 output_str = f"from FluxPythonUtils.ts_utils.micro_sec_ts_utils import *\n"
             elif option_val == "NANO_SEC":
@@ -669,10 +669,10 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         self.get_dependency_protogen_files(file, all_dependency_protogen_file_list)
         self.sort_message_order()
 
-        # Adding pydantic model file
-        output_dict[self.model_file_name + ".py"] = self.handle_pydantic_class_gen(file, is_main_file=True)
+        # Adding orm model file
+        output_dict[self.model_file_name + ".py"] = self.handle_ORM_class_gen(file, is_main_file=True)
         for file_ in all_dependency_protogen_file_list:
             file_name = f"{file_.generated_filename_prefix}_{self.model_file_suffix}.py"
-            output_dict[file_name] = self.handle_pydantic_class_gen(file_)
+            output_dict[file_name] = self.handle_ORM_class_gen(file_)
 
         return output_dict

@@ -16,15 +16,15 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_barter
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link import market
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_bartering_data_manager import BaseBarteringDataManager
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.Pydentic.basket_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.phone_book_n_street_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.ORMModel.basket_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.phone_book_n_street_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
 
 
 class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceDataManager, EmailBookServiceDataManager):
@@ -86,9 +86,3 @@ class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceData
             BasketCache.fx_symbol_overview_dict[fx_symbol_overview_.symbol] = fx_symbol_overview_
             BasketCache.notify_all()
         super().handle_fx_symbol_overview_get_all_ws(fx_symbol_overview_)
-
-    def handle_top_of_book_get_all_ws(self, top_of_book_: TopOfBookBaseModel | TopOfBook, **kwargs):
-        if top_of_book_.symbol in BasketCache.fx_symbol_overview_dict:
-            # if we need fx TOB: StratCache needs to collect reference here (like we do in symbol_overview)
-            return  # No use-case for fx TOB at this time
-        super().handle_top_of_book_get_all_ws(top_of_book_)

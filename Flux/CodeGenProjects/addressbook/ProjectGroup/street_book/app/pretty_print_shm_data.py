@@ -97,7 +97,7 @@ if __name__ == '__main__':
     from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import *
 
     log_dir: PurePath = PurePath(__file__).parent.parent / "log"
-    datetime_str: str = datetime.now().strftime("%Y%m%d")
+    datetime_str: str = datetime.datetime.now().strftime("%Y%m%d")
     configure_logger('debug', str(log_dir), f'pretty_print_shm_data_log_{datetime_str}.log')
 
     # change below values based on requirement

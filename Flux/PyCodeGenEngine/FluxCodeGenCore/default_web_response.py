@@ -28,6 +28,6 @@ class DefaultMsgspecWebResponse(MsgspecBaseModel):
     msg: str
     id: Any = None
 
-    def format_msg(self, pydantic_obj_name: str, id: Any) -> str:
+    def format_msg(self, model_obj_name: str, id: Any) -> str:
         self.id = id
-        return f"{self.msg}: {pydantic_obj_name} {id}"
+        return f"{self.msg}: {model_obj_name} {id}"

@@ -409,7 +409,8 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
     }
 
     if (mr_config_.m_last_barter_db_update_publish_policy_ == PublishPolicy::PRE) {
-        m_last_barter_codec_.insert(last_barter);
+        auto db_id = m_last_barter_codec_.insert(last_barter);
+        last_barter.id_ = db_id;
     }
 
     if (mr_config_.m_last_barter_ws_update_publish_policy_ == PublishPolicy::PRE) {
@@ -714,11 +715,12 @@ void MobileBookPublisher::market_depth_consumer() {
                     }
                 }
                 populate_market_depth(market_depth_queue_element, market_depth);
-                m_market_depth_list_.market_depth_.push_back(market_depth);
 
                 if (mr_config_.m_market_depth_db_update_publish_policy_ == PublishPolicy::POST) {
-                    m_market_depth_codec_.insert_or_update(market_depth);
+                    auto db_id  = m_market_depth_codec_.insert_or_update(market_depth);
+                    market_depth.id_ = db_id;
                 }
+                m_market_depth_list_.market_depth_.push_back(market_depth);
 
                 if (mr_config_.m_market_depth_http_update_publish_policy_ == PublishPolicy::POST) {
                     auto db_id = m_market_depth_codec_.get_db_id_from_root_model_obj(market_depth);
@@ -908,10 +910,11 @@ void MobileBookPublisher::last_barter_consumer() {
             }
 
             if (mr_config_.m_last_barter_db_update_publish_policy_ == PublishPolicy::POST) {
-                m_last_barter_codec_.insert(last_barter);
+                auto db_id = m_last_barter_codec_.insert(last_barter);
+                last_barter.id_ = db_id;
             }
 
-            if (mr_config_.m_last_barter_http_update_publish_policy_ == PublishPolicy::PRE) {
+            if (mr_config_.m_last_barter_http_update_publish_policy_ == PublishPolicy::POST) {
                 assert(m_lt_web_client_.value().create_client(last_barter));
             }
 

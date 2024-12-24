@@ -6,10 +6,10 @@
 
 class MobileBookConsumer {
 public:
-    explicit MobileBookConsumer(Config& r_config) :
-    mr_config_(r_config), m_mobile_book_publisher_(mr_config_) {}
+    explicit MobileBookConsumer(Config& r_config, std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_handler) :
+    mr_config_(r_config), m_sp_mongodb_handler_(std::move(mongo_db_handler)), m_mobile_book_publisher_(mr_config_, m_sp_mongodb_handler_) {}
 
-    void process_market_depth(MarketDepthQueueElement &md) {
+    void process_market_depth(const MarketDepthQueueElement &md) {
         m_mobile_book_publisher_.process_market_depth(md);
     }
 
@@ -103,7 +103,7 @@ public:
     }
 
 
-    void go() {
+    void go() const {
     	size_t market_depth_index = 0;
 		size_t last_barter_index = 0;
 
@@ -163,5 +163,6 @@ public:
 	}
 protected:
     Config& mr_config_;
+	std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongodb_handler_;
     MobileBookPublisher m_mobile_book_publisher_;
 };

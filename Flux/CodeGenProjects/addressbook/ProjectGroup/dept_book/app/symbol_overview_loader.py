@@ -1,6 +1,6 @@
 from ProjectGroup.dept_book.app.yahoo_finance_base import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import dashboard_service_http_client
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.Pydentic.dept_book_service_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.dept_book_service_msgspec_model import *
 from FluxPythonUtils.scripts.utility_functions import configure_logger
 
 

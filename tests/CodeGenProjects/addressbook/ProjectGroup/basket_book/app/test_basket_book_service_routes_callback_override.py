@@ -7,7 +7,7 @@ import pytest
 
 # project imports
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import basket_book_web_client
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.Pydentic.basket_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.ORMModel.basket_book_service_model_imports import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.conftest import *
 import timeit
 

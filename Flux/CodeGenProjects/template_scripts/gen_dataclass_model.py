@@ -16,12 +16,12 @@ if __name__ == "__main__":
     env_var_dict["PLUGIN_FILE_NAME"] = "dataclass_model_plugin.py"
     env_var_dict["ModelType"] = "dataclass"
 
-    code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_", "PluginPydentic", env_var_dict)
+    code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_", "PluginORMModel", env_var_dict)
 
     plugin_execute_script = PluginExecuteScript(str(code_gen_engine_env_manager.project_dir), "service.proto")
     plugin_execute_script.execute()
 
-    # moving generated core pydantic model files to their locations
+    # moving generated core ORMModel files to their locations
     root_flux_core_config_yaml_path = code_gen_engine_env_manager.code_gen_root / "flux_core.yaml"
     root_flux_core_config_yaml_dict = (
         YAMLConfigurationManager.load_yaml_configurations(str(root_flux_core_config_yaml_path)))
@@ -35,10 +35,10 @@ if __name__ == "__main__":
     # removing .proto from file_names
     root_core_proto_files = [proto_file.removesuffix(".proto") for proto_file in root_core_proto_files]
 
-    if not os.path.exists(code_gen_engine_env_manager.py_code_gen_core_path / "Pydantic"):
-        os.mkdir(code_gen_engine_env_manager.py_code_gen_core_path / "Pydantic")
+    if not os.path.exists(code_gen_engine_env_manager.py_code_gen_core_path / "ORMModel"):
+        os.mkdir(code_gen_engine_env_manager.py_code_gen_core_path / "ORMModel")
 
     for model_file in os.listdir(code_gen_engine_env_manager.plugin_output_dir):
         if model_file.removesuffix("_dataclass_model.py") in root_core_proto_files:
             shutil.move(code_gen_engine_env_manager.plugin_output_dir / model_file,
-                        code_gen_engine_env_manager.py_code_gen_core_path / "Pydantic" / model_file)
+                        code_gen_engine_env_manager.py_code_gen_core_path / "ORMModel" / model_file)

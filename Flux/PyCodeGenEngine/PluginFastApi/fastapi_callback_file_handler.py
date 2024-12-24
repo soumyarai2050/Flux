@@ -252,7 +252,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                 output_str = (f"    async def delete_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n")
             output_str += "        pass\n\n"
         else:
-            output_str = f"    async def delete_{message_name_snake_cased}_pre(self, pydantic_obj_to_be_deleted: " \
+            output_str = f"    async def delete_{message_name_snake_cased}_pre(self, model_obj_to_be_deleted: " \
                          f"{message.proto.name}):\n"
             output_str += "        pass\n\n"
         output_str += f"    async def delete_{message_name_snake_cased}_post(self, " \
@@ -673,7 +673,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"from {model_file_path} import *\n"
 
         if file and model_file_suffix:
-            project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+            project_grp_root_dir = PurePath(project_dir).parent.parent / "ORMModel"
             dependency_file_path_list = self.get_dependency_file_path_list(
                 file, root_core_proto_files, project_grp_core_proto_files,
                 model_file_suffix, str(project_grp_root_dir))

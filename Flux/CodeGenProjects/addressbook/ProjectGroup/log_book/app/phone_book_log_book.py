@@ -14,8 +14,8 @@ from FluxPythonUtils.log_book.log_book import get_transaction_counts_n_timeout_f
 from FluxPythonUtils.scripts.utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_base_log_book import (
     PhoneBookBaseLogBook, StratLogDetail)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client, get_reset_log_book_cache_wrapper_pattern)
@@ -92,13 +92,13 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             self.portfolio_alert_queue.put("EXIT")
             self.raw_performance_data_queue.put("EXIT")
 
-            for _, queue_ in self.pydantic_type_name_to_patch_queue_cache_dict.items():
+            for _, queue_ in self.model_type_name_to_patch_queue_cache_dict.items():
                 queue_.put("EXIT")
         # else not required: avoiding multiple terminate calls
 
     def _handle_strat_alert_queue_err_handler(self, *args):
         try:
-            strat_alert_obj_list: List[StratAlertBaseModel] = args[0]     # single unprocessed pydantic object is passed
+            strat_alert_obj_list: List[StratAlertBaseModel] = args[0]    # single unprocessed basemodel object is passed
             strat_alert_obj: StratAlertBaseModel
             for strat_alert_obj in strat_alert_obj_list:
                 alert_meta = strat_alert_obj.alert_meta

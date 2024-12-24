@@ -17,7 +17,8 @@ int main(int argc, char *argv[]) {
     }
     std::string config_file = argv[1];
     Config config(config_file); // Use std::string directly
-    mobile_book_consumer = std::make_unique<MobileBookConsumer>(config);
+    std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_handler = std::make_shared<FluxCppCore::MongoDBHandler>(config.m_mongodb_uri_, config.m_db_name_);
+    mobile_book_consumer = std::make_unique<MobileBookConsumer>(config, mongo_db_handler);
     FluxCppCore::BaseWebServer http_server(host, config.m_http_server_port_, *mobile_book_consumer);
     mobile_book_consumer->init_shm();
     std::thread http_server_thread{&FluxCppCore::BaseWebServer::run, &http_server};

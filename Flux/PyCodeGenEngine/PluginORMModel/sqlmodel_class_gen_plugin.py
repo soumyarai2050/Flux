@@ -8,10 +8,10 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginPydentic.cached_pydantic_model_plugin import CachedPydanticModelPlugin, main
+from Flux.PyCodeGenEngine.PluginORMModel.cached_pydantic_model_plugin import CachedORMModelPlugin, main
 
 
-class SQLModelModelPlugin(CachedPydanticModelPlugin):
+class SQLModelModelPlugin(CachedORMModelPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
@@ -89,7 +89,7 @@ class SQLModelModelPlugin(CachedPydanticModelPlugin):
         output_str += "from typing import List\n\n\n"
         return output_str
 
-    def handle_pydantic_class_gen(self, file: protogen.File) -> str:
+    def handle_ORM_class_gen(self, file: protogen.File) -> str:
         self.load_root_and_non_root_messages_in_dicts(file.messages)
         self.sort_message_order()
         self.db_file_name = f"{str(file.proto.name).split('.')[0]}_db.db"

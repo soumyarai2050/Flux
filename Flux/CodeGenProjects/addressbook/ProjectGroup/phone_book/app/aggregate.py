@@ -1,6 +1,6 @@
 import os
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 cum_price_size_aggregate_json = {"aggregate": [

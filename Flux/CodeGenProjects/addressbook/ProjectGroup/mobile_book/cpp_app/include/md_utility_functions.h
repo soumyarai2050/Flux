@@ -1,10 +1,11 @@
 #pragma once
 
 #include "shm_symbol_cache.h"
+#include "utility_functions.h"
 
 namespace mobile_book_handler {
     template<size_t N>
-    inline void format_data(MDContainer<N> const& cache, std::vector<char>& buffer) {
+    inline void format_data(MDContainer<N> const& cache, std::vector<char>& buffer, const bool print_cumulative_fields = false) {
 
         std::format_to(std::back_inserter(buffer), "\n{:*^40}\n\n", std::string_view(cache.symbol_));
         std::format_to(std::back_inserter(buffer), "{:*^40}\n\n", "Last Barter");
@@ -15,8 +16,8 @@ namespace mobile_book_handler {
             cache.last_barter_.px_,
             cache.last_barter_.qty_,
             cache.last_barter_.premium_,
-            cache.last_barter_.exch_time_,
-            cache.last_barter_.arrival_time_);
+            FluxCppCore::time_in_utc_str(cache.last_barter_.exch_time_),
+            FluxCppCore::time_in_utc_str(cache.last_barter_.arrival_time_));
 
         const auto top_bid_qty = (int)cache.top_of_book_.bid_quote_.qty_;
         const auto top_bid_px = (float)cache.top_of_book_.bid_quote_.px_;
@@ -28,32 +29,57 @@ namespace mobile_book_handler {
         const auto last_barter_px = (float)cache.top_of_book_.last_barter_.px_;
 
         std::format_to(std::back_inserter(buffer), "{:*^40}\n\n", "Top of Book");
-        std::format_to(std::back_inserter(buffer), "BID QTY  BID PRICE  ASK QTY  ASK PRICE  LAST QTY  LAST PRICE\n");
-        std::format_to(std::back_inserter(buffer), "{:6}  {:10.3f}  {:6}  {:10.3f}  {:6}  {:10.3f}\n\n",
-            top_bid_qty, top_bid_px, top_ask_qty, top_ask_px, last_barter_qty, last_barter_px);
+        std::format_to(std::back_inserter(buffer), "BID QTY  BID PRICE  ASK QTY  ASK PRICE  LAST QTY  "
+                                                   "LAST PRICE          TIME\n");
+        std::format_to(std::back_inserter(buffer), "{:6}  {:10.3f}  {:6}  {:10.3f}  {:6}  {:10.3f}      {:<14}\n\n",
+            top_bid_qty, top_bid_px, top_ask_qty, top_ask_px, last_barter_qty, last_barter_px,
+            FluxCppCore::time_in_utc_str(cache.top_of_book_.last_update_date_time_));
 
-        constexpr auto md_format_spec = "{:10.3f}                   {:6}                    {:10.3f}                "
+        if (print_cumulative_fields) {
+            constexpr auto md_format_spec = "{:10.3f}                   {:6}                    {:10.3f}                "
                                         "{:6}       {:10.3f}     {:10.3f}  {:6}       {:10.3f}                          "
                                         "{:6}                               {:10.3f}\n";
+            // BUY CUM QTY , BUY CUM px , BUY QTY, BUY PX, SELL PX, SELL QTY, SELL CUM PX, SELL CUM QTY
+            std::format_to(std::back_inserter(buffer), "{:*^40}\n", "Market Depth");
+            std::format_to(std::back_inserter(buffer), "BUY CUMULATIVE NOTIONAL  BUY CUMULATIVE QTY"
+                                                       "  BUY CUMULATIVE AVG PX  BUY QTY    BUY PX          SELL PX  SELL QTY  "
+                                                       "SELL CUMULATIVE NOTIONAL  SELL CUMULATIVE QTY   "
+                                                       "SELL CUMULATIVE AVG PX\n\n");
+           for (size_t i{0}; i < MARKET_DEPTH_LEVEL; ++i) {
+                const auto& bid = cache.bid_market_depths_[i];
+                const auto& ask = cache.ask_market_depths_[i];
+                auto bid_qty = bid.qty_ ;
+                auto bid_px = bid.px_;
 
-        // BUY CUM QTY , BUY CUM px , BUY QTY, BUY PX, SELL PX, SELL QTY, SELL CUM PX, SELL CUM QTY
-        std::format_to(std::back_inserter(buffer), "{:*^40}\n", "Market Depth");
-        std::format_to(std::back_inserter(buffer), "BUY CUMULATIVE NOTIONAL  BUY CUMULATIVE QTY"
-                                                   "  BUY CUMULATIVE AVG PX  BUY QTY    BUY PX          SELL PX  SELL QTY  "
-                                                   "SELL CUMULATIVE NOTIONAL  SELL CUMULATIVE QTY   "
-                                                   "SELL CUMULATIVE AVG PX\n\n");
-       for (size_t i{0}; i < MARKET_DEPTH_LEVEL; ++i) {
-            const auto& bid = cache.bid_market_depths_[i];
-            const auto& ask = cache.ask_market_depths_[i];
-            auto bid_qty = bid.qty_ ;
-            auto bid_px = bid.px_;
+                auto ask_qty = ask.qty_;
+                auto ask_px = ask.px_;
 
-            auto ask_qty = ask.qty_;
-            auto ask_px = ask.px_;
+                std::format_to(std::back_inserter(buffer), md_format_spec,
+                    bid.cumulative_notional_, bid.cumulative_qty_, bid.cumulative_avg_px_, bid_qty, bid_px,
+                    ask_px, ask_qty, ask.cumulative_notional_, ask.cumulative_qty_, ask.cumulative_avg_px_);
+            }
+        } else {
+            constexpr auto md_format_spec = "{:<14}                 {:<14}                 {:6}       {:10.3f}     "
+                                            "{:10.3f}  {:6}         {:<14}                 {:<14}\n";
+            // BUY CUM QTY , BUY CUM px , BUY QTY, BUY PX, SELL PX, SELL QTY, SELL CUM PX, SELL CUM QTY
+            std::format_to(std::back_inserter(buffer), "{:*^40}\n", "Market Depth");
+            std::format_to(std::back_inserter(buffer), "EXCH TS                ARR TS                "
+                                                       "BUY QTY    BUY PX          SELL PX  SELL QTY       "
+                                                       "EXCH TS                    ARR TS\n\n");
+           for (size_t i{0}; i < MARKET_DEPTH_LEVEL; ++i) {
+                const auto& bid = cache.bid_market_depths_[i];
+                const auto& ask = cache.ask_market_depths_[i];
+                auto bid_qty = bid.qty_ ;
+                auto bid_px = bid.px_;
 
-            std::format_to(std::back_inserter(buffer), md_format_spec,
-                bid.cumulative_notional_, bid.cumulative_qty_, bid.cumulative_avg_px_, bid_qty, bid_px,
-                ask_px, ask_qty, ask.cumulative_notional_, ask.cumulative_qty_, ask.cumulative_avg_px_);
+                auto ask_qty = ask.qty_;
+                auto ask_px = ask.px_;
+
+                std::format_to(std::back_inserter(buffer), md_format_spec,
+                    FluxCppCore::time_in_utc_str(bid.exch_time_),
+                    FluxCppCore::time_in_utc_str(bid.arrival_time_), bid_qty, bid_px, ask_px, ask_qty,
+                    FluxCppCore::time_in_utc_str(ask.exch_time_), FluxCppCore::time_in_utc_str(ask.arrival_time_));
+            }
         }
 
     }

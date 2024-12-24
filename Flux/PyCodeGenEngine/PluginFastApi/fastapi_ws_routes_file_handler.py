@@ -21,13 +21,13 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.shared_lock_name_to_pydentic_class_dict: Dict[str, List[protogen.Message]] = {}
+        self.shared_lock_name_to_model_class_dict: Dict[str, List[protogen.Message]] = {}
         self.shared_lock_name_message_list: List[protogen.Message] = []
         self.message_to_link_messages_dict: Dict[protogen.Message, List[protogen.Message]] = {}
 
     def _get_list_of_shared_lock_for_message(self, message: protogen.Message) -> List[str]:
         shared_lock_name_list = []
-        for shared_lock_name, message_list in self.shared_lock_name_to_pydentic_class_dict.items():
+        for shared_lock_name, message_list in self.shared_lock_name_to_model_class_dict.items():
             if message in message_list:
                 shared_lock_name_list.append(shared_lock_name)
         return shared_lock_name_list
@@ -559,7 +559,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def handle_ws_routes_file_gen(self) -> str:
         # running pre-requisite method to set shared lock option info
         self._get_messages_having_links()
-        self._set_shared_lock_name_to_pydentic_class_dict()
+        self._set_shared_lock_name_to_model_class_dict()
 
         base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
         output_str = f"from {base_routes_file_path} import *\n\n"
@@ -569,7 +569,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def handle_ws_msgspec_routes_file_gen(self) -> str:
         # running pre-requisite method to set shared lock option info
         self._get_messages_having_links()
-        self._set_shared_lock_name_to_pydentic_class_dict()
+        self._set_shared_lock_name_to_model_class_dict()
 
         base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
         output_str = f"from {base_routes_file_path} import *\n\n"

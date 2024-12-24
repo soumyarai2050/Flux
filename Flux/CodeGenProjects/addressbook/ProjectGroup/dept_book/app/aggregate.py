@@ -3,7 +3,7 @@ from typing import List, Dict
 
 # below import is required in routes
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.Pydentic.dept_book_service_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.dept_book_service_msgspec_model import *
 
 
 def get_dict_list_for_bar_meta_data_match(symbol: str, exch_id: str, bar_type: BarType) -> List[Dict[str, Any]]:
@@ -20,8 +20,8 @@ def get_dict_list_for_bar_meta_data_match(symbol: str, exch_id: str, bar_type: B
     ]
 
 def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, bar_type: BarType,
-                                                   start_date_time: DateTime | None = None,
-                                                   end_date_time: DateTime | None = None,
+                                                   start_date_time: int | None = None,
+                                                   end_date_time: int | None = None,
                                                    id_list: List[int] | None = None):
     # Code generated function
     agg_pipeline = [
@@ -107,8 +107,8 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, ba
 
 
 def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(
-        symbol: str, exch_id: str, bar_type: BarType, start_date_time: DateTime | None = None,
-        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+        symbol: str, exch_id: str, bar_type: BarType, start_date_time: int | None = None,
+        end_date_time: int | None = None, id_list: List[int] | None = None):
     # Code generated function
     agg_pipeline = [
         {
@@ -194,8 +194,8 @@ def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(
 
 
 def get_vwap_change_projection_from_bar_data_agg_pipeline(
-        symbol: str, exch_id: str, bar_type: BarType, start_date_time: DateTime | None = None,
-        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+        symbol: str, exch_id: str, bar_type: BarType, start_date_time: int | None = None,
+        end_date_time: int | None = None, id_list: List[int] | None = None):
     # Code generated function
     agg_pipeline = [
         {
@@ -280,8 +280,8 @@ def get_vwap_change_projection_from_bar_data_agg_pipeline(
 
 
 def get_premium_projection_from_bar_data_agg_pipeline(
-        symbol: str, exch_id: str, bar_type: BarType, start_date_time: DateTime | None = None,
-        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+        symbol: str, exch_id: str, bar_type: BarType, start_date_time: int | None = None,
+        end_date_time: int | None = None, id_list: List[int] | None = None):
     # shift this function to aggregate.py file of project and remove this comment afterward
     agg_pipeline = [
         {
@@ -366,8 +366,8 @@ def get_premium_projection_from_bar_data_agg_pipeline(
 
 
 def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(
-        symbol: str, exch_id: str, bar_type: BarType, start_date_time: DateTime | None = None,
-        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+        symbol: str, exch_id: str, bar_type: BarType, start_date_time: int | None = None,
+        end_date_time: int | None = None, id_list: List[int] | None = None):
     # shift this function to aggregate.py file of project and remove this comment afterward
     agg_pipeline = [
         {
@@ -453,8 +453,8 @@ def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(
 
 
 def get_premium_change_projection_from_bar_data_agg_pipeline(
-        symbol: str, exch_id: str, bar_type: BarType, start_date_time: DateTime | None = None,
-        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
+        symbol: str, exch_id: str, bar_type: BarType, start_date_time: int | None = None,
+        end_date_time: int | None = None, id_list: List[int] | None = None):
     # shift this function to aggregate.py file of project and remove this comment afterward
     agg_pipeline = [
         {

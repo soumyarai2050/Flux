@@ -24,4 +24,30 @@ namespace FluxCppCore {
         return config["market_depth_levels"].as<int8_t>();
     }
 
+    inline auto get_timespec_utc_as_str(const std::timespec &ts) {
+        char buffer[32];
+        auto n = std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%T", std::gmtime(&ts.tv_sec));
+        return std::format("{}.{:0<6}{}", std::string_view(buffer, n), ts.tv_nsec/1000, "+00:00");
+    }
+
+    inline auto exch_time_to_timespec_utc(const unsigned long fht) {
+        double d = 0.0;
+        double fraction = std::modf(fht / 1000000000.0, &d);
+        std::timespec ts{static_cast<long int>(d), static_cast<long>(fraction * 1'000'000'000)};
+        return ts;
+    }
+
+    inline auto exch_time_to_str(const unsigned long fht) {
+        return get_timespec_utc_as_str(exch_time_to_timespec_utc(fht));
+    }
+
+    inline auto time_in_utc_str(unsigned long fht) {
+        double d = 0.0;
+        double fraction = std::modf(fht / 1000.0, &d);
+        std::timespec ts{static_cast<long int>(d), static_cast<long>(fraction * 1'000'000'000)};
+        char buffer[32];
+        auto n = std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%T", std::gmtime(&ts.tv_sec));
+         return std::format("{}.{:0<3}", std::string_view(buffer, n), ts.tv_nsec/1000000);
+    }
+
 }

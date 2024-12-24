@@ -5,7 +5,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.StreetB
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_base_strat_cache import \
     EmailBookServiceBaseStratCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import BaseStratCache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.Pydentic.basket_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.ORMModel.basket_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.StreetBook.basket_book_service_key_handler import BasketBookServiceKeyHandler
 
 
@@ -44,10 +44,3 @@ class BasketCache(BaseStratCache, BasketBookServiceBaseStratCache, EmailBookServ
         self.handle_set_chore_snapshot(chore_snapshot, overfill_log_str)
         return _chore_snapshots_update_date_time  # ignore - helps with debug
 
-    def set_symbol_overview(self, symbol_overview_: SymbolOverviewBaseModel | SymbolOverview):
-        symbol_overview = self.handle_set_symbol_overview_in_symbol_cache(symbol_overview_)
-        return symbol_overview.last_update_date_time
-
-    def set_top_of_book(self, top_of_book: TopOfBookBaseModel | TopOfBook) -> DateTime | None:
-        tob = self.handle_set_top_of_book(top_of_book)
-        return tob.last_update_date_time

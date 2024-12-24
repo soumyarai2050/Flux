@@ -31,21 +31,21 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
     def handle_POST_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = (" "*4 + f"def create_{message_name_snake_cased}_client(self, pydantic_obj: "
+        output_str = (" "*4 + f"def create_{message_name_snake_cased}_client(self, model_obj: "
                       f"{message_name}BaseModel, return_obj_copy: bool | None = True) -> "
                       f"{message_name}BaseModel | bool:\n")
         output_str += " "*8 + f"return generic_http_post_client(self.create_{message_name_snake_cased}_client_url, " \
-                      f"pydantic_obj, {message_name}BaseModel, return_obj_copy)"
+                      f"model_obj, {message_name}BaseModel, return_obj_copy)"
         return output_str
 
     def handle_POST_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = (" "*4 + f"def create_all_{message_name_snake_cased}_client(self, pydantic_obj_list: "
+        output_str = (" "*4 + f"def create_all_{message_name_snake_cased}_client(self, model_obj_list: "
                       f"List[{message_name}BaseModel], return_obj_copy: bool | None = True"
                       f") -> List[{message_name}BaseModel] | bool:\n")
         output_str += " "*8 + f"return generic_http_post_all_client(self.create_all_{message_name_snake_cased}_client_url, " \
-                      f"pydantic_obj_list, {message_name}BaseModel, return_obj_copy)"
+                      f"model_obj_list, {message_name}BaseModel, return_obj_copy)"
         return output_str
 
     def handle_GET_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
@@ -60,39 +60,39 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
     def handle_PUT_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = (" "*4 + f"def put_{message_name_snake_cased}_client(self, pydantic_obj: "
+        output_str = (" "*4 + f"def put_{message_name_snake_cased}_client(self, model_obj: "
                       f"{message_name}BaseModel, return_obj_copy: bool | None = True"
                       f") -> {message_name}BaseModel | bool:\n")
         output_str += " "*4 + f"    return generic_http_put_client(self.put_{message_name_snake_cased}_client_url, " \
-                      f"pydantic_obj, {message_name}BaseModel, return_obj_copy)"
+                      f"model_obj, {message_name}BaseModel, return_obj_copy)"
         return output_str
 
     def handle_PUT_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = (" "*4 + f"def put_all_{message_name_snake_cased}_client(self, pydantic_obj: "
+        output_str = (" "*4 + f"def put_all_{message_name_snake_cased}_client(self, model_obj: "
                       f"List[{message_name}BaseModel], return_obj_copy: bool | None = True"
                       f") -> List[{message_name}BaseModel] | bool:\n")
         output_str += " "*4 + f"    return generic_http_put_all_client(self.put_all_{message_name_snake_cased}_client_url," \
-                      f" pydantic_obj, {message_name}BaseModel, return_obj_copy)"
+                      f" model_obj, {message_name}BaseModel, return_obj_copy)"
         return output_str
 
     def handle_PATCH_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = " "*4 + f"def patch_{message_name_snake_cased}_client(self, pydantic_obj_json: " \
+        output_str = " "*4 + f"def patch_{message_name_snake_cased}_client(self, model_obj_json: " \
                      f"Dict, return_obj_copy: bool | None = True) -> {message_name}BaseModel | bool:\n"
         output_str += " "*4 + f"    return generic_http_patch_client(self.patch_{message_name_snake_cased}" \
-                      f"_client_url, pydantic_obj_json, {message_name}BaseModel, return_obj_copy)"
+                      f"_client_url, model_obj_json, {message_name}BaseModel, return_obj_copy)"
         return output_str
 
     def handle_PATCH_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = " "*4 + f"def patch_all_{message_name_snake_cased}_client(self, pydantic_obj_json_list: " \
+        output_str = " "*4 + f"def patch_all_{message_name_snake_cased}_client(self, model_obj_json_list: " \
                      f"List[Dict], return_obj_copy: bool | None = True) -> List[{message_name}BaseModel] | bool:\n"
         output_str += " "*4 + f"    return generic_http_patch_all_client(self.patch_all_{message_name_snake_cased}" \
-                      f"_client_url, pydantic_obj_json_list, {message_name}BaseModel, return_obj_copy)"
+                      f"_client_url, model_obj_json_list, {message_name}BaseModel, return_obj_copy)"
         return output_str
 
     def handle_DELETE_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
@@ -140,7 +140,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         output_str = f"from {model_file_path} import *\n"
 
         if file is not None and model_file_suffix is not None:
-            project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+            project_grp_root_dir = PurePath(project_dir).parent.parent / "ORMModel"
             dependency_file_path_list = self.get_dependency_file_path_list(
                 file, root_core_proto_files, project_grp_core_proto_files,
                 model_file_suffix, str(project_grp_root_dir))

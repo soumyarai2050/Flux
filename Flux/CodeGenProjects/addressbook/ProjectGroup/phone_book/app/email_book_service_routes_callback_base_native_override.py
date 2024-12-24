@@ -16,8 +16,8 @@ from fastapi import UploadFile
 from pymongo import MongoClient
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import (
     SymbolOverviewBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_routes_msgspec_callback import (
     EmailBookServiceRoutesCallback)
@@ -30,10 +30,10 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     get_reset_log_book_cache_wrapper_pattern,
     pair_strat_client_call_log_str, UpdateType,
     get_matching_strat_from_symbol_n_side)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key, get_pair_strat_dict_log_key
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key, get_pair_strat_dict_log_key, pair_strat_id_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
     get_ongoing_pair_strat_filter, get_all_pair_strat_from_symbol_n_side, get_ongoing_or_all_pair_strats_by_sec_id)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
     StratViewBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
@@ -1057,9 +1057,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
         updated_pair_strat_obj_dict["last_active_date_time"] = DateTime.utcnow()
 
-        updated_pydantic_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_pair_strat_obj.to_dict()),
-                                                         updated_pair_strat_obj_dict)
-        updated_pair_strat_obj = PairStrat.from_dict(updated_pydantic_obj_dict)
+        updated_strat_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_pair_strat_obj.to_dict()),
+                                                      updated_pair_strat_obj_dict)
+        updated_pair_strat_obj = PairStrat.from_dict(updated_strat_obj_dict)
         res = await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
         if not res:
             sec_id: str = stored_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id
@@ -1153,11 +1153,11 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                 strat_state = pair_strat_.get("strat_state")
                 _id = pair_strat_.get("_id")
                 if strat_state == StratState.StratState_ACTIVE:
-                    # update_pair_strat = PairStratBaseModel(_id=_id, strat_state=StratState.StratState_PAUSED)
                     update_pair_strat = {"_id": _id, "strat_state": StratState.StratState_PAUSED}
                     updated_pair_strats_list.append(update_pair_strat)
 
             if updated_pair_strats_list:
+                logging.warning("Pausing all strats")
                 (await EmailBookServiceRoutesCallbackBaseNativeOverride.
                  underlying_partial_update_all_pair_strat_http(updated_pair_strats_list, return_obj_copy=False))
         return []
@@ -1380,6 +1380,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
             # Removing StratView for this strat
             photo_book_service_http_client.delete_strat_view_client(pair_strat_to_be_deleted)
+
+            # removing log key cache value form pair_strat_id_key cache
+            pair_strat_id_key.pop(pair_strat_to_be_deleted.id, None)
 
         else:
             err_str_ = ("Unexpected: Strat is not found in loaded or buffer list, ignoring this strat delete, "

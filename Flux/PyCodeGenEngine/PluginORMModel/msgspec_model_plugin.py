@@ -10,7 +10,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginPydentic.dataclass_model_plugin import DataclassModelPlugin, main, IdType
+from Flux.PyCodeGenEngine.PluginORMModel.dataclass_model_plugin import DataclassModelPlugin, main, IdType
 from FluxPythonUtils.scripts.utility_functions import (
     convert_to_capitalized_camel_case, convert_camel_case_to_specific_case)
 
@@ -136,14 +136,14 @@ class MsgspecModelPlugin(DataclassModelPlugin):
             else:
                 auto_gen_id = IdType.NO_ID
         # else not required: if msg is non-root and if int id field doesn't exist in message then using default
-        # PydanticObjectId id implementation
+        # ObjectId id implementation
         return auto_gen_id
 
-    def _handle_pydantic_class_declaration(self, message: protogen.Message) -> Tuple[str, bool, IdType]:
+    def _handle_ORM_class_declaration(self, message: protogen.Message) -> Tuple[str, bool, IdType]:
         # auto_gen_id=INT_ID: If int type id field is present in message then adding int autoincrement impl
         # auto_gen_id=STR_ID: If str type id field is present in message then adding unique str impl
         # auto_gen_id=DEFAULT: If id field doesn't exist but msg is root type using default
-        #                    PydanticObjectId id implementation
+        #                    ObjectId id implementation
         # auto_gen_id=NO_ID: If id field doesn't exist and msg is non-root type then avoiding any id handling
         auto_gen_id_type: IdType = self._check_id_int_field(message)
 
@@ -373,7 +373,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
                                                         alias_name_dict=alias_name_dict)
         output_str += "\n\n"
 
-        # Adding other versions for root pydantic class
+        # Adding other versions for root model class
         output_str += self.handle_dummy_message_gen(message, auto_gen_id_type, alias_name_dict=alias_name_dict)
 
         # handling projections
@@ -439,7 +439,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         return output_str
 
     def handle_message_output(self, message: protogen.Message) -> str:
-        output_str, is_msg_root, auto_gen_id_type = self._handle_pydantic_class_declaration(message)
+        output_str, is_msg_root, auto_gen_id_type = self._handle_ORM_class_declaration(message)
 
         output_str += self._handle_class_docstring(message)
         output_str += self._handle_reentrant_lock(message)

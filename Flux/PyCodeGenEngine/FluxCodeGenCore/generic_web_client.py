@@ -35,57 +35,57 @@ else:
         raise Exception(err_str)
 
 @log_n_except
-def generic_http_get_all_client(url: str, pydantic_type, limit_obj_count: int | None = None):
+def generic_http_get_all_client(url: str, model_type, limit_obj_count: int | None = None):
     params = None
     if limit_obj_count:
         params = {"limit_obj_count": limit_obj_count}
     response: requests.Response = requests.get(url, timeout=120, params=params)     # TIMEOUT for get-all set to 60 sec
-    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
+    return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 
 
 @log_n_except
-def generic_http_post_client(url: str, pydantic_obj, pydantic_type, return_copy_obj: bool | None = True):
+def generic_http_post_client(url: str, model_obj, model_type, return_copy_obj: bool | None = True):
     # When used for routes
-    if pydantic_obj is not None:
+    if model_obj is not None:
         # create don't need to delete any field: model default should handle that,
         # so: exclude_unset=True, exclude_none=True
-        json_data = generic_encoder(pydantic_obj, pydantic_type.enc_hook, by_alias=True, exclude_none=True)
+        json_data = generic_encoder(model_obj, model_type.enc_hook, by_alias=True, exclude_none=True)
 
-    # When used for queries like get last date query, as there is no pydantic obj in case of query
+    # When used for queries like get last date query, as there is no model obj in case of query
     else:
         json_data = None
     response: requests.Response = requests.post(url, json=json_data, params={"return_obj_copy": return_copy_obj})
-    return http_response_as_class_type(url, response, 201, pydantic_type, HTTPRequestType.POST)
+    return http_response_as_class_type(url, response, 201, model_type, HTTPRequestType.POST)
 
 
 @log_n_except
 def generic_http_file_query_client(url: str, file_path: str | PurePath, query_params_dict: Dict[str, Any],
-                                   pydantic_type):
+                                   model_type):
     # When used for routes
     if os.path.exists(file_path):
         with open(file_path, "rb") as file:
             files = {"upload_file": (str(file_path), file, "multipart/form-data")}
             response: requests.Response = requests.post(url, files=files, params=query_params_dict)
-            return http_response_as_class_type(url, response, 201, pydantic_type, HTTPRequestType.POST)
+            return http_response_as_class_type(url, response, 201, model_type, HTTPRequestType.POST)
     else:
         raise ClientError(f"Can't find file path: {file_path}")
 
 
 @log_n_except
-def generic_http_post_all_client(url: str, pydantic_obj_list, pydantic_type, return_copy_obj: bool | None = True):
+def generic_http_post_all_client(url: str, model_obj_list, model_type, return_copy_obj: bool | None = True):
     # When used for routes
-    if pydantic_obj_list is not None:
-        json_data = generic_encoder(pydantic_obj_list, pydantic_type.enc_hook, by_alias=True, exclude_none=True)
+    if model_obj_list is not None:
+        json_data = generic_encoder(model_obj_list, model_type.enc_hook, by_alias=True, exclude_none=True)
 
-    # When used for queries like get last date query, as there is no pydantic obj in case of query
+    # When used for queries like get last date query, as there is no model obj in case of query
     else:
         json_data = None
     response: requests.Response = requests.post(url, json=json_data, params={"return_obj_copy": return_copy_obj})
-    return http_response_as_class_type(url, response, 201, pydantic_type, HTTPRequestType.POST)
+    return http_response_as_class_type(url, response, 201, model_type, HTTPRequestType.POST)
 
 
 @log_n_except
-def generic_http_get_client(url: str, query_param: Any, pydantic_type):
+def generic_http_get_client(url: str, query_param: Any, model_type):
     # When used for routes
     if query_param is not None:
         if url.endswith("/"):
@@ -95,47 +95,47 @@ def generic_http_get_client(url: str, query_param: Any, pydantic_type):
 
     # else not required: When used for queries, like get last date query, there is no query_param in case of query
     response: requests.Response = requests.get(url)
-    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
+    return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 
 
 @log_n_except
-def generic_http_put_client(url: str, pydantic_obj, pydantic_type, return_copy_obj: bool | None = True):
-    if pydantic_obj is not None:
+def generic_http_put_client(url: str, model_obj, model_type, return_copy_obj: bool | None = True):
+    if model_obj is not None:
         # When used for routes
-        json_data = generic_encoder(pydantic_obj, pydantic_type.enc_hook, by_alias=True)
+        json_data = generic_encoder(model_obj, model_type.enc_hook, by_alias=True)
     else:
-        # When used for queries like get last date query, as there is no pydantic obj in case of query
+        # When used for queries like get last date query, as there is no model obj in case of query
         json_data = None
     response: requests.Response = requests.put(url, json=json_data, params={"return_obj_copy": return_copy_obj})
-    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PUT)
+    return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.PUT)
 
 
 @log_n_except
-def generic_http_put_all_client(url: str, pydantic_obj_list, pydantic_type, return_copy_obj: bool | None = True):
-    if pydantic_obj_list is not None:
+def generic_http_put_all_client(url: str, model_obj_list, model_type, return_copy_obj: bool | None = True):
+    if model_obj_list is not None:
         # When used for routes
-        json_data = generic_encoder(pydantic_obj_list, pydantic_type.enc_hook, by_alias=True)
+        json_data = generic_encoder(model_obj_list, model_type.enc_hook, by_alias=True)
     else:
-        # When used for queries like get last date query, as there is no pydantic obj in case of query
+        # When used for queries like get last date query, as there is no model obj in case of query
         json_data = None
     response: requests.Response = requests.put(url, json=json_data, params={"return_obj_copy": return_copy_obj})
-    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PUT)
+    return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.PUT)
 
 
 @log_n_except
-def generic_http_patch_client(url: str, pydantic_obj_json, pydantic_type, return_copy_obj: bool | None = True):
-    pydantic_obj_json = generic_encoder(pydantic_obj_json, pydantic_type.enc_hook, by_alias=True)
-    response: requests.Response = requests.patch(url, json=pydantic_obj_json,
+def generic_http_patch_client(url: str, model_obj_json, model_type, return_copy_obj: bool | None = True):
+    model_obj_json = generic_encoder(model_obj_json, model_type.enc_hook, by_alias=True)
+    response: requests.Response = requests.patch(url, json=model_obj_json,
                                                  params={"return_obj_copy": return_copy_obj})
-    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PATCH)
+    return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.PATCH)
 
 
 @log_n_except
-def generic_http_patch_all_client(url: str, pydantic_obj_json_list, pydantic_type, return_copy_obj: bool | None = True):
-    pydantic_obj_json_list = generic_encoder(pydantic_obj_json_list, pydantic_type.enc_hook, by_alias=True)
-    response: requests.Response = requests.patch(url, json=pydantic_obj_json_list,
+def generic_http_patch_all_client(url: str, model_obj_json_list, model_type, return_copy_obj: bool | None = True):
+    model_obj_json_list = generic_encoder(model_obj_json_list, model_type.enc_hook, by_alias=True)
+    response: requests.Response = requests.patch(url, json=model_obj_json_list,
                                                  params={"return_obj_copy": return_copy_obj})
-    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PATCH)
+    return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.PATCH)
 
 
 @log_n_except
@@ -159,7 +159,7 @@ def generic_http_delete_all_client(url: str, return_copy_obj: bool | None = True
     return response_json
 
 
-async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Callable, query_args: Dict | None = None):
+async def generic_ws_get_all_client(url: str, model_type, user_callback: Callable, query_args: Dict | None = None):
 
     if query_args:
         url = url + "?" + urllib.parse.urlencode(query_args)
@@ -188,18 +188,17 @@ async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Call
                 break
             if data is not None:
                 data = json.loads(data)
-                pydantic_obj_list: List[pydantic_type] = pydantic_type.from_dict_list(data)
-                user_callback(pydantic_obj_list)
+                model_obj_list: List[model_type] = model_type.from_dict_list(data)
+                user_callback(model_obj_list)
                 data = None
                 try:
-                    for pydantic_obj in pydantic_obj_list:
-                        # print(pydantic_obj)
-                        logging.debug(pydantic_obj)
+                    for model_obj in model_obj_list:
+                        logging.debug(model_obj)
                 except KeyError:
                     continue
 
 
-async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_callback: Callable):
+async def generic_ws_get_client(url: str, query_param: Any, model_type, user_callback: Callable):
     if query_param is not None:
         if url.endswith("/"):
             url = f"{url}{query_param}"
@@ -232,39 +231,38 @@ async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_
                 break
             if data is not None:
                 data = json.loads(data)
-                pydantic_type_obj = pydantic_type(**data)
-                user_callback(pydantic_type_obj)
+                model_type_obj = model_type(**data)
+                user_callback(model_type_obj)
                 data = None
                 try:
-                    # print('\n', "Update: ", pydantic_type_obj)
-                    logging.debug(f"Update: {pydantic_type_obj}")
+                    logging.debug(f"Update: {model_type_obj}")
                 except KeyError:
                     continue
 
 @log_n_except
-def generic_http_index_client(url: str, query_params: List[Any], pydantic_type):
+def generic_http_index_client(url: str, query_params: List[Any], model_type):
     query_params = "/".join(query_params)
     if url.endswith("/"):
         url = f"{url}{query_params}"
     else:
         url = f"{url}/{query_params}"
     response: requests.Response = requests.get(url)
-    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
+    return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 
 
 @log_n_except
-def generic_http_get_query_client(url: str, query_params_dict: Dict[str, Any], pydantic_type):
+def generic_http_get_query_client(url: str, query_params_dict: Dict[str, Any], model_type):
     response: requests.Response = requests.get(url, params=query_params_dict)
-    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
+    return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 
 
 @log_n_except
-def generic_http_patch_query_client(url: str, query_payload_dict: Dict[str, Any], pydantic_type):
+def generic_http_patch_query_client(url: str, query_payload_dict: Dict[str, Any], model_type):
     response: requests.Response = requests.patch(url, json=query_payload_dict)
-    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PATCH)
+    return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.PATCH)
 
 
 @log_n_except
-def generic_http_post_query_client(url: str, query_payload_dict: Dict[str, Any], pydantic_type):
+def generic_http_post_query_client(url: str, query_payload_dict: Dict[str, Any], model_type):
     response: requests.Response = requests.post(url, json=query_payload_dict)
-    return http_response_as_class_type(url, response, 201, pydantic_type, HTTPRequestType.POST)
+    return http_response_as_class_type(url, response, 201, model_type, HTTPRequestType.POST)

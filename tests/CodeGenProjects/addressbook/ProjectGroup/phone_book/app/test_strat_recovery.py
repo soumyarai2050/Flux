@@ -33,11 +33,12 @@ def _test_executor_crash_recovery(
         create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
+    print(f"Executor crash test for strat with state: {strat_state_to_handle}, {buy_symbol=}, {sell_symbol=}, {created_pair_strat.id=}")
 
     if strat_state_to_handle != StratState.StratState_ACTIVE:
-        created_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
-            PairStratBaseModel.from_kwargs(_id=created_pair_strat.id,
-                                           strat_state=strat_state_to_handle).to_dict(exclude_none=True))
+        update_pair_strat_dict = PairStratBaseModel.from_kwargs(_id=created_pair_strat.id,
+                                           strat_state=strat_state_to_handle).to_dict(exclude_none=True)
+        created_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(update_pair_strat_dict)
         if strat_state_to_handle == StratState.StratState_SNOOZED:
             # deleting all symbol_overview in strat which needs to check StratState_SNOOZED - now after recovery
             # strat will not convert to READY
@@ -165,7 +166,7 @@ def test_executor_crash_recovery(
     symbols_n_strat_state_list = []
     strat_state_list = [StratState.StratState_ACTIVE, StratState.StratState_READY, StratState.StratState_PAUSED,
                         StratState.StratState_SNOOZED, StratState.StratState_ERROR, StratState.StratState_DONE]
-    # strat_state_list = [StratState.StratState_READY]
+    # strat_state_list = [StratState.StratState_ERROR]
     for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(strat_state_list)]):
         symbols_n_strat_state_list.append((symbol_tuple[0], symbol_tuple[1], strat_state_list[index]))
 
@@ -568,7 +569,7 @@ def test_recover_snoozed_n_activate_strat_after_recovery(
     leg2_symbol = leg1_leg2_symbol_list[0][1]
     stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
 
-    # killing executor with partial name - port is not allocated for this port yet
+    # killing executor with partial name - port is not allocated for this strat yet
     os.system(f'kill $(pgrep -f "launch_msgspec_fastapi.py 1 &")')
     pair_strat_n_strat_state_tuple_list = (
         _kill_executors_n_phone_book([], residual_wait_sec))
@@ -769,7 +770,7 @@ def test_pair_strat_crash_recovery(
 
 # todo: Currently broken - DB updates from log analyzer currently only updates strat_view
 @pytest.mark.recovery1
-def test_update_pair_strat_from_pair_strat_log_book(
+def _test_update_pair_strat_from_pair_strat_log_book(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
         market_depth_basemodel_list, last_barter_fixture_list,

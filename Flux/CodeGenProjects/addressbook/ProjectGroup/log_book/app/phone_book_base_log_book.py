@@ -17,7 +17,7 @@ from FluxPythonUtils.scripts.utility_functions import get_last_log_line_date_tim
 from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_book import AppLogBook
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client, is_ongoing_strat, Side, UpdateType)
@@ -48,7 +48,7 @@ class StratLogDetail(LogDetail, kw_only=True):
 
 class PairStratDbUpdateDataContainer(msgspec.Struct):
     method_name: str
-    pydantic_basemodel_type: str
+    basemodel_type: str
     kwargs: Dict[str, Any]
     update_type: UpdateType | None = None
 
@@ -85,7 +85,7 @@ class PhoneBookBaseLogBook(AppLogBook):
         self.pair_strat_api_ops_queue: Queue = Queue()
         self.raw_performance_data_queue: queue.Queue = queue.Queue()
         self.port_to_executor_web_client: Dict[int, StreetBookServiceHttpClient] = {}
-        self.pydantic_type_name_to_patch_queue_cache_dict: Dict[str, Queue] = {}
+        self.model_type_name_to_patch_queue_cache_dict: Dict[str, Queue] = {}
         self.phone_book_snapshot_type_update_cache_dict: Dict[str, Queue] = {}
         self.field_sep = get_field_seperator_pattern()
         self.key_val_sep = get_key_val_seperator_pattern()
@@ -126,7 +126,7 @@ class PhoneBookBaseLogBook(AppLogBook):
             self._handle_portfolio_alert_query_call_from_alert_queue_handler,
             self._handle_portfolio_alert_queue_err_handler)
 
-    def handle_raw_performance_data_queue_err_handler(self, pydantic_obj_list):
+    def handle_raw_performance_data_queue_err_handler(self, model_obj_list):
         pass
 
     def _handle_raw_performance_data_queue(self):
@@ -188,25 +188,25 @@ class PhoneBookBaseLogBook(AppLogBook):
 
             try:
                 method_name = pair_strat_api_ops_data.method_name
-                pydantic_basemodel_type = pair_strat_api_ops_data.pydantic_basemodel_type
+                model_basemodel_type = pair_strat_api_ops_data.basemodel_type
                 kwargs = pair_strat_api_ops_data.kwargs
                 callback_method: Callable = getattr(email_book_service_http_client, method_name)
 
                 while 1:
                     try:
-                        if pydantic_basemodel_type != "None":
+                        if model_basemodel_type != "None":
                             # API operations other than update
-                            pydantic_basemodel_class_type: Type[MsgspecModel] = eval(pydantic_basemodel_type)
+                            basemodel_class_type: Type[MsgspecModel] = eval(model_basemodel_type)
 
                             if isinstance(kwargs, list):  # put_all or post_all
-                                pydantic_obj_list = []
+                                model_obj_list = []
                                 for kwarg in kwargs:
-                                    pydantic_object = pydantic_basemodel_class_type.from_dict(kwarg)
-                                    pydantic_obj_list.append(pydantic_object)
-                                callback_method(pydantic_obj_list)
+                                    model_object = basemodel_class_type.from_dict(kwarg)
+                                    model_obj_list.append(model_object)
+                                callback_method(model_obj_list)
                             else:
-                                pydantic_object = pydantic_basemodel_class_type.from_dict(kwargs)
-                                callback_method(pydantic_object)
+                                model_object = basemodel_class_type.from_dict(kwargs)
+                                callback_method(model_object)
                         else:
                             # query handling
                             callback_method(**kwargs)
@@ -214,7 +214,7 @@ class PhoneBookBaseLogBook(AppLogBook):
                     except Exception as e:
                         if not should_retry_due_to_server_down(e):
                             alert_brief: str = f"{method_name} failed in pair_strat log analyzer"
-                            alert_details: str = f"{pydantic_basemodel_type=}, exception: {e}"
+                            alert_details: str = f"{model_basemodel_type=}, exception: {e}"
                             logging.exception(f"{alert_brief}{PhoneBookBaseLogBook.log_seperator} "
                                               f"{alert_details}")
                             alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
@@ -234,10 +234,10 @@ class PhoneBookBaseLogBook(AppLogBook):
                 self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
                                            alert_meta=alert_meta)
 
-    def _snapshot_type_callable_err_handler(self, pydantic_basemodel_class_type: Type[BaseModel], kwargs):
+    def _snapshot_type_callable_err_handler(self, model_basemodel_class_type: Type[BaseModel], kwargs):
         err_str_brief = ("Can't find _id key in patch kwargs dict - ignoring this update in "
                          "get_update_obj_for_snapshot_type_update, "
-                         f"pydantic_basemodel_class_type: {pydantic_basemodel_class_type.__name__}, "
+                         f"model_basemodel_class_type: {model_basemodel_class_type.__name__}, "
                          f"{kwargs=}")
         logging.exception(f"{err_str_brief}")
         alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
@@ -245,10 +245,10 @@ class PhoneBookBaseLogBook(AppLogBook):
         self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
                                    alert_meta=alert_meta)
 
-    def dynamic_queue_handler_err_handler(self, pydantic_basemodel_type: str, update_type: UpdateType,
+    def dynamic_queue_handler_err_handler(self, basemodel_type: str, update_type: UpdateType,
                                           err_str_: Exception):
-        err_str_brief = (f"handle_dynamic_queue_for_patch running for pydantic_basemodel_type: "
-                         f"{pydantic_basemodel_type} and update_type: {update_type} failed")
+        err_str_brief = (f"handle_dynamic_queue_for_patch running for basemodel_type: "
+                         f"{basemodel_type} and update_type: {update_type} failed")
         err_str_detail = f"exception: {err_str_}"
         logging.exception(f"{err_str_brief}{PhoneBookBaseLogBook.log_seperator} "
                           f"{err_str_detail}")
@@ -259,19 +259,20 @@ class PhoneBookBaseLogBook(AppLogBook):
                                    alert_meta=alert_meta)
 
     def _get_update_obj_list_for_journal_type_update(
-            self, pydantic_basemodel_class_type: Type[BaseModel], update_type: str, method_name: str,
-            patch_queue: Queue, max_fetch_from_queue: int, parse_to_pydantic: bool | None = None):
+            self, basemodel_class_type: Type[BaseModel], update_type: str, method_name: str,
+            patch_queue: Queue, max_fetch_from_queue: int, update_json_list: List[MsgspecModel | Dict],
+            parse_to_model: bool | None = None):
         # blocking function
         update_json_list = get_update_obj_list_for_journal_type_update(
-            pydantic_basemodel_class_type, update_type, method_name, patch_queue,
-            max_fetch_from_queue, parse_to_pydantic)
+            basemodel_class_type, update_type, method_name, patch_queue,
+            max_fetch_from_queue, update_json_list, parse_to_model=parse_to_model)
 
         # handling interrupt
         if update_json_list == "EXIT":
             return "EXIT"
 
         container_json = {"update_json_list": update_json_list, "update_type": update_type,
-                          "pydantic_basemodel_type_name": pydantic_basemodel_class_type.__name__,
+                          "basemodel_type_name": basemodel_class_type.__name__,
                           "method_name": method_name}
         return container_json
 
@@ -279,7 +280,7 @@ class PhoneBookBaseLogBook(AppLogBook):
             self, msgspec_class_type: Type[MsgspecModel], update_type: str, method_name: str,
             patch_queue: Queue, max_fetch_from_queue: int, err_handler_callable: Callable,
             update_res: Dict,
-            parse_to_pydantic: bool | None = None):
+            parse_to_model: bool | None = None):
         if update_res:
             update_res = update_res.get("update_json_list")
         else:
@@ -288,14 +289,14 @@ class PhoneBookBaseLogBook(AppLogBook):
         # blocking function
         update_json_list = get_update_obj_for_snapshot_type_update(
             msgspec_class_type, update_type, method_name, patch_queue,
-            max_fetch_from_queue, err_handler_callable, update_res, parse_to_pydantic)
+            max_fetch_from_queue, err_handler_callable, update_res, parse_to_model)
 
         # handling interrupt
         if update_json_list == "EXIT":
             return "EXIT"
 
         container_json = {"update_json_list": update_json_list, "update_type": update_type,
-                          "pydantic_basemodel_type_name": msgspec_class_type.__name__,
+                          "basemodel_type_name": msgspec_class_type.__name__,
                           "method_name": method_name}
         return container_json
 
@@ -304,7 +305,7 @@ class PhoneBookBaseLogBook(AppLogBook):
             # remove pattern_for_pair_strat_db_updates from beginning of message
             message: str = message[len(self.pattern_for_pair_strat_db_updates):]
             args: List[str] = message.split(self.field_sep)
-            pydantic_basemodel_type_name: str = args.pop(0)
+            basemodel_type_name: str = args.pop(0)
             update_type: str = args.pop(0)
             method_name: str = args.pop(0)
 
@@ -314,8 +315,8 @@ class PhoneBookBaseLogBook(AppLogBook):
                 key, value = arg.split(self.key_val_sep)
                 kwargs[key] = value
 
-            handle_patch_db_queue_updater(update_type, self.pydantic_type_name_to_patch_queue_cache_dict,
-                                          pydantic_basemodel_type_name, method_name, kwargs,
+            handle_patch_db_queue_updater(update_type, self.model_type_name_to_patch_queue_cache_dict,
+                                          basemodel_type_name, method_name, kwargs,
                                           self._get_update_obj_list_for_journal_type_update,
                                           self.get_update_obj_for_snapshot_type_update,
                                           photo_book_service_http_client.process_strat_view_updates_query_client,

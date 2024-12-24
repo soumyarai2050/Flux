@@ -5,10 +5,10 @@ import math
 import sys
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import ChoreStatusType
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import ChoreStatusType
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager, SecurityRecord
-from Flux.CodeGenProjects.AddressBook.Pydantic.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
 
@@ -139,13 +139,16 @@ def check_n_update_conv_px(ticker: str, conv_px: float | None, security_record: 
     return conv_px
 
 
-def get_pair_strat_id_from_cmd_argv() -> int:
+def get_pair_strat_id_from_cmd_argv(raise_exception: bool | None = True) -> int | None:
     if len(sys.argv) > 2:
         pair_strat_id = sys.argv[1]
         return parse_to_int(pair_strat_id)
     else:
-        err_str_ = ("Can't find pair_strat_id as cmd argument, "
-                    "Usage: python launch_beanie_fastapi.py <PAIR_STRAT_ID>, "
-                    f"current args: {sys.argv}")
-        logging.error(err_str_)
-        raise Exception(err_str_)
+        if raise_exception:
+            err_str_ = ("Can't find pair_strat_id as cmd argument, "
+                        "Usage: python launch_beanie_fastapi.py <PAIR_STRAT_ID>, "
+                        f"current args: {sys.argv}")
+            logging.error(err_str_)
+            raise Exception(err_str_)
+        else:
+            return None

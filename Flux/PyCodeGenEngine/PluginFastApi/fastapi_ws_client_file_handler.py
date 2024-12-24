@@ -15,7 +15,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
 
 
 class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
-    beanie_pydantic_model_dir_name = "Pydentic"
+    orm_model_dir_name = "ORMModel"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -30,7 +30,7 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"from {model_file_path} import *\n"
 
         if file and model_file_suffix:
-            project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+            project_grp_root_dir = PurePath(project_dir).parent.parent / "ORMModel"
             dependency_file_path_list = self.get_dependency_file_path_list(
                 file, root_core_proto_files, project_grp_core_proto_files,
                 model_file_suffix, str(project_grp_root_dir))

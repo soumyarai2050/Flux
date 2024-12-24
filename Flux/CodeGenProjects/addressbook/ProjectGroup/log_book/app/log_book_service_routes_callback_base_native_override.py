@@ -17,8 +17,8 @@ import setproctitle
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_routes_msgspec_callback import LogBookServiceRoutesCallback
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_log_book import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import StratViewBaseModel
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import StratState
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import StratViewBaseModel
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import StratState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     UpdateType, email_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.aggregate import *
@@ -503,25 +503,25 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
     def _handle_strat_alert_queue_err_handler(self, *args):
         try:
-            pydantic_obj_list: List[StratAlertBaseModel] = args[0]  # single unprocessed pydantic object is passed
-            for pydantic_obj in pydantic_obj_list:
+            model_obj_list: List[StratAlertBaseModel] = args[0]  # single unprocessed basemodel object is passed
+            for model_obj in model_obj_list:
                 component_file_path = None
                 source_file_name = None
                 line_num = None
                 alert_create_date_time = None
                 first_detail = None
                 latest_detail = None
-                if pydantic_obj.alert_meta is not None:
-                    component_file_path = pydantic_obj.alert_meta.component_file_path
-                    source_file_name = pydantic_obj.alert_meta.source_file_name
-                    line_num = pydantic_obj.alert_meta.line_num
-                    alert_create_date_time = pydantic_obj.alert_meta.alert_create_date_time
-                    first_detail = pydantic_obj.alert_meta.first_detail
-                    latest_detail = pydantic_obj.alert_meta.latest_detail
+                if model_obj.alert_meta is not None:
+                    component_file_path = model_obj.alert_meta.component_file_path
+                    source_file_name = model_obj.alert_meta.source_file_name
+                    line_num = model_obj.alert_meta.line_num
+                    alert_create_date_time = model_obj.alert_meta.alert_create_date_time
+                    first_detail = model_obj.alert_meta.first_detail
+                    latest_detail = model_obj.alert_meta.latest_detail
                 alert_meta = get_alert_meta_obj(component_file_path, source_file_name, line_num,
                                                 alert_create_date_time, first_detail, latest_detail,
                                                 alert_meta_type=AlertMeta)
-                self.send_portfolio_alerts(pydantic_obj.severity, pydantic_obj.alert_brief, alert_meta)
+                self.send_portfolio_alerts(model_obj.severity, model_obj.alert_brief, alert_meta)
         except Exception as e:
             err_str_ = f"_handle_strat_alert_queue_err_handler failed, passed args: {args};;; exception: {e}"
             self.portfolio_alert_fail_logger.exception(err_str_)
@@ -1025,7 +1025,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                                "strat_alert_aggregated_severity": strat_alert_aggregated_severity,
                                "strat_alert_count": strat_alert_count}
                 payload_dict = {"update_json_list": [update_json], "update_type": UpdateType.SNAPSHOT_TYPE,
-                                "pydantic_basemodel_type_name": StratViewBaseModel.__name__,
+                                "basemodel_type_name": StratViewBaseModel.__name__,
                                 "method_name": "patch_all_strat_view_client"}
                 photo_book_service_http_client.process_strat_view_updates_query_client(payload_dict)
             # else not required: if no data is in db - no handling
@@ -1070,7 +1070,11 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def log_book_force_kill_tail_executor_query_pre(
             self, log_book_force_kill_tail_executor_class_type: Type[LogBookForceKillTailExecutor],
             log_file_path: str):
-        """terminates all tail executors running for passed file_path"""
+        """
+        terminates all tail executors running for passed file_path - doesn't release cache for log file path
+        since doing it will restart new tail executor - separate query must be called to release cache and restart
+        tail executor for log_file_path
+        """
 
         with self.file_path_to_tail_executor_process_cache_mutex:  # mutex for file_path_to_tail_executor_process_cache_dict
             tail_executor_process_list: List[multiprocessing.Process] = (
@@ -1110,6 +1114,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 # consumer of this queue handles task to release cache for this file entry - logs error if file
                 # not found in cache
                 self.clear_cache_file_path_queue.put(log_file_path)
+                logging.debug(f"requested cache clean-up for {log_file_path=}")
 
                 # clearing file_path_to_log_detail_cache_dict so that if next tail_executor starts with same file_path
                 # it doesn't already have entries for file_path
@@ -1158,7 +1163,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                            "strat_alert_aggregated_severity": Severity.Severity_UNSPECIFIED,
                            "strat_alert_count": 0}
             payload_dict = {"update_json_list": [update_json], "update_type": UpdateType.SNAPSHOT_TYPE,
-                            "pydantic_basemodel_type_name": StratViewBaseModel.__name__,
+                            "basemodel_type_name": StratViewBaseModel.__name__,
                             "method_name": "patch_all_strat_view_client"}
             photo_book_service_http_client.process_strat_view_updates_query_client(payload_dict)
         except Exception as e_:

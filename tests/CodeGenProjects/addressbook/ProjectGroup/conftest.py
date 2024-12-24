@@ -9,7 +9,7 @@ os.environ["ModelType"] = "msgspec"
 
 # Project Imports
 from tests.CodeGenProjects.BarterEngine.ProjectGroup.phone_book.app.utility_test_functions import *
-from Flux.CodeGenProjects.BarterEngine.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.BarterEngine.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 
 
 @pytest.fixture()

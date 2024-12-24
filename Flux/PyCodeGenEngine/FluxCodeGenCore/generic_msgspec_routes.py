@@ -45,12 +45,12 @@ del_success: Final[DefaultMsgspecWebResponse] = DefaultMsgspecWebResponse(msg="D
 code_gen_projects_path = PurePath(__file__).parent.parent.parent / "CodeGenProjects"
 
 
-def validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type: Type[MsgspecModel]):
-    if (not pydantic_class_type.read_ws_path_ws_connection_manager) or \
-            (not pydantic_class_type.read_ws_path_with_id_ws_connection_manager):
-        err: str = f"unexpected: publish_ws invoked on pydantic_class_type with missing either " \
+def validate_ws_connection_managers_in_model_obj(model_class_type: Type[MsgspecModel]):
+    if (not model_class_type.read_ws_path_ws_connection_manager) or \
+            (not model_class_type.read_ws_path_with_id_ws_connection_manager):
+        err: str = f"unexpected: publish_ws invoked on model_class_type with missing either " \
                    f"read_ws_path_ws_connection_manager or read_ws_path_with_id_ws_connection_manager: " \
-                   f"pydantic_class_type {pydantic_class_type}"
+                   f"model_class_type {model_class_type}"
         logging.exception(err)
         raise Exception(err)
 
@@ -119,7 +119,7 @@ async def publish_ws(msgspec_class_type: Type[MsgspecModel], db_obj_id: Any, db_
     :param has_links: bool for has_links
     :param update_ws_with_id: [Optional] bool to update ws with id
     """
-    validate_ws_connection_managers_in_pydantic_obj(msgspec_class_type)
+    validate_ws_connection_managers_in_model_obj(msgspec_class_type)
     tasks_list: List[asyncio.Task] = []
     active_ws_data_list: List[WSData] = msgspec_class_type.read_ws_path_ws_connection_manager.get_activ_ws_data_list()
     if active_ws_data_list:
@@ -152,7 +152,7 @@ async def publish_ws_all(msgspec_class_type: Type[MsgspecModel], db_obj_id_list:
     :param has_links: bool for has_links
     :param update_ws_with_id: bool to update ws with id
     """
-    validate_ws_connection_managers_in_pydantic_obj(msgspec_class_type)
+    validate_ws_connection_managers_in_model_obj(msgspec_class_type)
     tasks_list: List[asyncio.Task] = []
 
     active_ws_data_list: List[WSData] = msgspec_class_type.read_ws_path_ws_connection_manager.get_activ_ws_data_list()
@@ -284,9 +284,9 @@ async def generic_post_all_http(msgspec_class_type: Type[MsgspecModel], proto_pa
     return obj_json_list
 
 
-# def _get_beanie_formatted_update_request_json(updated_pydantic_obj_dict: Dict):
+# def _get_beanie_formatted_update_request_json(updated_model_obj_dict: Dict):
 #     # creating new obj without id and _id key
-#     request_obj = {'$set': updated_pydantic_obj_dict.items()}
+#     request_obj = {'$set': updated_model_obj_dict.items()}
 #     return request_obj
 
 
@@ -369,7 +369,7 @@ async def _underlying_patch_n_put_all(msgspec_class_type: Type[MsgspecModel], pr
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_put_http(pydantic_class_type: Type[MsgspecModel], proto_package_name: str,
+async def generic_put_http(model_class_type: Type[MsgspecModel], proto_package_name: str,
                            update_msgspec_obj: MsgspecModel, filter_agg_pipeline: Any = None,
                            update_agg_pipeline: Any = None, has_links: bool = False) -> Dict[str, Any] | bool:
 
@@ -381,29 +381,29 @@ async def generic_put_http(pydantic_class_type: Type[MsgspecModel], proto_packag
 
     update_json_dict = update_msgspec_obj.to_dict()
     updated_stored_json_obj = \
-        await _underlying_patch_n_put(pydantic_class_type, proto_package_name,
+        await _underlying_patch_n_put(model_class_type, proto_package_name,
                                       update_json_dict, filter_agg_pipeline, update_agg_pipeline, has_links)
     return updated_stored_json_obj
 
 
-# def get_stored_obj_id_to_obj_dict(stored_pydantic_obj_list: List[MsgspecModel]) -> Dict[int, str]:
+# def get_stored_obj_id_to_obj_dict(stored_model_obj_list: List[MsgspecModel]) -> Dict[int, str]:
 #     stored_obj_id_to_obj_dict: Dict[int, str] = {}
-#     for stored_pydantic_obj in stored_pydantic_obj_list:
-#         if stored_pydantic_obj.id not in stored_obj_id_to_obj_dict:
-#             stored_obj_id_to_obj_dict[stored_pydantic_obj.id] = stored_pydantic_obj
+#     for stored_model_obj in stored_model_obj_list:
+#         if stored_model_obj.id not in stored_obj_id_to_obj_dict:
+#             stored_obj_id_to_obj_dict[stored_model_obj.id] = stored_model_obj
 #     return stored_obj_id_to_obj_dict
 #
 #
-# def _generic_put_all_http(stored_pydantic_obj_list: List[DocumentModel],
-#                           updated_pydantic_obj_list: List[DocumentModel]) -> List[Tuple[DocumentModel, Dict]]:
-#     stored_obj_id_to_obj_dict = get_stored_obj_id_to_obj_dict(stored_pydantic_obj_list)
+# def _generic_put_all_http(stored_model_obj_list: List[DocumentModel],
+#                           updated_model_obj_list: List[DocumentModel]) -> List[Tuple[DocumentModel, Dict]]:
+#     stored_obj_id_to_obj_dict = get_stored_obj_id_to_obj_dict(stored_model_obj_list)
 #
-#     stored_pydantic_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocumentModel, Dict]] = []
-#     for index in range(len(updated_pydantic_obj_list)):
-#         stored_pydantic_obj_n_updated_obj_dict_tuple_list.append(
-#             (stored_obj_id_to_obj_dict[updated_pydantic_obj_list[index].id],
-#              updated_pydantic_obj_list[index].model_dump(by_alias=True)))
-#     return stored_pydantic_obj_n_updated_obj_dict_tuple_list
+#     stored_model_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocumentModel, Dict]] = []
+#     for index in range(len(updated_model_obj_list)):
+#         stored_model_obj_n_updated_obj_dict_tuple_list.append(
+#             (stored_obj_id_to_obj_dict[updated_model_obj_list[index].id],
+#              updated_model_obj_list[index].model_dump(by_alias=True)))
+#     return stored_model_obj_n_updated_obj_dict_tuple_list
 
 
 @http_except_n_log_error(status_code=500)
@@ -422,7 +422,7 @@ async def generic_put_all_http(msgspec_class_type: Type[MsgspecModel], proto_pac
 # def _assign_missing_ids_n_handle_date_time_type(field_model_type: Type[Any],
 #                                                 key: str,
 #                                                 value: Any,
-#                                                 pydantic_obj_update_json: Dict,
+#                                                 model_obj_update_json: Dict,
 #                                                 ignore_handling_datetime: bool | None = False):
 #     if (isinstance(field_model_type, types.UnionType) or (type(field_model_type) == typing._UnionGenericAlias) or
 #             field_model_type.__name__ == "List"):
@@ -437,13 +437,13 @@ async def generic_put_all_http(msgspec_class_type: Type[MsgspecModel], proto_pac
 #                         val["_id"] = (
 #                             field_model_type.__args__[0].model_fields.get("id").default_factory())
 #         else:
-#             # since JSON has no support to Datetime when receiving pydantic_obj_update_json
+#             # since JSON has no support to Datetime when receiving model_obj_update_json
 #             # all datetime type fields would be of str type
 #             if (not ignore_handling_datetime) and issubclass(field_model_type.__args__[0],
 #                                                              datetime.datetime):
 #                 if isinstance(value, str):
 #                     # Setting values parsed as str back to Datetime type
-#                     pydantic_obj_update_json[key] = pendulum.parse(value)
+#                     model_obj_update_json[key] = pendulum.parse(value)
 #     else:
 #         if issubclass(field_model_type, BaseModel):
 #             assign_missing_ids_n_handle_date_time_type(field_model_type, value,
@@ -455,16 +455,16 @@ async def generic_put_all_http(msgspec_class_type: Type[MsgspecModel], proto_pac
 #                 if value.get("_id") is None:
 #                     value["_id"] = field_model_type.model_fields.get("id").default_factory()
 #         else:
-#             # since JSON has no support to Datetime when receiving pydantic_obj_update_json
+#             # since JSON has no support to Datetime when receiving model_obj_update_json
 #             # all datetime type fields would be of str type
 #             if (not ignore_handling_datetime) and "DateTime" in field_model_type.__name__:
 #                 if isinstance(value, str):
 #                     # Setting values parsed as str back to Datetime type
-#                     pydantic_obj_update_json[key] = pendulum.parse(value)
+#                     model_obj_update_json[key] = pendulum.parse(value)
 #
 #
-# def assign_missing_ids_n_handle_date_time_type(pydantic_class_type: Type[DocumentModel] | Type[PydanticModel],
-#                                                pydantic_obj_update_json: Dict,
+# def assign_missing_ids_n_handle_date_time_type(model_class_type: Type[DocumentModel] | Type[modelModel],
+#                                                model_obj_update_json: Dict,
 #                                                ignore_root_id_check: bool | None = True,
 #                                                ignore_handling_datetime: bool | None = False):
 #     """
@@ -474,14 +474,14 @@ async def generic_put_all_http(msgspec_class_type: Type[MsgspecModel], proto_pac
 #     id field is not autogenerated, and if there is some use-case that can't provide id (ex: Web UI), we have
 #     to add id explicitly before saving in db
 #     """
-#     for key, value in pydantic_obj_update_json.items():
+#     for key, value in model_obj_update_json.items():
 #         if value is not None:
 #             if ignore_root_id_check:
 #                 if key == "_id":
 #                     ignore_root_id_check = False
 #                     continue
 #             field_model: FieldInfo
-#             if (field_model := pydantic_class_type.model_fields.get(key)) is not None:
+#             if (field_model := model_class_type.model_fields.get(key)) is not None:
 #                 field_model_type = field_model.annotation
 #                 if ((issubclass(type(field_model_type), UnionType)) or
 #                         (field_model_type.__name__ == "Optional")):
@@ -496,13 +496,13 @@ async def generic_put_all_http(msgspec_class_type: Type[MsgspecModel], proto_pac
 #                         raise Exception("Field type from annotation is Tuple signifying, field must be optional, "
 #                                         "nut couldn't find any Type other than NoneType in tuple annotation, "
 #                                         f"field_model_type: {field_model_type}, field_name: {key}, "
-#                                         f"pydantic_class_type: {pydantic_class_type.__name__}")
+#                                         f"model_class_type: {model_class_type.__name__}")
 #
 #                     _assign_missing_ids_n_handle_date_time_type(type_other_than_none, key, value,
-#                                                                 pydantic_obj_update_json,
+#                                                                 model_obj_update_json,
 #                                                                 ignore_handling_datetime)
 #                 else:
-#                     _assign_missing_ids_n_handle_date_time_type(field_model_type, key, value, pydantic_obj_update_json,
+#                     _assign_missing_ids_n_handle_date_time_type(field_model_type, key, value, model_obj_update_json,
 #                                                                 ignore_handling_datetime)
 #
 
@@ -534,8 +534,8 @@ async def generic_patch_http(msgspec_class_type: Type[MsgspecModel], proto_packa
 # @http_except_n_log_error(status_code=500)
 # @generic_perf_benchmark
 # async def generic_patch_without_db_update_http(
-#         pydantic_class_type: Type[MsgspecModel],
-#         stored_pydantic_obj: MsgspecModel, json_n_data_class_handler: JsonNMsgspecHandler,
+#         model_class_type: Type[MsgspecModel],
+#         stored_model_obj: MsgspecModel, json_n_data_class_handler: JsonNMsgspecHandler,
 #         return_obj_copy: bool | None = True) -> Dict[str, Any] | bool:
 #     if json_n_data_class_handler.dataclass_obj is None:
 #         obj_json = json_n_data_class_handler.json_dict
@@ -543,51 +543,51 @@ async def generic_patch_http(msgspec_class_type: Type[MsgspecModel], proto_packa
 #         obj_json = jsonable_encoder(json_n_data_class_handler.dataclass_obj, exclude_none=True)
 #         json_n_data_class_handler.set_json_dict(obj_json)  # updated json obj
 #
-#     # assign_missing_ids_n_handle_date_time_type(pydantic_class_type, obj_json)
+#     # assign_missing_ids_n_handle_date_time_type(model_class_type, obj_json)
 #     # try:
-#     #     updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.model_dump(by_alias=True),
-#     #                                                      pydantic_obj_update_json)
+#     #     updated_model_obj_dict = compare_n_patch_dict(stored_model_obj.model_dump(by_alias=True),
+#     #                                                      model_obj_update_json)
 #     # except Exception as e:
 #     #     err_str = f"compare_n_patch_dict failed: exception: {e}"
 #     #     logging.exception(err_str)
 #     #     raise HTTPException(detail=err_str, status_code=400)
 #     if return_obj_copy:
 #         return obj_json
-#         # return pydantic_class_type(**updated_pydantic_obj_dict)
+#         # return model_class_type(**updated_model_obj_dict)
 #     else:
 #         return True
 
 
-# def underlying_generic_patch_all_http(pydantic_class_type: Type[MsgspecModel], stored_pydantic_obj_list: List[DocumentModel],
-#                                       pydantic_obj_update_json_list: List[Dict],
+# def underlying_generic_patch_all_http(model_class_type: Type[MsgspecModel], stored_model_obj_list: List[DocumentModel],
+#                                       model_obj_update_json_list: List[Dict],
 #                                       ignore_datetime_handling: bool | None = None) -> List[Tuple[DocumentModel, Dict]]:
-#     stored_obj_id_to_obj_dict = get_stored_obj_id_to_obj_dict(stored_pydantic_obj_list)
+#     stored_obj_id_to_obj_dict = get_stored_obj_id_to_obj_dict(stored_model_obj_list)
 #
-#     stored_pydantic_obj_json_list: List[Dict] = []
-#     stored_pydantic_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocumentModel, Dict]] = []
-#     for index, pydantic_obj_update_json in enumerate(pydantic_obj_update_json_list):
-#         assign_missing_ids_n_handle_date_time_type(pydantic_class_type, pydantic_obj_update_json,
+#     stored_model_obj_json_list: List[Dict] = []
+#     stored_model_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocumentModel, Dict]] = []
+#     for index, model_obj_update_json in enumerate(model_obj_update_json_list):
+#         assign_missing_ids_n_handle_date_time_type(model_class_type, model_obj_update_json,
 #                                                    ignore_handling_datetime=ignore_datetime_handling)
 #
 #         # converting stored objs to json
-#         stored_pydantic_obj_json = jsonable_encoder(stored_obj_id_to_obj_dict[pydantic_obj_update_json.get("_id")],
+#         stored_model_obj_json = jsonable_encoder(stored_obj_id_to_obj_dict[model_obj_update_json.get("_id")],
 #                                                     by_alias=True)
-#         stored_pydantic_obj_json_list.append(stored_pydantic_obj_json)
+#         stored_model_obj_json_list.append(stored_model_obj_json)
 #
-#         # this list since contains container types (list of stored_pydantic_obj_json),
+#         # this list since contains container types (list of stored_model_obj_json),
 #         # gets updated in compare_n_patch_list called below
-#         stored_pydantic_obj_n_updated_obj_dict_tuple_list.append((stored_obj_id_to_obj_dict[
-#                                                                       stored_pydantic_obj_json.get("_id")],
-#                                                                   stored_pydantic_obj_json))
-#     compare_n_patch_list(stored_pydantic_obj_json_list, pydantic_obj_update_json_list)
+#         stored_model_obj_n_updated_obj_dict_tuple_list.append((stored_obj_id_to_obj_dict[
+#                                                                       stored_model_obj_json.get("_id")],
+#                                                                   stored_model_obj_json))
+#     compare_n_patch_list(stored_model_obj_json_list, model_obj_update_json_list)
 #
-#     return stored_pydantic_obj_n_updated_obj_dict_tuple_list
+#     return stored_model_obj_n_updated_obj_dict_tuple_list
 
 
 # @http_except_n_log_error(status_code=500)
 # @generic_perf_benchmark
 # async def generic_patch_all_without_db_update_http(
-#         msgspec_class_type: Type[MsgspecModel], stored_pydantic_obj_list: List[MsgspecModel],
+#         msgspec_class_type: Type[MsgspecModel], stored_model_obj_list: List[MsgspecModel],
 #         json_n_data_class_handler: JsonNMsgspecHandler,
 #         return_obj_copy: bool | None = True) -> List[Dict[str, Any]] | bool:
 #     if json_n_data_class_handler.dataclass_obj_list is None:
@@ -599,12 +599,12 @@ async def generic_patch_http(msgspec_class_type: Type[MsgspecModel], proto_packa
 #     # for obj_json in obj_json_list:
 #     #     assign_missing_ids_n_handle_date_time_type(msgspec_class_type, obj_json)
 #
-#     # stored_pydantic_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocumentModel, Dict]] = \
-#     #     underlying_generic_patch_all_http(msgspec_class_type, stored_pydantic_obj_list, pydantic_obj_update_json_list)
+#     # stored_model_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocumentModel, Dict]] = \
+#     #     underlying_generic_patch_all_http(msgspec_class_type, stored_model_obj_list, model_obj_update_json_list)
 #     if return_obj_copy:
 #         # updated_obj_list: List[DocumentModel] = []
-#         # for stored_pydantic_obj_, updated_pydantic_obj_dict in stored_pydantic_obj_n_updated_obj_dict_tuple_list:
-#         #     updated_obj_list.append(msgspec_class_type(**updated_pydantic_obj_dict))
+#         # for stored_model_obj_, updated_model_obj_dict in stored_model_obj_n_updated_obj_dict_tuple_list:
+#         #     updated_obj_list.append(msgspec_class_type(**updated_model_obj_dict))
 #         return obj_json_list
 #     else:
 #         return True
@@ -634,7 +634,7 @@ async def generic_patch_all_http(msgspec_class_type: Type[MsgspecModel], proto_p
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_delete_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
-                              pydantic_dummy_model, db_obj_id: int | str | Any,
+                              model_dummy_model, db_obj_id: int | str | Any,
                               update_agg_pipeline: Any = None, has_links: bool = False) -> DefaultMsgspecWebResponse | bool:
     collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
 
@@ -647,13 +647,13 @@ async def generic_delete_http(msgspec_class_type: Type[MsgspecModel], proto_pack
 
     # Setting back incremental id to 0 if collection gets empty
     if id_is_int_type:
-        pydantic_objs_count = await collection_obj.count_documents({})
-        if pydantic_objs_count == 0:
+        model_objs_count = await collection_obj.count_documents({})
+        if model_objs_count == 0:
             max_id_val = 0
             max_update_id_vale = 0
             msgspec_class_type.init_max_id(max_id_val, max_update_id_vale, force_set=True)
         # else not required: all good
-    # else not required: if id is not int then it must be of PydanticObjectId so no handling required
+    # else not required: if id is not int then it must be of modelObjectId so no handling required
     del_success.id = db_obj_id
     return del_success
 
@@ -682,13 +682,13 @@ async def generic_delete_all_http(msgspec_class_type: Type[MsgspecModel], proto_
 
     # Setting back incremental id to 0 if collection gets empty
     if id_is_int_type:
-        pydantic_objs_count = await collection_obj.count_documents({})
-        if pydantic_objs_count == 0:
+        _objs_count = await collection_obj.count_documents({})
+        if _objs_count == 0:
             max_id_val = 0
             max_update_id_vale = 0
             msgspec_class_type.init_max_id(max_id_val, max_update_id_vale)
         # else not required: all good
-    # else not required: if id is not int then it must be of PydanticObjectId so no handling required
+    # else not required: if id is not int then it must be of ObjectId so no handling required
 
     await publish_ws_all(msgspec_class_type, del_success.id, empty_obj_dict_list, update_ws_with_id=True)
     return del_success
@@ -1006,11 +1006,11 @@ async def get_filtered_obj_list(filter_agg_pipeline: Dict, msgspec_class_type: T
     # prevent polluting caller provided filter_agg_pipeline
     filter_agg_pipeline_copy = deepcopy(filter_agg_pipeline)
     if db_obj_id_list is not None:
-        pydantic_obj_id_field: str = "_id"
+        model_obj_id_field: str = "_id"
         if (match := filter_agg_pipeline_copy.get("match")) is not None:
-            match.append((pydantic_obj_id_field, db_obj_id_list))
+            match.append((model_obj_id_field, db_obj_id_list))
         else:
-            filter_agg_pipeline_copy["match"] = [(pydantic_obj_id_field, db_obj_id_list)]
+            filter_agg_pipeline_copy["match"] = [(model_obj_id_field, db_obj_id_list)]
     if not is_projection_type:
         agg_pipeline = get_aggregate_pipeline(filter_agg_pipeline_copy)
     else:
@@ -1024,10 +1024,10 @@ async def get_filtered_obj_list(filter_agg_pipeline: Dict, msgspec_class_type: T
 
 
 async def get_filtered_obj(filter_agg_pipeline: Dict, msgspec_class_type: Type[MsgspecModel],
-                           pydantic_obj_id: Any, has_links: bool = False,
+                           model_obj_id: Any, has_links: bool = False,
                            is_projection_type: bool | None = False) -> Dict[str, Any] | None:
     json_obj_list = await get_filtered_obj_list(filter_agg_pipeline, msgspec_class_type,
-                                                [pydantic_obj_id], has_links, is_projection_type)
+                                                [model_obj_id], has_links, is_projection_type)
     if json_obj_list:
         return json_obj_list[0]
     else:

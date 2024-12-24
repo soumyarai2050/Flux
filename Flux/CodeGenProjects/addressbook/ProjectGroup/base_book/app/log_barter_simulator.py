@@ -8,7 +8,7 @@ from filelock import FileLock
 from pendulum import DateTime
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
     Side, Position, PositionType, InstrumentType)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link_base import BarteringLinkBase
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
@@ -19,8 +19,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helpe
     get_bkr_from_underlying_account)
 from FluxPythonUtils.scripts.utility_functions import dict_or_list_records_csv_reader, transform_to_str
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
 
 
 log_simulate_logger = logging.getLogger("log_simulator")

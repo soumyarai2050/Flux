@@ -17,6 +17,7 @@ import requests
 # 3rd party imports
 import posix_ipc
 from sqlalchemy.testing.plugin.plugin_base import logging
+from filelock import FileLock
 
 # project imports
 # below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
@@ -42,7 +43,7 @@ from FluxPythonUtils.scripts.utility_functions import (
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecordManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, is_ongoing_strat, guaranteed_call_pair_strat_client,
     pair_strat_client_call_log_str, UpdateType, CURRENT_PROJECT_DIR as PAIR_STRAT_ENGINE_DIR)
@@ -58,10 +59,10 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate imp
     get_chore_total_sum_of_last_n_sec, get_symbol_side_snapshot_from_symbol_side, get_strat_brief_from_symbol,
     get_open_chore_snapshots_for_symbol, get_symbol_overview_from_symbol, get_last_n_sec_total_barter_qty,
     get_market_depths, get_last_n_sec_first_n_last_barter)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.ORMModel.post_book_service_model_imports import (
     PortfolioStatusUpdatesContainer)
 from FluxPythonUtils.scripts.ws_reader import WSReader
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
     StratViewBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
@@ -72,13 +73,13 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetB
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import (
     chore_has_terminal_state)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.aggregate import get_objs_from_symbol
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.phone_book_n_street_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.phone_book_n_street_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
 
 
 class FirstLastBarterCont(MsgspecBaseModel):
@@ -267,6 +268,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
         self.exch_to_market_depth_lvl_dict = executor_config_yaml_dict.get("exch_to_market_depth_lvl", {})
+        self.ports_cache_file_path: PurePath | None = EXECUTOR_PROJECT_DATA_DIR / "ports_cache_file.txt"
+        self.ports_cache_lock_file_path: PurePath | None = EXECUTOR_PROJECT_DATA_DIR / "ports_cache_lock_file.txt.lock"
+        self.top_of_book_ws_port: int | None = None
+        self.market_depth_ws_port: int | None = None
+        self.last_barter_ws_port: int | None = None
+        self.cpp_http_port: int | None = None
 
     def set_log_simulator_file_name_n_path(self):
         self.simulate_config_yaml_file_path = (get_simulator_config_file_path(self.pair_strat_id))
@@ -521,17 +528,38 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             logging.warning(f"_app_launch_pre_thread_func, thread going down, for {strat_key=} executor "
                             f"{self.port=}")
 
+    def get_free_port_for_md(self) -> int:
+        # must be called after taking file lock
+        while True:
+            port_ = find_free_port()
+            if os.path.exists(self.ports_cache_file_path):
+                with open(self.ports_cache_file_path, "r") as f:
+                    ports = f.readlines()
+                    if str(port_) + '\n' in ports:      # each port is string with '\n' at the end in ports list
+                        continue    # finding port again if port already used in some other strat
+                    # else not required: all good - new port found
+
+                with open(self.ports_cache_file_path, "a") as f:
+                    f.write(str(port_) + "\n")
+                    return port_
+
+            else:
+                with open(str(self.ports_cache_file_path), 'w') as f:
+                    f.write(str(port_) + "\n")
+                    return port_
+
     def update_simulate_config_yaml(self, pair_strat: PairStrat):
         if not self.updated_simulator_config_file:
             mongo_server = executor_config_yaml_dict.get("mongo_server")
 
             simulate_config_yaml_file_data = YAMLConfigurationManager.load_yaml_configurations(
                 self.simulate_config_yaml_file_path, load_as_str=True)
-            top_of_book_ws_port = find_free_port()
-            market_depth_ws_port = find_free_port()
-            last_barter_ws_port = find_free_port()
-            cpp_http_port = find_free_port()
-            self.cpp_http_url = f"http://127.0.0.1:{cpp_http_port}/"
+            with FileLock(self.ports_cache_lock_file_path):
+                self.top_of_book_ws_port = self.get_free_port_for_md()
+                self.market_depth_ws_port = self.get_free_port_for_md()
+                self.last_barter_ws_port = self.get_free_port_for_md()
+                self.cpp_http_port = self.get_free_port_for_md()
+            self.cpp_http_url = f"http://127.0.0.1:{self.cpp_http_port}/"
             simulate_config_yaml_file_data += "\n\n"
             simulate_config_yaml_file_data += f"leg_1_symbol: {self.strat_leg_1.sec.sec_id}\n"
             simulate_config_yaml_file_data += f"leg_1_feed_code: {self.strat_leg_1.exch_id}\n"
@@ -547,10 +575,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             # 2: Post(cpp starts new thread and returns control back immediately,
             #    operation on which it is set is handled by the different thread)
             if not executor_config_yaml_dict.get("avoid_cpp_ws_update"):
-                simulate_config_yaml_file_data += f"top_of_book_ws_port: {top_of_book_ws_port}\n"
-                simulate_config_yaml_file_data += f"market_depth_ws_port: {market_depth_ws_port}\n"
-                simulate_config_yaml_file_data += f"last_barter_ws_port: {last_barter_ws_port}\n"
-                simulate_config_yaml_file_data += f"cpp_http_port: {cpp_http_port}\n"
+                simulate_config_yaml_file_data += f"top_of_book_ws_port: {self.top_of_book_ws_port}\n"
+                simulate_config_yaml_file_data += f"market_depth_ws_port: {self.market_depth_ws_port}\n"
+                simulate_config_yaml_file_data += f"last_barter_ws_port: {self.last_barter_ws_port}\n"
+                simulate_config_yaml_file_data += f"cpp_http_port: {self.cpp_http_port}\n"
                 simulate_config_yaml_file_data += f"market_depth_ws_update_publish_policy: 2\n"
                 simulate_config_yaml_file_data += f"top_of_book_ws_update_publish_policy: 2\n"
                 simulate_config_yaml_file_data += f"last_barter_ws_update_publish_policy: 2\n"
@@ -579,10 +607,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             BarteringLinkBase.reload_executor_configs()
 
             # Setting MobileBookCache instances for this symbol pair
-            pair_strat.top_of_book_port = top_of_book_ws_port
-            pair_strat.last_barter_port = last_barter_ws_port
-            pair_strat.market_depth_port = market_depth_ws_port
-            pair_strat.cpp_http_port = cpp_http_port
+            pair_strat.top_of_book_port = self.top_of_book_ws_port
+            pair_strat.last_barter_port = self.last_barter_ws_port
+            pair_strat.market_depth_port = self.market_depth_ws_port
+            pair_strat.cpp_http_port = self.cpp_http_port
 
             self.updated_simulator_config_file = True   # setting it true avoid updating config file again
 
@@ -1523,10 +1551,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         if (eligible_brokers := updated_strat_limits_obj_json.get("eligible_brokers")) is not None:
             original_eligible_brokers = copy.deepcopy(eligible_brokers)
 
-        updated_pydantic_obj_dict = compare_n_patch_dict(
+        updated_obj_dict = compare_n_patch_dict(
             copy.deepcopy(stored_strat_limits_dict), updated_strat_limits_obj_json)
         stored_strat_limits_obj = StratLimitsOptional.from_dict(stored_strat_limits_dict)
-        updated_strat_limits_obj = StratLimitsOptional.from_dict(updated_pydantic_obj_dict)
+        updated_strat_limits_obj = StratLimitsOptional.from_dict(updated_obj_dict)
         await self._update_strat_limits_pre(stored_strat_limits_obj, updated_strat_limits_obj)
         updated_strat_limits_obj_json = updated_strat_limits_obj.to_dict(exclude_none=True)
         updated_strat_limits_obj_json["eligible_brokers"] = original_eligible_brokers
@@ -1569,9 +1597,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
-        updated_pydantic_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_strat_status_obj_json),
+        updated_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_strat_status_obj_json),
                                                          updated_strat_status_obj_json)
-        updated_strat_status_obj = StratStatus.from_dict(updated_pydantic_obj_dict)
+        updated_strat_status_obj = StratStatus.from_dict(updated_obj_dict)
         await self._update_strat_status_pre(updated_strat_status_obj)
         updated_strat_status_obj_json = updated_strat_status_obj.to_dict(exclude_none=True)
 
@@ -4440,38 +4468,62 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         await self.handle_delete_symbol_overview_pre(obj_id)
 
     async def put_strat_to_snooze_query_pre(self, strat_status_class_type: Type[StratStatus]):
-        # removing current strat_status
-        await self._check_n_remove_strat_status()
-
-        # removing current strat limits
-        await self._check_n_remove_strat_limits()
-
-        # If strat_cache stopped means strat is not ongoing anymore or was never ongoing
-        # - removing related models that would have created if strat got activated
-        if self.strat_cache.stopped:
-            # deleting strat's both leg's symbol_side_snapshots
-            await self._check_n_delete_symbol_side_snapshot_from_unload_strat()
-
-            # deleting strat's strat_brief
-            await self._check_n_delete_strat_brief_for_unload_strat()
-
-            # making force publish flag back to false for current strat's symbol's symbol_overview
-            await self._force_unpublish_symbol_overview_from_unload_strat()
-
-        # removing strat_alert
         try:
-            log_book_service_http_client.remove_strat_alerts_for_strat_id_query_client(self.pair_strat_id)
+            # removing current strat_status
+            await self._check_n_remove_strat_status()
+
+            # removing current strat limits
+            await self._check_n_remove_strat_limits()
+
+            # If strat_cache stopped means strat is not ongoing anymore or was never ongoing
+            # - removing related models that would have created if strat got activated
+            if self.strat_cache.stopped:
+                # deleting strat's both leg's symbol_side_snapshots
+                await self._check_n_delete_symbol_side_snapshot_from_unload_strat()
+
+                # deleting strat's strat_brief
+                await self._check_n_delete_strat_brief_for_unload_strat()
+
+                # making force publish flag back to false for current strat's symbol's symbol_overview
+                await self._force_unpublish_symbol_overview_from_unload_strat()
+
+            # removing strat_alert
+            try:
+                log_book_service_http_client.remove_strat_alerts_for_strat_id_query_client(self.pair_strat_id)
+            except Exception as e:
+                err_str_ = f"Some Error occurred while removing strat_alerts in snoozing strat process, exception: {e}"
+                raise HTTPException(detail=err_str_, status_code=500)
+
+            # cleaning executor config.yaml file
+            try:
+                os.remove(self.simulate_config_yaml_file_path)
+            except Exception as e:
+                err_str_ = (f"Something went wrong while deleting executor_{self.pair_strat_id}_simulate_config.yaml, "
+                            f"exception: {e}")
+                logging.error(err_str_)
+
+            # removing current strat's ports from cached ports
+            remove_port_list = [
+                self.top_of_book_ws_port,
+                self.last_barter_ws_port,
+                self.market_depth_ws_port,
+                self.cpp_http_port
+            ]
+            with FileLock(self.ports_cache_lock_file_path):
+                with open(self.ports_cache_file_path, 'w+') as f:
+                    ports_list = f.readlines()
+                    for port in remove_port_list:
+                        if port is not None and str(port) in ports_list:
+                            ports_list.remove(str(port))
+                        # else not required: ignore remove - None state can happen if strat started and ports are not
+                        # yet assigned but strat is unloading
+
+                    # setting cleaned list in cache
+                    f.writelines(ports_list)
         except Exception as e:
-            err_str_ = f"Some Error occurred while removing strat_alerts in snoozing strat process, exception: {e}"
+            err_str_ = f"put_strat_to_snooze_query_pre faile with exception: {e}"
+            logging.exception(err_str_)
             raise HTTPException(detail=err_str_, status_code=500)
-
-        # cleaning executor config.yaml file
-        try:
-            os.remove(self.simulate_config_yaml_file_path)
-        except Exception as e:
-            err_str_ = (f"Something went wrong while deleting executor_{self.pair_strat_id}_simulate_config.yaml, "
-                        f"exception: {e}")
-            logging.error(err_str_)
 
         return []
 

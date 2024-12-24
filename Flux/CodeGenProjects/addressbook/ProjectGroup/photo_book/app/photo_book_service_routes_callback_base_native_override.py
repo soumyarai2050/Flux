@@ -36,7 +36,7 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
             "min_refresh_interval": "min_refresh_interval"
         }
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
-        self.pydantic_type_name_to_patch_queue_cache_dict: Dict[str, Queue] = {}
+        self.model_type_name_to_patch_queue_cache_dict: Dict[str, Queue] = {}
         self.max_fetch_from_queue = config_yaml_dict.get("max_fetch_from_patch_queue_for_server")
         if self.max_fetch_from_queue is None:
             self.max_fetch_from_queue = 10  # setting default value
@@ -108,7 +108,7 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
         logging.debug("Triggered server launch post override, killing file_watcher and tail executor processes")
 
         # Exiting running threads
-        for _, queue_ in self.pydantic_type_name_to_patch_queue_cache_dict.items():
+        for _, queue_ in self.model_type_name_to_patch_queue_cache_dict.items():
             queue_.put("EXIT")
 
     async def read_all_ui_layout_pre(self):
@@ -148,39 +148,39 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
             self, process_pair_strat_api_ops_class_type: Type[ProcessPairStratAPIOps], payload_dict: Dict[str, Any]):
         kwargs = payload_dict.get("kwargs")
         update_type = kwargs.get("update_type")
-        pydantic_basemodel_type_name = kwargs.get("pydantic_basemodel_type_name")
+        basemodel_type_name = kwargs.get("basemodel_type_name")
         method_name = kwargs.get("method_name")
         update_json_list = kwargs.get("update_json_list")
 
         if method_name == "patch_all_strat_view_client":
-            # currently using passed pydantic_basemodel_type_name only since in patch ultimately json is passed
+            # currently using passed basemodel_type_name only since in patch ultimately json is passed
             # to method_callable so even if BaseModel variant is passed of Model, it will not affect
             method_callable = self._strat_view_patch_all_by_async_submit
 
             for update_json in update_json_list:
-                handle_patch_db_queue_updater(update_type, self.pydantic_type_name_to_patch_queue_cache_dict,
-                                              pydantic_basemodel_type_name, method_name, update_json,
+                handle_patch_db_queue_updater(update_type, self.model_type_name_to_patch_queue_cache_dict,
+                                              basemodel_type_name, method_name, update_json,
                                               get_update_obj_list_for_journal_type_update,
                                               get_update_obj_for_snapshot_type_update,
                                               method_callable, self.dynamic_queue_handler_err_handler,
                                               self.max_fetch_from_queue, self._snapshot_type_callable_err_handler,
-                                              parse_to_pydantic=True)
+                                              parse_to_model=True)
         else:
             logging.exception(f"Unsupported {method_name=} for process_strat_view_updates_query, currently "
                               f"only supports 'patch_all_strat_view_client';;; {payload_dict=}")
         return []
 
-    def dynamic_queue_handler_err_handler(self, pydantic_basemodel_type: str, update_type: UpdateType,
+    def dynamic_queue_handler_err_handler(self, basemodel_type: str, update_type: UpdateType,
                                           err_str_: Exception):
-        err_str_brief = (f"handle_dynamic_queue_for_patch running for pydantic_basemodel_type: "
-                         f"{pydantic_basemodel_type} and update_type: {update_type} failed")
+        err_str_brief = (f"handle_dynamic_queue_for_patch running for basemodel_type: "
+                         f"{basemodel_type} and update_type: {update_type} failed")
         err_str_detail = f"exception: {err_str_}"
         logging.exception(f"{err_str_brief};;; {err_str_detail}")
 
-    def _snapshot_type_callable_err_handler(self, pydantic_basemodel_class_type: Type[BaseModel], kwargs):
+    def _snapshot_type_callable_err_handler(self, basemodel_class_type: Type[BaseModel], kwargs):
         err_str_brief = ("Can't find _id key in patch kwargs dict - ignoring this update in "
                          "get_update_obj_for_snapshot_type_update, "
-                         f"pydantic_basemodel_class_type: {pydantic_basemodel_class_type.__name__}, "
+                         f"basemodel_class_type: {basemodel_class_type.__name__}, "
                          f"{kwargs = }")
         logging.exception(f"{err_str_brief}")
 

@@ -140,4 +140,4 @@ target_link_libraries(mobile_book_executable
 # Add compile options to the shared library
 target_compile_options(mobile_book_executable PRIVATE -g -ggdb3 -Werror -Wall -Wextra
         -Wno-deprecated-declarations -Wno-unused-variable -Wno-error=unused-parameter
-        -DTEST -Wno-missing-field-initializers -Wno-return-type)
+        -DTEST -Wno-missing-field-initializers -Wno-return-type -Wno-error=tautological-compare)

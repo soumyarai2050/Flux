@@ -110,7 +110,6 @@ def test_place_sanity_parallel_buy_sell_pair_chores_to_check_strat_view(
     max_loop_count_per_side = 50
     leg1_leg2_symbol_list = []
     total_strats = 40
-    pair_strat_list = []
     for i in range(1, total_strats + 1):
         leg1_symbol = f"CB_Sec_{i}"
         leg2_symbol = f"EQT_Sec_{i}"
@@ -118,7 +117,7 @@ def test_place_sanity_parallel_buy_sell_pair_chores_to_check_strat_view(
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(_place_sanity_complete_buy_sell_pair_chores_with_pair_strat,
-                                   leg1_leg2_symbol_tuple[0], leg1_leg2_symbol_tuple[1], pair_strat_,
+                                   leg1_leg2_symbol_tuple[0], leg1_leg2_symbol_tuple[1], copy.deepcopy(pair_strat_),
                                    copy.deepcopy(expected_strat_limits_), copy.deepcopy(expected_strat_status_),
                                    copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
@@ -152,7 +151,9 @@ def _create_infinite_last_barter(buy_symbol, sell_symbol, last_barter_fixture_li
         if leg2_last_barter is not None:
             last_barter_fixture_list[1]["market_barter_volume"][
                 "participation_period_last_barter_qty_sum"] = leg2_last_barter.market_barter_volume.participation_period_last_barter_qty_sum
-        leg1_last_barter, leg2_last_barter = run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client, create_counts_per_side=10)
+        leg1_last_barter, leg2_last_barter = (
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
+                           create_counts_per_side=10, gap_secs=0.001))
 
 
 def _place_sanity_complete_buy_sell_pair_chores_with_pair_strat_and_parallel_market_updates(
@@ -238,45 +239,62 @@ def test_stress_with_parallel_md_updates(
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, expected_portfolio_limits_, refresh_sec_update_fixture):
-    # Updating portfolio limits
-    expected_portfolio_limits_.rolling_max_chore_count.max_rolling_tx_count = 51
-    expected_portfolio_limits_.max_open_baskets = 51
-    expected_portfolio_limits_.max_gross_n_open_notional = 8_000_000
-    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+    executor_config_file_path = STRAT_EXECUTOR / "data" / f"config.yaml"
+    executor_config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(executor_config_file_path)
+    executor_config_dict_str = YAMLConfigurationManager.load_yaml_configurations(executor_config_file_path,
+                                                                                 load_as_str=True)
+    executor_config_dict["allow_multiple_unfilled_chore_pairs_per_strat"] = True
+    YAMLConfigurationManager.update_yaml_configurations(executor_config_dict, str(executor_config_file_path))
 
-    max_loop_count_per_side = 50
-    leg1_leg2_symbol_list = []
-    total_strats = 20
-    pair_strat_list = []
-    for i in range(1, total_strats + 1):
-        leg1_symbol = f"CB_Sec_{i}"
-        leg2_symbol = f"EQT_Sec_{i}"
-        leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
+    try:
+        # Updating portfolio limits
+        expected_portfolio_limits_.rolling_max_chore_count.max_rolling_tx_count = 200
+        expected_portfolio_limits_.max_open_baskets = 200
+        expected_portfolio_limits_.max_gross_n_open_notional = 20_000_000
+        email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(_place_sanity_complete_buy_sell_pair_chores_with_pair_strat_and_parallel_market_updates,
-                                   leg1_leg2_symbol_tuple[0], leg1_leg2_symbol_tuple[1], pair_strat_,
-                                   copy.deepcopy(expected_strat_limits_), copy.deepcopy(expected_strat_status_),
-                                   copy.deepcopy(symbol_overview_obj_list),
-                                   copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
-                                   max_loop_count_per_side, refresh_sec_update_fixture)
-                   for idx, leg1_leg2_symbol_tuple in enumerate(leg1_leg2_symbol_list)]
 
-        for future in concurrent.futures.as_completed(results):
-            if future.exception() is not None:
-                raise Exception(future.exception())
-            future.result()
+        max_loop_count_per_side = 50
+        leg1_leg2_symbol_list = []
+        total_strats = 40
+        pair_strat_list = []
+        for i in range(1, total_strats + 1):
+            leg1_symbol = f"CB_Sec_{i}"
+            leg2_symbol = f"EQT_Sec_{i}"
+            leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
 
-    # Since total_fill_sell_notional < total_fill_buy_notional
-    px = 96
-    qty = 20
-    strat_view_list = photo_book_web_client.get_all_strat_view_client()
-    expected_balance_notional = (expected_strat_limits_.max_single_leg_notional -
-                                 max_loop_count_per_side * qty * get_px_in_usd(px))
-    for strat_view in strat_view_list:
-        assert strat_view.balance_notional == expected_balance_notional, \
-                (f"Mismatched: overall_buy_notional must be "
-                 f"{expected_balance_notional}, found {strat_view.balance_notional}")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
+            results = [executor.submit(_place_sanity_complete_buy_sell_pair_chores_with_pair_strat_and_parallel_market_updates,
+                                       leg1_leg2_symbol_tuple[0], leg1_leg2_symbol_tuple[1], copy.deepcopy(pair_strat_),
+                                       copy.deepcopy(expected_strat_limits_), copy.deepcopy(expected_strat_status_),
+                                       copy.deepcopy(symbol_overview_obj_list),
+                                       copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
+                                       max_loop_count_per_side, refresh_sec_update_fixture)
+                       for idx, leg1_leg2_symbol_tuple in enumerate(leg1_leg2_symbol_list)]
+
+            for future in concurrent.futures.as_completed(results):
+                if future.exception() is not None:
+                    raise Exception(future.exception())
+                future.result()
+
+        # Since total_fill_sell_notional < total_fill_buy_notional
+        px = 96
+        qty = 20
+        strat_view_list = photo_book_web_client.get_all_strat_view_client()
+        expected_balance_notional = (expected_strat_limits_.max_single_leg_notional -
+                                     max_loop_count_per_side * qty * get_px_in_usd(px))
+        for strat_view in strat_view_list:
+            assert strat_view.balance_notional == expected_balance_notional, \
+                    (f"Mismatched: overall_buy_notional must be "
+                     f"{expected_balance_notional}, found {strat_view.balance_notional}")
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(executor_config_dict_str, str(executor_config_file_path))
 
 
 def _place_sanity_complete_buy_chores_with_pair_strat(

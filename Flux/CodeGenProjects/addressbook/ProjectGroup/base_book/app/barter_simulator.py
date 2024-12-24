@@ -14,8 +14,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_conf
     executor_config_yaml_dict, EXECUTOR_PROJECT_DATA_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_symbol_side_key
 from FluxPythonUtils.scripts.utility_functions import dict_or_list_records_csv_writer
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_msgspec_model import *
 
 
 def init_symbol_configs():
@@ -122,8 +122,8 @@ class BarterSimulator(BarteringLinkBase):
                               client_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
         """
         when invoked form log analyzer - all params are passed as strings
-        pydantic default conversion handles conversion - any util functions called should be called with
-        explicit type convertors or pydantic object converted values
+        msgspec default conversion handles conversion - any util functions called should be called with
+        explicit type convertors or msgspec object converted values
         return bool indicating success/fail and unique-id-str/err-description in second param
         """
         if BarterSimulator.chore_create_async_callable:
@@ -351,8 +351,8 @@ class BarterSimulator(BarteringLinkBase):
         """
         cls.simulate_reverse_path or not - always simulate cancel chore's Ack/Rejects (unless configured for unack)
         when invoked form log analyzer - all params are passed as strings
-        pydantic default conversion handles conversion - any util functions called should be called with
-        explicit type convertors or pydantic object converted values
+        msgspec default conversion handles conversion - any util functions called should be called with
+        explicit type convertors or ORMModel object converted values
         """
         if BarterSimulator.chore_create_async_callable:
 

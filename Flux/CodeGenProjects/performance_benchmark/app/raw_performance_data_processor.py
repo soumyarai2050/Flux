@@ -7,7 +7,7 @@ import asyncio
 
 os.environ["ModelType"] = "msgspec"
 # project imports
-from Flux.CodeGenProjects.performance_benchmark.generated.Pydentic.performance_benchmark_service_model_imports import (
+from Flux.CodeGenProjects.performance_benchmark.generated.ORMModel.performance_benchmark_service_model_imports import (
     ProcessedPerformanceAnalysis)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import performance_benchmark_service_http_client
 

@@ -10,10 +10,10 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginPydentic.base_pydantic_model_plugin import BasePydanticModelPlugin, main, IdType
+from Flux.PyCodeGenEngine.PluginORMModel.base_ORM_model_plugin import BaseORMModelPlugin, main, IdType
 
 
-class CachedPydanticModelPlugin(BasePydanticModelPlugin):
+class CachedORMModelPlugin(BaseORMModelPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
@@ -39,7 +39,7 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
         if field.cardinality.name.lower() == "optional":
             is_optional = True
         elif field.cardinality.name.lower() == "repeated":
-            if not self.is_option_enabled(field, CachedPydanticModelPlugin.flux_fld_is_required):
+            if not self.is_option_enabled(field, CachedORMModelPlugin.flux_fld_is_required):
                 is_optional = True
         # else not required: is_required = False
         if leading_comments := field.location.leading_comments:
@@ -58,7 +58,7 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
     def _check_id_int_field(self, message: protogen.Message) -> IdType:
         """ Checking if id is of auto-increment int type"""
         for field in message.fields:
-            if field.proto.name == CachedPydanticModelPlugin.default_id_field_name:
+            if field.proto.name == CachedORMModelPlugin.default_id_field_name:
                 if "int" == self.proto_to_py_datatype(field):
                     return IdType.INT_ID
                 elif "str" == self.proto_to_py_datatype(field):
@@ -74,7 +74,7 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
             else:
                 return IdType.NO_ID
 
-    def _handle_pydantic_class_declaration(self, message: protogen.Message) -> Tuple[str, bool, IdType]:
+    def _handle_ORM_class_declaration(self, message: protogen.Message) -> Tuple[str, bool, IdType]:
         # auto_gen_id_type = DEFAULT | INT_ID: If int id field is present in message or
         #                   If id field doesn't exist in message
         #                   then using default int auto-increment id implementation
@@ -124,7 +124,7 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
         return output_str
 
     def handle_message_output(self, message: protogen.Message) -> str:
-        output_str, is_msg_root, auto_gen_id_type = self._handle_pydantic_class_declaration(message)
+        output_str, is_msg_root, auto_gen_id_type = self._handle_ORM_class_declaration(message)
 
         # Adding docstring if message lvl comment available
         output_str += self._handle_class_docstring(message)
@@ -137,7 +137,7 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
 
         # handling remaining fields
         for field in message.fields:
-            if field.proto.name == CachedPydanticModelPlugin.default_id_field_name:
+            if field.proto.name == CachedORMModelPlugin.default_id_field_name:
                 continue
             output_str += ' '*4 + self.handle_field_output(field)
 
@@ -182,4 +182,4 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
 
 
 if __name__ == "__main__":
-    main(CachedPydanticModelPlugin)
+    main(CachedORMModelPlugin)

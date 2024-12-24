@@ -11,9 +11,9 @@ import pandas as pd
 # project imports
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_strat_key_from_pair_strat
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
 
 email_book_service_beanie_web_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient.set_or_get_if_instance_exists(HOST, parse_to_int(PAIR_STRAT_BEANIE_PORT))
@@ -485,18 +485,18 @@ def test_patch_all_time_series_model(clean_and_set_limits, web_client):
 
 # todo: currently contains beanie http call of sample models, once cache http is implemented test that too
 @pytest.mark.nightly
-@pytest.mark.parametrize("pydantic_basemodel", [SampleModelBaseModel, SampleTSModel1BaseModel])
+@pytest.mark.parametrize("basemodel_type", [SampleModelBaseModel, SampleTSModel1BaseModel])
 # checking both JsonRoot and TimeSeries
 def test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_set_limits,
-                                                        pydantic_basemodel: Type[SampleModelBaseModel |
+                                                        basemodel_type: Type[SampleModelBaseModel |
                                                                                  SampleTSModel1BaseModel]):
     """
     This test case contains check of update aggregate feature available in beanie part, put and patch http calls.
     """
     counter = 0
     for index in range(5):
-        sample_model = pydantic_basemodel.from_kwargs(_id=index+1, sample="sample", date=DateTime.utcnow(), num=index+1)
-        created_obj: pydantic_basemodel = (
+        sample_model = basemodel_type.from_kwargs(_id=index+1, sample="sample", date=DateTime.utcnow(), num=index+1)
+        created_obj: basemodel_type = (
             email_book_service_native_web_client.create_sample_model_client(sample_model))
 
         counter += index+1
@@ -524,7 +524,7 @@ def test_verify_stored_n_update_obj_are_diff_in_post_callback_in_patch_http(stat
     sample_model = SampleModelBaseModel.from_kwargs(sample="sample", date=DateTime.utcnow(), num=1)
     created_sample_model = email_book_service_native_web_client.create_sample_model_client(sample_model)
 
-    try: 
+    try:
         created_sample_model.sample = "update_text"
         updated_sample_model = email_book_service_native_web_client.patch_sample_model_client(
             created_sample_model.to_json_dict())
@@ -1122,6 +1122,7 @@ def test_strat_gets_deleted_even_when_symbol_overview_is_not_found(
     # cleanup before leaving this test - since strat is deleted any test after this will not be able to know that
     # its tail executor also needs to be handled to handling it now
     # force killing all tails
+    time.sleep(2)
     kill_tail_executor_for_strat_id(created_pair_strat.id)
 
 

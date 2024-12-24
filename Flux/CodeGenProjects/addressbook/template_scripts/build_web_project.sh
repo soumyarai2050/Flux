@@ -48,6 +48,7 @@ python gen_cpp_shared_data_structure.py
 python gen_cpp_json_to_object_plugin.py
 python gen_cpp_object_to_json_plugin.py
 python gen_cpp_data_structure_plugin.py
+python gen_cpp_web_server_routes.py
 # NOTE: these plugins are not required. When needed - uncomment:
 #python gen_web_socket_server_util.py
 #python gen_cpp_web_socket_test.py

@@ -188,7 +188,8 @@ namespace FluxCppCore {
                 new_doc.append(bsoncxx::builder::basic::kvp(element.key(), date_value.count()));
             } else if (element.type() == bsoncxx::type::k_document) {
                 bsoncxx::builder::basic::document inner_doc;
-                for (const auto& inner_element : element.get_document().view()) {
+                auto documet = element.get_document();
+                for (const auto& inner_element : documet.view()) {
                     process_element(inner_element, inner_doc);
                 }
                 new_doc.append(bsoncxx::builder::basic::kvp(element.key(), inner_doc.view()));

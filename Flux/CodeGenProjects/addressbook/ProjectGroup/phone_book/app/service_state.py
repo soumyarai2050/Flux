@@ -1,15 +1,15 @@
 import logging
 
 from pendulum import DateTime
-from pydantic import ConfigDict, BaseModel
 
 
-class ServiceState(BaseModel):
-    ready: bool = False
-    last_exception: Exception | None = None
-    error_prefix: str = ""
-    first_error_time: DateTime | None = None
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+class ServiceState:
+
+    def __init__(self, error_prefix: str):
+        self.ready: bool = False
+        self.last_exception: Exception | None = None
+        self.error_prefix: str = ""
+        self.first_error_time: DateTime | None = None
 
     def record_error(self, e: Exception) -> int:
         """

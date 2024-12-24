@@ -10,11 +10,11 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginPydentic.cached_pydantic_model_plugin import CachedPydanticModelPlugin, main, IdType
+from Flux.PyCodeGenEngine.PluginORMModel.cached_pydantic_model_plugin import CachedORMModelPlugin, main, IdType
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
 
 
-class BeanieModelPlugin(CachedPydanticModelPlugin):
+class BeanieModelPlugin(CachedORMModelPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
@@ -177,7 +177,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         # PydanticObjectId id implementation
         return auto_gen_id
 
-    def _handle_pydantic_class_declaration(self, message: protogen.Message) -> Tuple[str, bool, IdType]:
+    def _handle_ORM_class_declaration(self, message: protogen.Message) -> Tuple[str, bool, IdType]:
         # auto_gen_id=INT_ID: If int type id field is present in message then adding int autoincrement impl
         # auto_gen_id=STR_ID: If str type id field is present in message then adding unique str impl
         # auto_gen_id=DEFAULT: If id field doesn't exist but msg is root type using default
@@ -239,7 +239,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         return output_str, is_msg_root, auto_gen_id_type
 
     def handle_message_output(self, message: protogen.Message) -> str:
-        output_str, is_msg_root, auto_gen_id_type = self._handle_pydantic_class_declaration(message)
+        output_str, is_msg_root, auto_gen_id_type = self._handle_ORM_class_declaration(message)
 
         output_str += self._handle_class_docstring(message)
         output_str += self._handle_reentrant_lock(message)
@@ -251,7 +251,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
             output_str += "    is_time_series: ClassVar[bool] = False\n"
 
         for field in message.fields:
-            if field.proto.name == CachedPydanticModelPlugin.default_id_field_name:
+            if field.proto.name == CachedORMModelPlugin.default_id_field_name:
                 output_str += self._handle_unique_id_required_fields(message, auto_gen_id_type)
             else:
                 output_str += ' '*4 + self.handle_field_output(field)

@@ -5,7 +5,6 @@
 
 #include "TemplateUtils.h"
 #include "project_includes.h"
-#include "cpp_app_logger.h"
 
 namespace beast = boost::beast;
 namespace http = beast::http;

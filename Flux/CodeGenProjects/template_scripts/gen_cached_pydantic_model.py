@@ -12,7 +12,7 @@ if __name__ == "__main__":
     env_var_dict["PLUGIN_FILE_NAME"] = "cached_pydantic_model_plugin.py"
     env_var_dict["ModelType"] = "cache"
 
-    code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_", "PluginPydentic", env_var_dict)
+    code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_", "PluginORMModel", env_var_dict)
 
     plugin_execute_script = PluginExecuteScript(str(code_gen_engine_env_manager.project_dir), "service.proto")
     plugin_execute_script.execute()

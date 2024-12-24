@@ -30,8 +30,8 @@ class StreetBookPlugin(BaseProtoPlugin):
         self.get_cache_key_required_messages = []
         self.get_log_key_required_messages = []
         self.get_cache_key_required_msg_to_key_count_dict: Dict[protogen.Message, int] = {}
-        self.beanie_pydantic_model_dir_name = "Pydentic"
-        self.beanie_fastapi_model_dir_name = "FastApi"
+        self.orm_model_dir_name = "ORMModel"
+        self.fastapi_dir_name = "FastApi"
         self.file_name = ""
         self.file_name_cap_camel_cased = ""
         self.model_file_name = ""
@@ -218,13 +218,13 @@ class StreetBookPlugin(BaseProtoPlugin):
         content_str += \
             f"from {key_handler_import_path} import {key_handler_class_name}\n"
         file_name = str(file.proto.name).split(".")[0]
-        ws_client_file_name = f"{self.beanie_fastapi_model_dir_name}.{file_name}_ws_client"
+        ws_client_file_name = f"{self.fastapi_dir_name}.{file_name}_ws_client"
         ws_client_import_path = self.import_path_from_os_path("OUTPUT_DIR",
                                                               f"{ws_client_file_name}")
         file_name_camel_cased = convert_to_capitalized_camel_case(file_name)
         content_str += f'from {ws_client_import_path} import {file_name_camel_cased}WSClient\n'
 
-        model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
+        model_file_name = f"{self.orm_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         content_str += f'from {model_file_path} import *\n\n\n'
 
@@ -408,7 +408,7 @@ class StreetBookPlugin(BaseProtoPlugin):
         output_str += "from pendulum import DateTime\n\n"
         output_str += "# project imports\n"
         file_name = str(file.proto.name).split(".")[0]
-        model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
+        model_file_name = f"{self.orm_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
         output_str += f"class {self.base_strat_cache_class_name}:\n"
@@ -521,7 +521,7 @@ class StreetBookPlugin(BaseProtoPlugin):
         output_str += "from pendulum import DateTime\n\n"
         output_str += "# project imports\n"
         file_name = str(file.proto.name).split(".")[0]
-        model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
+        model_file_name = f"{self.orm_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
         bartering_cache_class_name = f"{self.file_name_cap_camel_cased}BaseBarteringCache"
@@ -568,7 +568,7 @@ class StreetBookPlugin(BaseProtoPlugin):
         output_str += "from typing import List, Tuple\n"
         file_class_name = f"{self.file_name_cap_camel_cased}KeyHandler"
         file_name = str(file.proto.name).split(".")[0]
-        model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
+        model_file_name = f"{self.orm_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
         output_str += f"class {file_class_name}:\n"

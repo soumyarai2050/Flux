@@ -16,13 +16,11 @@ import glob
 import traceback
 from datetime import timedelta
 
-# from Pydantic.barter_core_msgspec_model import Side, InstrumentType
-
 # os.environ["PORT"] = "8081"
 os.environ["ModelType"] = "msgspec"
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import \
     EmailBookServiceHttpClient
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
@@ -35,9 +33,9 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.lo
     LogBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
     post_book_service_http_client)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.Pydentic.photo_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client import PhotoBookServiceHttpClient
 from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_http_client import PerformanceBenchmarkServiceHttpClient
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_http_client import BasketBookServiceHttpClient
@@ -2322,9 +2320,11 @@ def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side,
 
 def run_last_barter(leg1_symbol: str, leg2_symbol: str, last_barter_json_list: List[Dict],
                    executor_web_client: StreetBookServiceHttpClient,
-                   create_counts_per_side: int | None = None):
+                   create_counts_per_side: int | None = None, gap_secs: float | None = None):
     if create_counts_per_side is None:
         create_counts_per_side = 20
+    if gap_secs is None:
+        gap_secs = 0.1
     symbol_list = [leg1_symbol, leg2_symbol]
     leg1_last_barter_obj = None
     leg2_last_barter_obj = None
@@ -2341,7 +2341,7 @@ def run_last_barter(leg1_symbol: str, leg2_symbol: str, last_barter_json_list: L
             assert created_last_barter_obj == last_barter_obj, \
                 f"Mismatch last_barter: expected {last_barter_obj}, received {created_last_barter_obj}"
             # putting gap in between created objs since mongodb stores datetime with milli-sec precision
-            time.sleep(0.1)
+            time.sleep(gap_secs)
 
             if index == 0:
                 leg1_last_barter_obj = last_barter_obj
@@ -2416,16 +2416,6 @@ def create_strat(leg1_symbol, leg2_symbol, expected_pair_strat_obj, leg1_side=No
         f"Mismatch pair_strat_base_model.strat_state: expected {expected_pair_strat_obj.strat_state}, " \
         f"received {stored_pair_strat_basemodel.strat_state}"
     print(f"{leg1_symbol} - strat created, {stored_pair_strat_basemodel}")
-
-    # cleaning log analyzer cache for log files specific to strat executor so that log analyzer creates tail for
-    # these files
-    datetime_str = datetime.datetime.now().strftime("%Y%m%d")
-    log_simulator_log_file = str(STRAT_EXECUTOR / "log" /
-                                 f"log_simulator_{stored_pair_strat_basemodel.id}_logs_{datetime_str}.log")
-    street_book_log_file = str(STRAT_EXECUTOR / "log" /
-                                  f"street_book_{stored_pair_strat_basemodel.id}_logs_{datetime_str}.log")
-    log_file_list = [log_simulator_log_file, street_book_log_file]
-    log_book_web_client.log_book_remove_file_from_created_cache_query_client(log_file_list)
     return stored_pair_strat_basemodel
 
 
@@ -2905,10 +2895,20 @@ def renew_strat_collection():
 def kill_tail_executor_for_strat_id(pair_strat_id: int):
     datetime_str = datetime.datetime.now().strftime("%Y%m%d")
     log_simulator_log_file = str(STRAT_EXECUTOR / "log" / f"log_simulator_{pair_strat_id}_logs_{datetime_str}.log")
-    log_book_web_client.log_book_force_kill_tail_executor_query_client(log_simulator_log_file)
     street_book_log_file = str(STRAT_EXECUTOR / "log" /
                                   f"street_book_{pair_strat_id}_logs_{datetime_str}.log")
-    log_book_web_client.log_book_force_kill_tail_executor_query_client(street_book_log_file)
+
+    for log_file_path in [log_simulator_log_file, street_book_log_file]:
+        if os.path.exists(log_file_path):
+            # killing the existing tail executor if running
+            log_book_web_client.log_book_force_kill_tail_executor_query_client(log_file_path)
+
+            # changing log file names and then releasing cache in log analyzer to prevent restart of tail executor on
+            # same log file
+            datetime_str: str = datetime.datetime.now().strftime("%Y%m%d.%H%M%S")
+            os.rename(log_file_path, f"{log_file_path}.{datetime_str}")
+            log_book_web_client.log_book_remove_file_from_created_cache_query_client([log_file_path])
+        # else not required: if file doesn't exist then no tail executor must be running
 
 
 def clean_executors_and_today_activated_symbol_side_lock_file():
@@ -2921,11 +2921,7 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
         photo_book_web_client.patch_strat_view_client({'_id': pair_strat.id, 'unload_strat': True})
         time.sleep(1)
 
-    if len(existing_pair_strat) == 40:
-        wait_time_sec = 60 * 10
-    else:
-        wait_time_sec = 60
-
+    wait_time_sec = 60
     start_time = DateTime.utcnow()
     while True:
         try:

@@ -5,16 +5,16 @@ from threading import RLock
 
 # Project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
-from Flux.CodeGenProjects.AddressBook.Pydantic.dept_book_n_phone_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_phone_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
     SymbolCache, SymbolCacheContainer)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.pos_cache import PosCache
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_post_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_symbol_side_key)
-from Flux.CodeGenProjects.AddressBook.Pydantic.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.Pydantic.street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 
 
@@ -205,3 +205,11 @@ class BaseStratCache:
 
         symbol_cache.so = symbol_overview_
         return symbol_cache.so
+
+    def handle_set_tob_in_symbol_cache(self, top_of_book_: TopOfBookBaseModel | TopOfBook):
+        symbol_cache = SymbolCacheContainer.get_symbol_cache(top_of_book_.symbol)
+        if symbol_cache is None:
+            symbol_cache = SymbolCacheContainer.add_symbol_cache_for_symbol(top_of_book_.symbol)
+
+        symbol_cache.top_of_book = top_of_book_
+        return symbol_cache.top_of_book
