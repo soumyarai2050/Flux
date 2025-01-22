@@ -77,6 +77,7 @@ class BaseProtoPlugin(ABC):
     flux_file_date_time_print_timezone: ClassVar[str] = "FluxFileDateTimePrintTimezone"
     flux_fld_alias: ClassVar[str] = "FluxFldAlias"
     flux_msg_json_root: ClassVar[str] = "FluxMsgJsonRoot"
+    flux_msg_cpp_json_root: ClassVar[str] = "FluxMsgCppJsonRoot"
     flux_msg_json_root_time_series: ClassVar[str] = "FluxMsgJsonRootTimeSeries"
     flux_msg_json_query: ClassVar[str] = "FluxMsgJsonQuery"
     flux_msg_button_query: ClassVar[str] = "FluxMsgButtonQuery"
@@ -89,7 +90,9 @@ class BaseProtoPlugin(ABC):
     flux_json_root_patch_all_field: ClassVar[str] = "PatchAllOp"
     flux_json_root_delete_field: ClassVar[str] = "DeleteOp"
     flux_json_root_delete_all_field: ClassVar[str] = "DeleteAllOp"
+    flux_json_root_delete_by_id_list_field: ClassVar[str] = "DeleteByIdListOp"
     flux_json_root_read_by_id_websocket_field: ClassVar[str] = "ReadByIDWebSocketOp"
+    flux_json_root_include_dataframe_clients_field: ClassVar[str] = "IncludeDataframeClients"
     flux_json_root_set_reentrant_lock_field: ClassVar[str] = "SetReentrantLock"
     flux_json_query_name_field: ClassVar[str] = "QueryName"
     flux_json_query_aggregate_var_name_field: ClassVar[str] = "AggregateVarName"
@@ -133,10 +136,9 @@ class BaseProtoPlugin(ABC):
     flux_fld_name_color: ClassVar[str] = "FluxFldNameColor"
     flux_msg_widget_ui_data_element: ClassVar[str] = "FluxMsgWidgetUIDataElement"
     flux_msg_widget_ui_option: ClassVar[str] = "FluxMsgWidgetUIOption"
-    widget_ui_option_depending_proto_file_name_field: ClassVar[str] = "depending_proto_file_name"
     widget_ui_option_depending_proto_model_name_field: ClassVar[str] = "depending_proto_model_name"
     widget_ui_option_depends_on_other_model_for_id_field: ClassVar[str] = "depends_on_other_model_for_id"
-    widget_ui_option_depends_on_model_name_for_port_field: ClassVar[str] = "depends_on_model_name_for_port"
+    widget_ui_option_depending_proto_model_for_cpp_port_field: ClassVar[str] = "depending_proto_model_for_cpp_port"
     widget_ui_option_override_default_crud_field: ClassVar[str] = "override_default_crud"
     widget_ui_option_override_default_crud_ui_crud_type_field: ClassVar[str] = "ui_crud_type"
     widget_ui_option_override_default_crud_query_name_field: ClassVar[str] = "query_name"
@@ -144,8 +146,12 @@ class BaseProtoPlugin(ABC):
     widget_ui_option_override_default_crud_ui_query_params_field: ClassVar[str] = "ui_query_params"
     widget_ui_option_override_default_crud_ui_query_params_field_fld: ClassVar[str] = "query_param_field"
     widget_ui_option_override_default_crud_ui_query_params_src_field: ClassVar[str] = "query_param_field_src"
-    widget_ui_option_depends_on_other_model_for_dynamic_url_field: ClassVar[str] = \
-        "depends_on_other_model_for_dynamic_url"
+    widget_ui_option_depending_proto_model_field_name_for_host: ClassVar[str] = \
+        "depending_proto_model_field_name_for_host"
+    widget_ui_option_depending_proto_model_field_name_for_port: ClassVar[str] = \
+        "depending_proto_model_field_name_for_port"
+    widget_ui_option_depending_proto_model_field_name_for_ws_port: ClassVar[str] = \
+        "depending_proto_model_field_name_for_ws_port"
     flux_msg_widget_ui_data_element_widget_ui_data_field: ClassVar[str] = "widget_ui_data"
     flux_msg_aggregate_query_var_name: ClassVar[str] = "FluxMsgAggregateQueryVarName"
     aggregation_type_update: ClassVar[str] = "AggregateType_UpdateAggregate"
@@ -203,6 +209,7 @@ class BaseProtoPlugin(ABC):
     executor_option_cache_as_dict_with_key_field: ClassVar[str] = "CacheAsDictWithKeyField"
     flux_msg_small_sized_collection: ClassVar[str] = "FluxMsgSmallSizedCollection"
     flux_fld_PK: ClassVar[str] = "FluxFldPk"
+    flux_msg_is_cpp_web_server_model: ClassVar[str] = 'FluxMsgIsCppWebServerModel'
     flux_msg_string_length: ClassVar[str] = "FluxMsgStringLength"
     flux_enum_cmnt: ClassVar[str] = "FluxEnumCmnt"
     default_id_field_name: ClassVar[str] = "id"

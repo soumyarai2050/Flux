@@ -913,6 +913,10 @@ class StreetBook(BaseBook):
                         continue
                     # else not required: if shared_memory is found - all good, starting internal run
 
+                # setting server_ready_state to 3 to notify ui that md server is up
+                email_book_service_http_client.patch_pair_strat_client({"_id": pair_strat.id,
+                                                                           "server_ready_state": 3})
+
                 try:
                     ret_val = self.internal_run()
                 except Exception as e:

@@ -227,7 +227,7 @@ def get_update_obj_list_for_journal_type_update(
 
 def get_obj_id_to_put_as_key(obj_id) -> str:
     # type-casting to str to avoid duplicate key generation if obj_id is of varying types like str and int - this
-    # happens when obj are passed from logs and direct json calls due to which obj_id is str in logs case and
+    # happens when obj are passed from logs and direct json calls, due to which obj_id is str in logs case and
     # specific type like int for direct json call cases
     return str(obj_id)
 
@@ -240,8 +240,15 @@ def get_update_obj_for_snapshot_type_update(
     if pending_updates:
         # adding pending updates to dict that will be used to return from this function - avoids any pending updates
         # to be missed
-        for snapshot_obj in pending_updates:
-            id_to_obj_dict[snapshot_obj.get('_id')] = snapshot_obj
+        if parse_to_msgspec_obj:
+            for snapshot_obj_dict in pending_updates:
+                msgspec_object = msgspec_class_type.from_dict(snapshot_obj_dict, strict=False)
+                obj_id = get_obj_id_to_put_as_key(msgspec_object.id)
+                id_to_obj_dict[obj_id] = msgspec_object
+        else:
+            for snapshot_obj_dict in pending_updates:
+                obj_id = get_obj_id_to_put_as_key(snapshot_obj_dict.get('_id'))
+                id_to_obj_dict[obj_id] = snapshot_obj_dict
 
     # else not required: if no snapshot exists already to be send through client then nothing to add in id_to_obj_dict
 

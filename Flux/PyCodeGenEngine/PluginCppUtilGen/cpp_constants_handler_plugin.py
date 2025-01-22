@@ -441,6 +441,11 @@ class CppConstantsHandlerPlugin(BaseProtoPlugin):
             message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
             if message_name == cache_msg_list[0]:
                 pass
+            if self.is_option_enabled(message, self.flux_msg_ui_get_all_limit):
+                output_content += (f'\tconstexpr auto {message_name_snake_cased}_limit = '
+                                   f'{self.get_simple_option_value_from_proto(message, self.flux_msg_ui_get_all_limit)};\n')
+            else:
+                output_content += f'\tconstexpr auto {message_name_snake_cased}_limit = 0;\n'
             if CppConstantsHandlerPlugin.is_option_enabled(message, CppConstantsHandlerPlugin.flux_msg_json_root):
                 output_content += f'\tconst std::string {message_name_snake_cased}_port_key = "{message_name_snake_cased}_port";\n'
                 output_content += self.get_client_url(message_name_snake_cased)

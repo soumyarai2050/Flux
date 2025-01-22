@@ -7,6 +7,7 @@ import time
 
 import pytest
 import pandas as pd
+import polars as pl
 
 # project imports
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
@@ -164,137 +165,6 @@ def test_create_get_put_patch_delete_client(clean_and_set_limits, web_client):
 
 @pytest.mark.nightly
 @pytest.mark.parametrize("web_client", clients_list)
-def test_post_all(clean_and_set_limits, web_client):
-    for index, return_value_type in enumerate([True, None, False]):
-        sample_model_objects_list = [
-            SampleModelBaseModel.from_kwargs(_id=1 + (index * 3), sample="sample1",
-                                             date=get_utc_date_time(), num=1,
-                                             cum_sum_of_num=1+index*3),
-            SampleModelBaseModel.from_kwargs(_id=2 + (index * 3), sample="sample2",
-                                             date=get_utc_date_time(), num=1, cum_sum_of_num=2+index*3),
-            SampleModelBaseModel.from_kwargs(_id=3 + (index * 3), sample="sample3",
-                                             date=get_utc_date_time(), num=1, cum_sum_of_num=3+index*3)
-        ]
-
-        fetched_sample_model_list = web_client.get_all_sample_model_client()
-
-        for obj in sample_model_objects_list:
-            assert obj not in fetched_sample_model_list, f"Object {obj} must not be present in get-all list " \
-                                                            f"{fetched_sample_model_list} before post-all operation"
-
-        return_value = web_client.create_all_sample_model_client(sample_model_objects_list,
-                                                                 return_obj_copy=return_value_type)
-        if return_value_type or return_value_type is None:
-            assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
-                                                    f"received type: {type(return_value)}")
-        else:
-            assert (isinstance(return_value, bool) and return_value)
-
-        fetched_sample_model_list = web_client.get_all_sample_model_client()
-
-        for obj in sample_model_objects_list:
-            assert obj in fetched_sample_model_list, f"Couldn't find object {obj} in get-all list " \
-                                                        f"{fetched_sample_model_list}"
-
-
-@pytest.mark.nightly
-@pytest.mark.parametrize("web_client", clients_list)
-def test_put_all(clean_and_set_limits, web_client):
-    for index, return_value_type in enumerate([True, None, False]):
-        sample_model_objects_list = [
-            SampleModelBaseModel.from_kwargs(_id=1 + (index * 3), sample=f"sample{1 + (index * 3)}",
-                                             date=get_utc_date_time(), num=1, cum_sum_of_num=1+index*3),
-            SampleModelBaseModel.from_kwargs(_id=2 + (index * 3), sample=f"sample{1 + (index * 3)}",
-                                             date=get_utc_date_time(), num=1, cum_sum_of_num=2+index*3),
-            SampleModelBaseModel.from_kwargs(_id=3 + (index * 3), sample=f"sample{1 + (index * 3)}",
-                                             date=get_utc_date_time(), num=1, cum_sum_of_num=3+index*3)
-        ]
-
-        web_client.create_all_sample_model_client(sample_model_objects_list)
-
-        fetched_sample_model_list = web_client.get_all_sample_model_client()
-
-        for obj in sample_model_objects_list:
-            assert obj in fetched_sample_model_list, f"Couldn't find object {obj} in get-all list " \
-                                                        f"{fetched_sample_model_list}"
-
-        # updating values
-        for obj in sample_model_objects_list:
-            obj.sample = f"sample___{obj.id}"
-
-        return_value = web_client.put_all_sample_model_client(sample_model_objects_list,
-                                                              return_obj_copy=return_value_type)
-        if return_value_type or return_value_type is None:
-            assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
-                                                    f"received type: {type(return_value)}")
-        else:
-            assert (isinstance(return_value, bool) and return_value)
-
-        updated_sample_model_list = web_client.get_all_sample_model_client()
-
-        for expected_obj in sample_model_objects_list:
-            assert expected_obj in updated_sample_model_list, \
-                f"expected obj {expected_obj} not found in updated list of objects: {updated_sample_model_list}"
-
-
-@pytest.mark.nightly
-@pytest.mark.parametrize("web_client", clients_list)
-def test_patch_all(clean_and_set_limits, web_client):
-    for index, return_value_type in enumerate([True, None, False]):
-        portfolio_limits_objects_list = [
-            PortfolioLimitsBaseModel.from_kwargs(_id=2 + (index * 3), max_open_baskets=20),
-            PortfolioLimitsBaseModel.from_kwargs(_id=3 + (index * 3), max_open_baskets=30),
-            PortfolioLimitsBaseModel.from_kwargs(_id=4 + (index * 3), max_open_baskets=45)
-        ]
-
-        web_client.create_all_portfolio_limits_client(portfolio_limits_objects_list)
-
-        fetched_get_all_obj_list = web_client.get_all_portfolio_limits_client()
-
-        for obj in portfolio_limits_objects_list:
-            assert obj in fetched_get_all_obj_list, f"Couldn't find object {obj} in get-all list " \
-                                                    f"{fetched_get_all_obj_list}"
-
-        # updating values
-        portfolio_limits_objects_json_list = []
-        for obj in portfolio_limits_objects_list:
-            obj.eligible_brokers = []
-            for broker_obj_id in [1, 2]:
-                broker = broker_fixture()
-                broker.id = f"{broker_obj_id}"
-                broker.bkr_priority = broker_obj_id
-                obj.eligible_brokers.append(broker)
-            portfolio_limits_objects_json_list.append(obj.to_dict(exclude_none=True))
-
-        return_value = web_client.patch_all_portfolio_limits_client(portfolio_limits_objects_json_list,
-                                                                    return_obj_copy=return_value_type)
-        if return_value_type:
-            assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
-                                                    f"received type: {type(return_value)}")
-        else:
-            assert return_value
-
-        for expected_obj in portfolio_limits_objects_list:
-            updated_portfolio_limits = web_client.get_portfolio_limits_client(portfolio_limits_id=expected_obj.id)
-            assert expected_obj.to_dict() == updated_portfolio_limits.to_dict(), \
-                f"Mismatched: expected obj {expected_obj} received {updated_portfolio_limits}"
-
-        delete_broker = BrokerBaseModel()
-        delete_broker.id = "1"
-
-        delete_obj = PortfolioLimitsBaseModel.from_kwargs(_id=4 + (index * 3), eligible_brokers=[delete_broker])
-        delete_obj_json = delete_obj.to_dict(exclude_none=True)
-
-        web_client.patch_all_portfolio_limits_client([delete_obj_json])
-
-        updated_portfolio_limits = web_client.get_portfolio_limits_client(portfolio_limits_id=4)
-
-        assert delete_broker.id not in [broker.id for broker in updated_portfolio_limits.eligible_brokers], \
-            f"Deleted obj: {delete_obj} using patch still found in updated object: {updated_portfolio_limits}"
-
-
-@pytest.mark.nightly
-@pytest.mark.parametrize("web_client", clients_list)
 def test_create_get_put_patch_delete_time_series_model(clean_and_set_limits, web_client):
     for index, return_type_param in enumerate([True, None, False]):
         formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
@@ -364,25 +234,594 @@ def test_create_get_put_patch_delete_time_series_model(clean_and_set_limits, web
 
 @pytest.mark.nightly
 @pytest.mark.parametrize("web_client", clients_list)
-def test_post_all_time_series_model(clean_and_set_limits, web_client):
+def test_post_all(clean_and_set_limits, web_client):
+    for msgspec_basemodel, get_all_client, create_all_client in \
+            [(SampleModelBaseModel, web_client.get_all_sample_model_client,
+              web_client.create_all_sample_model_client),
+             (SampleTSModelBaseModel, web_client.get_all_sample_ts_model_client,
+              web_client.create_all_sample_ts_model_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            sample_model_objects_list = [
+                msgspec_basemodel.from_kwargs(_id=1 + (index * 3), sample="sample1",
+                                                 date=get_utc_date_time(), num=1,
+                                                 cum_sum_of_num=1+index*3),
+                msgspec_basemodel.from_kwargs(_id=2 + (index * 3), sample="sample2",
+                                                 date=get_utc_date_time(), num=1, cum_sum_of_num=2+index*3),
+                msgspec_basemodel.from_kwargs(_id=3 + (index * 3), sample="sample3",
+                                                 date=get_utc_date_time(), num=1, cum_sum_of_num=3+index*3)
+            ]
+
+            fetched_sample_model_list = get_all_client()
+
+            for obj in sample_model_objects_list:
+                assert obj not in fetched_sample_model_list, f"Object {obj} must not be present in get-all list " \
+                                                                f"{fetched_sample_model_list} before post-all operation"
+
+            return_value = create_all_client(sample_model_objects_list, return_obj_copy=return_value_type)
+            if return_value_type or return_value_type is None:
+                assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
+                                                        f"received type: {type(return_value)}")
+            else:
+                assert (isinstance(return_value, bool) and return_value)
+
+            fetched_sample_model_list = get_all_client()
+
+            for obj in sample_model_objects_list:
+                assert obj in fetched_sample_model_list, f"Couldn't find object {obj} in get-all list " \
+                                                            f"{fetched_sample_model_list}"
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_post_all_with_msgspec_list_in_df_out_client(clean_and_set_limits, web_client):
+    for msgspec_basemodel, get_all_client, create_all_model_list_in_df_out_client, get_all_df_client in \
+            [(SampleModelBaseModel, web_client.get_all_sample_model_client,
+              web_client.create_all_sample_model_model_list_in_df_out_client,
+              web_client.get_all_sample_model_df_client),
+             (SampleTSModelBaseModel, web_client.get_all_sample_ts_model_client,
+              web_client.create_all_sample_ts_model_model_list_in_df_out_client,
+              web_client.get_all_sample_ts_model_df_client)]:
+
+        for index, return_value_type in enumerate([True, None, False]):
+            sample_model_objects_list = [
+                msgspec_basemodel.from_kwargs(_id=1 + (index * 3), sample="sample1",
+                                                 date=get_utc_date_time(), num=1,
+                                                 cum_sum_of_num=1 + index * 3),
+                msgspec_basemodel.from_kwargs(_id=2 + (index * 3), sample="sample2",
+                                                 date=get_utc_date_time(), num=1, cum_sum_of_num=2 + index * 3),
+                msgspec_basemodel.from_kwargs(_id=3 + (index * 3), sample="sample3",
+                                                 date=get_utc_date_time(), num=1, cum_sum_of_num=3 + index * 3)
+            ]
+            sample_df = pl.DataFrame(generic_encoder(sample_model_objects_list, msgspec_basemodel.enc_hook,
+                                                     by_alias=True, exclude_none=True))
+
+            fetched_sample_model_list = get_all_client()
+
+            for obj in sample_model_objects_list:
+                assert obj not in fetched_sample_model_list, f"Object {obj} must not be present in get-all list " \
+                                                             f"{fetched_sample_model_list} before post-all operation"
+
+            # Insert the data into the database
+            return_value = create_all_model_list_in_df_out_client(sample_model_objects_list,
+                                                                  return_obj_copy=return_value_type)
+            if return_value_type or return_value_type is None:
+                assert isinstance(return_value, pl.DataFrame), \
+                    f"Mismatched: returned value from client must be a Polars DataFrame, received type: {type(return_value)}"
+            else:
+                assert isinstance(return_value, bool) and return_value, \
+                    "Expected a boolean return value indicating success"
+
+            # Fetch the data again
+            fetched_sample_df = get_all_df_client()
+            assert isinstance(fetched_sample_df, pl.DataFrame), \
+                f"Expected fetched data to be a Polars DataFrame, found {fetched_sample_df}"
+
+            # Verify that all rows of sample_df exist in fetched_sample_df
+            merged_df = sample_df.join(
+                fetched_sample_df, on="_id", how="inner"
+            )
+            assert merged_df.height == sample_df.height, \
+                f"Not all objects from sample_df were found in fetched_sample_df. Mismatch: {sample_df - merged_df}"
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_post_all_with_df_in_msgspec_model_out_client(clean_and_set_limits, web_client):
+    for msgspec_basemodel, get_all_client, create_all_df_in_model_list_out_client, get_all_df_client in \
+            [(SampleModelBaseModel, web_client.get_all_sample_model_client,
+              web_client.create_all_sample_model_df_in_model_list_out_client,
+              web_client.get_all_sample_model_df_client),
+             (SampleTSModelBaseModel, web_client.get_all_sample_ts_model_client,
+              web_client.create_all_sample_ts_model_df_in_model_list_out_client,
+              web_client.get_all_sample_ts_model_df_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            # Create sample data as a Polars DataFrame
+            sample_data = [
+                {"_id": 1 + (index * 3), "sample": "sample1", "date": get_utc_date_time(), "num": 1, "cum_sum_of_num": 1 + index * 3},
+                {"_id": 2 + (index * 3), "sample": "sample2", "date": get_utc_date_time(), "num": 1, "cum_sum_of_num": 2 + index * 3},
+                {"_id": 3 + (index * 3), "sample": "sample3", "date": get_utc_date_time(), "num": 1, "cum_sum_of_num": 3 + index * 3},
+            ]
+            sample_df = pl.DataFrame(sample_data)
+            sample_model_objects_list = msgspec_basemodel.from_dict_list(sample_df.to_dicts())
+
+            # Fetch all existing data as a DataFrame
+            fetched_sample_df = get_all_df_client()
+            assert isinstance(fetched_sample_df, pl.DataFrame), "Expected fetched data to be a Polars DataFrame"
+
+            # Check if fetched_sample_df is empty
+            if not fetched_sample_df.is_empty():
+                # Assert that the sample data is not yet present in the database
+                assert not sample_df.filter(
+                    sample_df["_id"].is_in(fetched_sample_df["_id"])
+                ).height, \
+                    f"Some objects from sample_df already exist in fetched_sample_df: {fetched_sample_df}"
+
+            # Insert the data into the database
+            return_value = create_all_df_in_model_list_out_client(sample_df, return_obj_copy=return_value_type)
+            if return_value_type or return_value_type is None:
+                assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
+                                                        f"received type: {type(return_value)}")
+            else:
+                assert (isinstance(return_value, bool) and return_value)
+
+            fetched_sample_model_list = get_all_client()
+
+            for obj in sample_model_objects_list:
+                assert obj in fetched_sample_model_list, f"Couldn't find object {obj} in get-all list " \
+                                                         f"{fetched_sample_model_list}"
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_post_all_with_df_in_df_out_client(clean_and_set_limits, web_client):
+    for create_all_df_in_df_out_client, get_all_df_client in \
+            [(web_client.create_all_sample_model_df_in_df_out_client,
+              web_client.get_all_sample_model_df_client),
+             (web_client.create_all_sample_ts_model_df_in_df_out_client,
+              web_client.get_all_sample_ts_model_df_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            # Create sample data as a Polars DataFrame
+            sample_data = [
+                {"_id": 1 + (index * 3), "sample": "sample1", "date": get_utc_date_time(), "num": 1, "cum_sum_of_num": 1 + index * 3},
+                {"_id": 2 + (index * 3), "sample": "sample2", "date": get_utc_date_time(), "num": 1, "cum_sum_of_num": 2 + index * 3},
+                {"_id": 3 + (index * 3), "sample": "sample3", "date": get_utc_date_time(), "num": 1, "cum_sum_of_num": 3 + index * 3},
+            ]
+            sample_df = pl.DataFrame(sample_data)
+
+            # Fetch all existing data as a DataFrame
+            fetched_sample_df = get_all_df_client()
+            assert isinstance(fetched_sample_df, pl.DataFrame), "Expected fetched data to be a Polars DataFrame"
+
+            # Check if fetched_sample_df is empty
+            if not fetched_sample_df.is_empty():
+                # Assert that the sample data is not yet present in the database
+                assert not sample_df.filter(
+                    sample_df["_id"].is_in(fetched_sample_df["_id"])
+                ).height, \
+                    f"Some objects from sample_df already exist in fetched_sample_df: {fetched_sample_df}"
+
+            # Insert the data into the database
+            return_value = create_all_df_in_df_out_client(sample_df, return_obj_copy=return_value_type)
+            if return_value_type or return_value_type is None:
+                assert isinstance(return_value, pl.DataFrame), \
+                    f"Mismatched: returned value from client must be a Polars DataFrame, received type: {type(return_value)}"
+            else:
+                assert isinstance(return_value, bool) and return_value, \
+                    "Expected a boolean return value indicating success"
+
+            # Fetch the data again
+            fetched_sample_df = get_all_df_client()
+            assert isinstance(fetched_sample_df, pl.DataFrame), \
+                f"Expected fetched data to be a Polars DataFrame, found {fetched_sample_df}"
+
+            # Verify that all rows of sample_df exist in fetched_sample_df
+            merged_df = sample_df.join(
+                fetched_sample_df, on="_id", how="inner"
+            )
+            assert merged_df.height == sample_df.height, \
+                f"Not all objects from sample_df were found in fetched_sample_df. Mismatch: {sample_df - merged_df}"
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_put_all(clean_and_set_limits, web_client):
+    for msgspec_basemodel, get_all_client, create_all_client, put_all_client in \
+            [(SampleModelBaseModel, web_client.get_all_sample_model_client,
+              web_client.create_all_sample_model_client,
+              web_client.put_all_sample_model_client),
+             (SampleTSModelBaseModel, web_client.get_all_sample_ts_model_client,
+              web_client.create_all_sample_ts_model_client, 
+              web_client.put_all_sample_ts_model_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            sample_model_objects_list = [
+                msgspec_basemodel.from_kwargs(_id=1 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                                 date=get_utc_date_time(), num=1, cum_sum_of_num=1+index*3),
+                msgspec_basemodel.from_kwargs(_id=2 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                                 date=get_utc_date_time(), num=1, cum_sum_of_num=2+index*3),
+                msgspec_basemodel.from_kwargs(_id=3 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                                 date=get_utc_date_time(), num=1, cum_sum_of_num=3+index*3)
+            ]
+
+            create_all_client(sample_model_objects_list)
+
+            fetched_sample_model_list = get_all_client()
+
+            for obj in sample_model_objects_list:
+                assert obj in fetched_sample_model_list, f"Couldn't find object {obj} in get-all list " \
+                                                            f"{fetched_sample_model_list}"
+
+            # updating values
+            for obj in sample_model_objects_list:
+                obj.sample = f"sample___{obj.id}"
+
+            return_value = put_all_client(sample_model_objects_list,
+                                                                  return_obj_copy=return_value_type)
+            if return_value_type or return_value_type is None:
+                assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
+                                                        f"received type: {type(return_value)}")
+            else:
+                assert (isinstance(return_value, bool) and return_value)
+
+            updated_sample_model_list = get_all_client()
+
+            for expected_obj in sample_model_objects_list:
+                assert expected_obj in updated_sample_model_list, \
+                    f"expected obj {expected_obj} not found in updated list of objects: {updated_sample_model_list}"
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_put_all_msgspec_list_in_df_out_client(clean_and_set_limits, web_client):
+    for msgspec_basemodel, get_all_client, create_all_client, get_all_df_client, put_all_model_list_in_df_out_client in \
+            [(SampleModelBaseModel, web_client.get_all_sample_model_client,
+              web_client.create_all_sample_model_client,
+              web_client.get_all_sample_model_df_client,
+              web_client.put_all_sample_model_model_list_in_df_out_client),
+             (SampleTSModelBaseModel, web_client.get_all_sample_ts_model_client,
+              web_client.create_all_sample_ts_model_client,
+              web_client.get_all_sample_ts_model_df_client,
+              web_client.put_all_sample_ts_model_model_list_in_df_out_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            sample_model_objects_list = [
+                msgspec_basemodel.from_kwargs(_id=1 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                                 date=get_utc_date_time(), num=1, cum_sum_of_num=1+index*3),
+                msgspec_basemodel.from_kwargs(_id=2 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                                 date=get_utc_date_time(), num=1, cum_sum_of_num=2+index*3),
+                msgspec_basemodel.from_kwargs(_id=3 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                                 date=get_utc_date_time(), num=1, cum_sum_of_num=3+index*3)
+            ]
+
+            create_all_client(sample_model_objects_list)
+            fetched_sample_model_list = get_all_client()
+
+            for obj in sample_model_objects_list:
+                assert obj in fetched_sample_model_list, f"Couldn't find object {obj} in get-all list " \
+                                                            f"{fetched_sample_model_list}"
+
+            # updating values
+            for obj in sample_model_objects_list:
+                obj.sample = f"sample___{obj.id}"
+            updated_sample_model_df = pl.DataFrame(generic_encoder(sample_model_objects_list, msgspec_basemodel.enc_hook,
+                                                     by_alias=True, exclude_none=True))
+
+            return_value = put_all_model_list_in_df_out_client(sample_model_objects_list,
+                                                               return_obj_copy=return_value_type)
+            if return_value_type or return_value_type is None:
+                assert isinstance(return_value, pl.DataFrame), \
+                    f"Expected return value to be a Polars DataFrame, but got {type(return_value)}"
+            else:
+                assert (isinstance(return_value, bool) and return_value)
+
+            # Fetch the data again
+            fetched_sample_df = get_all_df_client()
+            assert isinstance(fetched_sample_df, pl.DataFrame), \
+                f"Expected fetched data to be a Polars DataFrame, found {fetched_sample_df}"
+
+            # Verify the updated data in the database
+            merged_df = updated_sample_model_df.join(
+                fetched_sample_df, on="_id", how="inner"
+            )
+            assert merged_df.height == updated_sample_model_df.height, \
+                (f"Not all objects from updated_sample_model_df were found in fetched_sample_df. "
+                 f"Mismatch: {updated_sample_model_df - merged_df}")
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_put_all_df_in_msgspec_list_out_client(clean_and_set_limits, web_client):
+    for msgspec_basemodel, get_all_client, create_all_df_client, get_all_df_client, put_all_df_in_model_list_out_client in \
+            [(SampleModelBaseModel, web_client.get_all_sample_model_client,
+              web_client.create_all_sample_model_df_in_df_out_client,
+              web_client.get_all_sample_model_df_client,
+              web_client.put_all_sample_model_df_in_model_list_out_client),
+             (SampleTSModelBaseModel, web_client.get_all_sample_ts_model_client,
+              web_client.create_all_sample_ts_model_df_in_df_out_client,
+              web_client.get_all_sample_ts_model_df_client,
+              web_client.put_all_sample_ts_model_df_in_model_list_out_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            # Create initial data as a Polars DataFrame
+            sample_data = [
+                {"_id": 1 + (index * 3), "sample": f"sample{1 + (index * 3)}", "date": get_utc_date_time(),
+                 "num": 1, "cum_sum_of_num": 1 + index * 3},
+                {"_id": 2 + (index * 3), "sample": f"sample{2 + (index * 3)}", "date": get_utc_date_time(),
+                 "num": 1, "cum_sum_of_num": 2 + index * 3},
+                {"_id": 3 + (index * 3), "sample": f"sample{3 + (index * 3)}", "date": get_utc_date_time(),
+                 "num": 1, "cum_sum_of_num": 3 + index * 3},
+            ]
+            sample_df = pl.DataFrame(sample_data)
+
+            # Insert the initial data into the database
+            create_all_df_client(sample_df)
+
+            # Verify initial data in the database
+            fetched_sample_df = get_all_df_client()
+            assert isinstance(fetched_sample_df, pl.DataFrame), "Expected fetched data to be a Polars DataFrame"
+            ids_in_db = fetched_sample_df["_id"].to_list()
+            for row in sample_data:
+                assert row["_id"] in ids_in_db, f"Object with ID {row['_id']} not found in initial database"
+
+            # Update the data
+            for row in sample_data:
+                row["sample"] = f"sample_updated_{row['_id']}"
+            updated_sample_df = pl.DataFrame(sample_data)
+            sample_model_objects_list = msgspec_basemodel.from_dict_list(updated_sample_df.to_dicts())
+
+            # Perform the update operation
+            return_value = put_all_df_in_model_list_out_client(updated_sample_df, return_obj_copy=return_value_type)
+            if return_value_type or return_value_type is None:
+                assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
+                                                        f"received type: {type(return_value)}")
+            else:
+                assert (isinstance(return_value, bool) and return_value)
+
+            updated_sample_model_list = get_all_client()
+
+            for expected_obj in sample_model_objects_list:
+                assert expected_obj in updated_sample_model_list, \
+                    f"expected obj {expected_obj} not found in updated list of objects: {updated_sample_model_list}"
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_put_all_df_in_df_out_client(clean_and_set_limits, web_client):
+    for create_all_df_client, get_all_df_client, put_all_df_in_df_client in \
+            [(web_client.create_all_sample_model_df_in_df_out_client,
+              web_client.get_all_sample_model_df_client,
+              web_client.put_all_sample_model_df_in_df_out_client),
+             (web_client.create_all_sample_ts_model_df_in_df_out_client,
+              web_client.get_all_sample_ts_model_df_client,
+              web_client.put_all_sample_ts_model_df_in_df_out_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            # Create initial data as a Polars DataFrame
+            sample_data = [
+                {"_id": 1 + (index * 3), "sample": f"sample{1 + (index * 3)}", "date": get_utc_date_time(),
+                 "num": 1, "cum_sum_of_num": 1 + index * 3},
+                {"_id": 2 + (index * 3), "sample": f"sample{2 + (index * 3)}", "date": get_utc_date_time(),
+                 "num": 1, "cum_sum_of_num": 2 + index * 3},
+                {"_id": 3 + (index * 3), "sample": f"sample{3 + (index * 3)}", "date": get_utc_date_time(),
+                 "num": 1, "cum_sum_of_num": 3 + index * 3},
+            ]
+            sample_df = pl.DataFrame(sample_data)
+    
+            # Insert the initial data into the database
+            create_all_df_client(sample_df)
+    
+            # Verify initial data in the database
+            fetched_sample_df = get_all_df_client()
+            assert isinstance(fetched_sample_df, pl.DataFrame), "Expected fetched data to be a Polars DataFrame"
+            ids_in_db = fetched_sample_df["_id"].to_list()
+            for row in sample_data:
+                assert row["_id"] in ids_in_db, f"Object with ID {row['_id']} not found in initial database"
+    
+            # Update the data
+            for row in sample_data:
+                row["sample"] = f"sample_updated_{row['_id']}"
+            updated_sample_df = pl.DataFrame(sample_data)
+    
+            # Perform the update operation
+            return_value = put_all_df_in_df_client(updated_sample_df, return_obj_copy=return_value_type)
+            if return_value_type or return_value_type is None:
+                assert isinstance(return_value, pl.DataFrame), \
+                    f"Expected return value to be a Polars DataFrame, but got {type(return_value)}"
+            else:
+                assert (isinstance(return_value, bool) and return_value)
+    
+            # Fetch the data again
+            fetched_sample_df = get_all_df_client()
+            assert isinstance(fetched_sample_df, pl.DataFrame), \
+                f"Expected fetched data to be a Polars DataFrame, found {fetched_sample_df}"
+    
+            # Verify the updated data in the database
+            merged_df = updated_sample_df.join(
+                fetched_sample_df, on="_id", how="inner"
+            )
+            assert merged_df.height == updated_sample_df.height, \
+                f"Not all objects from updated_sample_df were found in fetched_sample_df. Mismatch: {updated_sample_df - merged_df}"
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_patch_all(clean_and_set_limits, web_client):
+    for msgspec_basemodel, get_all_client, create_all_client, patch_all_client in \
+            [(SampleModelBaseModel, web_client.get_all_sample_model_client,
+              web_client.create_all_sample_model_client,
+              web_client.patch_all_sample_model_client),
+             (SampleTSModelBaseModel, web_client.get_all_sample_ts_model_client,
+              web_client.create_all_sample_ts_model_client,
+              web_client.patch_all_sample_ts_model_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            sample_model_objects_list = [
+                msgspec_basemodel.from_kwargs(_id=1 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                              date=get_utc_date_time(), num=1, cum_sum_of_num=1 + index * 3),
+                msgspec_basemodel.from_kwargs(_id=2 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                              date=get_utc_date_time(), num=1, cum_sum_of_num=2 + index * 3),
+                msgspec_basemodel.from_kwargs(_id=3 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                              date=get_utc_date_time(), num=1, cum_sum_of_num=3 + index * 3)
+            ]
+
+            create_all_client(sample_model_objects_list)
+
+            fetched_email_book_beanie = get_all_client()
+
+            for obj in sample_model_objects_list:
+                assert obj in fetched_email_book_beanie, f"Couldn't find object {obj} in get-all list " \
+                                                            f"{fetched_email_book_beanie}"
+            # updating values
+            for obj in sample_model_objects_list:
+                obj.sample = f"sample_{obj.id}"
+                formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                obj.date = pendulum.parse(formatted_dt_utc)
+
+            sample_ts_model_objects_json_list = [obj.to_dict(exclude_none=True)
+                                                 for obj in sample_model_objects_list]
+            return_value = patch_all_client(sample_ts_model_objects_json_list, return_obj_copy=return_value_type)
+            if return_value_type:
+                assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
+                                                        f"received type: {type(return_value)}")
+            else:
+                assert return_value
+
+            updated_sample_ts_model_list = get_all_client()
+
+            for expected_obj in sample_model_objects_list:
+                assert expected_obj in updated_sample_ts_model_list, \
+                    f"expected obj {expected_obj} not found in updated list of objects: {updated_sample_ts_model_list}"
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_patch_all_json_list_in_df_out_client(clean_and_set_limits, web_client):
+    for msgspec_basemodel, get_all_client, create_all_client, patch_all_json_list_in_df_out_client in \
+            [(SampleModelBaseModel, web_client.get_all_sample_model_client,
+              web_client.create_all_sample_model_client,
+              web_client.patch_all_sample_model_json_list_in_df_out_client),
+             (SampleTSModelBaseModel, web_client.get_all_sample_ts_model_client,
+              web_client.create_all_sample_ts_model_client,
+              web_client.patch_all_sample_ts_model_json_list_in_df_out_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            sample_model_objects_list = [
+                msgspec_basemodel.from_kwargs(_id=1 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                              date=get_utc_date_time(), num=1, cum_sum_of_num=1 + index * 3),
+                msgspec_basemodel.from_kwargs(_id=2 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                              date=get_utc_date_time(), num=1, cum_sum_of_num=2 + index * 3),
+                msgspec_basemodel.from_kwargs(_id=3 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                              date=get_utc_date_time(), num=1, cum_sum_of_num=3 + index * 3)
+            ]
+
+            create_all_client(sample_model_objects_list)
+
+            fetched_email_book_beanie = get_all_client()
+
+            for obj in sample_model_objects_list:
+                assert obj in fetched_email_book_beanie, f"Couldn't find object {obj} in get-all list " \
+                                                            f"{fetched_email_book_beanie}"
+            # updating values
+            for obj in sample_model_objects_list:
+                obj.sample = f"sample_{obj.id}"
+                formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                obj.date = pendulum.parse(formatted_dt_utc)
+
+            sample_ts_model_objects_json_list = [obj.to_dict(exclude_none=True)
+                                                 for obj in sample_model_objects_list]
+            return_value = patch_all_json_list_in_df_out_client(sample_ts_model_objects_json_list, return_obj_copy=return_value_type)
+            if return_value_type or return_value_type is None:
+                assert isinstance(return_value, pl.DataFrame), \
+                    f"Expected return value to be a Polars DataFrame, but got {type(return_value)}"
+            else:
+                assert (isinstance(return_value, bool) and return_value)
+
+            updated_sample_ts_model_list = get_all_client()
+
+            for expected_obj in sample_model_objects_list:
+                assert expected_obj in updated_sample_ts_model_list, \
+                    f"expected obj {expected_obj} not found in updated list of objects: {updated_sample_ts_model_list}"
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_patch_all_df_in_df_out_client(clean_and_set_limits, web_client):
+    for msgspec_basemodel, get_all_client, create_all_client, patch_all_df_in_df_out_client in \
+            [(SampleModelBaseModel, web_client.get_all_sample_model_client,
+              web_client.create_all_sample_model_client,
+              web_client.patch_all_sample_model_df_in_df_out_client),
+             (SampleTSModelBaseModel, web_client.get_all_sample_ts_model_client,
+              web_client.create_all_sample_ts_model_client,
+              web_client.patch_all_sample_ts_model_df_in_df_out_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            sample_model_objects_list = [
+                msgspec_basemodel.from_kwargs(_id=1 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                              date=get_utc_date_time(), num=1, cum_sum_of_num=1 + index * 3),
+                msgspec_basemodel.from_kwargs(_id=2 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                              date=get_utc_date_time(), num=1, cum_sum_of_num=2 + index * 3),
+                msgspec_basemodel.from_kwargs(_id=3 + (index * 3), sample=f"sample{1 + (index * 3)}",
+                                              date=get_utc_date_time(), num=1, cum_sum_of_num=3 + index * 3)
+            ]
+
+            create_all_client(sample_model_objects_list)
+
+            fetched_email_book_beanie = get_all_client()
+
+            for obj in sample_model_objects_list:
+                assert obj in fetched_email_book_beanie, f"Couldn't find object {obj} in get-all list " \
+                                                            f"{fetched_email_book_beanie}"
+            # updating values
+            for obj in sample_model_objects_list:
+                obj.sample = f"sample_{obj.id}"
+                formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                obj.date = pendulum.parse(formatted_dt_utc)
+
+            update_json_list = [obj.to_dict(exclude_none=True) for obj in sample_model_objects_list]
+            update_model_df = pl.DataFrame(update_json_list)
+
+            return_value = patch_all_df_in_df_out_client(update_model_df,
+                                                         return_obj_copy=return_value_type)
+            if return_value_type or return_value_type is None:
+                assert isinstance(return_value, pl.DataFrame), \
+                    f"Expected return value to be a Polars DataFrame, but got {type(return_value)}"
+            else:
+                assert (isinstance(return_value, bool) and return_value)
+
+            updated_sample_ts_model_list = get_all_client()
+
+            for expected_obj in sample_model_objects_list:
+                assert expected_obj in updated_sample_ts_model_list, \
+                    f"expected obj {expected_obj} not found in updated list of objects: {updated_sample_ts_model_list}"
+
+
+
+@pytest.mark.nightly
+@pytest.mark.parametrize("web_client", clients_list)
+def test_patch_all_repeated_field_handling(clean_and_set_limits, web_client):
     for index, return_value_type in enumerate([True, None, False]):
-        formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-        sample_ts_model_objects_list = [
-            SampleTSModelBaseModel.from_kwargs(_id=2 + (index * 3), sample=f"sample-{2 + (index * 3)}",
-                                               date=pendulum.parse(formatted_dt_utc)),
-            SampleTSModelBaseModel.from_kwargs(_id=3 + (index * 3), sample=f"sample-{3 + (index * 3)}",
-                                               date=pendulum.parse(formatted_dt_utc)),
-            SampleTSModelBaseModel.from_kwargs(_id=4 + (index * 3), sample=f"sample-{4 + (index * 3)}",
-                                               date=pendulum.parse(formatted_dt_utc))
+        portfolio_limits_objects_list = [
+            PortfolioLimitsBaseModel.from_kwargs(_id=2 + (index * 3), max_open_baskets=20),
+            PortfolioLimitsBaseModel.from_kwargs(_id=3 + (index * 3), max_open_baskets=30),
+            PortfolioLimitsBaseModel.from_kwargs(_id=4 + (index * 3), max_open_baskets=45)
         ]
 
-        fetched_email_book_beanie = web_client.get_all_sample_ts_model_client()
+        web_client.create_all_portfolio_limits_client(portfolio_limits_objects_list)
 
-        for obj in sample_ts_model_objects_list:
-            assert obj not in fetched_email_book_beanie, f"Object {obj} must not be present in get-all list " \
-                                                            f"{fetched_email_book_beanie} before post-all operation"
+        fetched_get_all_obj_list = web_client.get_all_portfolio_limits_client()
 
-        return_value = web_client.create_all_sample_ts_model_client(sample_ts_model_objects_list,
+        for obj in portfolio_limits_objects_list:
+            assert obj in fetched_get_all_obj_list, f"Couldn't find object {obj} in get-all list " \
+                                                    f"{fetched_get_all_obj_list}"
+
+        # updating values
+        portfolio_limits_objects_json_list = []
+        for obj in portfolio_limits_objects_list:
+            obj.eligible_brokers = []
+            for broker_obj_id in [1, 2]:
+                broker = broker_fixture()
+                broker.id = f"{broker_obj_id}"
+                broker.bkr_priority = broker_obj_id
+                obj.eligible_brokers.append(broker)
+            portfolio_limits_objects_json_list.append(obj.to_dict(exclude_none=True))
+
+        return_value = web_client.patch_all_portfolio_limits_client(portfolio_limits_objects_json_list,
                                                                     return_obj_copy=return_value_type)
         if return_value_type:
             assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
@@ -390,97 +829,61 @@ def test_post_all_time_series_model(clean_and_set_limits, web_client):
         else:
             assert return_value
 
-        fetched_email_book_beanie = web_client.get_all_sample_ts_model_client()
+        for expected_obj in portfolio_limits_objects_list:
+            updated_portfolio_limits = web_client.get_portfolio_limits_client(portfolio_limits_id=expected_obj.id)
+            assert expected_obj.to_dict() == updated_portfolio_limits.to_dict(), \
+                f"Mismatched: expected obj {expected_obj} received {updated_portfolio_limits}"
 
-        for obj in sample_ts_model_objects_list:
-            assert obj in fetched_email_book_beanie, f"Couldn't find object {obj} in get-all list " \
-                                                        f"{fetched_email_book_beanie}"
+        delete_broker = BrokerBaseModel()
+        delete_broker.id = "1"
 
+        delete_obj = PortfolioLimitsBaseModel.from_kwargs(_id=4 + (index * 3), eligible_brokers=[delete_broker])
+        delete_obj_json = delete_obj.to_dict(exclude_none=True)
 
-@pytest.mark.nightly
-@pytest.mark.parametrize("web_client", clients_list)
-def test_put_all_time_series_model(clean_and_set_limits, web_client):
-    for index, return_value_type in enumerate([True, None, False]):
-        formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-        sample_ts_model_objects_list = [
-            SampleTSModelBaseModel.from_kwargs(_id=2 + (index * 3), sample=f"sample-{2 + (index * 3)}",
-                                               date=pendulum.parse(formatted_dt_utc)),
-            SampleTSModelBaseModel.from_kwargs(_id=3 + (index * 3), sample=f"sample-{3 + (index * 3)}",
-                                               date=pendulum.parse(formatted_dt_utc)),
-            SampleTSModelBaseModel.from_kwargs(_id=4 + (index * 3), sample=f"sample-{4 + (index * 3)}",
-                                               date=pendulum.parse(formatted_dt_utc))
-        ]
+        web_client.patch_all_portfolio_limits_client([delete_obj_json])
 
-        web_client.create_all_sample_ts_model_client(sample_ts_model_objects_list)
+        updated_portfolio_limits = web_client.get_portfolio_limits_client(portfolio_limits_id=4)
 
-        fetched_email_book_beanie = web_client.get_all_sample_ts_model_client()
+        assert delete_broker.id not in [broker.id for broker in updated_portfolio_limits.eligible_brokers], \
+            f"Deleted obj: {delete_obj} using patch still found in updated object: {updated_portfolio_limits}"
 
-        for obj in sample_ts_model_objects_list:
-            assert obj in fetched_email_book_beanie, f"Couldn't find object {obj} in get-all list " \
-                                                        f"{fetched_email_book_beanie}"
-        # updating values
-        for obj in sample_ts_model_objects_list:
-            obj.sample = f"sample_{obj.id}"
-            formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            obj.date = pendulum.parse(formatted_dt_utc)
-
-        return_value = web_client.put_all_sample_ts_model_client(sample_ts_model_objects_list,
-                                                                 return_obj_copy=return_value_type)
-        if return_value_type:
-            assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
-                                                    f"received type: {type(return_value)}")
-        else:
-            assert return_value
-
-        updated_sample_ts_model_list = web_client.get_all_sample_ts_model_client()
-
-        for expected_obj in sample_ts_model_objects_list:
-            assert expected_obj in updated_sample_ts_model_list, \
-                f"expected obj {expected_obj} not found in updated list of objects: {updated_sample_ts_model_list}"
 
 
 @pytest.mark.nightly
 @pytest.mark.parametrize("web_client", clients_list)
-def test_patch_all_time_series_model(clean_and_set_limits, web_client):
-    for index, return_value_type in enumerate([True, None, False]):
-        formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-        sample_ts_model_objects_list = [
-            SampleTSModelBaseModel.from_kwargs(_id=2 + (index * 3), sample=f"sample-{2 + (index * 3)}",
-                                               date=pendulum.parse(formatted_dt_utc)),
-            SampleTSModelBaseModel.from_kwargs(_id=3 + (index * 3), sample=f"sample-{3 + (index * 3)}",
-                                               date=pendulum.parse(formatted_dt_utc)),
-            SampleTSModelBaseModel.from_kwargs(_id=4 + (index * 3), sample=f"sample-{4 + (index * 3)}",
-                                               date=pendulum.parse(formatted_dt_utc))
-        ]
+def test_delete_by_id_list(clean_and_set_limits, web_client):
+    for msgspec_basemodel, create_all_client, delete_by_id_client, delete_all_client in \
+            [(SampleModelBaseModel,
+              web_client.create_all_sample_model_client,
+              web_client.delete_by_id_list_sample_model_client,
+              web_client.delete_all_sample_model_client),
+             (SampleTSModelBaseModel,
+              web_client.create_all_sample_ts_model_client,
+              web_client.delete_by_id_list_sample_ts_model_client,
+              web_client.delete_all_sample_ts_model_client)]:
+        for index, return_value_type in enumerate([True, None, False]):
+            sample_model_obj_list = []
+            for i in range(5):
+                sample_model_obj_list.append(msgspec_basemodel.from_kwargs(_id=i + 1, sample="sample1",
+                                             date=get_utc_date_time(), num=1, cum_sum_of_num=1+index*3))
+            create_all_client(sample_model_obj_list,
+                                                      return_obj_copy=return_value_type)
 
-        web_client.create_all_sample_ts_model_client(sample_ts_model_objects_list)
+            # id=6 doesn't exist - trying to see if client call ignores this id and logs it while deleting others
+            existing_ids_list = [2, 3, 4]
+            id_list_to_be_deleted = existing_ids_list + [6]
+            delete_web_response = delete_by_id_client(id_list_to_be_deleted)
+            if return_value_type is not None or return_value_type:
+                assert delete_web_response["id"] == existing_ids_list, \
+                    (f"Mismatched id list in delete_web_response, expected {existing_ids_list}, "
+                     f"found {delete_web_response["id"]}")
+            else:
+                assert delete_web_response, \
+                    f"Mismatch when return_value param to clinet was False, expected True received {delete_web_response}"
 
-        fetched_email_book_beanie = web_client.get_all_sample_ts_model_client()
+            # cleaning existing objs for next loop
+            delete_all_client()
 
-        for obj in sample_ts_model_objects_list:
-            assert obj in fetched_email_book_beanie, f"Couldn't find object {obj} in get-all list " \
-                                                        f"{fetched_email_book_beanie}"
-        # updating values
-        for obj in sample_ts_model_objects_list:
-            obj.sample = f"sample_{obj.id}"
-            formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            obj.date = pendulum.parse(formatted_dt_utc)
-
-        sample_ts_model_objects_json_list = [obj.to_dict(exclude_none=True)
-                                             for obj in sample_ts_model_objects_list]
-        return_value = web_client.patch_all_sample_ts_model_client(sample_ts_model_objects_json_list,
-                                                                   return_obj_copy=return_value_type)
-        if return_value_type:
-            assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
-                                                    f"received type: {type(return_value)}")
-        else:
-            assert return_value
-
-        updated_sample_ts_model_list = web_client.get_all_sample_ts_model_client()
-
-        for expected_obj in sample_ts_model_objects_list:
-            assert expected_obj in updated_sample_ts_model_list, \
-                f"expected obj {expected_obj} not found in updated list of objects: {updated_sample_ts_model_list}"
 
 
 # todo: currently contains beanie http call of sample models, once cache http is implemented test that too
@@ -649,13 +1052,11 @@ def test_place_chores_with_manual_executor_port(
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    port = 0    # <<<<<< manually replace thi with running executor port to place chores
+    port = 0    # <<<<<< manually replace this with running executor port to place chores
+    cpp_port = 0    # <<<<<< manually replace this with running cpp port to place chores
     executor_web_client = StreetBookServiceHttpClient(host='127.0.0.1', port=port)
-    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_web_client)
-
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_1_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path), load_as_str=True)
+    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, cpp_port)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(strat_id=1)
 
     try:
         # updating yaml_configs according to this test
@@ -668,22 +1069,13 @@ def test_place_chores_with_manual_executor_port(
 
         total_chore_count_for_each_side = max_loop_count_per_side
 
-        bid_buy_top_market_depth = None
-        ask_sell_top_market_depth = None
-        stored_market_depth = executor_web_client.get_all_market_depth_client()
-        for market_depth in stored_market_depth:
-            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-                bid_buy_top_market_depth = market_depth
-            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-                ask_sell_top_market_depth = market_depth
-
         # Placing buy chores
         buy_ack_chore_id = None
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, cpp_port)
 
             time.sleep(1)
-            # update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+            # update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
             #                                                    ask_sell_top_market_depth)
             place_new_chore(buy_symbol, Side.BUY, 98, 95, executor_web_client, InstrumentType.CB)
             ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -698,11 +1090,11 @@ def test_place_chores_with_manual_executor_port(
         # Placing sell chores
         sell_ack_chore_id = None
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, cpp_port)
             # required to make buy side tob latest
-            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], cpp_port)
 
-            # update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+            # update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
             #                                                     bid_buy_top_market_depth)
             place_new_chore(sell_symbol, Side.SELL, 98, 95, executor_web_client, InstrumentType.EQT)
 
@@ -812,11 +1204,9 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #         pair_strat_, market_depth_basemodel_list, symbol_overview_obj_list,
 #         expected_strat_limits_, expected_strat_status_)
 #
-#     run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+#     run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 #
-#     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-#     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-#     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+#     config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 #
 #     try:
 #         # updating yaml_configs according to this test
@@ -833,7 +1223,7 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #         buy_ack_chore_id = None
 #         sell_ack_chore_id = None
 #         for loop_count in range(total_chore_count_for_each_side):
-#             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
+#             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port,
 #                            create_counts_per_side=2)
 #
 #             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, 10, 90, executor_web_client)
@@ -942,13 +1332,13 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #
 #     for chore_count in range(chore_counts):
 #         # Buy Chore
-#         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+#         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 #         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 #         # Running TopOfBook (this triggers expected buy chore)
 #         run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client[0], False)
 #
 #         # Sell Chore
-#         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+#         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 #         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 #         # Running TopOfBook (this triggers expected buy chore)
 #         run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client[1], False)
@@ -2028,19 +2418,13 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
                                            last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_web_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == leg1_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == leg2_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_strat))
 
     # positive test
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
     time.sleep(1)
-    update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+    update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
 
     # internally checks chore_journal existence
@@ -2059,9 +2443,9 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
     time.sleep(5)
     check_alert_str_in_portfolio_alert(check_str, alert_fail_msg)
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
     time.sleep(1)
-    update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+    update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
     # internally checking buy chore
     chore_journal = \
@@ -2070,11 +2454,11 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
                                                        last_chore_id=chore_journal.chore.chore_id,
                                                        expect_no_chore=True)
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
     # required to make buy side tob latest
-    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
 
-    update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+    update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                         bid_buy_top_market_depth)
     # internally checking sell chore
     chore_journal = \
@@ -2102,7 +2486,7 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
 
     # positive test
     # placing buy chore
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
     place_new_chore(leg1_symbol, Side.BUY, buy_chore_.chore.px, buy_chore_.chore.qty, executor_web_client,
                     buy_inst_type)
     time.sleep(2)
@@ -2124,7 +2508,7 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
     check_alert_str_in_portfolio_alert(check_str, alert_fail_msg)
 
     # placing buy chore
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
     place_new_chore(leg1_symbol, Side.BUY, buy_chore_.chore.px, buy_chore_.chore.qty, executor_web_client,
                     buy_inst_type)
     time.sleep(2)
@@ -2135,7 +2519,7 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
                                                                    expect_no_chore=True)
 
     # placing sell chore
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
     place_new_chore(leg2_symbol, Side.SELL, sell_chore_.chore.px, sell_chore_.chore.qty, executor_web_client,
                     sell_inst_type)
     time.sleep(2)
@@ -2167,29 +2551,23 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
         system_control.to_dict(exclude_none=True))
     assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
 
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_web_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == leg1_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == leg2_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_strat))
     time.sleep(2)
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
     time.sleep(1)
-    update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+    update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
     # internally checking buy chore
     chore_journal = \
         get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg1_symbol, executor_web_client, expect_no_chore=True)
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
     # required to make buy side tob latest
-    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
 
-    update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+    update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                         bid_buy_top_market_depth)
     # internally checking sell chore
     chore_journal = \
@@ -2208,9 +2586,9 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     time.sleep(5)
     check_alert_str_in_portfolio_alert(check_str, alert_fail_msg)
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
     time.sleep(1)
-    update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+    update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
 
     # internally checks chore_journal existence
@@ -2218,11 +2596,11 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
                                                                                  leg1_symbol, executor_web_client)
     time.sleep(residual_wait_sec)
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
     # required to make buy side tob latest
-    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
 
-    update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+    update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                         bid_buy_top_market_depth)
     # internally checking sell chore
     chore_journal = \
@@ -2340,9 +2718,7 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
         try:
             # updating yaml_configs according to this test
@@ -2363,7 +2739,8 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
                         underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, leg1_symbol,
                                                                        leg2_symbol,
                                                                        last_barter_fixture_list,
-                                                                       chore_id, config_dict, executor_http_client)
+                                                                       chore_id, config_dict,
+                                                                       created_pair_strat, executor_http_client)
                     total_partial_filled_qty += partial_filled_qty
                     if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
                         # Sleeping to let the chore get cxlled
@@ -2410,9 +2787,7 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_
                                                expected_strat_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list, market_depth_basemodel_list))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
         try:
             # updating yaml_configs according to this test
@@ -2484,17 +2859,8 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            bid_buy_top_market_depth = None
-            ask_sell_top_market_depth = None
-            stored_market_depth = executor_http_client.get_all_market_depth_client()
-            for market_depth in stored_market_depth:
-                if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-                    bid_buy_top_market_depth = market_depth
-                if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-                    ask_sell_top_market_depth = market_depth
-
             # buy fills check
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
 
             px = 100
             qty = 90
@@ -2652,9 +3018,7 @@ def test_over_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pa
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -2666,19 +3030,13 @@ def test_over_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pa
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        bid_buy_top_market_depth = None
-        ask_sell_top_market_depth = None
-        stored_market_depth = executor_http_client.get_all_market_depth_client()
-        for market_depth in stored_market_depth:
-            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-                bid_buy_top_market_depth = market_depth
-            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-                ask_sell_top_market_depth = market_depth
+        bid_buy_top_market_depth, ask_sell_top_market_depth = (
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
 
         # buy fills check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -2746,9 +3104,7 @@ def test_over_fill_after_fulfill(
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -2760,19 +3116,13 @@ def test_over_fill_after_fulfill(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        bid_buy_top_market_depth = None
-        ask_sell_top_market_depth = None
-        stored_market_depth = executor_http_client.get_all_market_depth_client()
-        for market_depth in stored_market_depth:
-            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-                bid_buy_top_market_depth = market_depth
-            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-                ask_sell_top_market_depth = market_depth
+        bid_buy_top_market_depth, ask_sell_top_market_depth = (
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
 
         # buy fills check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(5)  # delay for chore to get placed
 
@@ -2852,9 +3202,7 @@ def test_ack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_
                                                expected_strat_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list, market_depth_basemodel_list))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
         try:
             # updating yaml_configs according to this test
@@ -2867,7 +3215,7 @@ def test_ack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_rej_chore_test(leg1_symbol, leg2_symbol, expected_strat_limits_,
+            handle_rej_chore_test(leg1_symbol, leg2_symbol, created_pair_strat, expected_strat_limits_,
                                   last_barter_fixture_list, max_loop_count_per_side,
                                   True, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
@@ -2900,9 +3248,7 @@ def test_unack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbo
                                                expected_strat_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list, market_depth_basemodel_list))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
         try:
             # updating yaml_configs according to this test
@@ -2915,7 +3261,7 @@ def test_unack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbo
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_rej_chore_test(leg1_symbol, leg2_symbol, expected_strat_limits_,
+            handle_rej_chore_test(leg1_symbol, leg2_symbol, created_pair_strat, expected_strat_limits_,
                                   last_barter_fixture_list, max_loop_count_per_side,
                                   False, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
@@ -2948,9 +3294,7 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
         try:
             # updating yaml_configs according to this test
@@ -2963,14 +3307,8 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            bid_buy_top_market_depth = None
-            ask_sell_top_market_depth = None
-            stored_market_depth = executor_http_client.get_all_market_depth_client()
-            for market_depth in stored_market_depth:
-                if market_depth.symbol == leg1_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-                    bid_buy_top_market_depth = market_depth
-                if market_depth.symbol == leg2_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-                    ask_sell_top_market_depth = market_depth
+            bid_buy_top_market_depth, ask_sell_top_market_depth = (
+                get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_strat))
 
             for check_symbol in [leg1_symbol, leg2_symbol]:
                 continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(check_symbol,
@@ -2980,17 +3318,17 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
                 last_cxl_chore_id = None
                 last_cxl_rej_chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
                     if check_symbol == leg1_symbol:
                         time.sleep(1)
-                        update_tob_through_market_depth_to_place_buy_chore(executor_http_client,
+                        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port,
                                                                            bid_buy_top_market_depth,
                                                                            ask_sell_top_market_depth)
                     else:
                         # required to make buy side tob latest
-                        run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], executor_http_client)
+                        run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
 
-                        update_tob_through_market_depth_to_place_sell_chore(executor_http_client,
+                        update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port,
                                                                             ask_sell_top_market_depth,
                                                                             bid_buy_top_market_depth)
                     time.sleep(10)  # delay for chore to get placed and trigger cxl
@@ -3042,9 +3380,7 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
         try:
             # updating yaml_configs according to this test
@@ -3058,16 +3394,8 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            bid_buy_top_market_depth = None
-            ask_sell_top_market_depth = None
-            stored_market_depth = executor_http_client.get_all_market_depth_client()
-            for market_depth in stored_market_depth:
-                if (market_depth.symbol == leg1_symbol and market_depth.position == 0 and
-                        market_depth.side == TickType.BID):
-                    bid_buy_top_market_depth = market_depth
-                if (market_depth.symbol == leg2_symbol and market_depth.position == 0 and
-                        market_depth.side == TickType.ASK):
-                    ask_sell_top_market_depth = market_depth
+            bid_buy_top_market_depth, ask_sell_top_market_depth = (
+                get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_strat))
 
             for check_symbol in [leg1_symbol, leg2_symbol]:
                 continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(check_symbol,
@@ -3077,17 +3405,17 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
                 last_cxl_chore_id = None
                 last_cxl_rej_chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
                     if check_symbol == leg1_symbol:
                         time.sleep(1)
-                        update_tob_through_market_depth_to_place_buy_chore(executor_http_client,
+                        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port,
                                                                            bid_buy_top_market_depth,
                                                                            ask_sell_top_market_depth)
                     else:
                         # required to make buy side tob latest
-                        run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], executor_http_client)
+                        run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
 
-                        update_tob_through_market_depth_to_place_sell_chore(executor_http_client,
+                        update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port,
                                                                             ask_sell_top_market_depth,
                                                                             bid_buy_top_market_depth)
                     time.sleep(10)  # delay for chore to get placed and trigger cxl
@@ -3160,7 +3488,7 @@ def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg
                 last_cxl_chore_id = None
                 last_cxl_rej_chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
                     if check_symbol == leg1_symbol:
                         px = 100
                         qty = 90
@@ -3234,9 +3562,7 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
                                            last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -3250,18 +3576,12 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        bid_buy_top_market_depth = None
-        ask_sell_top_market_depth = None
-        stored_market_depth = executor_http_client.get_all_market_depth_client()
-        for market_depth in stored_market_depth:
-            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-                bid_buy_top_market_depth = market_depth
-            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-                ask_sell_top_market_depth = market_depth
+        bid_buy_top_market_depth, ask_sell_top_market_depth = (
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
 
         cxl_req_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL,
@@ -3342,18 +3662,12 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
                                                expected_strat_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list, market_depth_basemodel_list))
 
-        bid_buy_top_market_depth = None
-        ask_sell_top_market_depth = None
-        stored_market_depth = executor_http_client.get_all_market_depth_client()
-        for market_depth in stored_market_depth:
-            if market_depth.symbol == leg1_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-                bid_buy_top_market_depth = market_depth
-            if market_depth.symbol == leg2_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-                ask_sell_top_market_depth = market_depth
+        bid_buy_top_market_depth, ask_sell_top_market_depth = (
+            get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, active_pair_strat))
 
         # buy handling
         buy_tob_last_update_date_time_tracker, buy_chore_id = \
-            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol,
+            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol, active_pair_strat,
                                                      buy_tob_last_update_date_time_tracker, buy_chore_id,
                                                      underlying_account_prefix, Side.BUY, executor_http_client,
                                                      bid_buy_top_market_depth, ask_sell_top_market_depth,
@@ -3363,7 +3677,7 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
 
         # sell handling
         sell_tob_last_update_date_time_tracker, sell_chore_id = \
-            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol,
+            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol, active_pair_strat,
                                                      sell_tob_last_update_date_time_tracker, sell_chore_id,
                                                      underlying_account_prefix, Side.SELL, executor_http_client,
                                                      bid_buy_top_market_depth, ask_sell_top_market_depth,
@@ -3417,9 +3731,7 @@ def test_last_n_sec_chore_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -3431,23 +3743,17 @@ def test_last_n_sec_chore_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        bid_buy_top_market_depth = None
-        ask_sell_top_market_depth = None
-        stored_market_depth = executor_http_client.get_all_market_depth_client()
-        for market_depth in stored_market_depth:
-            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-                bid_buy_top_market_depth = market_depth
-            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-                ask_sell_top_market_depth = market_depth
+        bid_buy_top_market_depth, ask_sell_top_market_depth = (
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # buy testing
         buy_new_chore_id = None
         chore_create_time_list = []
         chore_qty_list = []
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
 
             ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -3522,9 +3828,7 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_sym
                                                expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
         try:
             # updating yaml_configs according to this test
@@ -3537,8 +3841,8 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_sym
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, last_barter_fixture_list, max_loop_count_per_side,
-                                   executor_http_client, config_dict, residual_wait_sec)
+            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, active_pair_strat, last_barter_fixture_list,
+                                   max_loop_count_per_side, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -3571,9 +3875,7 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_s
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
         try:
             # updating yaml_configs according to this test
@@ -3586,8 +3888,8 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_s
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, last_barter_fixture_list, max_loop_count_per_side,
-                                   executor_http_client, config_dict, residual_wait_sec)
+            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, active_pair_strat, last_barter_fixture_list,
+                                   max_loop_count_per_side, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -3608,6 +3910,7 @@ def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_l
     activated_strats = []
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
+    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:5]
     # creates and activates multiple pair_strats
     for buy_symbol, sell_symbol in leg1_leg2_symbol_list:
         activated_strat, executor_http_client = (
@@ -3620,7 +3923,7 @@ def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_l
         # updating pair_strat_params
         pair_strat = \
             PairStratBaseModel.from_kwargs(_id=activated_strat.id,
-                               pair_strat_params=PairStratParamsBaseModel(common_premium=index))
+                                           pair_strat_params=PairStratParamsBaseModel(common_premium=index))
         updates_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
             pair_strat.to_dict(exclude_none=True))
         assert updates_pair_strat.pair_strat_params_update_seq_num == \
@@ -3716,7 +4019,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             new_chore_id = None
             acked_chore_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
-                run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+                run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
                 px = 100
                 qty = 90
                 place_new_chore(leg1_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -3739,7 +4042,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             new_chore_id = None
             acked_chore_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
-                run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+                run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
                 px = 110
                 qty = 95
                 place_new_chore(leg2_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
@@ -3857,17 +4160,8 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        bid_buy_top_market_depth = None
-        ask_sell_top_market_depth = None
-        stored_market_depth = executor_http_client.get_all_market_depth_client()
-        for market_depth in stored_market_depth:
-            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-                bid_buy_top_market_depth = market_depth
-            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-                ask_sell_top_market_depth = market_depth
-
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 100
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -3950,7 +4244,7 @@ def test_fill_post_unack_unsol_cxl(
                 buy_qty = qty
                 buy_px = px
 
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
@@ -4480,7 +4774,7 @@ def test_fulfill_post_unack_unsol_cxl(
                 buy_px = px
                 buy_qty = qty
 
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
@@ -5019,7 +5313,7 @@ def test_overfill_post_unack_unsol_cxl(
                 buy_overfill_qty = overfill_qty
                 buy_px = px
 
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
@@ -5533,7 +5827,7 @@ def test_fill_pre_chore_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 100
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -5614,7 +5908,7 @@ def test_fulfill_pre_chore_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 100
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -5692,7 +5986,7 @@ def test_overfill_pre_chore_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 100
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -5768,13 +6062,10 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -5846,9 +6137,7 @@ def _strat_pause_on_negative_consumable_cxl_qty_without_fill(leg1_leg2_symbol_li
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, leg1_side=leg1_side, leg2_side=leg2_side))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -5911,13 +6200,10 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, leg1_side=leg1_side, leg2_side=leg2_side))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
     inst_type: InstrumentType = buy_inst_type if check_side == Side.BUY else sell_inst_type
 
     try:
@@ -5933,7 +6219,7 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # positive test - chore will be placed making last n sec chore notional 18000
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 100
         qty = 90
         # placing new non-systematic new_chore
@@ -6042,9 +6328,7 @@ def _strat_pause_on_negative_consumable_cxl_qty_with_fill(leg1_leg2_symbol_list,
                                            market_depth_basemodel_list, leg1_side=leg1_side,
                                            leg2_side=leg2_side))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -6107,13 +6391,10 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
                                            market_depth_basemodel_list, leg1_side=leg1_side,
                                            leg2_side=leg2_side))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
     inst_type: InstrumentType = buy_inst_type if check_side == Side.BUY else sell_inst_type
 
     try:
@@ -6127,7 +6408,7 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # positive test - chore will be placed making last n sec chore notional 18000
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 100
         qty = 90
         # placing new non-systematic new_chore
@@ -6196,7 +6477,7 @@ def test_strat_pause_on_negative_sell_consumable_cxl_qty_with_fill(static_data_,
                                                           refresh_sec_update_fixture, check_side=Side.SELL)
 
 
-@pytest.mark.nightly1
+@pytest.mark.nightly
 def test_strat_pause_on_sell_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
@@ -6658,7 +6939,7 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
 
         for symbol, side in [(buy_symbol, Side.BUY), (sell_symbol, Side.SELL)]:
             # Placing buy chores
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
             if symbol == buy_symbol:
                 px = 100
                 qty = 90
@@ -6712,6 +6993,36 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+def _verify_server_ready_state_in_reloaded_strat(pair_strat_id: int, existing_executor_port: int, 
+                                                 residual_wait_sec: int, buy_symbol: str, sell_symbol: str):
+    # no need to verify server_ready_state == 1 - executor db still contains symbol overview of before unload 
+    # so when strat reloads init checks passes to init symbol overview cache and marks strat ready 
+
+    loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(pair_strat_id)
+    executor_http_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(loaded_pair_strat.host,
+                                                                                        loaded_pair_strat.port)
+    assert loaded_pair_strat.server_ready_state == 2, \
+        ("Unexpected: After strat is loaded by this point since all service up check is done server_ready_state "
+         f"must be 2, found {loaded_pair_strat.server_ready_state}, pair_strat: {loaded_pair_strat}")
+    assert loaded_pair_strat.strat_state == StratState.StratState_READY, \
+        (f"Unexpected, StratState must be READY but found state: {loaded_pair_strat.strat_state}, "
+         f"pair_strat: {loaded_pair_strat}")
+
+    pair_strat = PairStratBaseModel.from_kwargs(_id=pair_strat_id, strat_state=StratState.StratState_ACTIVE)
+    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
+        pair_strat.to_dict(exclude_none=True))
+    assert activated_pair_strat.strat_state == StratState.StratState_ACTIVE, \
+        (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
+         f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
+    print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    time.sleep(10)
+    loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(pair_strat_id)
+    assert loaded_pair_strat.server_ready_state == 3, \
+        ("Unexpected: After strat is loaded by this point, since strat is activated, server_ready_state "
+         f"must be 3, found {loaded_pair_strat.server_ready_state}, pair_strat: {loaded_pair_strat}")
+    return executor_http_client, activated_pair_strat
+
+
 @pytest.mark.nightly
 def test_unload_reload_strat_from_collection(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
@@ -6727,9 +7038,7 @@ def test_unload_reload_strat_from_collection(
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -6742,8 +7051,9 @@ def test_unload_reload_strat_from_collection(
 
         total_chore_count_for_each_side = 1
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, created_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_web_client)
+        executor_port = created_pair_strat.port
 
         # Unloading Strat
         # making this strat DONE
@@ -6762,10 +7072,8 @@ def test_unload_reload_strat_from_collection(
         time.sleep(5)
 
         pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-        assert not pair_strat.is_partially_running, \
-            "Mismatch: is_partially_running must be False after strat unload"
-        assert not pair_strat.is_executor_running, \
-            "Mismatch: is_executor_running must be False after strat unload"
+        assert pair_strat.server_ready_state == 0, \
+            "Mismatch: server_ready_state must be 0 after strat unload"
 
         # Reloading strat
         strat_collection = email_book_service_native_web_client.get_strat_collection_client(1)
@@ -6783,35 +7091,9 @@ def test_unload_reload_strat_from_collection(
         raise Exception(e)
     # Since config file is removed while unloading - no need to revert changes
 
-    loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-    assert loaded_pair_strat.is_partially_running, \
-        ("Unexpected: After strat is loaded by this point since all service up check is done is_partially_running "
-         f"must be True, found False, pair_strat: {loaded_pair_strat}")
-
-    executor_http_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(loaded_pair_strat.host,
-                                                                                        loaded_pair_strat.port)
-    symbol_overview_list = executor_http_client.get_all_symbol_overview_client()
-
-    for symbol_overview in symbol_overview_list:
-        executor_http_client.put_symbol_overview_client(symbol_overview)
-
-    time.sleep(residual_wait_sec)   # waiting for strat to get loaded completely
-
-    loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-    assert loaded_pair_strat.is_executor_running, \
-        ("Unexpected: After strat is loaded by this point since all service up check is done is_partially_running "
-         f"must be True, found False, pair_strat: {loaded_pair_strat}")
-    assert loaded_pair_strat.strat_state == StratState.StratState_READY, \
-        (f"Unexpected, StratState must be READY but found state: {loaded_pair_strat.strat_state}, "
-         f"pair_strat: {pair_strat}")
-
-    pair_strat = PairStratBaseModel.from_kwargs(_id=created_pair_strat.id, strat_state=StratState.StratState_ACTIVE)
-    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
-        pair_strat.to_dict(exclude_none=True))
-    assert activated_pair_strat.strat_state == StratState.StratState_ACTIVE, \
-        (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
-         f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
-    print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    executor_http_client, activated_pair_strat = (
+        _verify_server_ready_state_in_reloaded_strat(created_pair_strat.id, executor_port,
+                                                     residual_wait_sec, buy_symbol, sell_symbol))
 
     time.sleep(5)
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -6825,12 +7107,12 @@ def test_unload_reload_strat_from_collection(
 
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        # updating market_depth to update cache in reloaded strat
-        update_market_depth(executor_http_client)
+        # updating market_depth to update shm cache in reloaded strat with existing data
+        update_market_depth(activated_pair_strat.cpp_port)
 
         total_chore_count_for_each_side = 2
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, activated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_http_client, True)
 
     except AssertionError as e:
@@ -6858,9 +7140,7 @@ def test_unload_strat_from_strat_view_unload_ui_button(
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -6873,7 +7153,7 @@ def test_unload_strat_from_strat_view_unload_ui_button(
 
         total_chore_count_for_each_side = 1
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, created_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_web_client)
 
         # Unloading Strat
@@ -6888,10 +7168,8 @@ def test_unload_strat_from_strat_view_unload_ui_button(
 
         # verifying pair_strat
         pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-        assert not pair_strat.is_partially_running, \
-            "Mismatch: is_partially_running must be False after strat unload"
-        assert not pair_strat.is_executor_running, \
-            "Mismatch: is_executor_running must be False after strat unload"
+        assert pair_strat.server_ready_state == 0, \
+            "Mismatch: server_ready_state must be 0 after strat unload"
 
         # verifying strat_collection
         strat_key = get_strat_key_from_pair_strat(created_pair_strat)
@@ -6936,7 +7214,7 @@ def test_unload_multiple_strats_from_strat_view_unload_ui_button(
         strat_view_dict = {'_id': pair_strat.id, 'unload_strat': True}
         strat_view = photo_book_web_client.patch_strat_view_client(strat_view_dict)
         
-    time.sleep(15)
+    time.sleep(20)
     # checking if all strats are shifted to unloaded keys in strat_collection and are not active anymore
     strat_collection = email_book_service_native_web_client.get_strat_collection_client(strat_collection_id=1)
     pair_strats = email_book_service_beanie_web_client.get_all_pair_strat_client()
@@ -6973,9 +7251,7 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -6988,7 +7264,7 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
 
         total_chore_count_for_each_side = 1
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, created_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_web_client)
 
         executor_port = created_pair_strat.port
@@ -7016,38 +7292,9 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
     assert not update_strat_view.recycle_strat, \
         f"Mismatched strat_view.unload_strat: expected False, found True"
 
-    loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-    assert loaded_pair_strat.is_partially_running, \
-        ("Unexpected: After strat is loaded by this point since all service up check is done is_partially_running "
-         f"must be True, found False, pair_strat: {loaded_pair_strat}")
-    assert loaded_pair_strat.port != executor_port, \
-        (f"Mismatch: expected new port - found same as before recycle, last port: {executor_port}, "
-         f"new_port: {loaded_pair_strat.port}")
-
-    executor_http_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(loaded_pair_strat.host,
-                                                                                        loaded_pair_strat.port)
-    symbol_overview_list = executor_http_client.get_all_symbol_overview_client()
-
-    for symbol_overview in symbol_overview_list:
-        executor_http_client.put_symbol_overview_client(symbol_overview)
-
-    time.sleep(residual_wait_sec)   # waiting for strat to get loaded completely
-
-    loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-    assert loaded_pair_strat.is_executor_running, \
-        ("Unexpected: After strat is loaded by this point since all service up check is done is_partially_running "
-         f"must be True, found False, pair_strat: {loaded_pair_strat}")
-    assert loaded_pair_strat.strat_state == StratState.StratState_READY, \
-        (f"Unexpected, StratState must be READY but found state: {loaded_pair_strat.strat_state}, "
-         f"pair_strat: {loaded_pair_strat}")
-
-    pair_strat = PairStratBaseModel.from_kwargs(_id=created_pair_strat.id, strat_state=StratState.StratState_ACTIVE)
-    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
-        pair_strat.to_dict(exclude_none=True))
-    assert activated_pair_strat.strat_state == StratState.StratState_ACTIVE, \
-        (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
-         f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
-    print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    executor_http_client, activated_pair_strat = (
+        _verify_server_ready_state_in_reloaded_strat(created_pair_strat.id, executor_port,
+                                                     residual_wait_sec, buy_symbol, sell_symbol))
 
     time.sleep(5)
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -7062,11 +7309,11 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # updating market_depth to update cache in reloaded strat
-        update_market_depth(executor_http_client)
+        update_market_depth(activated_pair_strat.cpp_port)
 
         total_chore_count_for_each_side = 2
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, activated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_http_client, True)
 
     except AssertionError as e:
@@ -7448,9 +7695,7 @@ def test_reactivate_after_pause_strat(
                                 expected_strat_status_, symbol_overview_obj_list,
                                 market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activated_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -7476,7 +7721,7 @@ def test_reactivate_after_pause_strat(
         time.sleep(2)
         total_chore_count_for_each_side = 2
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, activated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_http_client)
     except AssertionError as e:
         raise AssertionError(e)
@@ -7535,10 +7780,8 @@ def test_pause_done_n_unload_strat(static_data_, clean_and_set_limits, leg1_leg2
         time.sleep(2)
 
         pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_strat.id)
-        assert not pair_strat.is_partially_running, \
-            "Mismatch: is_partially_running must be False after strat unload"
-        assert not pair_strat.is_executor_running, \
-            "Mismatch: is_executor_running must be False after strat unload"
+        assert pair_strat.server_ready_state == 0, \
+            "Mismatch: server_ready_state must be 0 after strat unload"
 
     # loading strat to get it deleted by clean_n_set_limits of another tests
     for index, active_strat in enumerate(active_strat_list):
@@ -7941,7 +8184,7 @@ def test_simple_non_risky_amend_based_on_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -8214,7 +8457,7 @@ def test_simple_risky_amend_based_on_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -8447,7 +8690,7 @@ def test_simple_non_risky_amend_based_on_px(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -8683,7 +8926,7 @@ def test_simple_risky_amend_based_on_px(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -8899,7 +9142,7 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -9152,7 +9395,7 @@ def test_simple_risky_amend_based_on_px_and_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -9383,7 +9626,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -9681,7 +9924,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -10002,7 +10245,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -10293,7 +10536,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -10514,7 +10757,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -10763,7 +11006,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -11046,7 +11289,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -11293,7 +11536,7 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -11557,7 +11800,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
@@ -11685,7 +11928,7 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(110, 95, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -11820,7 +12063,7 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
@@ -12019,7 +12262,7 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(110, 95, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -12201,7 +12444,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -12437,7 +12680,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -12651,7 +12894,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -12909,7 +13152,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -13142,7 +13385,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -13367,7 +13610,7 @@ def test_risky_amend_rej_based_on_px_and_qty(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -13617,7 +13860,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
@@ -13795,7 +14038,7 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
@@ -13968,7 +14211,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -14191,7 +14434,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -14381,7 +14624,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -14592,7 +14835,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_filled_notional = None
@@ -14831,7 +15074,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -15103,7 +15346,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_filled_notional = None
@@ -15317,7 +15560,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -15545,7 +15788,7 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -15833,7 +16076,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -16107,7 +16350,7 @@ def test_multi_amends_based_on_qty_n_then_px(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_cxled_notional = None
         buy_residual_qty = None
@@ -16690,7 +16933,7 @@ def test_multi_amends_based_on_qty_n_px1(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_cxled_notional = None
         buy_residual_qty = None
@@ -17076,7 +17319,7 @@ def test_multi_amends_based_on_qty_n_px2(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_cxled_notional = None
         buy_residual_qty = None
@@ -17444,7 +17687,7 @@ def test_partial_non_risky_amend(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -17699,7 +17942,7 @@ def test_partial_risky_amend(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -17979,7 +18222,7 @@ def test_lapse_partial_qty_in_chore(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -18182,7 +18425,7 @@ def test_lapse_complete_qty_in_chore_with_none_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -18340,7 +18583,7 @@ def test_lapse_complete_qty_in_chore_with_providing_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -18492,7 +18735,7 @@ def _handle_test_for_more_than_expected_lapse_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -18699,7 +18942,7 @@ def test_lapse_post_cxl_req_pre_cxl_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -18912,7 +19155,7 @@ def test_lapse_in_btw_multi_fills(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -19122,7 +19365,7 @@ def test_lapse_pre_fill_making_chore_filled(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -19327,7 +19570,7 @@ def test_lapse_pre_fill_making_chore_over_filled(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -19548,7 +19791,7 @@ def test_multi_partial_lapse_till_chore_dod(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -19713,7 +19956,7 @@ def test_lapse_pre_non_risky_amend_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -20043,7 +20286,7 @@ def test_full_lapse_pre_non_risky_amend_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -20359,7 +20602,7 @@ def test_lapse_pre_non_risky_amend_req(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -20690,7 +20933,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -20945,7 +21188,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -21190,7 +21433,7 @@ def test_lapse_pre_risky_amend_req(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -21504,7 +21747,7 @@ def test_lapse_pre_risky_amend_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -21814,7 +22057,7 @@ def test_lapse_pre_risky_amend_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -22124,7 +22367,7 @@ def test_full_lapse_pre_risky_amend_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -22407,7 +22650,7 @@ def test_lapse_post_non_risky_amend(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -22740,7 +22983,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -23022,7 +23265,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -23347,7 +23590,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -23608,7 +23851,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -23932,7 +24175,7 @@ def test_lapse_pre_risky_amend_rej_req(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -24245,7 +24488,7 @@ def test_lapse_pre_risky_amend_rej_ack(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -24563,7 +24806,7 @@ def test_full_lapse_pre_risky_amend_rej_ack(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -24803,7 +25046,7 @@ def test_lapse_post_risky_amend_rej_ack(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -25149,7 +25392,7 @@ def test_verify_deadlock_in_update_residuals_query(
             if leg2_last_barter is not None:
                 last_barter_fixture_list[1]["market_barter_volume"][
                     "participation_period_last_barter_qty_sum"] = leg2_last_barter.market_barter_volume.participation_period_last_barter_qty_sum
-            leg1_last_barter, leg2_last_barter = run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            leg1_last_barter, leg2_last_barter = run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
             px = 100
             qty = 90

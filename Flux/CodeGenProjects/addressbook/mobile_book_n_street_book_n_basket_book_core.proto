@@ -9,6 +9,9 @@ enum DummyEnumMSB{
 }
 
 message TopOfBook {
+  option (FluxMsgCppJsonRoot) = {
+    ReadOp: AggregateType_UNSPECIFIED,
+  };
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
@@ -29,10 +32,12 @@ message TopOfBook {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "email_book_service.proto",
+    server_running_status_lvl: 3,
     depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true,
-    depends_on_model_name_for_port: true,
+    depending_proto_model_field_name_for_host: "PairStrat.host",
+    depending_proto_model_field_name_for_port: "PairStrat.cpp_port",
+    depending_proto_model_field_name_for_ws_port: "PairStrat.cpp_ws_port",
+    depending_proto_model_for_cpp_port: true,
     is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
@@ -60,6 +65,14 @@ message TopOfBook {
 }
 
 message MarketDepth {
+  option (FluxMsgCppJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
+  };
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
@@ -80,16 +93,18 @@ message MarketDepth {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
+    server_running_status_lvl: 3,
     join_sort: {
       sort_chore: {
         chore_by: 'side',
         sort_type: 'desc'
       }
     },
-    depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true,
-    depends_on_model_name_for_port: true,
+    depending_proto_model_field_name_for_host: "PairStrat.host",
+    depending_proto_model_field_name_for_port: "PairStrat.cpp_port",
+    depending_proto_model_field_name_for_ws_port: "PairStrat.cpp_ws_port",
+    depending_proto_model_for_cpp_port: true,
     is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
@@ -118,6 +133,12 @@ message MarketDepth {
 }
 
 message LastBarter {
+  option (FluxMsgCppJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
+  };
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 7.0,
     CreateOp: AggregateType_UNSPECIFIED,
@@ -137,10 +158,12 @@ message LastBarter {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "email_book_service.proto",
+    server_running_status_lvl: 3,
     depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true,
-    depends_on_model_name_for_port: true,
+    depending_proto_model_field_name_for_host: "PairStrat.host",
+    depending_proto_model_field_name_for_port: "PairStrat.cpp_port",
+    depending_proto_model_field_name_for_ws_port: "PairStrat.cpp_ws_port",
+    depending_proto_model_for_cpp_port: true,
     is_read_only: true
   };
   option (FluxMsgUIGetAllLimit) = "-100";

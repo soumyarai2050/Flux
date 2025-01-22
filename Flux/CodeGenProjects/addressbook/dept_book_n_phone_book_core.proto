@@ -31,13 +31,14 @@ message ChoreAccount {
 message PortfolioLimits {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
-    CreateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    CreateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found this cmt can be removed
     ReadOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
-    PatchAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    PatchAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found this cmt can be removed
     DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
+    IncludeDataframeClients: true   // currently set for tests, once real use-case is found this cmt can be removed
   };
 
   // todo: take coordinates from yaml for projects in project_specific plugin
@@ -91,6 +92,7 @@ message FxSymbolOverview{
     w: 8,
     h: 10,
     is_repeated: true,
+    server_running_status_lvl: 1,
     widget_ui_data: {
       view_layout: UI_TABLE
     },

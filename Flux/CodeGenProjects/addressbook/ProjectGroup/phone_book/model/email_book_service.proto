@@ -38,7 +38,8 @@ message PairStratParams {
     h: 20,
     widget_ui_data: {
       view_layout: UI_TREE
-    }
+    },
+    server_running_status_lvl: 2
   };
   option (FluxMsgStringLength) = 128;
 
@@ -76,7 +77,8 @@ message ChoreLimits {
     widget_ui_data: {
       view_layout: UI_TABLE,
       edit_layout: UI_TREE
-    }
+    },
+    server_running_status_lvl: 2,
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -322,14 +324,11 @@ message PairStrat {
     optional int64 pair_strat_params_update_seq_num = 7 [(FluxFldHide) = "True"];
     optional string host = 8 [(FluxFldHide) = "True"];
     optional int64 port = 9 [(FluxFldHide) = "True"];
-    optional int64 top_of_book_port = 10 [(FluxFldHide) = "True"];
-    optional int64 market_depth_port = 11 [(FluxFldHide) = "True"];
-    optional int64 last_barter_port = 12 [(FluxFldHide) = "True"];
-    optional int64 cpp_http_port = 13 [(FluxFldHide) = "True"];
-    optional bool is_executor_running = 14 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerReadyStatus) = true];
-    optional bool is_partially_running = 15 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
+    optional int64 cpp_port = 10 [(FluxFldHide) = "True"];
+    optional int64 cpp_ws_port = 11 [(FluxFldHide) = "True"];
+    optional int64 server_ready_state = 12 [default=0, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerReadyStatus) = true];
     // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
-    required StratState strat_state = 16 [default = StratState_SNOOZED, (FluxFldButton) = {
+    required StratState strat_state = 13 [default = StratState_SNOOZED, (FluxFldButton) = {
       unpressed_caption: "Activate",
       pressed_caption: "Pause",
       disabled_captions: "StratState_DONE=Done",
@@ -421,10 +420,13 @@ message SampleModel{
     PatchOp: AggregateType_UpdateAggregate,
     PatchAllOp: AggregateType_UpdateAggregate,
     DeleteOp: AggregateType_UpdateAggregate,
+    DeleteByIdListOp: AggregateType_UpdateAggregate,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
     SetReentrantLock: false,
     PassStoredObjToPartialUpdatePostCallback: True,
-    PassStoredObjToPartialUpdateAllPostCallback: True
+    PassStoredObjToPartialUpdateAllPostCallback: True,
+    IncludeDataframeClients: true,
   };
   option (FluxMsgAggregateQueryVarName) = "sample_cum_aggregate_pipeline";
   option (FluxMsgJsonQuery) = {
@@ -497,9 +499,11 @@ message SampleTSModel{
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
+    DeleteByIdListOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
-    Granularity: Sec
+    Granularity: Sec,
+    IncludeDataframeClients: true
   };
   option (FluxMsgStringLength) = 128;
 

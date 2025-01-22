@@ -262,7 +262,9 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
             output_str += '                    "properties": {\n'
             output_str += '                        "id": {\n'
             output_str += '                            "type": "array",\n'
-            output_str += '                            "items": "integer"\n'
+            output_str += '                            "items": {\n'
+            output_str += '                                "type": "integer"\n'
+            output_str += '                            }\n'
             output_str += '                        },\n'
             output_str += '                        "msg": {\n'
             output_str += '                            "type": "string"\n'
@@ -274,10 +276,37 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
             output_str += '    }\n'
             output_str += '}\n\n'
 
+        if option_val_dict.get(FastapiOpenapiSchema.flux_json_root_delete_by_id_list_field) is not None:
+            # delete-all request response
+            output_str += f"{message_name_snake_cased}_delete_by_id_list_response = " + "{\n"
+            output_str += '    "200": {\n'
+            output_str += '        "description": "Deleted all",\n'
+            output_str += '        "content": {\n'
+            output_str += '            "application/json": {\n'
+            output_str += '                "schema": {\n'
+            output_str += '                    "type": "object",\n'
+            output_str += '                    "properties": {\n'
+            output_str += '                        "id": {\n'
+            output_str += '                            "type": "array",\n'
+            output_str += '                            "items": {\n'
+            output_str += '                                "type": "integer"\n'
+            output_str += '                            }\n'
+            output_str += '                        },\n'
+            output_str += '                        "msg": {\n'
+            output_str += '                            "type": "string"\n'
+            output_str += '                        }\n'
+            output_str += '                    }\n'
+            output_str += '                }\n'
+            output_str += '            }\n'
+            output_str += '        }\n'
+            output_str += '    },\n'
+            output_str += self.handle_status_404_response()
+            output_str += '}\n\n'
+
         return output_str
 
     def _get_query_msg_openapi_schemas_str(
-            self, message: protogen.Message, aggregate_value: Dict) -> str:
+            self, message: protogen.Message, query_route_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
 
@@ -286,13 +315,6 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
         output_str += self._handle_msg_schema(message, message_name_snake_cased)
 
         # handling query msg response
-        query_route_value = aggregate_value[FastapiOpenapiSchema.query_route_type_key]
-        query_route_type = query_route_value if query_route_value is not None else None
-        query_type_value = aggregate_value[FastapiOpenapiSchema.query_type_key]
-        query_type = str(query_type_value).lower() if query_type_value is not None else None
-        if query_type == "http_file":
-            query_route_type = FastapiOpenapiSchema.flux_json_query_route_post_type_field_val
-
         if (query_route_type is None or
                 query_route_type == FastapiOpenapiSchema.flux_json_query_route_get_type_field_val):
             output_str += self._handle_get_response(message_name_snake_cased)
@@ -309,7 +331,7 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
         output_str = '                "parameters": [\n'
         output_str += '                    {\n'
         output_str += '                        "name": "return_obj_copy",\n'
-        output_str += '                        "in": "query",\n'
+        output_str += '                        "in": "path",\n'
         output_str += '                        "required": False,\n'
         output_str += '                        "schema": {\n'
         output_str += '                            "type": "boolean",\n'
@@ -369,7 +391,9 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
         output_str = '                        "schema": {\n'
         if is_repeated:
             output_str += '                            "type": "array",\n'
-            output_str += f'                            "items": "{schema_type}",\n'
+            output_str += '                            "items": {\n'
+            output_str += f'                                "type": "{schema_type}"\n'
+            output_str += '                            },\n'
         else:
             output_str += f'                            "type": "{schema_type}",\n'
         output_str += '                        }'
@@ -422,7 +446,7 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
     def handle_POST_all_req_body(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = f'        "/{self.proto_file_package}/create_all-{message_name_snake_cased}": ' + '{\n'
+        output_str = f'        "/{self.proto_file_package}/create-all-{message_name_snake_cased}": ' + '{\n'
         output_str += '            "post": {\n'
         output_str += f'                "summary": "POST-ALL api for {message_name}",\n'
         output_str += '                "requestBody": {\n'
@@ -462,7 +486,7 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
     def handle_PUT_all_req_body(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = f'        "/{self.proto_file_package}/put_all-{message_name_snake_cased}": ' + '{\n'
+        output_str = f'        "/{self.proto_file_package}/put-all-{message_name_snake_cased}": ' + '{\n'
         output_str += '            "put": {\n'
         output_str += f'                "summary": "PUT-ALL api for {message_name}",\n'
         output_str += '                "requestBody": {\n'
@@ -502,7 +526,7 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
     def handle_PATCH_all_req_body(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = f'        "/{self.proto_file_package}/patch_all-{message_name_snake_cased}": ' + '{\n'
+        output_str = f'        "/{self.proto_file_package}/patch-all-{message_name_snake_cased}": ' + '{\n'
         output_str += '            "patch": {\n'
         output_str += f'                "summary": "PATCH-ALL api for {message_name}",\n'
         output_str += '                "requestBody": {\n'
@@ -565,10 +589,34 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
         output_str += '        }'
         return output_str
 
+    def handle_DELETE_by_id_list_req_body(self, message: protogen.Message) -> str:
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        output_str = f'        "/{self.proto_file_package}/delete-by-id-list-{message_name_snake_cased}": ' + '{\n'
+        output_str += '            "delete": {\n'
+        output_str += f'                "summary": "DELETE by id list api for {message_name}",\n'
+        output_str += f'                "responses": {message_name_snake_cased}_delete_by_id_list_response,\n'
+        output_str += '                "requestBody": {\n'
+        output_str += '                    "content": {\n'
+        output_str += '                        "application/json": {\n'
+        output_str += f'                            "schema": '+'{\n'
+        output_str += '                                "type": "array",\n'
+        output_str += '                                "items": {\n'
+        output_str += f'                                    "type": "integer"\n'
+        output_str += '                                },\n'
+        output_str += '                            },\n'
+        output_str += '                        }\n'
+        output_str += '                    },\n'
+        output_str += '                    "required": True\n'
+        output_str += '                }\n'
+        output_str += '            }\n'
+        output_str += '        }'
+        return output_str
+
     def handle_DELETE_all_req_body(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = f'        "/{self.proto_file_package}/delete_all-{message_name_snake_cased}": ' + '{\n'
+        output_str = f'        "/{self.proto_file_package}/delete-all-{message_name_snake_cased}": ' + '{\n'
         output_str += '            "delete": {\n'
         output_str += f'                "summary": "DELETE-ALL api for {message_name}",\n'
         output_str += f'                "responses": {message_name_snake_cased}_delete_list_response\n'
@@ -746,8 +794,24 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
 
                 # If any of the query require schema for this message - that is enough for all queries
                 if query_type is None or query_type == "http" or query_type == "both" or query_type == "http_file":
-                    output_str += self._get_query_msg_openapi_schemas_str(message, aggregate_value)
+                    query_route_value = aggregate_value[FastapiOpenapiSchema.query_route_type_key]
+                    query_route_type = query_route_value if query_route_value is not None else None
+                    if query_type == "http_file":   # http_file query type is POST type query
+                        query_route_type = FastapiOpenapiSchema.flux_json_query_route_post_type_field_val
+                    output_str += self._get_query_msg_openapi_schemas_str(message, query_route_type)
                     break
+
+        # ui button query schema and response handling
+        for message, query_data_dict_list in self.message_to_button_query_data_dict.items():
+            for query_data_dict in query_data_dict_list:
+                query_data = query_data_dict.get("query_data")
+                query_type_value = query_data.get(FastapiOpenapiSchema.flux_json_query_type_field)
+                query_route_value = query_data.get(FastapiOpenapiSchema.flux_json_query_route_type_field)
+                query_route_type = query_route_value if query_route_value is not None else None
+                query_type = str(query_type_value).lower() if query_type_value is not None else None
+                if query_type == "http_file":   # http_file query type is POST type query
+                    query_route_type = FastapiOpenapiSchema.flux_json_query_route_post_type_field_val
+                output_str += self._get_query_msg_openapi_schemas_str(message, query_route_type)
 
         output_str += "# openapi schema\n"
         output_str += "openapi_schema = {\n"
@@ -768,6 +832,7 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
             FastapiOpenapiSchema.flux_json_root_patch_field: self.handle_PATCH_req_body,
             FastapiOpenapiSchema.flux_json_root_patch_all_field: self.handle_PATCH_all_req_body,
             FastapiOpenapiSchema.flux_json_root_delete_field: self.handle_DELETE_req_body,
+            FastapiOpenapiSchema.flux_json_root_delete_by_id_list_field: self.handle_DELETE_by_id_list_req_body,
             FastapiOpenapiSchema.flux_json_root_delete_all_field: self.handle_DELETE_all_req_body
         }
 
@@ -811,7 +876,7 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
                                                                   query_params_name_n_param_type_tuple_list)
                     output_str += ",\n"
 
-        # ui button query req body and response handling
+        # ui button query req body
         query_data_dict_list: List[Dict]
         for message, query_data_dict_list in self.message_to_button_query_data_dict.items():
             for query_data_dict in query_data_dict_list:

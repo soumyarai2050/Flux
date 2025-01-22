@@ -54,7 +54,7 @@ def start_strats_in_parallel(
                                    leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
                                    copy.deepcopy(expected_strat_limits_), copy.deepcopy(expected_strat_status_),
                                    copy.deepcopy(symbol_overview_obj_list), copy.deepcopy(market_depth_basemodel_list),
-                                   None, None)
+                                   None, None, False)
                    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
 
         for future in concurrent.futures.as_completed(results):
@@ -84,14 +84,14 @@ def check_alert_exists_in_portfolio_alert(
                 else:
                     if portfolio_alert.alert_meta.first_detail == expected_alert_detail_first:
                         assert False, ("portfolio_alert found with correct brief but mismatched "
-                                       f"portfolio_alert.alert_meta.first_detail, "
-                                       f"expected {expected_alert_detail_first}, "
-                                       f"found: {portfolio_alert.alert_meta.first_detail}")
+                                       f"portfolio_alert.alert_meta.latest_detail, "
+                                       f"expected: {expected_alert_detail_latest}, "
+                                       f"found: {portfolio_alert.alert_meta.latest_detail}")
                     else:
                         assert False, ("portfolio_alert found with correct brief but mismatched "
-                                       f"portfolio_alert.alert_meta.latest_detail, "
-                                       f"expected {expected_alert_detail_latest}, "
-                                       f"found: {portfolio_alert.alert_meta.latest_detail}")
+                                       f"portfolio_alert.alert_meta.first_detail, "
+                                       f"expected: {expected_alert_detail_first}, "
+                                       f"found: {portfolio_alert.alert_meta.first_detail}")
     else:
         assert False, f"Cant find any portfolio_alert with {expected_alert_brief=}, {log_file_path=}"
 
@@ -266,14 +266,7 @@ def test_log_to_start_alert_through_strat_id(
     except Exception as e:
         raise e
     finally:
-        if os.path.exists(log_file_path):
-            os.remove(log_file_path)
-
-            # killing tail_executor for log_file_path
-            log_book_web_client.log_book_force_kill_tail_executor_query_client(str(log_file_path))
-
-            # clearing cache
-            log_book_web_client.log_book_remove_file_from_created_cache_query_client([str(log_file_path)])
+        handle_tail_executor_terminate_n_clear_cache_for_log_file(str(log_file_path))
 
 
 @pytest.mark.log_book
@@ -879,7 +872,6 @@ def file_watcher_check_tail_executor_start(log_file_name: str, log_file_path: st
             assert False, \
                 f"tail executor process must not already exist, found process info: {res}"
 
-        # positive test
         if not os.path.exists(STRAT_EXECUTOR / "log"):
             os.mkdir(STRAT_EXECUTOR / "log")
         with open(log_file_path, "w"):
@@ -904,18 +896,10 @@ def file_watcher_check_tail_executor_start(log_file_name: str, log_file_path: st
         time.sleep(1)
 
         check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
-
     except Exception as e:
         raise e
     finally:
-        if os.path.exists(log_file_path):
-            os.remove(log_file_path)    # removing file
-
-        # killing tail_executor for log_file_path
-        log_book_web_client.log_book_force_kill_tail_executor_query_client(str(log_file_path))
-
-        # clearing cache
-        log_book_web_client.log_book_remove_file_from_created_cache_query_client([str(log_file_path)])
+        handle_tail_executor_terminate_n_clear_cache_for_log_file(str(log_file_path))
 
 
 @pytest.mark.log_book
@@ -1101,10 +1085,17 @@ def test_tail_executor_restarts_if_tail_error_occurs(
 
     time.sleep(10)
 
+    portfolio_alert = check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail)
+    # expecting alert is not updated since restart must happen from latest line and should't reread existing log
+    assert portfolio_alert.alert_count == 1, \
+        f"Mismatched: expected portfolio_alert.alert_count: 2, found {portfolio_alert.alert_count=}"
+
+    # updating alert by creating one more log with same file_name, line_num and severity
+    add_log_to_file(log_file_path, log_str)
+    time.sleep(1)
     portfolio_alert = check_alert_exists_in_portfolio_alert(sample_brief, log_file_path, sample_detail, sample_detail)
     assert portfolio_alert.alert_count == 2, \
         f"Mismatched: expected portfolio_alert.alert_count: 2, found {portfolio_alert.alert_count=}"
-
 
 @pytest.mark.log_book
 def test_kill_tail_executor_n_clear_cache_(
@@ -1284,7 +1275,7 @@ def test_strat_alert_with_no_strat_with_strat_id_is_sent_to_portfolio_alert(
     executor_log_dir_path = STRAT_EXECUTOR / "log"
     log_file_path = executor_log_dir_path / log_file_name
 
-    # crating log dir if not exists
+    # creating log dir if not exists
     if not os.path.exists(executor_log_dir_path):
         os.mkdir(executor_log_dir_path)
 
@@ -1292,37 +1283,42 @@ def test_strat_alert_with_no_strat_with_strat_id_is_sent_to_portfolio_alert(
     with open(log_file_path, "w"):
         pass
 
-    sample_file_name = "sample_file.py"
-    line_no = random.randint(1, 100)
+    try:
+        sample_file_name = "sample_file.py"
+        line_no = random.randint(1, 100)
 
-    sample_brief = f"Sample Log not to be created as strat_alert"
-    sample_detail = "sample detail string"
-    log_str = get_log_line_str("ERROR", sample_file_name,
-                               line_no, f"{sample_brief};;;{sample_detail}")
-    add_log_to_file(log_file_path, log_str)
-    time.sleep(1)
-
-    for _ in range(10):
+        sample_brief = f"Sample Log not to be created as strat_alert"
+        sample_detail = "sample detail string"
+        log_str = get_log_line_str("ERROR", sample_file_name,
+                                   line_no, f"{sample_brief};;;{sample_detail}")
+        add_log_to_file(log_file_path, log_str)
         time.sleep(1)
-        # checking if any strat_alert contains this alert content
-        strat_alert_list = log_book_web_client.get_all_strat_alert_client()
 
-        for strat_alert in strat_alert_list:
-            if strat_alert.alert_brief == sample_brief:
-                assert False, \
-                    f"No start alert must exists with having alert_brief: {sample_brief}, found alert: {strat_alert}"
+        for _ in range(10):
+            time.sleep(1)
+            # checking if any strat_alert contains this alert content
+            strat_alert_list = log_book_web_client.get_all_strat_alert_client()
 
-        portfolio_alert_list = log_book_web_client.get_all_portfolio_alert_client()
-        for portfolio_alert in portfolio_alert_list:
-            if portfolio_alert.alert_brief == sample_brief:
-                break
+            for strat_alert in strat_alert_list:
+                if strat_alert.alert_brief == sample_brief:
+                    assert False, \
+                        f"No start alert must exists with having alert_brief: {sample_brief}, found alert: {strat_alert}"
+
+            portfolio_alert_list = log_book_web_client.get_all_portfolio_alert_client()
+            for portfolio_alert in portfolio_alert_list:
+                if portfolio_alert.alert_brief == sample_brief:
+                    break
+            else:
+                continue
+            break
         else:
-            continue
-        break
-    else:
-        assert False, \
-            ("Failed strat_alert must be created as portfolio_alert of same severity and brief, but couldn't find "
-             "any portfolio_alert")
+            assert False, \
+                ("Failed strat_alert must be created as portfolio_alert of same severity and brief, but couldn't find "
+                 "any portfolio_alert")
+    except Exception as e:
+        raise e
+    finally:
+        handle_tail_executor_terminate_n_clear_cache_for_log_file(str(log_file_path))
 
 
 @pytest.mark.log_book
@@ -1587,14 +1583,7 @@ def test_check_create_call_in_queue_handler_waits_if_server_is_down(
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
-        if os.path.exists(log_file_path):
-            os.remove(log_file_path)
-
-            # killing tail_executor for log_file_path
-            log_book_web_client.log_book_force_kill_tail_executor_query_client(str(log_file_path))
-
-            # clearing cache
-            log_book_web_client.log_book_remove_file_from_created_cache_query_client([str(log_file_path)])
+        handle_tail_executor_terminate_n_clear_cache_for_log_file(str(log_file_path))
 
         if not is_perf_bench_server_up_already:
             res = kill_perf_bench_server()
@@ -1674,34 +1663,39 @@ def test_check_background_logs_alert_handling(
             pass
     time.sleep(5)
 
-    # verifying tail executor for background logs
-    tail_process_grep_pattern = "tail_executor~phone_book_background_debug"
-    res = get_process_info_for_tail_executor(tail_process_grep_pattern, log_file_name)
-    if res is None:
-        assert False, \
-            f"tail executor process must exist for background logs"
+    try:
+        # verifying tail executor for background logs
+        tail_process_grep_pattern = "tail_executor~phone_book_background_debug"
+        res = get_process_info_for_tail_executor(tail_process_grep_pattern, log_file_name)
+        if res is None:
+            assert False, \
+                f"tail executor process must exist for background logs"
 
-    # Sample Exception
-    log_str: List[str] = [
-        "Traceback (most recent call last):",
-        '  File "/home/scratches/scratch.py", line 1300, in <module>',
-        '    raise Exception("SAMPLE EXCEPTION")',
-        "Exception: SAMPLE EXCEPTION"
-    ]
-    for line in log_str:
-        add_log_to_file(log_file_path, line)
-        time.sleep(1)
-
-    for _ in range(10):
-        portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
-        for portfolio_alert in portfolio_alerts:
-            if portfolio_alert.alert_brief == log_str[-1]:
-                break
-        else:
+        # Sample Exception
+        log_str: List[str] = [
+            "Traceback (most recent call last):",
+            '  File "/home/scratches/scratch.py", line 1300, in <module>',
+            '    raise Exception("SAMPLE EXCEPTION")',
+            "Exception: SAMPLE EXCEPTION"
+        ]
+        for line in log_str:
+            add_log_to_file(log_file_path, line)
             time.sleep(1)
-        break
-    else:
-        assert False, "Can't find alert containing error msg in brief"
+
+        for _ in range(10):
+            portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
+            for portfolio_alert in portfolio_alerts:
+                if portfolio_alert.alert_brief == log_str[-1]:
+                    break
+            else:
+                time.sleep(1)
+            break
+        else:
+            assert False, "Can't find alert containing error msg in brief"
+    except Exception as e:
+        raise e
+    finally:
+        handle_tail_executor_terminate_n_clear_cache_for_log_file(str(log_file_path))
 
 
 def check_perf_of_alerts(
@@ -1811,3 +1805,78 @@ def test_perf_of_db_updates(
         else:
             assert False, (f"Can't find strat_view update with max_single_leg_notional: {total_updates} "
                            f"after {(DateTime.utcnow() - start_time).total_seconds()} secs")
+
+
+@pytest.mark.log_book
+def test_tail_executor_recovery(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        market_depth_basemodel_list):
+    log_file_name = f"sample_100_test.log"
+    log_file_path = STRAT_EXECUTOR / "log" / log_file_name
+    tail_process_grep_pattern = "tail_executor~test_street_book_with_pattern"
+
+    if not os.path.exists(STRAT_EXECUTOR / "log"):
+        os.mkdir(STRAT_EXECUTOR / "log")
+    with open(log_file_path, "w"):
+        pass
+
+    try:
+        time.sleep(2)
+        assert os.path.exists(log_file_path), \
+            f"Can't find sample log file: {log_file_path!r}"
+
+        time.sleep(2)
+        res = get_process_info_for_tail_executor(tail_process_grep_pattern, log_file_name)
+        if res is None:
+            assert False, \
+                f"Can't find tail executor process for sample log file: {log_file_path!r}"
+
+        # checking if tail executor is functional for this log file
+        sample_file_name = "sample_file.py"
+        sample_brief = f"Sample Log to be created as strat_alert"
+        sample_detail = "sample detail string"
+        line_no = random.randint(1, 100)
+        for i in range(5):
+            log_str = get_log_line_str("ERROR", sample_file_name, line_no, f"{sample_brief}-{i};;; {sample_detail}")
+            add_log_to_file(log_file_path, log_str)
+            time.sleep(1)
+
+        # killing cpp app
+        result = subprocess.run(
+            [f'pgrep', '-f', tail_process_grep_pattern],
+            text=True,  # Capture text output
+            stdout=subprocess.PIPE,  # Capture standard output
+            stderr=subprocess.PIPE,  # Capture standard error
+        )
+        if result.stdout:
+            process_id = parse_to_int(result.stdout.strip())
+            os.kill(parse_to_int(process_id), signal.SIGKILL)
+            print(f"Killed tail executor process - {process_id=}")
+        else:
+            assert False, \
+                (f"Can't find tail executor process for {tail_process_grep_pattern=}, "
+                 f"process check output: {result.stdout}")
+
+        for i in range(5, 10):
+            log_str = get_log_line_str("ERROR", sample_file_name, line_no, f"{sample_brief}-{i};;; {sample_detail}")
+            add_log_to_file(log_file_path, log_str)
+
+        time.sleep(30)      # log analyzer refresh wait
+
+        res = get_process_info_for_tail_executor(tail_process_grep_pattern, log_file_name)
+        if res is None:
+            assert False, \
+                f"Can't find tail executor process for sample log file: {log_file_path!r} post process kill"
+
+        portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
+        expected_alert_counts = 10
+        for portfolio_alert in portfolio_alerts:
+            if sample_brief in portfolio_alert.alert_brief:
+                assert portfolio_alert.alert_count == expected_alert_counts, \
+                    f"Mismatched alert count: {portfolio_alert.alert_count=}, {expected_alert_counts=}, {portfolio_alert}"
+                break
+    except Exception as e:
+        raise e
+    finally:
+        handle_tail_executor_terminate_n_clear_cache_for_log_file(str(log_file_path))

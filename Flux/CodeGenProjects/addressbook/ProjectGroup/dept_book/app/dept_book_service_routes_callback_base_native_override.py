@@ -1,24 +1,33 @@
 from pendulum import DateTime
 from threading import Thread
 import time
+import logging
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.dept_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_routes_callback_imports import \
-    DeptBookServiceRoutesCallback
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_routes_callback_imports import (
+    DeptBookServiceRoutesCallback)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import \
-      (get_vwap_projection_from_bar_data_agg_pipeline, get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline,
-       get_vwap_change_projection_from_bar_data_agg_pipeline, get_premium_projection_from_bar_data_agg_pipeline,
-       get_premium_n_premium_change_projection_from_bar_data_agg_pipeline,
-       get_premium_change_projection_from_bar_data_agg_pipeline)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
+    get_new_portfolio_limits)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import (
+    get_vwap_projection_from_bar_data_agg_pipeline, get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline,
+    get_vwap_change_projection_from_bar_data_agg_pipeline, get_premium_projection_from_bar_data_agg_pipeline,
+    get_premium_n_premium_change_projection_from_bar_data_agg_pipeline,
+    get_premium_change_projection_from_bar_data_agg_pipeline)
 from FluxPythonUtils.scripts.utility_functions import (
     except_n_log_alert)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 
 
 class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallback):
-
+    underlying_read_portfolio_limits_http_json_dict: Callable[..., Any] | None = None
+    underlying_create_portfolio_limits_http: Callable[..., Any] | None = None
+    underlying_read_dash_filters_collection_http_json_dict: Callable[..., Any] | None = None
+    underlying_create_dash_filters_collection_http: Callable[..., Any] | None = None
+    underlying_read_dash_collection_by_id_http: Callable[..., Any] | None = None
+    underlying_create_dash_collection_http: Callable[..., Any] | None = None
+    underlying_update_dash_collection_http: Callable[..., Any] | None = None
     underlying_read_bar_data_http: Callable[Any, Any] | None = None
 
     def __init__(self):
@@ -29,10 +38,23 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         self.config_yaml_last_modified_timestamp = os.path.getmtime(config_yaml_path)
         self.asyncio_loop: asyncio.AbstractEventLoop | None = None
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
+        if self.min_refresh_interval is None:
+            self.min_refresh_interval = 30
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_http_msgspec_routes import underlying_read_bar_data_http
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_http_msgspec_routes import (
+            underlying_read_portfolio_limits_http_json_dict, underlying_create_portfolio_limits_http,
+            underlying_read_dash_filters_collection_http_json_dict, underlying_create_dash_filters_collection_http,
+            underlying_read_dash_collection_by_id_http, underlying_create_dash_collection_http,
+            underlying_update_dash_collection_http, underlying_read_bar_data_http)
+        cls.underlying_read_portfolio_limits_http_json_dict = underlying_read_portfolio_limits_http_json_dict
+        cls.underlying_create_portfolio_limits_http = underlying_create_portfolio_limits_http
+        cls.underlying_read_dash_filters_collection_http_json_dict = underlying_read_dash_filters_collection_http_json_dict
+        cls.underlying_create_dash_filters_collection_http = underlying_create_dash_filters_collection_http
+        cls.underlying_read_dash_collection_by_id_http = underlying_read_dash_collection_by_id_http
+        cls.underlying_create_dash_collection_http = underlying_create_dash_collection_http
+        cls.underlying_update_dash_collection_http = underlying_update_dash_collection_http
         cls.underlying_read_bar_data_http = underlying_read_bar_data_http
 
     @except_n_log_alert()
@@ -64,8 +86,17 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                 if not self.service_up:
                     try:
                         if is_all_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
-                            self.service_up = True
-                            should_sleep = False
+                            run_coro = self._check_and_create_start_up_models()
+                            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                            try:
+                                # block for task to finish
+                                self.service_up = future.result()
+                                should_sleep = False
+                            except Exception as e:
+                                err_str_ = (f"_check_and_create_portfolio_status_and_chore_n_portfolio_limits "
+                                            f"failed with exception: {e}")
+                                logging.exception(err_str_)
+                                raise Exception(err_str_)
                     except Exception as e:
                         logging.exception("unexpected: service startup threw exception, "
                                           f"we'll retry periodically in: {self.min_refresh_interval} seconds"
@@ -101,6 +132,57 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                         f"{attempt_counts} attempts")
             logging.critical(err_str_)
             raise HTTPException(detail=err_str_, status_code=500)
+
+    @staticmethod
+    async def _check_and_create_start_up_models() -> bool:
+        try:
+            await DeptBookServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_limits()
+            await DeptBookServiceRoutesCallbackBaseNativeOverride._check_n_create_dash_filters_collection()
+        except Exception as e:
+            logging.exception(f"_check_and_create_start_up_models failed, exception: {e}")
+            return False
+        else:
+            return True
+
+    @staticmethod
+    async def _check_n_create_portfolio_limits():
+        async with PortfolioLimits.reentrant_lock:
+            portfolio_limits_list: List[Dict] = (
+                await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_limits_http_json_dict())
+            if 0 == len(portfolio_limits_list):  # no portfolio_limits set yet, create one
+                portfolio_limits = get_new_portfolio_limits()
+                await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_limits_http(
+                    portfolio_limits, return_obj_copy=False)
+
+    @staticmethod
+    async def _check_n_create_dash_filters_collection():
+        async with DashFiltersCollection.reentrant_lock:
+            dash_filters_collection_list: List[Dict] = (
+                await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_dash_filters_collection_http_json_dict())
+            if len(dash_filters_collection_list) == 0:
+                created_dash_filters_collection = DashFiltersCollection.from_kwargs(_id=1, loaded_dash_filters=[],
+                                                                                    buffered_dash_filters=[])
+                await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_create_dash_filters_collection_http(
+                    created_dash_filters_collection, return_obj_copy=False)
+
+    async def create_dash_filters_post(self, dash_filters_obj: DashFilters):
+        try:
+            dash_collection_obj: DashCollection = await (DeptBookServiceRoutesCallbackBaseNativeOverride.
+                                                         underlying_read_dash_collection_by_id_http(dash_filters_obj.id))
+            dash_collection_obj.dash_name = dash_filters_obj.dash_name
+            dash_collection_obj.buffered_dashes = []
+            await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_update_dash_collection_http(
+                dash_collection_obj)
+        except HTTPException as exp:  # does not exist - create new
+            if exp.status_code == 404:
+                dash_collection_obj: DashCollection = DashCollection.from_kwargs(
+                    _id=dash_filters_obj.id, dash_name=dash_filters_obj.dash_name, buffered_dashes=[], loaded_dashes=[])
+                await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_create_dash_collection_http(
+                    dash_collection_obj)
+            else:
+                err_str_ = f"create_dash_collection failed in create_dash_filters_post, exception: {exp=}"
+                logging.error(err_str_)
+                raise HTTPException(status_code=400, detail=err_str_)
 
     async def search_n_update_dash_query_pre(self, dash_class_type: Type[Dash], payload_dict: Dict[str, Any]):
         # To be implemented in main callback override file

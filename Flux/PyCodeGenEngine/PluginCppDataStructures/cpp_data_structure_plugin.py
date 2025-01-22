@@ -113,6 +113,20 @@ class CppDataStructurePlugin(BaseProtoPlugin):
             if not name.endswith("List"):
                 for fld in message.fields:
                     fld_kind = fld.kind.name.lower()
+                    # if self.is_option_enabled(fld, self.flux_fld_val_is_datetime):
+                    #     if fld_kind == "int64":
+                    #         output_content += f"\tint64_t {fld.proto.name}_;\n"
+                    #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                    #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                    #     elif fld_kind == "int32":
+                    #         output_content += f"\tint32_t {fld.proto.name}_;\n"
+                    #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                    #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                    #     else:
+                    #         output_content += f"\t{fld_kind} {fld.proto.name}_;\n"
+                    #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                    #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                    # else:
                     if fld_kind == "enum":
                         output_content += f"\tstring {fld.proto.name}_;\n"
                         if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
@@ -153,6 +167,20 @@ class CppDataStructurePlugin(BaseProtoPlugin):
             if not name.endswith("List"):
                 for fld in message.fields:
                     fld_kind = fld.kind.name.lower()
+                    # if self.is_option_enabled(fld, self.flux_fld_val_is_datetime):
+                    #     if fld_kind == "int64":
+                    #         output_content += f"\tint64_t {fld.proto.name}_;\n"
+                    #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                    #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                    #     elif fld_kind == "int32":
+                    #         output_content += f"\tint32_t {fld.proto.name}_;\n"
+                    #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                    #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                    #     else:
+                    #         output_content += f"\t{fld_kind} {fld.proto.name}_;\n"
+                    #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                    #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                    # else:
                     if fld_kind == "enum":
                         output_content += f"\tstring {fld.proto.name}_;\n"
                         if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
@@ -171,7 +199,7 @@ class CppDataStructurePlugin(BaseProtoPlugin):
                             output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
                         elif fld.cardinality.name.lower() == "repeated":
                             output_content += f"\tvector<{fld.message.proto.name}> {fld.proto.name}_;\n"
-                            output_content += f"\tbool is_{fld.proto.name}_set_;\n"
+                            output_content += f"\tbool is_{fld.proto.name}_set_ = false;\n"
                         else:
                             output_content += f"\t{fld.message.proto.name} {fld.proto.name}_;\n"
                     elif fld_kind == "float":

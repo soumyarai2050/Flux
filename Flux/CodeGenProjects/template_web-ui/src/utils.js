@@ -151,8 +151,6 @@ const fieldProps = [
     { propertyName: "mapping_projection_query_field", usageName: "mapping_projection_query_field" },
     { propertyName: "mapping_underlying_meta_field", usageName: "mapping_underlying_meta_field" },
     { propertyName: "mapping_src", usageName: "mapping_src" },
-    // indicates underlying server up status is derived from this field
-    { propertyName: "server_running_status", usageName: "server_running_status" },
     // indicates underlying server ready status is derivied from this field
     { propertyName: "server_ready_status", usageName: "server_ready_status" },
     // sets column size of field in table
@@ -1678,7 +1676,7 @@ export function getTableColumns(collections, mode, enableOverride = [], disableO
                 return true;
             } else if (collection.type === 'button' && !collection.rootLevel) {
                 if (mode === Modes.EDIT_MODE && collection.button.read_only) {
-                    return false;    
+                    return false;
                 }
                 return true;
             } else if (collection.type === 'progressBar') {
@@ -2724,7 +2722,7 @@ export function formatJSONObjectOrArray(json, fieldProps, truncateDateTime = fal
                 } else if (typeof json[key] === DataTypes.NUMBER) {
                     const [suffix, v] = getLocalizedValueAndSuffix(prop, json[key]);
                     json[key] = v.toLocaleString() + suffix;
-                } 
+                }
                 if (prop.hide) {
                     delete json[key];
                 }
@@ -3422,34 +3420,53 @@ export function updatePartitionFldSchema(schema, chartObj) {
     return updatedSchema;
 }
 
-export function getServerUrl(widgetSchema, linkedObj, runningField, readyField, schemaName, requestType) {
+function jsonify(obj) {
+    return JSON.stringify({ obj });
+}
+
+export function getServerUrl(widgetSchema, linkedObj, serverReadyStatusFld, requestType='http') {
     if (widgetSchema.connection_details) {
         const connectionDetails = widgetSchema.connection_details;
-        const { host, port, project_name } = connectionDetails;
+        const { host, port, ws_port, project_name } = connectionDetails;
         // set url only if linkedObj running field is set to true for dynamic as well as static
         if (widgetSchema.widget_ui_data_element?.depending_proto_model_name) {
-            let checkField = readyField;
-            if (widgetSchema.widget_ui_data_element?.is_repeated) {
-                checkField = runningField;
-            }
-            if (linkedObj && Object.keys(linkedObj).length && _.get(linkedObj, checkField)) {
+            const requiredStateLvl = widgetSchema.widget_ui_data_element.server_running_status_lvl || 0;
+            if (linkedObj && Object.keys(linkedObj).length && _.get(linkedObj, serverReadyStatusFld) >= requiredStateLvl) {
                 if (connectionDetails.dynamic_url) {
                     const hostxpath = host.substring(host.indexOf('.') + 1);
-                    let portxpath = port.substring(port.indexOf('.') + 1);
-                    if (widgetSchema.widget_ui_data_element.depends_on_model_name_for_port && schemaName) {
-                        if (requestType === 'http') {
-                            const port = _.get(linkedObj, portxpath);
-                            if (!port) return null;
-                            return `http://${_.get(linkedObj, hostxpath)}:${port}/${project_name}`;
-                        } else if (requestType === 'ws') {
-                            portxpath = schemaName + '_port';
-                            const port = _.get(linkedObj, portxpath);
-                            if (!port) return null;
-                            return `http:${_.get(linkedObj, hostxpath)}:${port}`;
+                    const portFld = requestType === 'http' ? port : ws_port;
+                    const portxpath = portFld.substring(port.indexOf('.') + 1);
+                    const hostVal = _.get(linkedObj, hostxpath);
+                    const portVal = _.get(linkedObj, portxpath);
+                    if (!hostVal || !portVal) return null;
+                    if (requestType === 'http') {
+                        if (widgetSchema.widget_ui_data_element?.depending_proto_model_for_cpp_port) {
+                            return `http://${hostVal}:${portVal}`;
                         }
+                        return `http://${hostVal}:${portVal}/${project_name}`;
+                    } else if (requestType === 'ws') {
+                        if (widgetSchema.widget_ui_data_element?.depending_proto_model_for_cpp_port) {
+                            return `ws://${hostVal}:${portVal}`;
+                        }
+                        return `ws://${hostVal}:${portVal}/${project_name}`;
                     } else {
-                        return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
+                        const err_ = `getServerUrl failed, unsupported ${jsonify(requestType)}. allowed [http, ws]`;
+                        console.error(err_);
                     }
+                    // if (widgetSchema.widget_ui_data_element.depends_on_model_name_for_port && schemaName) {
+                    //     if (requestType === 'http') {
+                    //         const port = _.get(linkedObj, portxpath);
+                    //         if (!port) return null;
+                    //         return `http://${_.get(linkedObj, hostxpath)}:${port}/${project_name}`;
+                    //     } else if (requestType === 'ws') {
+                    //         portxpath = schemaName + '_port';
+                    //         const port = _.get(linkedObj, portxpath);
+                    //         if (!port) return null;
+                    //         return `http:${_.get(linkedObj, hostxpath)}:${port}`;
+                    //     }
+                    // } else {
+                    //     return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
+                    // }
                 } else {
                     return `http://${host}:${port}/${project_name}`;
                 }

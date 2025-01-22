@@ -58,9 +58,10 @@ message SymbolSideSnapshot{
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "email_book_service.proto",
+    server_running_status_lvl: 1,
     depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true,
+    depending_proto_model_field_name_for_host: "PairStrat.host",
+    depending_proto_model_field_name_for_port: "PairStrat.port",
     is_read_only: true
   };
   option (FluxMsgStringLength) = 128;
@@ -101,10 +102,11 @@ message StratStatus{
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "email_book_service.proto",
+    server_running_status_lvl: 2,
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_id: true,
-    depends_on_other_model_for_dynamic_url: true
+    depending_proto_model_field_name_for_host: "PairStrat.host",
+    depending_proto_model_field_name_for_port: "PairStrat.port"
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -193,10 +195,11 @@ message StratLimits{
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "email_book_service.proto",
+    server_running_status_lvl: 2,
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_id: true,
-    depends_on_other_model_for_dynamic_url: true
+    depending_proto_model_field_name_for_host: "PairStrat.host",
+    depending_proto_model_field_name_for_port: "PairStrat.port",
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,

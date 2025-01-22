@@ -176,7 +176,7 @@ message DashFiltersCollection {
   repeated string loaded_dash_filters = 2 [(FluxFldAbbreviated) = "Id:DashFilters.id^Dashboard:DashFilters.dash_name", (FluxFldAlertBubbleSource) = "DashCollection.loaded_dashes"];
   //show 9 most recently used (weight:2) & 9 most frequently used (weight: 1)
   //Sort by type, merge by weight, FILTER OUT loaded
-  repeated string buffered_dash_filters = 3 [(FluxFldHide) = "True"];
+  repeated string buffered_dash_filters = 3 [(FluxFldHide) = "True", (FluxFldAbbreviated) = "Dashboard:DashFilters.dash_name"];
 }
 
 message BarMetaData {
@@ -195,7 +195,8 @@ message BarData {
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,
-    ExpireAfterSeconds: 31536000  // one year worth of seconds
+    ExpireAfterSeconds: 31536000,  // one year worth of seconds
+    IncludeDataframeClients: true
   };
   option (FluxMsgStringLength) = 128;
   required int32 id = 1;
@@ -222,6 +223,7 @@ message ErrorBarData {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED
+    IncludeDataframeClients: true
   };
   option (FluxMsgStringLength) = 128;
   required int32 id = 1;
@@ -384,6 +386,7 @@ message BarDataAvailability {
     UpdateOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+    IncludeDataframeClients: true
   };
   option (FluxMsgStringLength) = 128;
 

@@ -28,7 +28,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
 
-    def handle_POST_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+    def handle_POST_client_gen(self, message: protogen.Message, field_type: str | None = None, **kwargs) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = (" "*4 + f"def create_{message_name_snake_cased}_client(self, model_obj: "
@@ -38,7 +38,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                       f"model_obj, {message_name}BaseModel, return_obj_copy)"
         return output_str
 
-    def handle_POST_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+    def handle_POST_all_client_gen(self, message: protogen.Message, field_type: str | None = None, **kwargs) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = (" "*4 + f"def create_all_{message_name_snake_cased}_client(self, model_obj_list: "
@@ -46,9 +46,36 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                       f") -> List[{message_name}BaseModel] | bool:\n")
         output_str += " "*8 + f"return generic_http_post_all_client(self.create_all_{message_name_snake_cased}_client_url, " \
                       f"model_obj_list, {message_name}BaseModel, return_obj_copy)"
+
+        if kwargs.get("include_dataframe_clients"):
+            output_str += "\n\n"
+            output_str += (" " * 4 + f"def create_all_{message_name_snake_cased}_df_in_model_list_out_client("
+                                    f"self, df: pl.DataFrame, return_obj_copy: bool | None = True"
+                                    f") -> List[{message_name}BaseModel] | bool:\n")
+            output_str += " " * 8 + (f"return generic_http_post_all_df_in_model_list_out_client("
+                                     f"self.create_all_{message_name_snake_cased}_client_url, "
+                                     f"df, {message_name}BaseModel, return_obj_copy)")
+
+            output_str += "\n\n"
+            output_str += (" " * 4 + f"def create_all_{message_name_snake_cased}_model_list_in_df_out_client("
+                                     f"self, model_obj_list: List[{message_name}BaseModel], "
+                                     f"return_obj_copy: bool | None = True) -> pl.DataFrame | bool:\n")
+            output_str += " " * 8 + (f"return generic_http_post_all_model_list_in_df_out_client("
+                                     f"self.create_all_{message_name_snake_cased}_client_url, "
+                                     f"model_obj_list, {message_name}BaseModel, return_obj_copy)")
+
+            output_str += "\n\n"
+            output_str += (" " * 4 + f"def create_all_{message_name_snake_cased}_df_in_df_out_client("
+                                    f"self, df: pl.DataFrame, return_obj_copy: bool | None = True"
+                                    f") -> pl.DataFrame | bool:\n")
+            output_str += " " * 8 + (f"return generic_http_post_all_df_in_df_out_client("
+                                     f"self.create_all_{message_name_snake_cased}_client_url, "
+                                     f"df, {message_name}BaseModel, return_obj_copy)")
+        # else not required: not adding df related clients if option val is not set
+
         return output_str
 
-    def handle_GET_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+    def handle_GET_client_gen(self, message: protogen.Message, field_type: str | None = None, **kwargs) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = " "*4 + f"def get_{message_name_snake_cased}_client(self, {message_name_snake_cased}_id: " \
@@ -57,7 +84,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                       f"{message_name_snake_cased}_id, {message_name}BaseModel)"
         return output_str
 
-    def handle_PUT_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+    def handle_PUT_client_gen(self, message: protogen.Message, field_type: str | None = None, **kwargs) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = (" "*4 + f"def put_{message_name_snake_cased}_client(self, model_obj: "
@@ -67,7 +94,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                       f"model_obj, {message_name}BaseModel, return_obj_copy)"
         return output_str
 
-    def handle_PUT_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+    def handle_PUT_all_client_gen(self, message: protogen.Message, field_type: str | None = None, **kwargs) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = (" "*4 + f"def put_all_{message_name_snake_cased}_client(self, model_obj: "
@@ -75,9 +102,37 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                       f") -> List[{message_name}BaseModel] | bool:\n")
         output_str += " "*4 + f"    return generic_http_put_all_client(self.put_all_{message_name_snake_cased}_client_url," \
                       f" model_obj, {message_name}BaseModel, return_obj_copy)"
+
+        if kwargs.get("include_dataframe_clients"):
+            output_str += "\n\n"
+            output_str += (" " * 4 + f"def put_all_{message_name_snake_cased}_df_in_model_list_out_client("
+                                    f"self, df: pl.DataFrame, return_obj_copy: bool | None = True"
+                                    f") -> List[{message_name}BaseModel] | bool:\n")
+            output_str += " " * 4 + (f"    return generic_http_put_all_df_in_model_list_out_client("
+                                     f"self.put_all_{message_name_snake_cased}_client_url,"
+                                     f" df, {message_name}BaseModel, return_obj_copy)")
+
+            output_str += "\n\n"
+            output_str += (" " * 4 + f"def put_all_{message_name_snake_cased}_model_list_in_df_out_client("
+                                    f"self, model_obj_list: List[{message_name}BaseModel], "
+                                    f"return_obj_copy: bool | None = True"
+                                    f") -> pl.DataFrame | bool:\n")
+            output_str += " " * 4 + (f"    return generic_http_put_all_model_list_in_df_out_client("
+                                     f"self.put_all_{message_name_snake_cased}_client_url,"
+                                     f" model_obj_list, {message_name}BaseModel, return_obj_copy)")
+
+            output_str += "\n\n"
+            output_str += (" " * 4 + f"def put_all_{message_name_snake_cased}_df_in_df_out_client("
+                                    f"self, df: pl.DataFrame, return_obj_copy: bool | None = True"
+                                    f") -> pl.DataFrame | bool:\n")
+            output_str += " " * 4 + (f"    return generic_http_put_all_df_in_df_out_client("
+                                     f"self.put_all_{message_name_snake_cased}_client_url,"
+                                     f" df, {message_name}BaseModel, return_obj_copy)")
+        # else not required: not adding df related clients if option val is not set
+
         return output_str
 
-    def handle_PATCH_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+    def handle_PATCH_client_gen(self, message: protogen.Message, field_type: str | None = None, **kwargs) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = " "*4 + f"def patch_{message_name_snake_cased}_client(self, model_obj_json: " \
@@ -86,16 +141,35 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                       f"_client_url, model_obj_json, {message_name}BaseModel, return_obj_copy)"
         return output_str
 
-    def handle_PATCH_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+    def handle_PATCH_all_client_gen(self, message: protogen.Message, field_type: str | None = None, **kwargs) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = " "*4 + f"def patch_all_{message_name_snake_cased}_client(self, model_obj_json_list: " \
                      f"List[Dict], return_obj_copy: bool | None = True) -> List[{message_name}BaseModel] | bool:\n"
         output_str += " "*4 + f"    return generic_http_patch_all_client(self.patch_all_{message_name_snake_cased}" \
                       f"_client_url, model_obj_json_list, {message_name}BaseModel, return_obj_copy)"
+
+        if kwargs.get("include_dataframe_clients"):
+            output_str += "\n\n"
+            output_str += " " * 4 + (f"def patch_all_{message_name_snake_cased}_json_list_in_df_out_client("
+                                    f"self, model_obj_json_list: List[Dict], return_obj_copy: bool | None = True"
+                                    f") -> pl.DataFrame | bool:\n")
+            output_str += " " * 4 + (f"    return generic_http_patch_all_json_list_in_df_out_client("
+                                     f"self.patch_all_{message_name_snake_cased}"
+                                     f"_client_url, model_obj_json_list, return_obj_copy)")
+
+            output_str += "\n\n"
+            output_str += " " * 4 + (f"def patch_all_{message_name_snake_cased}_df_in_df_out_client("
+                                    f"self, df: pl.DataFrame, return_obj_copy: bool | None = True"
+                                    f") -> pl.DataFrame | bool:\n")
+            output_str += " " * 4 + (f"    return generic_http_patch_all_df_in_df_out_client("
+                                     f"self.patch_all_{message_name_snake_cased}"
+                                     f"_client_url, df, {message_name}BaseModel, return_obj_copy)")
+        # else not required: not adding df related clients if option val is not set
+
         return output_str
 
-    def handle_DELETE_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+    def handle_DELETE_client_gen(self, message: protogen.Message, field_type: str | None = None, **kwargs) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = " "*4 + f"def delete_{message_name_snake_cased}_client(self, {message_name_snake_cased}_id: " \
@@ -104,7 +178,18 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                       f"_client_url, {message_name_snake_cased}_id, return_obj_copy)"
         return output_str
 
-    def handle_DELETE_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+    def handle_DELETE_by_id_list_client_gen(self, message: protogen.Message, field_type: str | None = None, **kwargs) -> str:
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        output_str = " "*4 + (f"def delete_by_id_list_{message_name_snake_cased}_client(self, "
+                              f"{message_name_snake_cased}_id_list: List[{field_type}], "
+                              f"return_obj_copy: bool | None = True) -> Dict | bool:\n")
+        output_str += " "*4 + (f"    return generic_http_delete_by_id_list_client("
+                               f"self.delete_by_id_list_{message_name_snake_cased}" 
+                               f"_client_url, {message_name_snake_cased}_id_list, {message_name}, return_obj_copy)")
+        return output_str
+
+    def handle_DELETE_all_client_gen(self, message: protogen.Message, field_type: str | None = None, **kwargs) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = " "*4 + (f"def delete_all_{message_name_snake_cased}_client(self, "
@@ -126,13 +211,20 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                       f"[{', '.join([f'{field.proto.name}' for field in index_fields])}], {message_name}BaseModel)\n\n"
         return output_str
 
-    def handle_get_all_message_http_client(self, message: protogen.Message):
+    def handle_get_all_message_http_client(self, message: protogen.Message, **kwargs):
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = " "*4 + (f"def get_all_{message_name_snake_cased}_client(self, limit_obj_count: int | None = None"
                               f") -> List[{message_name}BaseModel]:\n")
         output_str += " "*4 + f"    return generic_http_get_all_client(self.get_all_" \
                       f"{message_name_snake_cased}_client_url, {message_name}BaseModel, limit_obj_count)\n\n"
+
+        if kwargs.get("include_dataframe_clients"):
+            output_str += " "*4 + (f"def get_all_{message_name_snake_cased}_df_client(self, "
+                                  f"limit_obj_count: int | None = None) -> pl.DataFrame:\n")
+            output_str += " "*4 + f"    return generic_http_get_all_df_client(self.get_all_" \
+                          f"{message_name_snake_cased}_client_url, limit_obj_count)\n\n"
+
         return output_str
 
     def _import_model_in_client_file(self, file: protogen.File | None = None, model_file_suffix: str | None = None) -> str:
@@ -162,42 +254,56 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                 self.get_complex_option_value_from_proto(message, FastapiHttpClientFileHandler.flux_msg_json_root_time_series))
 
         crud_field_name_to_url_dict = {
-            BaseFastapiPlugin.flux_json_root_create_field: f"self.create_{message_name_snake_cased}_client_url: "
-                                                           "str = f'http://{self.host}:{self.port}/" +
-                                                           f"{self.proto_file_package}/"
-                                                           f"create-{message_name_snake_cased}'",
-            BaseFastapiPlugin.flux_json_root_create_all_field: f"self.create_all_{message_name_snake_cased}_client_"
-                                                               "url: str = f'http://{self.host}:{self.port}/" +
-                                                               f"{self.proto_file_package}/create_all-" +
-                                                               f"{message_name_snake_cased}'",
-            BaseFastapiPlugin.flux_json_root_read_field: f"self.get_{message_name_snake_cased}_client_url: str = "
-                                                         "f'http://{self.host}:{self.port}/" +
-                                                         f"{self.proto_file_package}/"
-                                                         f"get-{message_name_snake_cased}'",
-            BaseFastapiPlugin.flux_json_root_update_field: f"self.put_{message_name_snake_cased}_client_url: str = "
-                                                           "f'http://{self.host}:{self.port}/" +
-                                                           f"{self.proto_file_package}/"
-                                                           f"put-{message_name_snake_cased}'",
-            BaseFastapiPlugin.flux_json_root_update_all_field: f"self.put_all_{message_name_snake_cased}_client_url: str = "
-                                                           "f'http://{self.host}:{self.port}/" +
-                                                           f"{self.proto_file_package}/"
-                                                           f"put_all-{message_name_snake_cased}'",
-            BaseFastapiPlugin.flux_json_root_patch_field: f"self.patch_{message_name_snake_cased}_client_url: "
-                                                          "str = f'http://{self.host}:{self.port}/" +
-                                                          f"{self.proto_file_package}/"
-                                                          f"patch-{message_name_snake_cased}'",
-            BaseFastapiPlugin.flux_json_root_patch_all_field: f"self.patch_all_{message_name_snake_cased}_client_url: "
-                                                          "str = f'http://{self.host}:{self.port}/" +
-                                                          f"{self.proto_file_package}/"
-                                                          f"patch_all-{message_name_snake_cased}'",
-            BaseFastapiPlugin.flux_json_root_delete_field: f"self.delete_{message_name_snake_cased}_client_url: "
-                                                           "str = f'http://{self.host}:{self.port}/" +
-                                                           f"{self.proto_file_package}/"
-                                                           f"delete-{message_name_snake_cased}'",
-            BaseFastapiPlugin.flux_json_root_delete_all_field: f"self.delete_all_{message_name_snake_cased}_client_url: "
-                                                               "str = f'http://{self.host}:{self.port}/" +
-                                                               f"{self.proto_file_package}/"
-                                                               f"delete_all-{message_name_snake_cased}'"
+            BaseFastapiPlugin.flux_json_root_create_field:
+                f"self.create_{message_name_snake_cased}_client_url: "
+                "str = f'http://{self.host}:{self.port}/" +
+                f"{self.proto_file_package}/"
+                f"create-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_create_all_field:
+                f"self.create_all_{message_name_snake_cased}_client_"
+                "url: str = f'http://{self.host}:{self.port}/" +
+                f"{self.proto_file_package}/create-all-" +
+                f"{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_read_field:
+                f"self.get_{message_name_snake_cased}_client_url: str = "
+                "f'http://{self.host}:{self.port}/" +
+                f"{self.proto_file_package}/"
+                f"get-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_update_field:
+                f"self.put_{message_name_snake_cased}_client_url: str = "
+                "f'http://{self.host}:{self.port}/" +
+                f"{self.proto_file_package}/"
+                f"put-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_update_all_field:
+                f"self.put_all_{message_name_snake_cased}_client_url: str = "
+                "f'http://{self.host}:{self.port}/" +
+                f"{self.proto_file_package}/"
+                f"put-all-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_patch_field:
+                f"self.patch_{message_name_snake_cased}_client_url: "
+                "str = f'http://{self.host}:{self.port}/" +
+                f"{self.proto_file_package}/"
+                f"patch-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_patch_all_field:
+                f"self.patch_all_{message_name_snake_cased}_client_url: "
+                "str = f'http://{self.host}:{self.port}/" +
+                f"{self.proto_file_package}/"
+                f"patch-all-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_delete_field:
+                f"self.delete_{message_name_snake_cased}_client_url: "
+                "str = f'http://{self.host}:{self.port}/" +
+                f"{self.proto_file_package}/"
+                f"delete-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_delete_by_id_list_field:
+                f"self.delete_by_id_list_{message_name_snake_cased}_client_url: "
+                "str = f'http://{self.host}:{self.port}/" +
+                f"{self.proto_file_package}/"
+                f"delete-by-id-list-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_delete_all_field:
+                f"self.delete_all_{message_name_snake_cased}_client_url: "
+                "str = f'http://{self.host}:{self.port}/" +
+                f"{self.proto_file_package}/"
+                f"delete-all-{message_name_snake_cased}'"
         }
         output_str += " " * 8 + "self.get_all_" + f"{message_name_snake_cased}" + \
                       "_client_url: str = f'http://{self.host}:{self.port}/" + \
@@ -291,7 +397,8 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_client_http_query_output(self, message_name: str, query_name: str, query_params: List[str],
                                          params_str: str, route_type: str | None = None,
-                                         is_projection_query: bool | None = None):
+                                         is_projection_query: bool | None = None,
+                                         include_dataframe_clients: bool | None = None):
         if is_projection_query:
             container_model_name = message_name
         else:
@@ -320,6 +427,31 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                 else:
                     output_str += " " * 4 + (f"    return generic_http_post_query_client(self.query_{query_name}"
                                              f"_url, query_params_data, {container_model_name})\n\n")
+
+            if include_dataframe_clients:
+                output_str += " " * 4 + f"def {query_name}_query_df_client(self, {params_str}) -> " \
+                                       f"pl.DataFrame:\n"
+                params_dict_str = \
+                    ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
+                if route_type is None or route_type == FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val:
+                    output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
+                    output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
+                                             f"{message_name}.enc_hook, "
+                                             "exclude_none=True)   # removes none values from dict\n")
+                    output_str += " " * 4 + f"    return generic_http_get_query_df_client(self.query_{query_name}_url, " \
+                                            f"query_params_data)\n\n"
+                else:
+                    output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
+                    output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
+                                             f"{message_name}.enc_hook, "
+                                             "exclude_none=True)   # removes none values from dict\n")
+                    if route_type == FastapiHttpClientFileHandler.flux_json_query_route_patch_type_field_val:
+                        output_str += " " * 4 + (f"    return generic_http_patch_query_df_client(self.query_{query_name}"
+                                                 f"_url, query_params_data)\n\n")
+                    else:
+                        output_str += " " * 4 + (f"    return generic_http_post_query_df_client(self.query_{query_name}"
+                                                 f"_url, query_params_data)\n\n")
+            # else not required: not adding df related clients if option val is not set
         else:
             if route_type == FastapiHttpClientFileHandler.flux_json_query_route_patch_type_field_val:
                 err_str = f"Patch web client can't be generated without payload parameters, query_name: {query_name} " \
@@ -365,6 +497,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             query_route_type_value = aggregate_value[FastapiHttpClientFileHandler.query_route_type_key]
             query_route_type = str(query_route_type_value) if query_route_type_value is not None else \
                 FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val
+            include_dataframe_clients = aggregate_value.get(FastapiHttpClientFileHandler.flux_json_root_include_dataframe_clients_field)
 
             query_params_name_list = []
             if query_params:
@@ -377,7 +510,8 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
 
             if query_type is None or query_type == "http" or query_type == "both":
                 output_str += self._handle_client_http_query_output(message_name, query_name, query_params_name_list,
-                                                                    params_str, query_route_type)
+                                                                    params_str, query_route_type,
+                                                                    include_dataframe_clients)
             elif query_type == "http_file":
                 output_str += self._handle_client_http_file_query_output(message_name, query_name, query_params_name_list, params_str)
             # else not required: ws handling is done by ws client plugin
@@ -494,10 +628,14 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
     def _handle_client_route_methods(self, message: protogen.Message) -> str:
         output_str = ""
         if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root):
-            option_value_dict = self.get_complex_option_value_from_proto(message, FastapiHttpClientFileHandler.flux_msg_json_root)
+            option_value_dict: Dict = self.get_complex_option_value_from_proto(message, FastapiHttpClientFileHandler.flux_msg_json_root)
         else:
-            option_value_dict = (
+            option_value_dict: Dict = (
                 self.get_complex_option_value_from_proto(message, FastapiHttpClientFileHandler.flux_msg_json_root_time_series))
+
+        kwargs = {}
+        if option_value_dict.get(FastapiHttpClientFileHandler.flux_json_root_include_dataframe_clients_field):
+            kwargs["include_dataframe_clients"] = True
 
         crud_field_name_to_method_call_dict = {
             BaseFastapiPlugin.flux_json_root_create_field: self.handle_POST_client_gen,
@@ -508,16 +646,17 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             BaseFastapiPlugin.flux_json_root_patch_field: self.handle_PATCH_client_gen,
             BaseFastapiPlugin.flux_json_root_patch_all_field: self.handle_PATCH_all_client_gen,
             BaseFastapiPlugin.flux_json_root_delete_field: self.handle_DELETE_client_gen,
+            BaseFastapiPlugin.flux_json_root_delete_by_id_list_field: self.handle_DELETE_by_id_list_client_gen,
             BaseFastapiPlugin.flux_json_root_delete_all_field: self.handle_DELETE_all_client_gen
         }
 
-        output_str += self.handle_get_all_message_http_client(message)
+        output_str += self.handle_get_all_message_http_client(message, **kwargs)
 
         id_field_type: str = self._get_msg_id_field_type(message)
 
         for crud_option_field_name, crud_operation_method in crud_field_name_to_method_call_dict.items():
             if crud_option_field_name in option_value_dict:
-                output_str += crud_operation_method(message, id_field_type)
+                output_str += crud_operation_method(message, id_field_type, **kwargs)
                 output_str += "\n\n"
             # else not required: Avoiding method creation if desc not provided in option
 
@@ -565,7 +704,8 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'from typing import Dict, List, Callable, Any\n'
         output_str += f'from fastapi import UploadFile\n'
         output_str += f'import threading\n\n'
-        output_str += f'# 3rd party imports\n\n'
+        output_str += f'# 3rd party imports\n'
+        output_str += f'import polars as pl\n\n'
         output_str += f'# project imports\n'
         generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client")
         output_str += f'from {generic_web_client_path} import *\n'

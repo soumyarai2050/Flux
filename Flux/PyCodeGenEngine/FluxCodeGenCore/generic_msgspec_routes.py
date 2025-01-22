@@ -631,6 +631,16 @@ async def generic_patch_all_http(msgspec_class_type: Type[MsgspecModel], proto_p
     return update_obj_dict_list
 
 
+async def handle_reset_int_id(collection_obj: motor.motor_asyncio.AsyncIOMotorCollection,
+                              msgspec_class_type: Type[MsgspecModel]):
+    model_objs_count = await collection_obj.count_documents({})
+    if model_objs_count == 0:
+        max_id_val = 0
+        max_update_id_vale = 0
+        msgspec_class_type.init_max_id(max_id_val, max_update_id_vale, force_set=True)
+    # else not required: all good
+
+
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_delete_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
@@ -639,29 +649,32 @@ async def generic_delete_http(msgspec_class_type: Type[MsgspecModel], proto_pack
     collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
 
     id_is_int_type = isinstance(db_obj_id, int)
-    await collection_obj.delete_one({"_id": db_obj_id})
-    await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
+    delete_res = await collection_obj.delete_one({"_id": db_obj_id})
+    if delete_res.deleted_count == 1:
+        await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
 
-    empty_obj_dict = {'_id': db_obj_id}
-    await publish_ws(msgspec_class_type, db_obj_id, empty_obj_dict, has_links=has_links, update_ws_with_id=True)
+        empty_obj_dict = {'_id': db_obj_id}
+        await publish_ws(msgspec_class_type, db_obj_id, empty_obj_dict, has_links=has_links, update_ws_with_id=True)
 
-    # Setting back incremental id to 0 if collection gets empty
-    if id_is_int_type:
-        model_objs_count = await collection_obj.count_documents({})
-        if model_objs_count == 0:
-            max_id_val = 0
-            max_update_id_vale = 0
-            msgspec_class_type.init_max_id(max_id_val, max_update_id_vale, force_set=True)
-        # else not required: all good
-    # else not required: if id is not int then it must be of modelObjectId so no handling required
-    del_success.id = db_obj_id
-    return del_success
+        # Setting back incremental id to 0 if collection gets empty
+        if id_is_int_type:
+            await handle_reset_int_id(collection_obj, msgspec_class_type)
+        # else not required: if id is not int then it must be of modelObjectId so no handling required
+        del_success.id = db_obj_id
+        return del_success
+    else:
+        # delete_res.deleted_count for delete_one will always be either 1 or 0 - The delete_one method is
+        # implemented to stop after deleting a single matching document, so it will never delete more than
+        # one document, even if multiple documents match the query filter.
+        err_str = f"Unexpected: Obj with {db_obj_id=} doesn't exist - Can't be deleted"
+        logging.error(err_str)
+        raise HTTPException(status_code=404, detail=err_str)
 
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_delete_all_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
-                                  dataclass_dummy_model: Type[MsgspecModel]) -> DefaultMsgspecWebResponse | bool:
+                                  msgspec_dummy_model: Type[MsgspecModel]) -> DefaultMsgspecWebResponse | bool:
     collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
 
     id_is_int_type = (msgspec_class_type.__annotations__.get("_id") == int)
@@ -682,16 +695,60 @@ async def generic_delete_all_http(msgspec_class_type: Type[MsgspecModel], proto_
 
     # Setting back incremental id to 0 if collection gets empty
     if id_is_int_type:
-        _objs_count = await collection_obj.count_documents({})
-        if _objs_count == 0:
-            max_id_val = 0
-            max_update_id_vale = 0
-            msgspec_class_type.init_max_id(max_id_val, max_update_id_vale)
-        # else not required: all good
+        await handle_reset_int_id(collection_obj, msgspec_class_type)
     # else not required: if id is not int then it must be of ObjectId so no handling required
 
     await publish_ws_all(msgspec_class_type, del_success.id, empty_obj_dict_list, update_ws_with_id=True)
     return del_success
+
+
+@http_except_n_log_error(status_code=500)
+@generic_perf_benchmark
+async def generic_delete_by_id_list_http(
+        msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
+        model_dummy_model, db_obj_id_list: List[int | str | Any], update_agg_pipeline: Any = None,
+        has_links: bool = False) -> DefaultMsgspecWebResponse | bool:
+    collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+
+    id_is_int_type = isinstance(db_obj_id_list[0], int)     # checking only first obj type assuming all will have same
+
+    # fetching document objs based using requested id list to verify if all ids exist
+    motor_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find({'_id': {'$in': db_obj_id_list}})
+    documents_to_delete = await motor_cursor.to_list(None)
+    delete_res = await collection_obj.delete_many({'_id': {'$in': db_obj_id_list}})
+
+    if delete_res.deleted_count:
+        if delete_res.deleted_count != len(db_obj_id_list):
+            deleted_ids: List[int | str | Any] = []
+            empty_obj_dict_list: List[Dict[str, Any]] = []
+            for doc in documents_to_delete:
+                _id = doc.get('_id')
+                deleted_ids.append(_id)
+                empty_obj_dict_list.append({'_id': _id})
+
+            deleted_ids = [doc['_id'] for doc in documents_to_delete]
+            non_existing_ids = list(set(db_obj_id_list) - set(deleted_ids))
+
+            logging.error(f"Expection: Can't find ids {non_existing_ids} in db, only deleted existing ids "
+                          f"{deleted_ids} out of requested id list")
+            # setting only existing id list to db_obj_id_list variable to handle only those further
+            db_obj_id_list = deleted_ids
+        else:
+            empty_obj_dict_list: List[Dict[str, Any]] = [{"_id": _id} for _id in db_obj_id_list]
+
+        await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
+        await publish_ws_all(msgspec_class_type, db_obj_id_list, empty_obj_dict_list, has_links=has_links, update_ws_with_id=True)
+
+        # Setting back incremental id to 0 if collection gets empty
+        if id_is_int_type:
+            await handle_reset_int_id(collection_obj, msgspec_class_type)
+        # else not required: if id is not int then it must be of modelObjectId so no handling required
+        del_success.id = db_obj_id_list
+        return del_success
+    else:
+        err_str = f"Unexpected: No obj found with ids in provided list {db_obj_id_list=}, No obj deleted"
+        logging.error(err_str)
+        raise HTTPException(status_code=404, detail=err_str)
 
 
 @http_except_n_log_error(status_code=500)

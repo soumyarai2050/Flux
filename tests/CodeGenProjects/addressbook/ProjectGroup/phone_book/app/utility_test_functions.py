@@ -7,7 +7,7 @@ import time
 import copy
 import re
 from typing import Dict
-
+import requests
 import pendulum
 import pexpect
 from csv import writer
@@ -26,7 +26,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 from FluxPythonUtils.scripts.utility_functions import clean_mongo_collections, YAMLConfigurationManager, parse_to_int, \
     get_mongo_db_list, drop_mongo_database, avg_of_new_val_sum_to_avg, run_gbd_terminal_with_pid, get_pid_from_port, \
-    ClientError
+    ClientError, HTTPRequestType, handle_http_response
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
@@ -341,19 +341,6 @@ def get_both_side_last_barter_px():
     return buy_side_last_barter_px, sell_side_last_barter_px
 
 
-def get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol: str,
-                                      sell_symbol: str) -> Tuple[MarketDepthBaseModel, MarketDepthBaseModel]:
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_http_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
-    return bid_buy_top_market_depth, ask_sell_top_market_depth
-
-
 def update_expected_strat_brief_for_buy(expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                         expected_other_leg_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -572,8 +559,7 @@ def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
         f"Couldn't find {buy_placed_chore_journal} in {chore_journal_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, pair_strat_)
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
@@ -704,8 +690,7 @@ def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_
         f"Couldn't find {buy_placed_chore_journal} in {chore_journal_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, expected_pair_strat)
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
@@ -2318,8 +2303,39 @@ def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side,
 #     _update_tob(sell_stored_tob, px, Side.SELL, executor_web_client)
 
 
+def cpp_create_last_barter_client(cpp_port: int, last_barter: LastBarterBaseModel):
+    json_data = last_barter.to_dict()
+    if '_id' in json_data:
+        del json_data['_id']
+    if "update_id" in json_data:
+        del json_data["update_id"]
+
+    premium = json_data.get("premium")
+    if premium is None:
+        del json_data["premium"]
+
+    if last_barter.market_barter_volume is not None:
+        if "_id" in json_data["market_barter_volume"]:
+            del json_data["market_barter_volume"]["_id"]
+    json_data[
+        "participation_period_last_barter_qty_sum"] = last_barter.market_barter_volume.participation_period_last_barter_qty_sum if last_barter.market_barter_volume.participation_period_last_barter_qty_sum else 0
+    json_data[
+        "applicable_period_seconds"] = last_barter.market_barter_volume.applicable_period_seconds if last_barter.market_barter_volume.applicable_period_seconds else 0
+    json_data["exch_time"] = get_epoch_from_pendulum_dt(json_data["exch_time"])
+    json_data["arrival_time"] = get_epoch_from_pendulum_dt(json_data["arrival_time"])
+
+    last_barter_url = f"http://127.0.0.1:{cpp_port}/" + "create-last_barter"
+    response = requests.post(last_barter_url, json=json_data)
+    status_code, response_json = handle_http_response(response)
+    expected_status_code = 201
+    if status_code != expected_status_code:
+        raise Exception(f"failed for cpp url: {last_barter_url}, http_request_type: {str(HTTPRequestType.POST)} "
+                        f"http_error: {response_json}, status_code: {status_code}")
+    return LastBarterBaseModel.from_dict(response_json)
+
+
 def run_last_barter(leg1_symbol: str, leg2_symbol: str, last_barter_json_list: List[Dict],
-                   executor_web_client: StreetBookServiceHttpClient,
+                   cpp_port: int,
                    create_counts_per_side: int | None = None, gap_secs: float | None = None):
     if create_counts_per_side is None:
         create_counts_per_side = 20
@@ -2334,7 +2350,8 @@ def run_last_barter(leg1_symbol: str, leg2_symbol: str, last_barter_json_list: L
             last_barter_obj.symbol_n_exch_id.symbol = symbol_list[index]
             last_barter_obj.exch_time = DateTime.utcnow()
             last_barter_obj.market_barter_volume.participation_period_last_barter_qty_sum += 100 * i
-            created_last_barter_obj = executor_web_client.create_last_barter_client(last_barter_obj)
+            # created_last_barter_obj = executor_web_client.create_last_barter_client(last_barter_obj)
+            created_last_barter_obj = cpp_create_last_barter_client(cpp_port, last_barter_obj)
             created_last_barter_obj.id = None
             created_last_barter_obj.market_barter_volume.id = last_barter_obj.market_barter_volume.id
             created_last_barter_obj.exch_time = last_barter_obj.exch_time
@@ -2419,6 +2436,14 @@ def create_strat(leg1_symbol, leg2_symbol, expected_pair_strat_obj, leg1_side=No
     return stored_pair_strat_basemodel
 
 
+def assert_server_ready_state(pair_strat_id: int, expected_server_ready_state: int):
+    pair_strat_obj = email_book_service_native_web_client.get_pair_strat_client(pair_strat_id)
+    assert pair_strat_obj.server_ready_state == expected_server_ready_state, \
+        (f"server_ready_state must be {expected_server_ready_state}, "
+         f"found {pair_strat_obj.server_ready_state}, pair_strat: {pair_strat_obj}")
+    return pair_strat_obj
+
+
 def move_snoozed_pair_strat_to_ready_n_then_active(
         stored_pair_strat_basemodel, market_depth_basemodel_list,
         symbol_overview_obj_list, expected_strat_limits, expected_strat_status, only_make_ready: bool = False):
@@ -2430,17 +2455,17 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
         sell_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id
 
     for _ in range(60):
-        # checking is_partially_running of executor
+        # checking server_ready_state of executor
         try:
             updated_pair_strat = (
                 email_book_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id))
-            if updated_pair_strat.is_partially_running:
+            if updated_pair_strat.server_ready_state == 1:
                 break
             time.sleep(1)
         except Exception as e:
             pass
     else:
-        assert False, (f"is_partially_running state must be True, found false, "
+        assert False, (f"server_ready_state must be 1, "
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}, "
                        f"{stored_pair_strat_basemodel=}")
 
@@ -2564,18 +2589,13 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
              f"{(DateTime.utcnow()-start_time).total_seconds()} secs")
 
     # checking is_running_state of executor
-    updated_pair_strat = email_book_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id)
-    assert updated_pair_strat.is_executor_running, \
-        f"is_executor_running state must be True, found false, pair_strat: {updated_pair_strat}"
-    print(f"is_executor_running is True, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-    assert updated_pair_strat.top_of_book_port is not None, (
-        "Once pair_strat is running it also must contain top_of_book_port, updated object has "
+    updated_pair_strat = assert_server_ready_state(stored_pair_strat_basemodel.id, expected_server_ready_state=2)
+    print(f"server_ready_state is 2, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    assert updated_pair_strat.cpp_port is not None, (
+        "Once pair_strat is running it also must contain cpp_port, updated object has "
         f"port field as None, updated pair_strat: {updated_pair_strat}")
-    assert updated_pair_strat.market_depth_port is not None, (
-        "Once pair_strat is running it also must contain market_depth_port, updated object has "
-        f"port field as None, updated pair_strat: {updated_pair_strat}")
-    assert updated_pair_strat.last_barter_port is not None, (
-        "Once pair_strat is running it also must contain last_barter_port, updated object has "
+    assert updated_pair_strat.cpp_ws_port is not None, (
+        "Once pair_strat is running it also must contain cpp_ws_port, updated object has "
         f"port field as None, updated pair_strat: {updated_pair_strat}")
     assert updated_pair_strat.strat_state == StratState.StratState_READY, \
         (f"StratState Mismatched, expected StratState: {StratState.StratState_READY}, "
@@ -2595,8 +2615,11 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
     print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     time.sleep(10)
+    assert_server_ready_state(stored_pair_strat_basemodel.id, expected_server_ready_state=3)
+    print(f"server_ready_state is 3, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
     # creating market_depth
-    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_web_client)
+    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, activated_pair_strat.cpp_port)
     print(f"market_depth created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     return activated_pair_strat, executor_web_client
@@ -2664,17 +2687,17 @@ def manage_strat_creation_and_activation(leg1_symbol: str, leg2_symbol: str,
         sell_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id
 
     for _ in range(60):
-        # checking is_partially_running of executor
+        # checking server_ready_state of executor
         try:
             updated_pair_strat = (
                 email_book_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id))
-            if updated_pair_strat.is_partially_running:
+            if updated_pair_strat.server_ready_state == 1:
                 break
             time.sleep(1)
         except Exception as e:
             pass
     else:
-        assert False, (f"is_partially_running state must be True, found false, "
+        assert False, (f"server_ready_state state must be 1, "
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     assert updated_pair_strat.port is not None, (
@@ -2685,7 +2708,7 @@ def manage_strat_creation_and_activation(leg1_symbol: str, leg2_symbol: str,
         updated_pair_strat.host, updated_pair_strat.port)
 
     # creating market_depth
-    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_web_client)
+    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, updated_pair_strat.cpp_port)
     print(f"market_depth created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # running symbol_overview
@@ -2750,10 +2773,8 @@ def manage_strat_creation_and_activation(leg1_symbol: str, leg2_symbol: str,
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # checking is_running_state of executor
-    updated_pair_strat = email_book_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id)
-    assert updated_pair_strat.is_executor_running, \
-        f"is_executor_running state must be True, found false, pair_strat: {updated_pair_strat}"
-    print(f"is_executor_running is True, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    assert_server_ready_state(stored_pair_strat_basemodel.id, expected_server_ready_state=2)
+    print(f"server_ready_state is 2, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
     assert updated_pair_strat.strat_state == StratState.StratState_READY, \
         (f"StratState Mismatched, expected StratState: {StratState.StratState_READY}, "
          f"received pair_strat's strat_state: {updated_pair_strat.strat_state}")
@@ -2818,13 +2839,13 @@ def run_symbol_overview(buy_symbol: str, sell_symbol: str,
 
 
 def create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list: List[MarketDepthBaseModel],
-                        executor_web_client: StreetBookServiceHttpClient):
+                        cpp_port: int):
     for index, market_depth_basemodel in enumerate(market_depth_basemodel_list):
         if index < len(market_depth_basemodel_list)/2:
             market_depth_basemodel.symbol = buy_symbol
         else:
             market_depth_basemodel.symbol = sell_symbol
-        created_market_depth = executor_web_client.create_market_depth_client(market_depth_basemodel)
+        created_market_depth = cpp_create_market_depth_client(cpp_port, market_depth_basemodel)
         created_market_depth.id = None
         created_market_depth.cumulative_avg_px = None
         created_market_depth.cumulative_notional = None
@@ -2833,12 +2854,12 @@ def create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list: Li
             f"Mismatch created market_depth: expected {market_depth_basemodel} received {created_market_depth}"
 
 
-def update_market_depth(executor_web_client: StreetBookServiceHttpClient):
-    market_depth_list = executor_web_client.get_all_market_depth_client()
+def update_market_depth(cpp_http_port: int):
+    market_depth_list: List[MarketDepthBaseModel] = cpp_get_all_market_depth_client(cpp_http_port)
     for index, market_depth_basemodel in enumerate(market_depth_list):
         market_depth_basemodel.exch_time = get_utc_date_time()
         market_depth_basemodel.arrival_time = get_utc_date_time()
-        created_market_depth = executor_web_client.put_market_depth_client(market_depth_basemodel)
+        created_market_depth = cpp_put_market_depth_client(cpp_http_port, market_depth_basemodel)
         # created_market_depth.id = None
         # created_market_depth.cumulative_avg_px = None
         # created_market_depth.cumulative_notional = None
@@ -2892,6 +2913,19 @@ def renew_strat_collection():
         email_book_service_native_web_client.put_strat_collection_client(strat_collection)
 
 
+def handle_tail_executor_terminate_n_clear_cache_for_log_file(log_file_path: str):
+    if os.path.exists(log_file_path):
+        # killing the existing tail executor if running
+        log_book_web_client.log_book_force_kill_tail_executor_query_client(log_file_path)
+
+        # changing log file names and then releasing cache in log analyzer to prevent restart of tail executor on
+        # same log file
+        datetime_str: str = datetime.datetime.now().strftime("%Y%m%d.%H%M%S")
+        os.rename(log_file_path, f"{log_file_path}.{datetime_str}")
+        log_book_web_client.log_book_remove_file_from_created_cache_query_client([log_file_path])
+    # else not required: if file doesn't exist then no tail executor must be running
+
+
 def kill_tail_executor_for_strat_id(pair_strat_id: int):
     datetime_str = datetime.datetime.now().strftime("%Y%m%d")
     log_simulator_log_file = str(STRAT_EXECUTOR / "log" / f"log_simulator_{pair_strat_id}_logs_{datetime_str}.log")
@@ -2899,16 +2933,7 @@ def kill_tail_executor_for_strat_id(pair_strat_id: int):
                                   f"street_book_{pair_strat_id}_logs_{datetime_str}.log")
 
     for log_file_path in [log_simulator_log_file, street_book_log_file]:
-        if os.path.exists(log_file_path):
-            # killing the existing tail executor if running
-            log_book_web_client.log_book_force_kill_tail_executor_query_client(log_file_path)
-
-            # changing log file names and then releasing cache in log analyzer to prevent restart of tail executor on
-            # same log file
-            datetime_str: str = datetime.datetime.now().strftime("%Y%m%d.%H%M%S")
-            os.rename(log_file_path, f"{log_file_path}.{datetime_str}")
-            log_book_web_client.log_book_remove_file_from_created_cache_query_client([log_file_path])
-        # else not required: if file doesn't exist then no tail executor must be running
+        handle_tail_executor_terminate_n_clear_cache_for_log_file(log_file_path)
 
 
 def clean_executors_and_today_activated_symbol_side_lock_file():
@@ -3163,7 +3188,7 @@ def create_pre_chore_test_requirements(leg1_symbol: str, leg2_symbol: str, pair_
     print(f"strat created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # running Last Barter
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
     print(f"LastBarter created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     return active_pair_strat, executor_web_client
@@ -3200,7 +3225,7 @@ def create_pre_chore_test_requirements_for_log_book(leg1_symbol: str, leg2_symbo
     print(f"strat created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # running Last Barter
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
     print(f"LastBarter created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     return active_pair_strat, executor_web_client
@@ -3227,11 +3252,12 @@ def get_usd_to_local_px_or_notional(val: int | float):
     return val * fx_symbol_overview_obj().closing_px
 
 
-def update_tob_through_market_depth_to_place_buy_chore(executor_web_client: StreetBookServiceHttpClient,
+def update_tob_through_market_depth_to_place_buy_chore(cpp_port: int,
                                                        bid_buy_market_depth_obj: MarketDepthBaseModel,
                                                        ask_sell_market_depth_obj: MarketDepthBaseModel):
     ask_sell_market_depth_obj.exch_time = get_utc_date_time()
     ask_sell_market_depth_obj.arrival_time = get_utc_date_time()
+    time.sleep(1)
     bid_buy_market_depth_obj.exch_time = get_utc_date_time()
     bid_buy_market_depth_obj.arrival_time = get_utc_date_time()
 
@@ -3239,14 +3265,15 @@ def update_tob_through_market_depth_to_place_buy_chore(executor_web_client: Stre
     sell_market_depth_json = ask_sell_market_depth_obj.to_dict(exclude_none=True)
 
     # update to not trigger place chore
-    executor_web_client.patch_market_depth_client(sell_market_depth_json)
-    time.sleep(1)
-    executor_web_client.patch_market_depth_client(buy_market_depth_json)
+    cpp_patch_market_depth_client(cpp_port, sell_market_depth_json)
+    # time.sleep(1)
+    cpp_patch_market_depth_client(cpp_port, buy_market_depth_json)
 
     time.sleep(1)
 
     ask_sell_market_depth_obj.exch_time = get_utc_date_time()
     ask_sell_market_depth_obj.arrival_time = get_utc_date_time()
+    time.sleep(1)
     bid_buy_market_depth_obj.exch_time = get_utc_date_time()
     bid_buy_market_depth_obj.arrival_time = get_utc_date_time()
 
@@ -3254,17 +3281,125 @@ def update_tob_through_market_depth_to_place_buy_chore(executor_web_client: Stre
     sell_market_depth_json = ask_sell_market_depth_obj.to_dict(exclude_none=True)
 
     # update to trigger place chore
-    buy_market_depth_json["px"] = 100
-    executor_web_client.patch_market_depth_client(sell_market_depth_json)
-    time.sleep(1)
-    executor_web_client.patch_market_depth_client(buy_market_depth_json)
+    buy_market_depth_json["px"] = 100.0
+    cpp_patch_market_depth_client(cpp_port, sell_market_depth_json)
+    # time.sleep(1)
+    cpp_patch_market_depth_client(cpp_port, buy_market_depth_json)
 
 
-def update_tob_through_market_depth_to_place_sell_chore(executor_web_client: StreetBookServiceHttpClient,
-                                                        sell_market_depth_obj, buy_market_depth_obj):
+def handle_market_depth_json(market_depth_json: Dict):
+    px = market_depth_json.get("px")
+    market_depth_json["px"] = float(px)
+    # Convert to bytes (for char* arguments)
+    exch_time: DateTime | int = market_depth_json.get("exch_time")
+    if exch_time is not None:
+        if isinstance(exch_time, DateTime):
+            market_depth_json["exch_time"] = get_epoch_from_pendulum_dt(exch_time)
+        else:
+            market_depth_json["exch_time"] = exch_time
+    else:
+        market_depth_json["exch_time"] = 0
+    arrival_time: DateTime | int = market_depth_json.get("arrival_time")
+    if arrival_time is not None:
+        if isinstance(exch_time, DateTime):
+            market_depth_json["arrival_time"] = get_epoch_from_pendulum_dt(arrival_time)
+        else:
+            market_depth_json["arrival_time"] = arrival_time
+    else:
+        market_depth_json["arrival_time"] = 0
+    is_smart_depth = market_depth_json.get("is_smart_depth")
+    market_depth_json["is_smart_depth"] = True if is_smart_depth else False
+    cumulative_notional = market_depth_json.get("cumulative_notional")
+    market_depth_json["cumulative_notional"] = cumulative_notional if cumulative_notional else 0.0
+    cumulative_qty = market_depth_json.get("cumulative_qty")
+    market_depth_json["cumulative_qty"] = cumulative_qty if cumulative_qty else 0
+    cumulative_avg_px = market_depth_json.get("cumulative_avg_px")
+    market_depth_json["cumulative_avg_px"] = cumulative_avg_px if cumulative_avg_px else 0.0
 
+    if "update_id" in market_depth_json:
+        del market_depth_json["update_id"]
+    # if "_id" in market_depth_json:
+    #     del market_depth_json["_id"]
+
+
+def cpp_get_all_market_depth_client(cpp_port: int):
+    market_depth_url = f"http://127.0.0.1:{cpp_port}/" + "get-all-market_depth"
+    response = requests.get(market_depth_url)
+    status_code, response_json_list = handle_http_response(response)
+    expected_status_code = 200
+    if status_code != expected_status_code:
+        raise Exception(f"failed for cpp url: {market_depth_url}, http_request_type: {str(HTTPRequestType.POST)} "
+                        f"http_error: {response_json_list}, status_code: {status_code}")
+    return MarketDepthBaseModel.from_dict_list(response_json_list)
+
+
+def cpp_create_market_depth_client(cpp_port: int, market_depth: MarketDepthBaseModel):
+    market_depth_url = f"http://127.0.0.1:{cpp_port}/" + "create-market_depth"
+    market_depth_json = generic_encoder(market_depth, MarketDepth.enc_hook, by_alias=True)
+    handle_market_depth_json(market_depth_json)
+    if "_id" in market_depth_json:
+        del market_depth_json["_id"]
+    response = requests.post(market_depth_url, json=market_depth_json)
+    status_code, response_json = handle_http_response(response)
+    expected_status_code = 201
+    if status_code != expected_status_code:
+        raise Exception(f"failed for cpp url: {market_depth_url}, http_request_type: {str(HTTPRequestType.POST)} "
+                        f"http_error: {response_json}, status_code: {status_code}")
+    return MarketDepthBaseModel.from_dict(response_json)
+
+
+def cpp_create_all_market_depth_client(cpp_port: int, market_depth_list: List[MarketDepthBaseModel]):
+    for market_depth_ in market_depth_list:
+        cpp_create_market_depth_client(cpp_port, market_depth_)
+
+
+def cpp_put_market_depth_client(cpp_port: int, market_depth: MarketDepthBaseModel):
+    market_depth_url = f"http://127.0.0.1:{cpp_port}/" + "put-market_depth"
+    market_depth_json = generic_encoder(market_depth, MarketDepth.enc_hook, by_alias=True)
+    handle_market_depth_json(market_depth_json)
+    response = requests.put(market_depth_url, json=market_depth_json)
+    status_code, response_json = handle_http_response(response)
+    expected_status_code = 200
+    if status_code != expected_status_code:
+        raise Exception(f"failed for cpp url: {market_depth_url}, http_request_type: {str(HTTPRequestType.POST)} "
+                        f"http_error: {response_json}, status_code: {status_code}")
+    return MarketDepthBaseModel.from_dict(response_json)
+
+def cpp_patch_market_depth_client(cpp_port: int, market_depth_json: Dict):
+    market_depth_url = f"http://127.0.0.1:{cpp_port}/" + "patch-market_depth"
+
+    # handling datetime fields
+    exch_time: DateTime | int = market_depth_json.get("exch_time")
+    if exch_time is not None:
+        if isinstance(exch_time, DateTime):
+            market_depth_json["exch_time"] = get_epoch_from_pendulum_dt(exch_time)
+        else:
+            market_depth_json["exch_time"] = exch_time
+
+    arrival_time: DateTime | int = market_depth_json.get("arrival_time")
+    if arrival_time is not None:
+        if isinstance(exch_time, DateTime):
+            market_depth_json["arrival_time"] = get_epoch_from_pendulum_dt(arrival_time)
+        else:
+            market_depth_json["arrival_time"] = arrival_time
+
+    # cpp doesn't have update_id impl
+    if market_depth_json.get("update_id"):
+        del market_depth_json["update_id"]
+
+    response = requests.patch(market_depth_url, json=market_depth_json)
+    status_code, response_json = handle_http_response(response)
+    expected_status_code = 200
+    if status_code != expected_status_code:
+        raise Exception(f"failed for cpp url: {market_depth_url}, http_request_type: {str(HTTPRequestType.POST)} "
+                        f"http_error: {response_json}, status_code: {status_code}")
+
+def update_tob_through_market_depth_to_place_sell_chore(cpp_port : int,
+                                                        sell_market_depth_obj: MarketDepthBaseModel,
+                                                        buy_market_depth_obj: MarketDepthBaseModel):
     buy_market_depth_obj.exch_time = get_utc_date_time()
     buy_market_depth_obj.arrival_time = get_utc_date_time()
+    time.sleep(1)
     sell_market_depth_obj.exch_time = get_utc_date_time()
     sell_market_depth_obj.arrival_time = get_utc_date_time()
 
@@ -3272,24 +3407,43 @@ def update_tob_through_market_depth_to_place_sell_chore(executor_web_client: Str
     buy_market_depth_json = buy_market_depth_obj.to_dict(exclude_none=True)
 
     # update to not trigger place chore
-    executor_web_client.patch_market_depth_client(buy_market_depth_json)
-    time.sleep(1)
-    executor_web_client.patch_market_depth_client(sell_market_depth_json)
+    cpp_patch_market_depth_client(cpp_port, buy_market_depth_json)
+    cpp_patch_market_depth_client(cpp_port, sell_market_depth_json)
 
     time.sleep(1)
 
     # update to trigger place chore
     buy_market_depth_obj.exch_time = get_utc_date_time()
     buy_market_depth_obj.arrival_time = get_utc_date_time()
+    time.sleep(1)
     sell_market_depth_obj.exch_time = get_utc_date_time()
     sell_market_depth_obj.arrival_time = get_utc_date_time()
 
     sell_market_depth_json = sell_market_depth_obj.to_json_dict(exclude_none=True)
     buy_market_depth_json = buy_market_depth_obj.to_dict(exclude_none=True)
-    sell_market_depth_json["px"] = 120
-    executor_web_client.patch_market_depth_client(buy_market_depth_json)
-    time.sleep(1)
-    executor_web_client.patch_market_depth_client(sell_market_depth_json)
+    sell_market_depth_json["px"] = 120.0
+    cpp_patch_market_depth_client(cpp_port, buy_market_depth_json)
+    cpp_patch_market_depth_client(cpp_port, sell_market_depth_json)
+
+
+def get_buy_bid_n_ask_sell_market_depth(
+        buy_symbol: str, sell_symbol: str,
+        pair_strat_: PairStratBaseModel) -> Tuple[MarketDepthBaseModel | None, MarketDepthBaseModel | None]:
+
+    bid_buy_top_market_depth = None
+    ask_sell_top_market_depth = None
+    stored_market_depth = cpp_get_all_market_depth_client(pair_strat_.cpp_port)
+    for market_depth in stored_market_depth:
+        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
+            bid_buy_top_market_depth = market_depth
+        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
+            ask_sell_top_market_depth = market_depth
+            
+    assert bid_buy_top_market_depth is not None, \
+        f"Couldn't find market depth having symbol: {buy_symbol}, position: 0, side: {TickType.BID}"
+    assert ask_sell_top_market_depth is not None, \
+        f"Couldn't find market depth having symbol: {sell_symbol}, position: 0, side: {TickType.ASK}"
+    return bid_buy_top_market_depth, ask_sell_top_market_depth
 
 
 def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_count: int,
@@ -3330,18 +3484,11 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
     expected_strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
     expected_strat_status = copy.deepcopy(expected_start_status_)
 
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_web_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     for loop_count in range(1, total_loop_count + 1):
         start_time = DateTime.utcnow()
@@ -3353,13 +3500,13 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
         expected_buy_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -3464,15 +3611,15 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
         expected_sell_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # required to make buy side tob latest so that when top update reaches in test place chore function in
             # executor both side are new last_update_date_time
-            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-            update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+            update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                                 bid_buy_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -3602,18 +3749,11 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
     expected_buy_symbol_side_snapshot.security.sec_id = buy_symbol
     expected_strat_status = copy.deepcopy(expected_start_status_)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_web_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
     for loop_count in range(1, total_loop_count + 1):
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Loop started")
@@ -3624,13 +3764,13 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         expected_sell_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         # required to make buy side tob latest so that when top update reaches both side are new last_update_date_time
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
         # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
 
         if not is_non_systematic_run:
@@ -3728,12 +3868,12 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         expected_buy_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         print(f"LastBarters created: buy_symbol: {leg1_symbol}, sell_symbol: {sell_symbol}")
 
         # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
 
         if not is_non_systematic_run:
@@ -3880,21 +4020,15 @@ def verify_rej_chores(check_ack_to_reject_chores: bool, last_chore_id: int | Non
     return last_chore_id
 
 
-def handle_rej_chore_test(buy_symbol, sell_symbol, expected_strat_limits_,
+def handle_rej_chore_test(buy_symbol, sell_symbol, created_pair_strat, expected_strat_limits_,
                           last_barter_fixture_list, max_loop_count_per_side,
                           check_ack_to_reject_chores: bool, executor_web_client: StreetBookServiceHttpClient,
                           config_dict, residual_wait_secs):
     # explicitly setting waived_initial_chores to 10 for this test case
     expected_strat_limits_.cancel_rate.waived_initial_chores = 10
 
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_web_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
 
     # buy fills check
     continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(buy_symbol, config_dict)
@@ -3904,9 +4038,9 @@ def handle_rej_chore_test(buy_symbol, sell_symbol, expected_strat_limits_,
     last_id = None
     buy_rej_last_id = None
     for loop_count in range(1, max_loop_count_per_side + 1):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -3943,10 +4077,10 @@ def handle_rej_chore_test(buy_symbol, sell_symbol, expected_strat_limits_,
     sell_chore_count = 0
     sell_special_chore_count = 0
     for loop_count in range(1, max_loop_count_per_side + 1):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
-        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
+        update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -4004,7 +4138,7 @@ def verify_cxl_rej(last_cxl_chore_id: str | None, last_cxl_rej_chore_id: str | N
     return last_cxl_chore_id, last_cxl_rej_chore_id
 
 
-def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str,
+def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, active_pair_strat: PairStratBaseModel,
                                              tob_last_update_date_time_tracker: DateTime | None,
                                              chore_id: str | None, underlying_account_prefix: str, side: Side,
                                              executor_web_client: StreetBookServiceHttpClient,
@@ -4012,18 +4146,18 @@ def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str,
                                              ask_sell_top_market_depth: MarketDepthBaseModel,
                                              last_barter_fixture_list: List[Dict]):
     loop_count = 1
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
     if side == Side.BUY:
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         symbol = buy_symbol
         wait_stop_px = 100
     else:
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
 
-        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
         symbol = sell_symbol
         wait_stop_px = 120
@@ -4106,16 +4240,10 @@ def handle_unsolicited_cxl_for_sides(symbol: str, last_id: str, last_cxl_ack_id:
     return last_id, last_cxl_ack_id, chore_count, cxl_count
 
 
-def handle_unsolicited_cxl(buy_symbol, sell_symbol, last_barter_fixture_list, max_loop_count_per_side,
+def handle_unsolicited_cxl(buy_symbol, sell_symbol, active_pair_strat, last_barter_fixture_list, max_loop_count_per_side,
                            executor_web_client: StreetBookServiceHttpClient, config_dict, residual_wait_sec):
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_web_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
     # buy fills check
     continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(buy_symbol, config_dict)
@@ -4124,9 +4252,9 @@ def handle_unsolicited_cxl(buy_symbol, sell_symbol, last_barter_fixture_list, ma
     last_id = None
     last_cxl_ack_id = None
     for loop_count in range(1, max_loop_count_per_side + 1):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -4146,11 +4274,11 @@ def handle_unsolicited_cxl(buy_symbol, sell_symbol, last_barter_fixture_list, ma
     last_id = None
     last_cxl_ack_id = None
     for loop_count in range(1, max_loop_count_per_side + 1):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
 
-        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -4208,7 +4336,7 @@ def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, 
                                            leg1_side=leg1_side, leg2_side=leg2_side))
 
     # buy test
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, activated_strat.cpp_port)
     loop_count = 1
     return leg1_symbol, leg2_symbol, activated_strat, executor_http_client
 
@@ -4236,16 +4364,22 @@ def check_alert_str_in_strat_alerts_n_portfolio_alerts(activated_pair_strat_id: 
         return check_alert_str_in_portfolio_alert(check_str, assert_fail_msg)
 
 
+def get_inst_type(side: Side, pair_strat: PairStratBaseModel):
+    leg1_inst_type: InstrumentType = InstrumentType.CB if (
+            pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
+    leg2_inst_type: InstrumentType = InstrumentType.EQT if leg1_inst_type == InstrumentType.CB else InstrumentType.CB
+
+    inst_type: InstrumentType = leg1_inst_type if pair_strat.pair_strat_params.strat_leg1.side == side else leg2_inst_type
+    return inst_type
+
+
 def handle_place_chore_and_check_str_in_alert_for_executor_limits(symbol: str, side: Side, px: float, qty: int,
                                                                   check_str: str, assert_fail_msg: str,
                                                                   active_pair_strat: PairStratBaseModel,
                                                                   executor_web_client: StreetBookServiceHttpClient,
                                                                   last_chore_id: str | None = None):
     activated_pair_strat_id = active_pair_strat.id
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
-    inst_type: InstrumentType = buy_inst_type if side == Side.BUY else sell_inst_type
+    inst_type: InstrumentType = get_inst_type(side, active_pair_strat)
     # placing new non-systematic new_chore
     place_new_chore(symbol, side, px, qty, executor_web_client, inst_type)
     print(f"symbol: {symbol}, Created new_chore obj")
@@ -4265,13 +4399,10 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_symb
                                                                         last_cxl_chore_id=None):
 
     active_pair_strat_id = active_pair_strat.id
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
-    inst_type: InstrumentType = buy_inst_type if side == Side.BUY else sell_inst_type
+    inst_type: InstrumentType = get_inst_type(side, active_pair_strat)
 
     # buy test
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
     check_symbol = buy_symbol if side == Side.BUY else sell_symbol
 
@@ -4302,13 +4433,10 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
         last_cxl_chore_id=None):
 
     active_pair_strat_id = active_pair_strat.id
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
-    inst_type: InstrumentType = buy_inst_type if side == Side.BUY else sell_inst_type
+    inst_type: InstrumentType = get_inst_type(side, active_pair_strat)
 
     # buy test
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
     check_symbol = buy_symbol if side == Side.BUY else sell_symbol
 
@@ -4369,27 +4497,21 @@ def get_partial_allowed_fill_qty(check_symbol: str, config_dict: Dict, qty: int)
 
 def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy_symbol,
                                                    sell_symbol, last_barter_fixture_list,
-                                                   last_chore_id, config_dict,
+                                                   last_chore_id, config_dict, active_pair_strat,
                                                    executor_web_client: StreetBookServiceHttpClient):
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_web_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
     if check_symbol == buy_symbol:
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
     else:
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
 
-        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
 
     chore_ack_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -4412,10 +4534,10 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
                                                          last_chore_id,
                                                          executor_web_client: StreetBookServiceHttpClient,
                                                          config_dict, fill_id: str | None = None):
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
+
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
     if check_symbol == buy_symbol:
         px = 100
         qty = 90
@@ -4481,9 +4603,7 @@ def strat_done_after_exhausted_consumable_notional(
         buy_inst_type = InstrumentType.EQT
         sell_inst_type = InstrumentType.CB
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path), load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -4496,7 +4616,7 @@ def strat_done_after_exhausted_consumable_notional(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # Positive Check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
         if side_to_check == Side.BUY:
             px = 98
             qty = 90
@@ -4522,7 +4642,7 @@ def strat_done_after_exhausted_consumable_notional(
         # chores and should come out of executor run and must set strat_state to StratState_DONE
 
         # buy fills check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
         if side_to_check == Side.BUY:
             px = 98
             qty = 90
@@ -4615,18 +4735,11 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
     expected_strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
     expected_strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
 
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_web_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     for loop_count in range(1, total_loop_count + 1):
         start_time = DateTime.utcnow()
@@ -4638,13 +4751,13 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
         expected_buy_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -4752,15 +4865,15 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
         expected_sell_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # required to make buy side tob latest so that when top update reaches in test place chore function in
             # executor both side are new last_update_date_time
-            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-            update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+            update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                                 bid_buy_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -4884,18 +4997,11 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
     expected_buy_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[0])
     expected_buy_symbol_side_snapshot.security.sec_id = buy_symbol
 
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_web_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     for loop_count in range(1, total_loop_count + 1):
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Loop started")
@@ -4906,15 +5012,15 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         expected_sell_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # required to make buy side tob latest so that when top update reaches in test place chore function in
             # executor both side are new last_update_date_time
-            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-            update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+            update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                                 bid_buy_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -5013,13 +5119,13 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         current_itr_expected_buy_chore_journal_.chore.security.sec_id = buy_symbol
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -5146,17 +5252,15 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
     expected_strat_limits1 = expected_strat_limits_list[0]
     buy_symbol1 = active_pair_strat_list[0].pair_strat_params.strat_leg1.sec.sec_id
     sell_symbol1 = active_pair_strat_list[0].pair_strat_params.strat_leg2.sec.sec_id
-    buy1_inst_type: InstrumentType = InstrumentType.CB if (
-                        active_pair_strat_list[0].pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell1_inst_type: InstrumentType = InstrumentType.EQT if buy1_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy1_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat_list[0])
+    sell1_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat_list[0])
 
     active_pair_strat2 = active_pair_strat_list[1]
     expected_strat_limits2 = expected_strat_limits_list[1]
     buy_symbol2 = active_pair_strat_list[1].pair_strat_params.strat_leg2.sec.sec_id
     sell_symbol2 = active_pair_strat_list[1].pair_strat_params.strat_leg1.sec.sec_id
-    buy2_inst_type: InstrumentType = InstrumentType.CB if (
-                        active_pair_strat_list[1].pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell2_inst_type: InstrumentType = InstrumentType.EQT if buy2_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy2_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat_list[1])
+    sell2_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat_list[1])
 
     strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker1: DateTime | None = None
@@ -5188,25 +5292,13 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
     expected_strat_brief_obj2.pair_buy_side_bartering_brief.security.sec_id = buy_symbol2
     expected_strat_brief_obj2.pair_sell_side_bartering_brief.security.sec_id = sell_symbol2
 
-    bid_buy_top_market_depth1 = None
-    ask_sell_top_market_depth1 = None
+    bid_buy_top_market_depth1, ask_sell_top_market_depth1 = (
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol1, sell_symbol1, active_pair_strat1))
     executor_web_client1 = executor_web_client_list[0]
-    stored_market_depth = executor_web_client1.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol1 and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth1 = market_depth
-        if market_depth.symbol == sell_symbol1 and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth1 = market_depth
 
-    bid_buy_top_market_depth2 = None
-    ask_sell_top_market_depth2 = None
+    bid_buy_top_market_depth2, ask_sell_top_market_depth2 = (
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol2, sell_symbol2, active_pair_strat2))
     executor_web_client2 = executor_web_client_list[1]
-    stored_market_depth = executor_web_client2.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol2 and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth2 = market_depth
-        if market_depth.symbol == sell_symbol2 and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth2 = market_depth
 
     for loop_count in range(1, total_loop_count + 1):
 
@@ -5220,13 +5312,14 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         expected_buy_chore_snapshot1.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol1, sell_symbol1, last_barter_fixture_list, executor_web_client1)
+        run_last_barter(buy_symbol1, sell_symbol1, last_barter_fixture_list, active_pair_strat1.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol1}, sell_symbol: {sell_symbol1}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(executor_web_client1, bid_buy_top_market_depth1,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat1.cpp_port,
+                                                               bid_buy_top_market_depth1,
                                                                ask_sell_top_market_depth1)
 
             # Waiting for tob to trigger place chore
@@ -5334,15 +5427,16 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         expected_sell_chore_snapshot1.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol1, sell_symbol1, last_barter_fixture_list, executor_web_client1)
+        run_last_barter(buy_symbol1, sell_symbol1, last_barter_fixture_list, active_pair_strat1.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol1}, sell_symbol: {sell_symbol1}")
 
         if not is_non_systematic_run:
             # required to make buy side tob latest so that when top update reaches in test place chore function in
             # executor both side are new last_update_date_time
-            run_last_barter(buy_symbol1, sell_symbol1, [last_barter_fixture_list[0]], executor_web_client1)
+            run_last_barter(buy_symbol1, sell_symbol1, [last_barter_fixture_list[0]], active_pair_strat1.cpp_port)
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-            update_tob_through_market_depth_to_place_sell_chore(executor_web_client1, ask_sell_top_market_depth1,
+            update_tob_through_market_depth_to_place_sell_chore(active_pair_strat1.cpp_port,
+                                                                ask_sell_top_market_depth1,
                                                                 bid_buy_top_market_depth1)
 
             # Waiting for tob to trigger place chore
@@ -5437,15 +5531,16 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         expected_sell_chore_snapshot2.chore_brief.bartering_security.inst_type = None
         
         # running last barter once more before sell side
-        run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, executor_web_client2)
+        run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, active_pair_strat2.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol2}, sell_symbol: {sell_symbol2}")
 
         if not is_non_systematic_run:
             # required to make buy side tob latest so that when top update reaches in test place chore function in
             # executor both side are new last_update_date_time
-            run_last_barter(buy_symbol2, sell_symbol2, [last_barter_fixture_list[0]], executor_web_client2)
+            run_last_barter(buy_symbol2, sell_symbol2, [last_barter_fixture_list[0]], active_pair_strat2.cpp_port)
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-            update_tob_through_market_depth_to_place_sell_chore(executor_web_client2, ask_sell_top_market_depth2,
+            update_tob_through_market_depth_to_place_sell_chore(active_pair_strat2.cpp_port,
+                                                                ask_sell_top_market_depth2,
                                                                 bid_buy_top_market_depth2)
 
             # Waiting for tob to trigger place chore
@@ -5544,13 +5639,14 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         current_itr_expected_buy_chore_journal_.chore.security.sec_id = buy_symbol2
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, executor_web_client2)
+        run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, active_pair_strat2.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol2}, sell_symbol: {sell_symbol2}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(executor_web_client2, bid_buy_top_market_depth2,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat2.cpp_port,
+                                                               bid_buy_top_market_depth2,
                                                                ask_sell_top_market_depth2)
 
             # Waiting for tob to trigger place chore
@@ -5649,7 +5745,8 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
 
 
 def place_sanity_chores_for_executor(
-        buy_symbol: str, sell_symbol: str, total_chore_count_for_each_side, last_barter_fixture_list,
+        buy_symbol: str, sell_symbol: str, created_pair_strat,
+        total_chore_count_for_each_side, last_barter_fixture_list,
         residual_wait_sec, executor_web_client, place_after_recovery: bool = False,
         expect_no_chore: bool = False):
 
@@ -5664,19 +5761,13 @@ def place_sanity_chores_for_executor(
                 if max_id < chore_journal.id:
                     buy_ack_chore_id = chore_journal.chore.chore_id
 
-    bid_buy_top_market_depth = None
-    ask_sell_top_market_depth = None
-    stored_market_depth = executor_web_client.get_all_market_depth_client()
-    for market_depth in stored_market_depth:
-        if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-            bid_buy_top_market_depth = market_depth
-        if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-            ask_sell_top_market_depth = market_depth
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
 
     for loop_count in range(total_chore_count_for_each_side):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
 
         ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -5691,11 +5782,11 @@ def place_sanity_chores_for_executor(
     # Placing sell chores
     sell_ack_chore_id = None
     for loop_count in range(total_chore_count_for_each_side):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
 
-        update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
 
         ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -5738,9 +5829,7 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path), load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -5753,22 +5842,16 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
 
         total_chore_count_for_each_side = max_loop_count_per_side
 
-        bid_buy_top_market_depth = None
-        ask_sell_top_market_depth = None
-        stored_market_depth = executor_web_client.get_all_market_depth_client()
-        for market_depth in stored_market_depth:
-            if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
-                bid_buy_top_market_depth = market_depth
-            if market_depth.symbol == sell_symbol and market_depth.position == 0 and market_depth.side == TickType.ASK:
-                ask_sell_top_market_depth = market_depth
+        bid_buy_top_market_depth, ask_sell_top_market_depth = (
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
 
         # Placing buy chores
         buy_ack_chore_id = None
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
 
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(executor_web_client, bid_buy_top_market_depth,
+            update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
             ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                buy_symbol, executor_web_client,
@@ -5782,11 +5865,11 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
         # Placing sell chores
         sell_ack_chore_id = None
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
             # required to make buy side tob latest
-            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_web_client)
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
 
-            update_tob_through_market_depth_to_place_sell_chore(executor_web_client, ask_sell_top_market_depth,
+            update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                                 bid_buy_top_market_depth)
 
             ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -5818,9 +5901,8 @@ def handle_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, ex
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, leg1_side=leg1_side, leg2_side=leg2_side))
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     config_file_path: str | None
     config_dict: Dict | None
@@ -5836,3 +5918,10 @@ def handle_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, ex
 
     return (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
             config_file_path, config_dict, config_dict_str)
+
+
+def get_config_file_path_n_config_dict(strat_id: int):
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{strat_id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path), load_as_str=True)
+    return config_file_path, config_dict, config_dict_str

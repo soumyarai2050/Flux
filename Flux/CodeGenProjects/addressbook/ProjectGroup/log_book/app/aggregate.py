@@ -485,6 +485,29 @@ def get_strat_alert_from_strat_id_n_alert_brief_regex(strat_id: int, brief_regex
     return agg_pipeline
 
 
+def get_projection_strat_alert_id_by_strat_id(strat_id: int):
+    agg_pipeline = {"aggregate": [
+        {
+            '$match': {
+                'strat_id': strat_id
+            }
+        }, {
+            '$group': {
+                '_id': 1,
+                'strat_alert_ids': {
+                    '$push': '$_id'
+                }
+            }
+        }, {
+            '$project': {
+                '_id': 0,
+                'strat_alert_ids': 1
+            }
+        }
+    ]}
+    return agg_pipeline
+
+
 if __name__ == "__main__":
     import pprint
     # pprint.pprint(get_limited_alerts_obj_v5(5, StratAlertBaseModel))

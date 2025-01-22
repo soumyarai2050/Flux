@@ -88,8 +88,7 @@ message ProcessedPerformanceAnalysis{
     is_repeated: true,
     widget_ui_data: {
       view_layout: UI_TABLE
-    },
-    depending_proto_file_name: "strat_manager_service.proto"
+    }
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string callable_name = 2;

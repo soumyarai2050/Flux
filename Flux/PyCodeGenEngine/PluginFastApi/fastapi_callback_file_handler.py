@@ -270,6 +270,24 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += "        pass\n\n"
         return output_str
 
+    def handle_DELETE_by_id_list_callback_methods_gen(self, **kwargs) -> str:
+        message, id_field_type, model_type = self.unpack_kwargs_for_callback_methods(**kwargs)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+            if id_field_type is None:
+                output_str = f"    async def delete_by_id_list_{message_name_snake_cased}_pre(self, db_obj_id_list: List[int]):\n"
+            else:
+                output_str = (f"    async def delete_by_id_list_{message_name_snake_cased}_pre(self, obj_id_list: List[{id_field_type}]):\n")
+            output_str += "        pass\n\n"
+        else:
+            output_str = f"    async def delete_by_id_list_{message_name_snake_cased}_pre(self, model_obj_list_to_be_deleted: " \
+                         f"List[{message.proto.name}]):\n"
+            output_str += "        pass\n\n"
+        output_str += f"    async def delete_by_id_list_{message_name_snake_cased}_post(self, " \
+                      f"delete_web_response):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
     def handle_read_by_id_WEBSOCKET_callback_methods_gen(self, **kwargs) -> str:
         message, id_field_type, _ = self.unpack_kwargs_for_callback_methods(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
@@ -393,6 +411,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                 FastapiCallbackFileHandler.flux_json_root_patch_all_field: self.handle_PATCH_all_callback_methods_gen,
                 FastapiCallbackFileHandler.flux_json_root_delete_field: self.handle_DELETE_callback_methods_gen,
                 FastapiCallbackFileHandler.flux_json_root_delete_all_field: self.handle_DELETE_all_callback_methods_gen,
+                FastapiCallbackFileHandler.flux_json_root_delete_by_id_list_field: self.handle_DELETE_by_id_list_callback_methods_gen,
                 FastapiCallbackFileHandler.flux_json_root_read_by_id_websocket_field:
                     self.handle_read_by_id_WEBSOCKET_callback_methods_gen
             }

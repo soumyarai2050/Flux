@@ -28,43 +28,6 @@ set(QUILL_LIB ${LIBS_ROOT_DIR}/quill/lib)
 
 set(DATE_INCLUDE ${LIBS_ROOT_DIR}/date/include)
 
-#set(protobuf_ABSL_USED_TARGETS ${libabsl_ROOT_PATH}/libabsl_log_severity.a ${libabsl_ROOT_PATH}/libabsl_raw_logging_internal.a
-#        ${libabsl_ROOT_PATH}/libabsl_bad_optional_access.a ${libabsl_ROOT_PATH}/libabsl_die_if_null.a
-#        ${libabsl_ROOT_PATH}/libabsl_hash.a ${libabsl_ROOT_PATH}/libabsl_bad_variant_access.a
-#        ${libabsl_ROOT_PATH}/libabsl_hashtablez_sampler.a ${libabsl_ROOT_PATH}/libabsl_low_level_hash.a
-#        ${libabsl_ROOT_PATH}/libabsl_spinlock_wait.a ${libabsl_ROOT_PATH}/libabsl_city.a
-#        ${libabsl_ROOT_PATH}/libabsl_leak_check.a ${libabsl_ROOT_PATH}/libabsl_civil_time.a
-#         ${libabsl_ROOT_PATH}/libabsl_log_entry.a ${libabsl_ROOT_PATH}/libabsl_status.a
-#        ${libabsl_ROOT_PATH}/libabsl_cord.a ${libabsl_ROOT_PATH}/libabsl_flags_commandlineflag.a
-#        ${libabsl_ROOT_PATH}/libabsl_statusor.a ${libabsl_ROOT_PATH}/libabsl_cord_internal.a
-#        ${libabsl_ROOT_PATH}/libabsl_flags_commandlineflag_internal.a ${libabsl_ROOT_PATH}/libabsl_log_globals.a
-#        ${libabsl_ROOT_PATH}/libabsl_statusor.a ${libabsl_ROOT_PATH}/libabsl_cordz_functions.a
-#        ${libabsl_ROOT_PATH}/libabsl_exponential_biased.a ${libabsl_ROOT_PATH}/libabsl_flags_config.a
-#        ${libabsl_ROOT_PATH}/libabsl_log_initialize.a ${libabsl_ROOT_PATH}/libabsl_str_format_internal.a
-#        ${libabsl_ROOT_PATH}/libabsl_flags_internal.a ${libabsl_ROOT_PATH}/libabsl_log_internal_check_op.a
-#        ${libabsl_ROOT_PATH}/libabsl_log_internal_nullguard.a
-#        ${libabsl_ROOT_PATH}/libabsl_strings.a ${libabsl_ROOT_PATH}/libabsl_cordz_info.a
-#        ${libabsl_ROOT_PATH}/libabsl_cordz_handle.a ${libabsl_ROOT_PATH}/libabsl_flags_marshalling.a
-#        ${libabsl_ROOT_PATH}/libabsl_log_internal_conditions.a ${libabsl_ROOT_PATH}/libabsl_strings_internal.a
-#        ${libabsl_ROOT_PATH}/libabsl_flags_private_handle_accessor.a ${libabsl_ROOT_PATH}/libabsl_synchronization.a
-#        ${libabsl_ROOT_PATH}/libabsl_kernel_timeout_internal.a
-#        ${libabsl_ROOT_PATH}/libabsl_graphcycles_internal.a
-#        ${libabsl_ROOT_PATH}/libabsl_symbolize.a
-#        ${libabsl_ROOT_PATH}/libabsl_demangle_internal.a ${libabsl_ROOT_PATH}/libabsl_crc_cord_state.a
-#        ${libabsl_ROOT_PATH}/libabsl_crc32c.a ${libabsl_ROOT_PATH}/libabsl_flags_program_name.a
-#        ${libabsl_ROOT_PATH}/libabsl_throw_delegate.a ${libabsl_ROOT_PATH}/libabsl_crc_cpu_detect.a
-#        ${libabsl_ROOT_PATH}/libabsl_flags_reflection.a ${libabsl_ROOT_PATH}/libabsl_log_internal_message.a
-#        ${libabsl_ROOT_PATH}/libabsl_strerror.a
-#        ${libabsl_ROOT_PATH}/libabsl_log_internal_format.a ${libabsl_ROOT_PATH}/libabsl_examine_stack.a
-#        ${libabsl_ROOT_PATH}/libabsl_log_globals.a ${libabsl_ROOT_PATH}/libabsl_log_internal_globals.a
-#        ${libabsl_ROOT_PATH}/libabsl_log_internal_log_sink_set.a ${libabsl_ROOT_PATH}/libabsl_log_sink.a
-#        ${libabsl_ROOT_PATH}/libabsl_time.a
-#        ${libabsl_ROOT_PATH}/libabsl_time_zone.a
-#        ${libabsl_ROOT_PATH}/libabsl_crc_internal.a
-#        ${libabsl_ROOT_PATH}/libabsl_log_internal_proto.a ${libabsl_ROOT_PATH}/libabsl_raw_hash_set.a
-#        ${libabsl_ROOT_PATH}/libabsl_malloc_internal.a ${libabsl_ROOT_PATH}/libabsl_stacktrace.a
-#        ${libabsl_ROOT_PATH}/libabsl_debugging_internal.a ${libabsl_ROOT_PATH}/libabsl_int128.a
-#        ${libabsl_ROOT_PATH}/libabsl_base.a)
 
 set(Boost_INCLUDE_LIBS_TARGET ${Boost_INCLUDE_LIBS}/libboost_atomic.so ${Boost_INCLUDE_LIBS}/libboost_chrono.so
          ${Boost_INCLUDE_LIBS}/libboost_container.so ${Boost_INCLUDE_LIBS}/libboost_context.so
@@ -129,9 +92,6 @@ add_executable(mobile_book_executable main.cpp ${SRC_FILES}
 target_link_libraries(mobile_book_executable
         ${MONGO_LIB}
         ${BSON_LIB}
-        ${protobuf_lib}
-        ${lib_utf}
-        ${protobuf_ABSL_USED_TARGETS}
         ${QUILL_LIB}/libquill.a
         ${Boost_INCLUDE_LIBS_TARGET}
         ${CPP_YAML_LIB}

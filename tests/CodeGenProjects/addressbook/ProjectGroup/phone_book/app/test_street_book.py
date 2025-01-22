@@ -1,5 +1,6 @@
 # standard imports
 import copy
+import math
 import time
 import traceback
 import concurrent.futures
@@ -34,9 +35,7 @@ def test_min_chore_notional_breach_in_normal_strat_mode1(
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -49,12 +48,12 @@ def test_min_chore_notional_breach_in_normal_strat_mode1(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -76,9 +75,9 @@ def test_min_chore_notional_breach_in_normal_strat_mode1(
 
         time.sleep(1)
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -120,9 +119,7 @@ def test_min_chore_notional_breach_in_normal_strat_mode2(
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -135,12 +132,12 @@ def test_min_chore_notional_breach_in_normal_strat_mode2(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -162,9 +159,9 @@ def test_min_chore_notional_breach_in_normal_strat_mode2(
         min_chore_notional = f"{strat_limits.min_chore_notional=:.2f}"
         time.sleep(1)
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -193,9 +190,9 @@ def test_min_chore_notional_breach_in_normal_strat_mode2(
         min_chore_notional = f"{strat_limits.min_chore_notional=:.2f}"
         time.sleep(1)
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -249,9 +246,7 @@ def test_min_chore_notional_breach_in_relaxed_strat_mode(
                                                  last_barter_fixture_list, market_depth_basemodel_list,
                                                  StratMode.StratMode_Relaxed))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -264,12 +259,12 @@ def test_min_chore_notional_breach_in_relaxed_strat_mode(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         debug_max_wait_sec = None
@@ -297,9 +292,9 @@ def test_min_chore_notional_breach_in_relaxed_strat_mode(
         min_chore_notional = f"{strat_limits.min_chore_notional=:.2f}"
         time.sleep(1)
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -356,13 +351,10 @@ def test_min_eqt_qty_in_buy_sell_strat(
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -374,11 +366,8 @@ def test_min_eqt_qty_in_buy_sell_strat(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
-
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
         px = 97
         qty = 90
@@ -390,7 +379,7 @@ def test_min_eqt_qty_in_buy_sell_strat(
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
             time.sleep(residual_wait_sec)
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 96
         qty = 90
         place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
@@ -403,7 +392,7 @@ def test_min_eqt_qty_in_buy_sell_strat(
             time.sleep(residual_wait_sec)
 
         # Now placing eqt chore with less then min_eqt_qty=20
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 96
         qty = 10
         place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
@@ -439,19 +428,16 @@ def test_min_eqt_qty_in_sell_buy_strat(
         max_loop_count_per_side, expected_chore_limits_, refresh_sec_update_fixture):
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
-    buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
+    leg1_symbol, leg2_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list,
                                                  leg1_side=Side.SELL, leg2_side=Side.BUY))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -463,30 +449,27 @@ def test_min_eqt_qty_in_sell_buy_strat(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
-
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 96
         qty = 90
-        place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
+        place_new_chore(leg1_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
         new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
-                                                                           sell_symbol, executor_http_client)
+                                                                           leg1_symbol, executor_http_client)
         last_chore_id = new_chore_journal.chore.chore_id
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
             time.sleep(residual_wait_sec)
 
         # Now placing eqt chore with less then min_eqt_qty=20
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 96
         qty = 10
-        place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
+        place_new_chore(leg1_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
         new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
-                                                                           sell_symbol, executor_http_client,
+                                                                           leg1_symbol, executor_http_client,
                                                                            expect_no_chore=True,
                                                                            last_chore_id=last_chore_id)
 
@@ -520,9 +503,7 @@ def test_max_chore_notional_breach(static_data_, clean_and_set_limits, leg1_leg2
         underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -535,12 +516,12 @@ def test_max_chore_notional_breach(static_data_, clean_and_set_limits, leg1_leg2
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -557,9 +538,9 @@ def test_max_chore_notional_breach(static_data_, clean_and_set_limits, leg1_leg2
         chore_limits.max_chore_notional = 8000
         email_book_service_native_web_client.put_chore_limits_client(chore_limits)
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -597,9 +578,7 @@ def test_max_chore_qty_breach(static_data_, clean_and_set_limits, leg1_leg2_symb
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -612,12 +591,12 @@ def test_max_chore_qty_breach(static_data_, clean_and_set_limits, leg1_leg2_symb
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -634,9 +613,9 @@ def test_max_chore_qty_breach(static_data_, clean_and_set_limits, leg1_leg2_symb
         chore_limits.max_chore_qty = 80
         email_book_service_native_web_client.put_chore_limits_client(chore_limits)
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -674,9 +653,7 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  [], market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -688,16 +665,13 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
-
         sample_buy_last_barter = copy.deepcopy(last_barter_fixture_list[0])
         sample_buy_last_barter["px"] = 0
         sample_sell_last_barter = copy.deepcopy(last_barter_fixture_list[1])
         sample_sell_last_barter["px"] = 0
         run_last_barter(buy_symbol, sell_symbol,
                        [sample_buy_last_barter, sample_sell_last_barter],
-                       executor_http_client)
+                       active_pair_strat.cpp_port)
 
         # Negative Check - since buy tob is missing last_barter and sell side last_barter.px is 0 both
         # chores must get blocked
@@ -732,11 +706,11 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
         # Positive check - if tob is fine then chores must get placed
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -745,11 +719,11 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
             time.sleep(residual_wait_sec)
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
-        # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        # required to make sell side tob latest
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
 
-        update_tob_through_market_depth_to_place_sell_chore(executor_http_client, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -779,9 +753,7 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
         underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -794,12 +766,12 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -843,9 +815,7 @@ def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits,
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, []))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -876,15 +846,15 @@ def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits,
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
         # positive test case: Putting valid market depth
-        create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_http_client)
+        create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, active_pair_strat.cpp_port)
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -923,7 +893,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
             if md.side == TickType.ASK and md.position == 0:
                 buy_zeroth_ask_md = md
             else:
-                created_market_depth = executor_http_client.create_market_depth_client(md)
+                created_market_depth = cpp_create_market_depth_client(active_pair_strat.cpp_port, md)
                 created_market_depth.id = None
                 created_market_depth.cumulative_avg_px = None
                 created_market_depth.cumulative_notional = None
@@ -934,7 +904,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
             if md.side == TickType.BID and md.position == 0:
                 sell_zeroth_bid_md = md
             else:
-                created_market_depth = executor_http_client.create_market_depth_client(md)
+                created_market_depth = cpp_create_market_depth_client(active_pair_strat.cpp_port, md)
                 created_market_depth.id = None
                 created_market_depth.cumulative_avg_px = None
                 created_market_depth.cumulative_notional = None
@@ -942,9 +912,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
                 assert created_market_depth == md, \
                     f"Mismatch created market_depth: expected {md} received {created_market_depth}"
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -987,7 +955,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
 
         # creating earlier skipped market depths also
         for md in [buy_zeroth_ask_md, sell_zeroth_bid_md]:
-            created_market_depth = executor_http_client.create_market_depth_client(md)
+            created_market_depth = cpp_create_market_depth_client(active_pair_strat.cpp_port, md)
             created_market_depth.id = None
             created_market_depth.cumulative_avg_px = None
             created_market_depth.cumulative_notional = None
@@ -997,13 +965,13 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
             time.sleep(1)
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
         time.sleep(1)
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -1012,11 +980,11 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
             time.sleep(residual_wait_sec)   # wait to get open chore residual
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
 
-        update_tob_through_market_depth_to_place_sell_chore(executor_http_client, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -1049,9 +1017,7 @@ def _test_px_check_if_tob_none(static_data_, clean_and_set_limits, buy_sell_symb
                                            expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -1064,7 +1030,7 @@ def _test_px_check_if_tob_none(static_data_, clean_and_set_limits, buy_sell_symb
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         # Deleting all tobs
         tob_list = executor_http_client.get_all_top_of_book_client()
@@ -1090,6 +1056,17 @@ def _test_px_check_if_tob_none(static_data_, clean_and_set_limits, buy_sell_symb
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+def _put_n_assert_market_depth(active_pair_strat_cpp_port, market_depth_basemodel):
+    updated_market_depth = cpp_put_market_depth_client(active_pair_strat_cpp_port,
+                                                       market_depth_basemodel)
+
+    assert math.isclose(updated_market_depth.cumulative_avg_px, market_depth_basemodel.cumulative_avg_px), \
+        (f"Mismatched market_depth.cumulative_avg_px, expected {market_depth_basemodel.cumulative_avg_px}, "
+         f"updated {updated_market_depth.cumulative_avg_px}")
+    updated_market_depth.cumulative_avg_px = market_depth_basemodel.cumulative_avg_px
+    assert updated_market_depth == market_depth_basemodel, \
+        f"Mismatched market_depth: expected: {market_depth_basemodel}, updated: {updated_market_depth}"
+
 @pytest.mark.nightly
 def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
@@ -1106,13 +1083,10 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -1126,7 +1100,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
 
         # updating sell market depth to make its max depth px value greater than calculated max_px_by_basis_point
         sell_px = 85
-        stored_market_depths = executor_http_client.get_all_market_depth_client()
+        stored_market_depths = cpp_get_all_market_depth_client(active_pair_strat.cpp_port)
         for market_depth_basemodel in stored_market_depths:
             if market_depth_basemodel.symbol == buy_symbol:
                 if market_depth_basemodel.side == "ASK":
@@ -1134,9 +1108,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
                 market_depth_basemodel.exch_time = get_utc_date_time()
                 market_depth_basemodel.arrival_time = get_utc_date_time()
 
-                updated_market_depth = executor_http_client.put_market_depth_client(market_depth_basemodel)
-                assert updated_market_depth == market_depth_basemodel, \
-                    f"Mismatched market_depth: expected: {market_depth_basemodel}, updated: {updated_market_depth}"
+                _put_n_assert_market_depth(active_pair_strat.cpp_port, market_depth_basemodel)
                 time.sleep(1)
 
         # below are computes expected for HIGH breach px:
@@ -1154,7 +1126,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
 
         # Negative Check for buy chore - chore block since px > max_breach_threshold_px
         # placing new non-systematic new_chore
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 98
         qty = 90
         check_str = "blocked generated Side.BUY chore, chore-px=98.0 > high_breach_px=97.750; low_breach_px=95.000"
@@ -1178,7 +1150,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
 
         # Negative Check for buy chore - chore block since px < min_breach_threshold_px
         # placing new non-systematic new_chore
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 94
         qty = 90
         check_str = "blocked generated Side.BUY chore, chore-px=94.0 < low_breach_px=95.000; high_breach_px=97.750"
@@ -1188,7 +1160,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
                                                                       active_pair_strat, executor_http_client)
 
         # Positive check for buy chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
         px = 97
         qty = 90
@@ -1204,16 +1176,16 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
         # checking min_px_by_basis_point
 
         # updating last_barter for sell symbol
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         sample_last_barter_obj = LastBarterBaseModel.from_dict(last_barter_fixture_list[1])
         sample_last_barter_obj.px = 100
         sample_last_barter_obj.exch_time = get_utc_date_time()
         sample_last_barter_obj.arrival_time = get_utc_date_time()
-        executor_http_client.create_last_barter_client(sample_last_barter_obj)
+        cpp_create_last_barter_client(active_pair_strat.cpp_port, sample_last_barter_obj)
 
         # updating buy market depth to make its max depth px value less than calculated max_px_by_basis_point
         buy_px = 100
-        stored_market_depths = executor_http_client.get_all_market_depth_client()
+        stored_market_depths = cpp_get_all_market_depth_client(active_pair_strat.cpp_port)
         for pos in range(4, -1, -1):
             for market_depth_basemodel in stored_market_depths:
                 if market_depth_basemodel.symbol == sell_symbol:
@@ -1222,7 +1194,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
                         market_depth_basemodel.exch_time = get_utc_date_time()
                         market_depth_basemodel.arrival_time = get_utc_date_time()
 
-                        executor_http_client.put_market_depth_client(market_depth_basemodel)
+                        cpp_put_market_depth_client(active_pair_strat.cpp_port, market_depth_basemodel)
                         time.sleep(1)
                         break
 
@@ -1241,7 +1213,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
 
         # Negative Check for sell chore - chore block since px < min_breach_threshold_px
         # placing new non-systematic new_chore
-        # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 84
         qty = 90
         check_str = "blocked generated Side.SELL chore, chore-px=84.0 < low_breach_px=85.000; high_breach_px=120.000"
@@ -1265,7 +1237,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
 
         # Negative Check for sell chore - chore block since px > max_breach_threshold_px
         # placing new non-systematic new_chore
-        # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         px = 121
         qty = 90
         check_str = "blocked generated Side.SELL chore, chore-px=121.0 > high_breach_px=120.000; low_breach_px=85.000"
@@ -1275,14 +1247,14 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
                                                                       active_pair_strat, executor_http_client)
 
         # Positive check for sell chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
-        # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         sample_last_barter_obj = LastBarterBaseModel.from_dict(last_barter_fixture_list[1])
         sample_last_barter_obj.px = 100
         sample_last_barter_obj.exch_time = get_utc_date_time()
         sample_last_barter_obj.arrival_time = get_utc_date_time()
-        executor_http_client.create_last_barter_client(sample_last_barter_obj)
+        cpp_create_last_barter_client(active_pair_strat.cpp_port, sample_last_barter_obj)
 
         px = 86
         qty = 90
@@ -1343,13 +1315,10 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
                                                      expected_strat_status_, symbol_overview_obj_list,
                                                      last_barter_fixture_list, market_depth_basemodel_list))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-        buy_inst_type: InstrumentType = InstrumentType.CB if (
-                pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-        sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+        buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+        sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
         try:
             # updating yaml_configs according to this test
@@ -1366,7 +1335,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
             buy_sample_last_barter.exch_time = get_utc_date_time()
             buy_sample_last_barter.arrival_time = get_utc_date_time()
             buy_sample_last_barter.market_barter_volume.participation_period_last_barter_qty_sum = 2000
-            executor_http_client.create_last_barter_client(buy_sample_last_barter)
+            cpp_create_last_barter_client(active_pair_strat.cpp_port, buy_sample_last_barter)
 
             # below are computes expected for HIGH breach px:
             # ask_quote_px = 121
@@ -1437,7 +1406,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
             sell_sample_last_barter.px = 110
             sell_sample_last_barter.exch_time = get_utc_date_time()
             sell_sample_last_barter.arrival_time = get_utc_date_time()
-            executor_http_client.create_last_barter_client(sell_sample_last_barter)
+            cpp_create_last_barter_client(active_pair_strat.cpp_port, sell_sample_last_barter)
 
             # below are computes expected for LOW breach px:
             # ask_quote_px = 80
@@ -1544,13 +1513,10 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
                                                      expected_strat_status_, symbol_overview_obj_list,
                                                      last_barter_fixture_list, market_depth_basemodel_list))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-        buy_inst_type: InstrumentType = InstrumentType.CB if (
-                pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-        sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+        buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+        sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
         try:
             # updating yaml_configs according to this test
@@ -1564,7 +1530,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
 
             # updating sell market depth to make its max depth px value greater than calculated max_px_by_basis_point
             sell_px = 85
-            stored_market_depths = executor_http_client.get_all_market_depth_client()
+            stored_market_depths = cpp_get_all_market_depth_client(active_pair_strat.cpp_port)
             for market_depth_basemodel in stored_market_depths:
                 if market_depth_basemodel.symbol == buy_symbol:
                     if market_depth_basemodel.side == "ASK":
@@ -1572,9 +1538,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
                     market_depth_basemodel.exch_time = get_utc_date_time()
                     market_depth_basemodel.arrival_time = get_utc_date_time()
 
-                    updated_market_depth = executor_http_client.put_market_depth_client(market_depth_basemodel)
-                    assert updated_market_depth == market_depth_basemodel, \
-                        f"Mismatched market_depth: expected: {market_depth_basemodel}, updated: {updated_market_depth}"
+                    _put_n_assert_market_depth(active_pair_strat.cpp_port, market_depth_basemodel)
                     time.sleep(1)
 
             # below are computes expected for HIGH breach px:
@@ -1595,7 +1559,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
 
             # Negative Check for buy chore - chore block since px > max_breach_threshold_px
             # placing new non-systematic new_chore
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
             px = 117
             qty = 90
             check_str = ("blocked generated Side.BUY chore, chore-px=117.0 > high_breach_px=116.001; "
@@ -1623,7 +1587,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
 
             # Negative Check for buy chore - chore block since px < min_breach_threshold_px>
             # placing new non-systematic new_chore
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
             px = 94
             qty = 90
             check_str = "blocked generated Side.BUY chore, chore-px=94.0 < low_breach_px=95.000; high_breach_px=116.001"
@@ -1633,7 +1597,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
                                                                           active_pair_strat, executor_http_client)
 
             # Positive check for buy chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
             px = 116
             qty = 90
@@ -1649,16 +1613,16 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
             # checking min_px_by_basis_point
 
             # updating last_barter for sell symbol
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
             sample_last_barter_obj = LastBarterBaseModel.from_dict(last_barter_fixture_list[1])
             sample_last_barter_obj.px = 100
             sample_last_barter_obj.exch_time = get_utc_date_time()
             sample_last_barter_obj.arrival_time = get_utc_date_time()
-            executor_http_client.create_last_barter_client(sample_last_barter_obj)
+            cpp_create_last_barter_client(active_pair_strat.cpp_port, sample_last_barter_obj)
 
             # updating buy market depth to make its max depth px value less than calculated max_px_by_basis_point
             buy_px = 130
-            stored_market_depths = executor_http_client.get_all_market_depth_client()
+            stored_market_depths = cpp_get_all_market_depth_client(active_pair_strat.cpp_port)
             for pos in range(4, -1, -1):
                 for market_depth_basemodel in stored_market_depths:
                     if market_depth_basemodel.symbol == sell_symbol:
@@ -1667,7 +1631,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
                             market_depth_basemodel.exch_time = get_utc_date_time()
                             market_depth_basemodel.arrival_time = get_utc_date_time()
 
-                            executor_http_client.put_market_depth_client(market_depth_basemodel)
+                            cpp_put_market_depth_client(active_pair_strat.cpp_port, market_depth_basemodel)
                             time.sleep(1)
                             break
 
@@ -1689,7 +1653,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
 
             # Negative Check for sell chore - chore block since px < min_breach_threshold_px
             # placing new non-systematic new_chore
-            # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
             px = 98
             qty = 90
             check_str = ("blocked generated Side.SELL chore, chore-px=98.0 < low_breach_px=99.999; "
@@ -1717,7 +1681,7 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
 
             # Negative Check for sell chore - chore block since px > max_breach_threshold_px
             # placing new non-systematic new_chore
-            # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
             px = 122
             qty = 90
             check_str = ("blocked generated Side.SELL chore, chore-px=122.0 > high_breach_px=121.001; "
@@ -1728,14 +1692,14 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
                                                                           active_pair_strat, executor_http_client)
 
             # Positive check for sell chore - chore places since min_breach_threshold_px < px < max_breach_threshold_px
-            # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            # run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
             sample_last_barter_obj = LastBarterBaseModel.from_dict(last_barter_fixture_list[1])
             sample_last_barter_obj.px = 100
             sample_last_barter_obj.exch_time = get_utc_date_time()
             sample_last_barter_obj.arrival_time = get_utc_date_time()
-            executor_http_client.create_last_barter_client(sample_last_barter_obj)
+            cpp_create_last_barter_client(active_pair_strat.cpp_port, sample_last_barter_obj)
 
             px = 100
             qty = 90
@@ -1796,13 +1760,10 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -1819,7 +1780,7 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
         buy_sample_last_barter.exch_time = get_utc_date_time()
         buy_sample_last_barter.arrival_time = get_utc_date_time()
         buy_sample_last_barter.market_barter_volume.participation_period_last_barter_qty_sum = 2000
-        executor_http_client.create_last_barter_client(buy_sample_last_barter)
+        cpp_create_last_barter_client(active_pair_strat.cpp_port, buy_sample_last_barter)
 
         # below are computes expected for HIGH breach px:
         # ask_quote_px = 121
@@ -1882,7 +1843,7 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
         sell_sample_last_barter.px = 110
         sell_sample_last_barter.exch_time = get_utc_date_time()
         sell_sample_last_barter.arrival_time = get_utc_date_time()
-        executor_http_client.create_last_barter_client(sell_sample_last_barter)
+        cpp_create_last_barter_client(active_pair_strat.cpp_port, sell_sample_last_barter)
 
         # below are computes expected for LOW breach px:
         # ask_quote_px = 80
@@ -1963,13 +1924,10 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -1983,7 +1941,7 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
 
         # updating sell market depth to make its max depth px value lowest of all values
         sell_px = 91
-        stored_market_depths = executor_http_client.get_all_market_depth_client()
+        stored_market_depths = cpp_get_all_market_depth_client(active_pair_strat.cpp_port)
         for market_depth_basemodel in stored_market_depths:
             if market_depth_basemodel.symbol == buy_symbol:
                 if market_depth_basemodel.side == "ASK":
@@ -1991,7 +1949,7 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
                 market_depth_basemodel.exch_time = get_utc_date_time()
                 market_depth_basemodel.arrival_time = get_utc_date_time()
 
-                executor_http_client.put_market_depth_client(market_depth_basemodel)
+                cpp_put_market_depth_client(active_pair_strat.cpp_port, market_depth_basemodel)
                 time.sleep(1)
 
         # max_px_by_basis_point = 109.2
@@ -2063,11 +2021,11 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
         sell_sample_last_barter.px = 110
         sell_sample_last_barter.exch_time = get_utc_date_time()
         sell_sample_last_barter.arrival_time = get_utc_date_time()
-        executor_http_client.create_last_barter_client(sell_sample_last_barter)
+        cpp_create_last_barter_client(active_pair_strat.cpp_port, sell_sample_last_barter)
 
         # updating buy market depth to make its max depth px value less than calculated max_px_by_basis_point
         buy_px = 100
-        stored_market_depths = executor_http_client.get_all_market_depth_client()
+        stored_market_depths = cpp_get_all_market_depth_client(active_pair_strat.cpp_port)
         for pos in range(4, -1, -1):
             for market_depth_basemodel in stored_market_depths:
                 if market_depth_basemodel.symbol == sell_symbol:
@@ -2076,7 +2034,7 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
                         market_depth_basemodel.exch_time = get_utc_date_time()
                         market_depth_basemodel.arrival_time = get_utc_date_time()
 
-                        executor_http_client.put_market_depth_client(market_depth_basemodel)
+                        cpp_put_market_depth_client(active_pair_strat.cpp_port, market_depth_basemodel)
                         time.sleep(1)
                         break
 
@@ -2170,13 +2128,10 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -2189,12 +2144,12 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -2294,9 +2249,7 @@ def test_strat_limits_with_none_or_o_limit_up_down_px(
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -2342,12 +2295,12 @@ def test_strat_limits_with_none_or_o_limit_up_down_px(
                 f"Mismatched: expected {symbol_overview_}, received: {updated_symbol_overview}"
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -2360,6 +2313,36 @@ def test_strat_limits_with_none_or_o_limit_up_down_px(
         raise Exception(e)
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_update_max_open_chores_per_side_updates_consumable_open_chores(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_,
+        max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+    buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
+        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+                                                 expected_strat_status_, symbol_overview_obj_list,
+                                                 last_barter_fixture_list, market_depth_basemodel_list))
+
+    # updating max_open_chores_per_side
+    for expected_max_open_chores_per_side in [0, 10]:
+        strat_limits = executor_http_client.get_strat_limits_client(active_pair_strat.id)
+        strat_limits.max_open_chores_per_side = expected_max_open_chores_per_side
+        executor_http_client.put_strat_limits_client(strat_limits)
+
+        strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+        assert strat_brief.pair_buy_side_bartering_brief.consumable_open_chores == strat_limits.max_open_chores_per_side, \
+            (f"Mismatched buy consumable_open_chores: expected {strat_limits.max_open_chores_per_side}, "
+             f"found {strat_brief.pair_buy_side_bartering_brief.consumable_open_chores}")
+        assert strat_brief.pair_sell_side_bartering_brief.consumable_open_chores == strat_limits.max_open_chores_per_side, \
+            (f"Mismatched sell consumable_open_chores: expected {strat_limits.max_open_chores_per_side}, "
+             f"found {strat_brief.pair_sell_side_bartering_brief.consumable_open_chores}")
 
 
 @pytest.mark.nightly
@@ -2377,9 +2360,7 @@ def test_strat_limits_with_0_consumable_open_chores(static_data_, clean_and_set_
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -2392,12 +2373,12 @@ def test_strat_limits_with_0_consumable_open_chores(static_data_, clean_and_set_
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -2413,11 +2394,11 @@ def test_strat_limits_with_0_consumable_open_chores(static_data_, clean_and_set_
                                            f"as only one strat exists for this test, received " \
                                            f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
         strat_brief = strat_brief_list[0]
-        strat_brief.pair_buy_side_bartering_brief.consumable_open_chores = -1
+        strat_brief.pair_buy_side_bartering_brief.consumable_open_chores = 0
         updated_strat_brief = \
             executor_http_client.put_strat_brief_client(strat_brief.to_dict(exclude_none=True))
-        assert updated_strat_brief.pair_buy_side_bartering_brief.consumable_open_chores == -1, \
-            "Updated strat_brief.pair_buy_side_bartering_brief.consumable_open_chores to -1 using http route call but " \
+        assert updated_strat_brief.pair_buy_side_bartering_brief.consumable_open_chores == 0, \
+            "Updated strat_brief.pair_buy_side_bartering_brief.consumable_open_chores to 0 using http route call but " \
             f"received unexpected returned value {updated_strat_brief}"
 
         # placing new non-systematic new_chore
@@ -2459,6 +2440,240 @@ def test_strat_limits_with_0_consumable_open_chores(static_data_, clean_and_set_
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+def _check_max_single_leg_notional_updates_before_placing_chore(
+        leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat, executor_http_client,
+        residual_wait_sec, chore_symbol, side):
+
+    # Positive check
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat.cpp_port)
+    time.sleep(1)
+    px = 98
+    qty = 90
+    inst_type: InstrumentType = get_inst_type(side, activated_strat)
+    place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
+    # Internally checks if chore_journal is found with OE_NEW state
+    placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+                                                                          chore_symbol, executor_http_client)
+
+    if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+        time.sleep(residual_wait_sec)  # wait to get open chore residual
+
+    # Negative check
+    # updating max_single_leg_notional such that consumable_notional becomes less than next chore notional
+    stored_strat_limits = executor_http_client.get_strat_limits_client(activated_strat.id)
+    stored_strat_brief = executor_http_client.get_strat_brief_client(activated_strat.id)
+    if side == Side.BUY:
+        current_consumable_notional = stored_strat_brief.pair_buy_side_bartering_brief.consumable_notional
+    else:
+        current_consumable_notional = stored_strat_brief.pair_sell_side_bartering_brief.consumable_notional
+    non_chore_placable_consumable_notional = 17000
+    # since when max_single_leg_notional is updated, updated delta is what is added to consumable_notional
+    # delta = stored_max_single_leg_notional - updated_max_single_leg_notional
+    # updated_max_single_leg_notional = stored_max_single_leg_notional - delta
+    # so this delta will become -ive and when will be added to current consumable notional will make it to 17000
+    updated_max_single_leg_notional = (stored_strat_limits.max_single_leg_notional -
+                                       (current_consumable_notional - non_chore_placable_consumable_notional))
+    updated_strat_limits = executor_http_client.patch_strat_limits_client(
+        {"_id": activated_strat.id, "max_single_leg_notional": updated_max_single_leg_notional})
+    assert updated_strat_limits.max_single_leg_notional == updated_max_single_leg_notional, \
+        (f"Mismatch max_single_leg_notional: expected {updated_max_single_leg_notional} "
+         f"found {updated_strat_limits.max_single_leg_notional}")
+
+    updated_strat_brief = executor_http_client.get_strat_brief_client(activated_strat.id)
+    if side == Side.BUY:
+        assert updated_strat_brief.pair_buy_side_bartering_brief.consumable_notional == non_chore_placable_consumable_notional, \
+            (f"Mismatched updated buy consumable_notional: expected {non_chore_placable_consumable_notional}, "
+             f"updated {updated_strat_brief.pair_buy_side_bartering_brief.consumable_notional}")
+    else:
+        assert updated_strat_brief.pair_sell_side_bartering_brief.consumable_notional == non_chore_placable_consumable_notional, \
+            (f"Mismatched updated buy consumable_notional: expected {non_chore_placable_consumable_notional}, "
+             f"updated {updated_strat_brief.pair_sell_side_bartering_brief.consumable_notional}")
+
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat.cpp_port)
+    # placing new non-systematic new_chore
+    check_str = f"blocked generated Side.{side.value} chore, breaches available consumable notional"
+    assert_fail_msg = f"couldn't find alert saying: {check_str!r}"
+    handle_place_chore_and_check_str_in_alert_for_executor_limits(chore_symbol, side, px, qty,
+                                                                  check_str, assert_fail_msg,
+                                                                  activated_strat, executor_http_client,
+                                                                  last_chore_id=placed_chore_journal.chore.chore_id)
+
+    # reverting back max_single_leg_notional by updating it back to last value that will make consumable notional
+    # worthy to place chore - this checks if max_single_leg_notional is exhausted and we increase it then
+    # all chores gets placed till it is again exhausted
+    updated_strat_limits = executor_http_client.patch_strat_limits_client(
+        {"_id": activated_strat.id, "max_single_leg_notional": stored_strat_limits.max_single_leg_notional})
+    assert updated_strat_limits.max_single_leg_notional == stored_strat_limits.max_single_leg_notional, \
+        (f"Mismatch max_single_leg_notional: expected {stored_strat_limits.max_single_leg_notional} "
+         f"found {updated_strat_limits.max_single_leg_notional}")
+
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat.cpp_port)
+    time.sleep(1)
+    inst_type: InstrumentType = get_inst_type(side, activated_strat)
+    place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
+    # Internally checks if chore_journal is found with OE_NEW state
+    placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+                                                                          chore_symbol, executor_http_client,
+                                                                          last_chore_id=placed_chore_journal.chore.chore_id)
+
+
+def _check_max_open_single_leg_notional_updates_before_placing_chore(
+        leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat, executor_http_client,
+        residual_wait_sec, chore_symbol, side):
+
+    # Positive check
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat.cpp_port)
+    time.sleep(1)
+    px = 98
+    qty = 90
+    inst_type: InstrumentType = get_inst_type(side, activated_strat)
+    place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
+    # Internally checks if chore_journal is found with OE_NEW state
+    placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+                                                                          chore_symbol, executor_http_client)
+
+    if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+        time.sleep(residual_wait_sec)  # wait to get open chore residual
+
+    # Negative check
+    # updating max_single_leg_notional such that consumable_notional becomes less than next chore notional
+    stored_strat_limits = executor_http_client.get_strat_limits_client(activated_strat.id)
+    stored_strat_brief = executor_http_client.get_strat_brief_client(activated_strat.id)
+    if side == Side.BUY:
+        current_consumable_open_notional = stored_strat_brief.pair_buy_side_bartering_brief.consumable_open_notional
+    else:
+        current_consumable_open_notional = stored_strat_brief.pair_sell_side_bartering_brief.consumable_open_notional
+    non_chore_placable_consumable_open_notional = 17000
+    # since when max_open_single_leg_notional is updated, updated delta is what is added to consumable_open_notional
+    # delta = stored_max_open_single_leg_notional - updated_max_open_single_leg_notional
+    # updated_max_open_single_leg_notional = stored_max_open_single_leg_notional - delta
+    # so this delta will become -ive and when will be added to current consumable_open_notional will make it to 17000
+    updated_max_open_single_leg_notional = (stored_strat_limits.max_open_single_leg_notional -
+                                            (current_consumable_open_notional - non_chore_placable_consumable_open_notional))
+    updated_strat_limits = executor_http_client.patch_strat_limits_client(
+        {"_id": activated_strat.id, "max_open_single_leg_notional": updated_max_open_single_leg_notional})
+    assert updated_strat_limits.max_open_single_leg_notional == updated_max_open_single_leg_notional, \
+        (f"Mismatch max_open_single_leg_notional: expected {updated_max_open_single_leg_notional} "
+         f"found {updated_strat_limits.max_open_single_leg_notional}")
+
+    updated_strat_brief = executor_http_client.get_strat_brief_client(activated_strat.id)
+    if side == Side.BUY:
+        assert updated_strat_brief.pair_buy_side_bartering_brief.consumable_open_notional == updated_max_open_single_leg_notional, \
+            (f"Mismatched updated buy consumable_open_notional: expected {updated_max_open_single_leg_notional}, "
+             f"updated {updated_strat_brief.pair_buy_side_bartering_brief.consumable_open_notional}")
+    else:
+        assert updated_strat_brief.pair_sell_side_bartering_brief.consumable_open_notional == updated_max_open_single_leg_notional, \
+            (f"Mismatched updated sell consumable_open_notional: expected {updated_max_open_single_leg_notional}, "
+             f"updated {updated_strat_brief.pair_sell_side_bartering_brief.consumable_open_notional}")
+
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat.cpp_port)
+    # placing new non-systematic new_chore
+    check_str = (f"blocked chore with symbol_side_key: %%symbol-side={chore_symbol}-{side.value}%%, "
+                 f"breaches available consumable open notional")
+    assert_fail_msg = f"couldn't find alert saying: {check_str!r}"
+    handle_place_chore_and_check_str_in_alert_for_executor_limits(chore_symbol, side, px, qty,
+                                                                  check_str, assert_fail_msg,
+                                                                  activated_strat, executor_http_client,
+                                                                  last_chore_id=placed_chore_journal.chore.chore_id)
+
+    # reverting back max_single_leg_notional by updating it back to last value that will make consumable notional
+    # worthy to place chore - this checks if max_single_leg_notional is exhausted and we increase it then
+    # all chores gets placed till it is again exhausted
+    updated_strat_limits = executor_http_client.patch_strat_limits_client(
+        {"_id": activated_strat.id, "max_open_single_leg_notional": stored_strat_limits.max_open_single_leg_notional})
+    assert updated_strat_limits.max_open_single_leg_notional == stored_strat_limits.max_open_single_leg_notional, \
+        (f"Mismatch max_open_single_leg_notional: expected {stored_strat_limits.max_open_single_leg_notional} "
+         f"found {updated_strat_limits.max_open_single_leg_notional}")
+
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat.cpp_port)
+    time.sleep(1)
+    inst_type: InstrumentType = get_inst_type(side, activated_strat)
+    place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
+    # Internally checks if chore_journal is found with OE_NEW state
+    placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+                                                                          chore_symbol, executor_http_client,
+                                                                          last_chore_id=placed_chore_journal.chore.chore_id)
+
+
+@pytest.mark.nightly
+def test_max_single_leg_notional_updates_pre_buy_chore_placing(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+    leg1_symbol, leg2_symbol, activated_strat, executor_http_client = (
+        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+                                                 expected_strat_status_, symbol_overview_obj_list,
+                                                 last_barter_fixture_list, market_depth_basemodel_list))
+
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_strat.id)
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 30
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        _check_max_single_leg_notional_updates_before_placing_chore(
+            leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat, executor_http_client,
+            residual_wait_sec, leg1_symbol, Side.BUY)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_max_single_leg_notional_updates_pre_sell_chore_placing(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+    leg1_symbol, leg2_symbol, activated_strat, executor_http_client = (
+        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+                                                 expected_strat_status_, symbol_overview_obj_list,
+                                                 last_barter_fixture_list, market_depth_basemodel_list,
+                                                 leg1_side=Side.SELL, leg2_side=Side.BUY))
+
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_strat.id)
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 30
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        _check_max_single_leg_notional_updates_before_placing_chore(
+            leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat, executor_http_client,
+            residual_wait_sec, leg1_symbol, Side.SELL)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
 @pytest.mark.nightly
 def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                     pair_strat_, expected_strat_limits_,
@@ -2474,9 +2689,7 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activated_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -2489,12 +2702,12 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, activated_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, activated_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(activated_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -2506,7 +2719,7 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
         # Negative check
         # updating strat_brief to make limits less than next chores
         strat_brief_list = executor_http_client.get_all_strat_brief_client()
-        # since only one strat in current test
+        # Only one strat_brief must exist for each executor
         assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
                                            f"as only one strat exists for this test, received " \
                                            f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
@@ -2518,7 +2731,7 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
         assert updated_strat_brief == strat_brief, (f"Mismatched StratBrief: Expected {strat_brief}, "
                                                     f"updated: {updated_strat_brief}")
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, activated_strat.cpp_port)
         # placing new non-systematic new_chore
         px = 98
         qty = 90
@@ -2529,7 +2742,7 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
                                                                       activated_strat, executor_http_client,
                                                                       last_chore_id=placed_chore_journal.chore.chore_id)
         # placing new non-systematic new_chore
-        px = 92
+        px = 96
         qty = 90
         check_str = "blocked generated Side.SELL chore, breaches available consumable notional"
         assert_fail_msg = f"couldn't find alert saying: {check_str!r}"
@@ -2547,6 +2760,125 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
 
 
 @pytest.mark.nightly
+def test_updating_max_concentration_updates_consumable_concentration(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_,
+        max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+    buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
+        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+                                                 expected_strat_status_, symbol_overview_obj_list,
+                                                 last_barter_fixture_list, market_depth_basemodel_list))
+
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+        strat_limits = executor_http_client.get_strat_limits_client(active_pair_strat.id)
+
+        # Note: security_float value is kept based on barter_ready_records.csv value - please change
+        # here also if changed in file
+        security_float = 1000000
+        expected_consumable_concentration = int(strat_limits.max_concentration * (security_float/100))
+        assert strat_brief.pair_buy_side_bartering_brief.consumable_concentration == expected_consumable_concentration, \
+            (f"Mismatched consumable_concentration, expected {expected_consumable_concentration}, "
+             f"updating {strat_brief.pair_buy_side_bartering_brief.consumable_concentration}")
+        assert strat_brief.pair_sell_side_bartering_brief.consumable_concentration == expected_consumable_concentration, \
+            (f"Mismatched consumable_concentration, expected {expected_consumable_concentration}, "
+             f"updating {strat_brief.pair_sell_side_bartering_brief.consumable_concentration}")
+
+        last_max_concentration = strat_limits.max_concentration
+        strat_limits.max_concentration = 0
+        updated_strat_limits = executor_http_client.put_strat_limits_client(strat_limits)
+        strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+        assert strat_brief.pair_buy_side_bartering_brief.consumable_concentration == updated_strat_limits.max_concentration, \
+            (f"Mismatched consumable_concentration, expected {updated_strat_limits.max_concentration}, "
+             f"updating {strat_brief.pair_buy_side_bartering_brief.consumable_concentration}")
+        assert strat_brief.pair_sell_side_bartering_brief.consumable_concentration == updated_strat_limits.max_concentration, \
+            (f"Mismatched consumable_concentration, expected {updated_strat_limits.max_concentration}, "
+             f"updating {strat_brief.pair_sell_side_bartering_brief.consumable_concentration}")
+
+        _place_chore_n_check_consumable_concentration_is_0(buy_symbol, sell_symbol,
+                                                           active_pair_strat, executor_http_client)
+
+        strat_limits.max_concentration = last_max_concentration
+        executor_http_client.put_strat_limits_client(strat_limits)
+        strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+        assert strat_brief.pair_buy_side_bartering_brief.consumable_concentration == expected_consumable_concentration, \
+            (f"Mismatched consumable_concentration, expected {expected_consumable_concentration}, "
+             f"updating {strat_brief.pair_buy_side_bartering_brief.consumable_concentration}")
+        assert strat_brief.pair_sell_side_bartering_brief.consumable_concentration == expected_consumable_concentration, \
+            (f"Mismatched consumable_concentration, expected {expected_consumable_concentration}, "
+             f"updating {strat_brief.pair_sell_side_bartering_brief.consumable_concentration}")
+
+        bid_buy_top_market_depth, ask_sell_top_market_depth = (
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
+                                                           ask_sell_top_market_depth)
+        # Internally checks if chore_journal is found with OE_NEW state
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+            time.sleep(residual_wait_sec)
+
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        # required to make buy side tob latest
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
+        time.sleep(1)
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
+                                                            bid_buy_top_market_depth)
+        # Internally checks if chore_journal is found with OE_NEW state
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              sell_symbol, executor_http_client)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+def _place_chore_n_check_consumable_concentration_is_0(
+        buy_symbol, sell_symbol, active_pair_strat, executor_http_client, placed_chore_journal=None):
+    # placing new non-systematic new_chore
+    px = 98
+    qty = 90
+    check_str = "blocked generated BUY chore, unexpected: consumable_concentration found 0!"
+    assert_fail_message = "Could not find any alert containing message to block chores due to less " \
+                          "consumable concentration"
+    last_chore_id = placed_chore_journal.chore.chore_id if placed_chore_journal is not None else None
+    handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
+                                                                  check_str, assert_fail_message,
+                                                                  active_pair_strat, executor_http_client,
+                                                                  last_chore_id=last_chore_id)
+    # placing new non-systematic new_chore
+    px = 92
+    qty = 90
+    check_str = "blocked generated SELL chore, unexpected: consumable_concentration found 0!"
+    handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
+                                                                  check_str, assert_fail_message,
+                                                                  active_pair_strat, executor_http_client)
+
+@pytest.mark.nightly
 def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                          pair_strat_, expected_strat_limits_,
                                                          expected_strat_status_, symbol_overview_obj_list,
@@ -2561,9 +2893,7 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -2576,12 +2906,12 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -2648,23 +2978,8 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
             "Mismatch pair_sell_side_bartering_brief.consumable_concentration: expected 0, received " \
             f"{updated_strat_brief.pair_sell_side_bartering_brief.consumable_concentration}"
 
-        # placing new non-systematic new_chore
-        px = 98
-        qty = 90
-        check_str = "blocked generated BUY chore, unexpected: consumable_concentration found 0!"
-        assert_fail_message = "Could not find any alert containing message to block chores due to less " \
-                              "consumable concentration"
-        handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
-                                                                      check_str, assert_fail_message,
-                                                                      active_pair_strat, executor_http_client,
-                                                                      last_chore_id=placed_chore_journal.chore.chore_id)
-        # placing new non-systematic new_chore
-        px = 92
-        qty = 90
-        check_str = "blocked generated SELL chore, unexpected: consumable_concentration found 0!"
-        handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
-                                                                      check_str, assert_fail_message,
-                                                                      active_pair_strat, executor_http_client)
+        _place_chore_n_check_consumable_concentration_is_0(
+            buy_symbol, sell_symbol, active_pair_strat, executor_http_client, placed_chore_journal)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -2690,9 +3005,7 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -2705,12 +3018,12 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -2769,13 +3082,10 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, keep_default_hedge_ratio=True))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activate_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activate_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, activate_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, activate_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -2790,7 +3100,7 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
         px = 98
         qty = 90
         # positive test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, activate_pair_strat.cpp_port)
 
         # placing new non-systematic new_chore
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -2807,7 +3117,7 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
         # make consumable_participation_qty < 0
         buy_last_barter = last_barter_fixture_list[0]
         buy_last_barter["market_barter_volume"]["participation_period_last_barter_qty_sum"] = 1000
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client, create_counts_per_side=1)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, activate_pair_strat.cpp_port, create_counts_per_side=1)
 
         check_str = ("blocked generated chore, not enough consumable_participation_qty available, "
                      "expected higher than chore qty: 90")
@@ -2848,9 +3158,7 @@ def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_an
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, keep_default_hedge_ratio=True))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activate_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activate_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -2877,12 +3185,12 @@ def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_an
                                                                       activate_pair_strat, executor_http_client)
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, activate_pair_strat))
 
         # Positive Check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, activate_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(activate_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
 
         # Internally checks if chore_journal is found with OE_NEW state
@@ -2919,13 +3227,10 @@ def test_strat_limits_with_positive_low_consumable_participation_qty(
                                 copy.deepcopy(expected_strat_status_), symbol_overview_obj_list,
                                 market_depth_basemodel_list, keep_default_hedge_ratio=True))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activate_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activate_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            activate_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, activate_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, activate_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -2941,12 +3246,14 @@ def test_strat_limits_with_positive_low_consumable_participation_qty(
         executor_http_client.delete_all_last_barter_client()
         buy_last_barter = last_barter_fixture_list[0]
         buy_last_barter["market_barter_volume"]["participation_period_last_barter_qty_sum"] = 50
-        executor_http_client.create_last_barter_client(buy_last_barter)
-        buy_last_barter["market_barter_volume"]["participation_period_last_barter_qty_sum"] = 100
-        executor_http_client.create_last_barter_client(buy_last_barter)
+        buy_last_barter = LastBarterBaseModel.from_dict(buy_last_barter)
+        cpp_create_last_barter_client(activate_pair_strat.cpp_port, buy_last_barter)
+        buy_last_barter.market_barter_volume.participation_period_last_barter_qty_sum = 100
+        cpp_create_last_barter_client(activate_pair_strat.cpp_port, buy_last_barter)
         sell_last_barter = last_barter_fixture_list[1]
-        executor_http_client.create_last_barter_client(sell_last_barter)
-        executor_http_client.create_last_barter_client(sell_last_barter)
+        sell_last_barter = LastBarterBaseModel.from_dict(sell_last_barter)
+        cpp_create_last_barter_client(activate_pair_strat.cpp_port, sell_last_barter)
+        cpp_create_last_barter_client(activate_pair_strat.cpp_port, sell_last_barter)
 
         # placing new non-systematic new_chore
         px = 98
@@ -2960,7 +3267,7 @@ def test_strat_limits_with_positive_low_consumable_participation_qty(
                                                                       activate_pair_strat, executor_http_client)
 
         # Positive Check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, activate_pair_strat.cpp_port)
 
         # placing new non-systematic new_chore
         px = 100
@@ -3021,6 +3328,45 @@ def test_strat_done_after_exhausted_sell_consumable_notional(
 
 
 @pytest.mark.nightly
+def test_max_open_single_leg_notional_updates_pre_buy_chore_placing(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list,
+        buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+    leg1_symbol, leg2_symbol, activated_strat, executor_http_client = (
+        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+                                                 expected_strat_status_, symbol_overview_obj_list,
+                                                 last_barter_fixture_list, market_depth_basemodel_list))
+
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_strat.id)
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 30
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.barter_simulator_reload_config_query_client()
+
+        _check_max_open_single_leg_notional_updates_before_placing_chore(
+            leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_strat, executor_http_client,
+            residual_wait_sec, leg1_symbol, Side.BUY)
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
 def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
@@ -3035,9 +3381,7 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -3050,12 +3394,12 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -3140,9 +3484,7 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -3155,13 +3497,15 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         # Positive check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
-                                                           ask_sell_top_market_depth)
+        px = 98
+        qty = 90
+        buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
         # Internally checks if chore_journal is found with OE_NEW state
         placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -3170,20 +3514,33 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
             time.sleep(residual_wait_sec)
 
         # Negative check
-        strat_brief_list = executor_http_client.get_all_strat_brief_client()
-        # since only one strat in current test
-        assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
-                                           f"as only one strat exists for this test, received " \
-                                           f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
-        strat_brief = strat_brief_list[0]
-        strat_brief.consumable_nett_filled_notional = 16000
-        updated_strat_brief = \
-            executor_http_client.put_strat_brief_client(strat_brief.to_dict(lude_none=True))
-        assert (updated_strat_brief.consumable_nett_filled_notional ==
-                strat_brief.consumable_nett_filled_notional), \
-            ("Updated strat_brief.pair_buy_side_bartering_brief.consumable_open_notional to "
-             f"{strat_brief.consumable_nett_filled_notional} "
-             "using http route call but received unexpected returned value {updated_strat_brief}")
+        strat_limits = executor_http_client.get_strat_limits_client(active_pair_strat.id)
+        last_max_net_filled_notional = strat_limits.max_net_filled_notional
+        strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+        last_consumable_nett_filled_notional = strat_brief.consumable_nett_filled_notional
+        # making max_nett_filled_notional such it makes consumable_nett_filled_notional 16000 which is less than
+        # next chore's notional - will be blocked and raise alert for exhaustion of consumable_nett_filled_notional
+        current_net_filled_notional = placed_chore_journal.chore.qty / 2    # since fill_percent in config is 50
+        expected_consumable_nett_filled_notional = 1600
+        # updated_max_net_filled_notional_delta = updated_max_net_filled_notional - stored_max_net_filled_notional
+        # updated_consumable_nett_filled_notional = stored_consumable_nett_filled_notional - updated_max_net_filled_notional_delta
+        # which can be written as:
+        # updated_consumable_nett_filled_notional = (stored_consumable_nett_filled_notional -
+        #                                            updated_max_net_filled_notional + stored_max_net_filled_notional)
+        # updated_max_net_filled_notional = (updated_consumable_nett_filled_notional -
+        #                                    stored_max_net_filled_notional + updated_max_net_filled_notional)
+        strat_limits.max_net_filled_notional = (expected_consumable_nett_filled_notional -
+                                                strat_brief.consumable_nett_filled_notional +
+                                                strat_limits.max_net_filled_notional)
+        updated_strat_limits = executor_http_client.put_strat_limits_client(strat_limits)
+        assert updated_strat_limits.max_net_filled_notional == strat_limits.max_net_filled_notional, \
+            (f"Mismatched max_net_filled_notional, Expected {strat_limits.max_net_filled_notional}, "
+             f"updated {updated_strat_limits.max_net_filled_notional}")
+
+        strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+        assert (strat_brief.consumable_nett_filled_notional == expected_consumable_nett_filled_notional), \
+            (f"Mismatched consumable_nett_filled_notional, Expected {expected_consumable_nett_filled_notional}, "
+             f"updated {strat_brief.consumable_nett_filled_notional}")
 
         # placing new non-systematic new_chore
         px = 98
@@ -3196,13 +3553,37 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
                                                                       last_chore_id=placed_chore_journal.chore.chore_id)
 
         # placing new non-systematic new_chore
-        px = 92
+        px = 96
         qty = 90
         check_str = "blocked Side.SELL generated chore, not enough consumable_nett_filled_notional available"
         assert_fail_message = f"Could not find any alert saying '{check_str}'"
         handle_place_chore_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat, executor_http_client)
+
+        # updating max_net_filled_notional back to what it was before update
+        strat_limits.max_net_filled_notional = last_max_net_filled_notional
+        updated_strat_limits = executor_http_client.put_strat_limits_client(strat_limits)
+        assert updated_strat_limits.max_net_filled_notional == strat_limits.max_net_filled_notional, \
+            (f"Mismatched max_net_filled_notional, Expected {strat_limits.max_net_filled_notional}, "
+             f"updated {updated_strat_limits.max_net_filled_notional}")
+
+        strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+        assert (strat_brief.consumable_nett_filled_notional == last_consumable_nett_filled_notional), \
+            (f"Mismatched consumable_nett_filled_notional, Expected {last_consumable_nett_filled_notional}, "
+             f"updated {strat_brief.consumable_nett_filled_notional}")
+
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        time.sleep(1)
+        px = 98
+        qty = 90
+        buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+        place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
+        # Internally checks if chore_journal is found with OE_NEW state
+        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                                                                              buy_symbol, executor_http_client,
+                                                                              last_chore_id=placed_chore_journal.chore.chore_id)
+
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -3213,7 +3594,6 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-@pytest.mark.nightly
 def handle_place_both_side_chores_for_portfolio_limits_test(buy_symbol: str, sell_symbol: str,
                                                             pair_strat_,
                                                             expected_strat_limits_, expected_strat_status_,
@@ -3231,13 +3611,10 @@ def handle_place_both_side_chores_for_portfolio_limits_test(buy_symbol: str, sel
                                                        symbol_overview_obj_list, expected_strat_limits_,
                                                        expected_strat_status_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            created_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, created_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, created_pair_strat)
 
     if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
         total_chore_count_for_each_side = 1
@@ -3256,7 +3633,7 @@ def handle_place_both_side_chores_for_portfolio_limits_test(buy_symbol: str, sel
         # Placing buy chores
         last_buy_chore_id = None
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
             px = 98
             qty = 90
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -3271,7 +3648,7 @@ def handle_place_both_side_chores_for_portfolio_limits_test(buy_symbol: str, sel
         last_sell_chore_id = None
         if executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
             for loop_count in range(total_chore_count_for_each_side):
-                run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+                run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
                 px = 92
                 qty = 90
                 place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
@@ -3293,7 +3670,6 @@ def handle_place_both_side_chores_for_portfolio_limits_test(buy_symbol: str, sel
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-@pytest.mark.nightly
 def handle_place_single_side_chores_for_portfolio_limits_test(leg_1_symbol: str, leg_2_symbol: str,
                                                               pair_strat_,
                                                               expected_strat_limits_, expected_strat_status_,
@@ -3317,13 +3693,10 @@ def handle_place_single_side_chores_for_portfolio_limits_test(leg_1_symbol: str,
         buy_symbol = leg_2_symbol
         sell_symbol = leg_1_symbol
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            created_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, created_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, created_pair_strat)
 
     if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
         total_chore_count_for_each_side = 1
@@ -3343,7 +3716,7 @@ def handle_place_single_side_chores_for_portfolio_limits_test(leg_1_symbol: str,
         if chore_side == Side.BUY:
             last_chore_id = None
             for loop_count in range(total_chore_count_for_each_side):
-                run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+                run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
                 px = 98
                 qty = 90
                 place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -3361,7 +3734,7 @@ def handle_place_single_side_chores_for_portfolio_limits_test(leg_1_symbol: str,
             # Placing sell chores
             last_chore_id = None
             for loop_count in range(total_chore_count_for_each_side):
-                run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+                run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
                 px = 96
                 qty = 90
                 place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
@@ -3400,9 +3773,7 @@ def _strat_pause_on_chore_fulfill_post_dod(buy_symbol, sell_symbol, pair_strat_,
                                            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -3418,13 +3789,13 @@ def _strat_pause_on_chore_fulfill_post_dod(buy_symbol, sell_symbol, pair_strat_,
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
 
         symbol = buy_symbol
         print(f"Checking symbol: {symbol}")
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -3920,9 +4291,7 @@ def all_strat_pause_test_for_max_reject_limit_breach(
                                                        symbol_overview_obj_list, expected_strat_limits_,
                                                        expected_start_status_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -3941,10 +4310,10 @@ def all_strat_pause_test_for_max_reject_limit_breach(
         max_loop_count_per_side = 2
 
         last_buy_rej_id, last_sell_rej_id = (
-            handle_rej_chore_test(buy_symbol, sell_symbol, expected_strat_limits_,
+            handle_rej_chore_test(buy_symbol, sell_symbol, created_pair_strat, expected_strat_limits_,
                                   last_barter_fixture_list, max_loop_count_per_side,
                                   False, executor_http_client, config_dict, residual_wait_sec))
-        return executor_http_client, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id
+        return executor_http_client, created_pair_strat, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -4143,21 +4512,22 @@ def test_all_strat_pause_for_max_reject_limit_breach(
             if future.exception() is not None:
                 raise Exception(future.exception())
 
-            executor_http_client, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id = future.result()
+            (executor_http_client, created_pair_strat, buy_symbol,
+             sell_symbol, last_buy_rej_id, last_sell_rej_id) = future.result()
             executor_http_clients_n_last_chore_id_tuple_list.append(
-                (executor_http_client, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id))
+                (executor_http_client, created_pair_strat, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id))
 
     time.sleep(2)
     # Placing on more rej chore that must trigger auto-kill_switch
     # (Placed chore will be rej type by simulator because of continues_special_chore_count)
-    executor_http_client, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id = (
+    executor_http_client, created_pair_strat, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id = (
         executor_http_clients_n_last_chore_id_tuple_list)[0]
 
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_bid_buy_n_ask_sell_last_barter(executor_http_client, buy_symbol, sell_symbol))
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
     time.sleep(1)
-    update_tob_through_market_depth_to_place_buy_chore(executor_http_client, bid_buy_top_market_depth,
+    update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
 
     latest_chore_journal = get_latest_chore_journal_with_events_and_symbol(
@@ -4187,13 +4557,10 @@ def _place_chore_at_limit_up(
                                                  expected_strat_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, []))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -4206,11 +4573,11 @@ def _place_chore_at_limit_up(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         last_barter_fixture_list[0]['px'] = 145
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
 
         # create market_depths
-        executor_http_client.create_all_market_depth_client(market_depth_basemodel_list)
+        cpp_create_all_market_depth_client(active_pair_strat.cpp_port, market_depth_basemodel_list)
 
         place_new_chore(buy_symbol, Side.BUY, 150, 90, executor_http_client, buy_inst_type)
 
@@ -4281,13 +4648,10 @@ def place_chore_at_limit_dn(
                                                  last_barter_fixture_list, [],
                                                  leg1_side=Side.SELL, leg2_side=Side.BUY))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -4301,11 +4665,11 @@ def place_chore_at_limit_dn(
 
         # Positive check
         last_barter_fixture_list[0]['px'] = 52
-        run_last_barter(sell_symbol, buy_symbol, last_barter_fixture_list, executor_http_client)
+        run_last_barter(sell_symbol, buy_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
         time.sleep(1)
 
         # create market_depths
-        executor_http_client.create_all_market_depth_client(market_depth_basemodel_list)
+        cpp_create_all_market_depth_client(active_pair_strat.cpp_port, market_depth_basemodel_list)
 
         place_new_chore(sell_symbol, Side.SELL, 50, 90, executor_http_client, sell_inst_type)
 

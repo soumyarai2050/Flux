@@ -6,8 +6,8 @@
 
 class MobileBookConsumer {
 public:
-    explicit MobileBookConsumer(Config& r_config, std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_handler) :
-    mr_config_(r_config), m_sp_mongodb_handler_(std::move(mongo_db_handler)), m_mobile_book_publisher_(mr_config_, m_sp_mongodb_handler_) {}
+    explicit MobileBookConsumer(Config& r_config, MobileBookPublisher& mobile_book_publisher) :
+    mr_config_(r_config), m_mobile_book_publisher_(mobile_book_publisher) {}
 
     void process_market_depth(const MarketDepthQueueElement &md) {
         m_mobile_book_publisher_.process_market_depth(md);
@@ -103,7 +103,7 @@ public:
     }
 
 
-    void go() const {
+    void go()  {
     	size_t market_depth_index = 0;
 		size_t last_barter_index = 0;
 
@@ -115,12 +115,11 @@ public:
 				auto md =
 					m_mobile_book_publisher_.m_raw_market_depth_history_list_.raw_market_depth_history_.at(
 						market_depth_index);
-				MarketDepth market_depth{
+				MarketDepthQueueElement market_depth{
 					.id_ = md.id_,
-					.symbol_ = md.symbol_n_exch_id_.symbol_,
 					.exch_time_ = md.exch_time_,
 					.arrival_time_ = md.arrival_time_,
-					.side_ = md.side_,
+					.side_ = md.side_[0],
 					.px_ = md.px_,
 					.is_px_set_ = true,
                     .qty_ = md.qty_,
@@ -133,7 +132,9 @@ public:
 					.is_cumulative_avg_px_set_ = false
 				};
 
-				// process_market_depth(market_depth);
+				FluxCppCore::StringUtil::setString(market_depth.symbol_, md.symbol_n_exch_id_.symbol_);
+
+				m_mobile_book_publisher_.process_market_depth(market_depth);
 				++market_depth_index;
 
 			} else {
@@ -141,20 +142,34 @@ public:
 				// Replay last barter
 
 				auto lt = m_mobile_book_publisher_.m_raw_last_barter_history_list_.raw_last_barter_history_.at(last_barter_index);
-				LastBarter last_barter{
+				LastBarterQueueElement last_barter{
 					.id_ = lt.id_,
-					.symbol_n_exch_id_ = lt.symbol_n_exch_id_,
                     .exch_time_ = lt.exch_time_,
                     .arrival_time_ = lt.arrival_time_,
                     .px_ = lt.px_,
 					.qty_ = lt.qty_,
 					.premium_ = lt.premium_,
 					.is_premium_set_ = lt.is_premium_set_,
-					.market_barter_volume_ = lt.market_barter_volume_,
 					.is_market_barter_volume_set_ = lt.is_market_barter_volume_set_
 				};
 
-				// process_last_barter(last_barter);
+				FluxCppCore::StringUtil::setString(last_barter.symbol_n_exch_id_.symbol_, lt.symbol_n_exch_id_.symbol_);
+				FluxCppCore::StringUtil::setString(last_barter.symbol_n_exch_id_.exch_id_, lt.symbol_n_exch_id_.exch_id_);
+
+				if (lt.is_market_barter_volume_set_) {
+					FluxCppCore::StringUtil::setString(last_barter.market_barter_volume_.id_, lt.market_barter_volume_.id_);
+                    if (lt.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_) {
+                        last_barter.market_barter_volume_.participation_period_last_barter_qty_sum_ =
+                            lt.market_barter_volume_.participation_period_last_barter_qty_sum_;
+                        last_barter.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_ = true;
+                    }
+
+					if (lt.market_barter_volume_.is_applicable_period_seconds_set_) {
+                        last_barter.market_barter_volume_.applicable_period_seconds_ = lt.market_barter_volume_.applicable_period_seconds_;
+                        last_barter.market_barter_volume_.is_applicable_period_seconds_set_ = true;
+                    }
+				}
+				m_mobile_book_publisher_.process_last_barter(last_barter);
 
 				++last_barter_index;
 			}
@@ -163,6 +178,5 @@ public:
 	}
 protected:
     Config& mr_config_;
-	std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongodb_handler_;
-    MobileBookPublisher m_mobile_book_publisher_;
+    MobileBookPublisher& m_mobile_book_publisher_;
 };

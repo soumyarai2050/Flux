@@ -243,8 +243,8 @@ def get_all_pair_strat_from_symbol_n_side(sec_id: str, side: Side):
                             ]
                         },
                         {
-                            "is_executor_running": {
-                                "$eq": True
+                            "server_ready_state": {
+                                "$gte": 2
                             }
                         }
                     ]

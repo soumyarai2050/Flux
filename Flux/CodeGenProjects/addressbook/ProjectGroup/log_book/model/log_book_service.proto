@@ -31,6 +31,7 @@ message StratAlert {
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
+    DeleteByIdListOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
@@ -42,7 +43,7 @@ message StratAlert {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "email_book_service.proto",
+    server_running_status_lvl: 1,
     override_default_crud: {
       ui_crud_type: GET_ALL,
       query_name: "filtered_strat_alert_by_strat_id",
@@ -134,7 +135,6 @@ message PortfolioAlert {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "email_book_service.proto",
     is_read_only: true,
     is_model_alert_type: true
   };
@@ -219,8 +219,7 @@ message ExecutorEventJournal {
     is_repeated: true,
     widget_ui_data: {
       view_layout: UI_TABLE
-    },
-    depending_proto_file_name: "email_book_service.proto"
+    }
   };
   option (FluxMsgStringLength) = 128;
 

@@ -1042,16 +1042,24 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         if not is_not_from_this_project:
             proto_model_name = widget_ui_data_option_value_dict.get(
                 JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_name_field)
-            dynamic_url = widget_ui_data_option_value_dict.get(
-                JsonSchemaConvertPlugin.widget_ui_option_depends_on_other_model_for_dynamic_url_field)
+            dynamic_host = widget_ui_data_option_value_dict.get(
+                JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_host)
+            dynamic_port = widget_ui_data_option_value_dict.get(
+                JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_port)
+            dynamic_ws_port = widget_ui_data_option_value_dict.get(
+                JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_ws_port)
             indent_count += 2
             json_msg_str += (" " * indent_count) + '"connection_details": {\n'
             indent_count += 2
-            if dynamic_url:
-                proto_model_name_case_styled = self.__case_style_convert_method(proto_model_name)
-                json_msg_str += (" " * indent_count) + f'"host": "{proto_model_name_case_styled}.host",\n'
-                json_msg_str += (" " * indent_count) + f'"port": "{proto_model_name_case_styled}.port",\n'
-
+            if dynamic_host:
+                json_msg_str += (" " * indent_count) + f'"host": "{self.__handle_options_value_case_having_msg_fld_name(dynamic_host, 
+                                                                                                                        JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}",\n'
+                json_msg_str += (" " * indent_count) + f'"port": "{self.__handle_options_value_case_having_msg_fld_name(dynamic_port, 
+                                                                                                                        JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}",\n'
+                if dynamic_ws_port:
+                    json_msg_str += (
+                                                " " * indent_count) + f'"ws_port": "{self.__handle_options_value_case_having_msg_fld_name(dynamic_ws_port, 
+                                                                                                                                          JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}",\n'
                 json_msg_str += (" " * indent_count) + f'"project_name": "{other_project_name}",\n'
                 json_msg_str += (" " * indent_count) + f'"dynamic_url": true\n'
             else:

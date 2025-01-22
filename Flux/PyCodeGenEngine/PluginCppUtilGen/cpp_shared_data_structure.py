@@ -108,6 +108,20 @@ class CppSharedDataStructure(BaseProtoPlugin):
                 #     output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
                 #     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                 #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                # if self.is_option_enabled(fld, self.flux_fld_val_is_datetime):
+                #     if fld.kind.name.lower() == "int64" or fld.kind.name.lower() == "int32":
+                #         output_content += "\t" + fld.kind.name.lower() + "_t" + " " + fld.proto.name + "_;\n"
+                #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                #     elif fld.kind.name.lower() == "string":
+                #         output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
+                #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                #     else:
+                #         output_content += "\t" + fld.kind.name.lower() + " " + fld.proto.name + "_;\n"
+                #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                # else:
                 if fld.kind.name.lower() == "float":
                     output_content += "\tdouble " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
@@ -144,6 +158,20 @@ class CppSharedDataStructure(BaseProtoPlugin):
                 #     output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
                 #     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
                 #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                # if self.is_option_enabled(fld, self.flux_fld_val_is_datetime):
+                #     if fld.kind.name.lower() == "int64" or fld.kind.name.lower() == "int32":
+                #         output_content += "\t" + fld.kind.name.lower() + "_t" + " " + fld.proto.name + "_;\n"
+                #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                #     elif fld.kind.name.lower() == "string":
+                #         output_content += "\tchar " + fld.proto.name + f"_[{char_size}];\n"
+                #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                #     else:
+                #         output_content += "\t" + fld.kind.name.lower() + " " + fld.proto.name + "_;\n"
+                #         # if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":
+                #         output_content += "\tbool is_" + fld.proto.name + "_set_ = false;\n"
+                # else:
                 if fld.kind.name.lower() == "float":
                     output_content += "\tdouble " + fld.proto.name + "_;\n"
                     if fld.cardinality.name.lower() == "optional" or fld.cardinality.name.lower() == "repeated":

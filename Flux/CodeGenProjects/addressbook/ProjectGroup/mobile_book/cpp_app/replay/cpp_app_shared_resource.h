@@ -7,6 +7,6 @@
 
 
 extern std::unique_ptr<MobileBookConsumer> mobile_book_consumer;
-extern std::atomic<bool> shutdown_db_n_ws_thread;
+extern std::atomic<bool> keepRunning;
 extern "C" void signal_handler([[maybe_unused]] int signal);
 

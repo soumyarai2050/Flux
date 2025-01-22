@@ -120,6 +120,16 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "\n"
             output_str += "}" + f" from '../features/{dependent_message_name_camel_cased}Slice';\n"
             if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+                msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
+                for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
+                    if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
+                        msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
+                        output_str += ("import { setSelected" + f"{msg_name_used_in_abb_option}Id, "
+                                                                f"set{msg_name_used_in_abb_option}ArrayWs, "
+                                                                f"update{msg_name_used_in_abb_option}, "
+                                                                f"setModified{msg_name_used_in_abb_option}" + " } " +
+                                       f"from '../features/{msg_name_used_in_abb_option_camel_cased}Slice';\n")
+
                 dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
@@ -127,34 +137,25 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         output_str += ("import { setSelected"+f"{dep_msg_name}"+f"Id" + " } " +
                                        f"from '../features/{dep_msg_camel_cased}Slice';\n")
 
-                    msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-                    for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-                        if msg_name_used_in_abb_option != self.abbreviated_dependent_message_name:
-                            msg_name_used_in_abb_option_camel_cased = convert_to_camel_case(msg_name_used_in_abb_option)
-                            output_str += ("import { setSelected"+f"{msg_name_used_in_abb_option}Id, "
-                                                                  f"set{msg_name_used_in_abb_option}ArrayWs, "
-                                                                  f"update{msg_name_used_in_abb_option}, "
-                                                                  f"setModified{msg_name_used_in_abb_option}" + " } " +
-                                           f"from '../features/{msg_name_used_in_abb_option_camel_cased}Slice';\n")
-
                     for msg in self.root_msg_list:
                         if msg in self.repeated_tree_layout_msg_list or msg in self.repeated_table_layout_msg_list:
-                            # taking all repeated root types
                             widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
                                 msg, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
-                            if (widget_ui_option_value.get(
-                                        JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field) ==
-                                    self.current_proto_file_name):
+                            other_proto_model_name = widget_ui_option_value.get(
+                                        JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field)
+                            if ((self.is_model_from_another_project(msg) and other_proto_model_name is not None) or
+                                    (self.is_model_from_another_project(msg) and
+                                     widget_ui_option_value.get(BaseJSLayoutPlugin.widget_ui_option_override_default_crud_field))):
                                 msg_name_camel_cased = convert_to_camel_case(msg.proto.name)
                                 output_str += ("import { reset" + f"{msg.proto.name}" + " } from '../features/" +
                                                f"{msg_name_camel_cased}Slice';\n")
 
         if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
-            output_str += "import {\n"
+            # output_str += "import {\n"
             dependent_abb_msg = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
             dependent_abb_msg_camel_cased = convert_to_camel_case(dependent_abb_msg)
-            output_str += f"    setSelected{dependent_abb_msg}Id\n"
-            output_str += "}"+f" from '../features/{dependent_abb_msg_camel_cased}Slice';\n"
+            # output_str += f"    setSelected{dependent_abb_msg}Id\n"
+            # output_str += "}"+f" from '../features/{dependent_abb_msg_camel_cased}Slice';\n"
             dependent_to_linked_abb_msg = self.abbreviated_msg_name_to_dependent_msg_name_dict[dependent_abb_msg]
             dependent_to_linked_abb_msg_camel_cased = convert_to_camel_case(dependent_to_linked_abb_msg)
             output_str += "import {\n"
@@ -312,9 +313,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    key={idx}\n"
             option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                 message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-            other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
             other_proto_model_name = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field)
-            if other_proto_file is not None and other_proto_model_name is None:
+            if self.is_model_from_another_project(message) and other_proto_model_name is None:
                 output_str += "                    url={url}\n"
             else:
                 output_str += "                    url={null}\n"
@@ -375,9 +375,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    key={idx}\n"
             option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                 message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-            other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
             other_proto_model_name = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field)
-            if other_proto_file is not None and other_proto_model_name is None:
+            if self.is_model_from_another_project(message) and other_proto_model_name is None:
                 output_str += "                    url={url}\n"
             else:
                 output_str += "                    url={null}\n"
@@ -510,17 +509,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type != JsxFileGenPlugin.repeated_root_type:
             output_str += "                    forceUpdate={forceUpdate}\n"
         if layout_type in [JsxFileGenPlugin.repeated_root_type, JsxFileGenPlugin.root_type]:
-            # if repeated and from other file
-            widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
-                message, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
-            if widget_ui_option_value.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field):
-                # if self.current_proto_file_name is not present that means there is no message from other
-                # project at all and if is not None then checking if current proto file_name is not in imported
-                # core file from which this message is imported - this confirms that this message is from another
-                # project
-                if (self.current_proto_file_name is not None and
-                        self.current_proto_file_name not in message.parent_file.proto.name):
-                    output_str += "                    url={url}\n"
+            if self.is_model_from_another_project(message):
+                output_str += "                    url={url}\n"
         if layout_type == JsxFileGenPlugin.root_type:
             output_str += "                    widgetType='root'\n"
         elif layout_type == JsxFileGenPlugin.repeated_root_type:
@@ -669,7 +659,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [forceSave, setForceSave] = useState(false);\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
                 if widget_ui_option_value.get(
-                        JsxFileGenPlugin.widget_ui_option_depends_on_model_name_for_port_field):
+                        JsxFileGenPlugin.widget_ui_option_depending_proto_model_for_cpp_port_field):
                     output_str += "    const [wsUrl, setWsUrl] = useState();\n"
                 output_str += "    const [formValidation, setFormValidation] = useState({});\n"
                 output_str += "    const [openConfirmSavePopup, setOpenConfirmSavePopup] = useState(false);\n"
@@ -680,10 +670,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [openDataSourceDialog, setOpenDataSourceDialog] = useState(false)\n"
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                     message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-                other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
                 other_proto_mode_name = option_dict.get(
                     JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field)
-                if other_proto_file is not None and other_proto_mode_name is None:
+                if self.is_model_from_another_project(message) and other_proto_mode_name is None:
                     output_str += "    const [url, setUrl] = useState();\n"
 
                 if get_all_override_default_crud is not None:
@@ -751,11 +740,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [disableWs, setDisableWs] = useState(false);\n"
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                     message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-                other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
-                # is_id_based = option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field)
                 other_proto_mode_name = option_dict.get(
                     JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field)
-                if other_proto_file is not None and other_proto_mode_name is None:
+                if self.is_model_from_another_project(message) and other_proto_mode_name is None:
                     output_str += "    const [url, setUrl] = useState();\n"
                 output_str += "    const getAllWsDict = useRef({});\n"
                 output_str += "    const getWsDict = useRef({});\n"
@@ -805,8 +792,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
                     dependent_abb_msg = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
                     dependent_abb_msg_camel_cased = convert_to_camel_case(dependent_abb_msg)
-                    output_str += "    const { " + f"{dependent_abb_msg_camel_cased}Array" + " } = useSelector(" + \
-                                  "state => " + f"state.{dependent_abb_msg_camel_cased});\n"
+                    # output_str += "    const { " + f"{dependent_abb_msg_camel_cased}Array" + " } = useSelector(" + \
+                    #               "state => " + f"state.{dependent_abb_msg_camel_cased});\n"
                     dependent_to_linked_abb_msg = self.abbreviated_msg_name_to_dependent_msg_name_dict[
                         dependent_abb_msg]
                     dependent_to_linked_abb_msg_camel_cased = convert_to_camel_case(dependent_to_linked_abb_msg)
@@ -1087,13 +1074,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         if JsxFileGenPlugin.is_option_enabled(msg, JsxFileGenPlugin.flux_msg_widget_ui_data_element):
                             option_dict = JsxFileGenPlugin.get_complex_option_value_from_proto(
                                 msg, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
-                            depending_proto_file_name = option_dict.get(
-                                JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
                             depending_proto_model_name = option_dict.get(
                                 JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field)
                             is_dependent_for_id = option_dict.get(
                                 JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field)
-                            if (self.current_proto_file_name == depending_proto_file_name and
+                            if (self.is_model_from_another_project(msg) and
                                     dependent_message == depending_proto_model_name and is_dependent_for_id):
                                 abbreviated_other_project_dependent_msg_name_list.append(msg.proto.name)
         return abbreviated_other_project_dependent_msg_name_list
@@ -1261,7 +1246,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "    const joinSort = currentSchema.widget_ui_data_element.join_sort;\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "    let groupedRows = getGroupedTableRows(rows, joinBy, joinSort);\n"
-        elif layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type:
+        elif (layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type or
+              layout_type == JsxFileGenPlugin.abbreviated_dependent_type):
             output_str += "    let groupedRows = getGroupedTableRows(rows, []);\n"
         # else not required
         output_str += "    const showLess = widgetOption.show_less ? widgetOption.show_less : [];\n"
@@ -1312,9 +1298,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         # taking all repeated root types
                         widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
                             msg, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
-                        if widget_ui_option_value.get(
-                                JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field) == \
-                                self.current_proto_file_name and \
+                        if self.is_model_from_another_project(msg) and \
                                 widget_ui_option_value.get(
                                     JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field) is not None:
                             output_str += f"        dispatch(reset{msg.proto.name}());\n"
@@ -1346,7 +1330,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                "groupedRows, [], mode);\n")
                 output_str += ("    const commonKeyCollections = getCommonKeyCollections("
                                "groupedRows, groupedTableColumns);\n\n")
-            elif layout_type == JsxFileGenPlugin.non_root_type:
+            elif layout_type == JsxFileGenPlugin.non_root_type or layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
                 output_str += "    const maxRowSize = getMaxRowSize(groupedRows);\n"
                 output_str += ("    const groupedTableColumns = getGroupedTableColumns(tableColumns, "
                                "maxRowSize, groupedRows, [], mode);\n")
@@ -1376,27 +1360,22 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                         message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
                     if (option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field) or
                         option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field) or
-                        option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_dynamic_url_field)):
+                        option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_field_name_for_port)):
                         output_str += (f"            const {other_file_dependent_msg_name_camel_cased}Collections = "
                                        f"schemaCollections['{other_file_dependent_msg_name_snake_cased}'];\n")
-                        output_str += (f"            const isRunningCheckField = "
-                                       f"{other_file_dependent_msg_name_camel_cased}Collections.find("
-                                       "col => col.hasOwnProperty('server_running_status')).key;\n")
-                        output_str += (f"            const isReadyCheckField = "
+                        output_str += (f"            const serverReadyStatusFld = "
                                        f"{other_file_dependent_msg_name_camel_cased}Collections.find("
                                        "col => col.hasOwnProperty('server_ready_status')).key;\n")
                         output_str += ("            const serverUrl = getServerUrl(currentSchema, "
-                                       f"{other_file_dependent_msg_name_camel_cased}, isRunningCheckField, "
-                                       f"isReadyCheckField")
-                        if option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_model_name_for_port_field):
-                            output_str += ", props.name, 'http'"
+                                       f"{other_file_dependent_msg_name_camel_cased}, serverReadyStatusFld")
+                        if option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_for_cpp_port_field):
+                            output_str += ", 'http'"
                         output_str += ");\n"
                         output_str += "            dispatch(setUrl(serverUrl));\n"
-                        if option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_model_name_for_port_field):
+                        if option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_for_cpp_port_field):
                             output_str += ("            const wsUrl = getServerUrl(currentSchema, "
-                                           f"{other_file_dependent_msg_name_camel_cased}, isRunningCheckField, "
-                                           f"isReadyCheckField, "
-                                           f"props.name, 'ws');\n")
+                                           f"{other_file_dependent_msg_name_camel_cased}, serverReadyStatusFld, "
+                                           f"'ws');\n")
                             output_str += "            setWsUrl(wsUrl);\n"
                     else:
                         output_str += f"            const serverUrl = getServerUrl(currentSchema, " \
@@ -1707,7 +1686,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         output_str += "        if (url && getAllUrlEndpoint && getAllQueryParam) {\n"
                     else:
                         if widget_ui_option_value.get(
-                                JsxFileGenPlugin.widget_ui_option_depends_on_model_name_for_port_field):
+                                JsxFileGenPlugin.widget_ui_option_depending_proto_model_for_cpp_port_field):
                             output_str += "        if (wsUrl) {\n"
                         else:
                             output_str += "        if (url) {\n"
@@ -1716,8 +1695,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                        "${getAllUrlEndpoint}?${getAllQueryParam}`);\n")
                     else:
                         if widget_ui_option_value.get(
-                                JsxFileGenPlugin.widget_ui_option_depends_on_model_name_for_port_field):
-                            output_str += "            socket = new WebSocket(`${wsUrl.replace('http', 'ws')}`);\n"
+                                JsxFileGenPlugin.widget_ui_option_depending_proto_model_for_cpp_port_field):
+                            output_str += ("            socket = new WebSocket(`${wsUrl.replace('http', 'ws')}/get-all-" +
+                                           f"{message_name_snake_cased}" + "-ws`);\n")
                         else:
                             output_str += ("            socket = new WebSocket(`${url.replace('http', 'ws')}/get-all-" +
                                            f"{message_name_snake_cased}" + "-ws`);\n")
@@ -1746,7 +1726,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         output_str += "    }, [url, getAllUrlEndpoint, getAllQueryParam])\n\n"
                     else:
                         if widget_ui_option_value.get(
-                                JsxFileGenPlugin.widget_ui_option_depends_on_model_name_for_port_field):
+                                JsxFileGenPlugin.widget_ui_option_depending_proto_model_for_cpp_port_field):
                             output_str += "    }, [wsUrl])\n\n"
                         else:
                             output_str += "    }, [url])\n\n"
@@ -1947,10 +1927,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += (f"                            const "
                                f"{abbreviated_dependent_msg_camel_cased}Collections = "
                                f"dependentWidgetCollectionsDict['{abbreviated_dependent_msg_snake_cased}'];\n")
-                output_str += (f"                            const isRunningCheckField = "
-                               f"{abbreviated_dependent_msg_camel_cased}Collections."
-                               "find(col => col.hasOwnProperty('server_running_status')).key;\n")
-                output_str += (f"                            const isReadyCheckField = "
+                output_str += (f"                            const serverReadyStatusFld = "
                                f"{abbreviated_dependent_msg_camel_cased}Collections."
                                "find(col => col.hasOwnProperty('server_ready_status')).key;\n")
                 msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
@@ -1972,7 +1949,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         output_str += (f"                            const "
                                        f"{msg_name_used_in_abb_option_camel_cased}Url = "
                                        f"getServerUrl({msg_name_used_in_abb_option_camel_cased}Schema, updatedObj, "
-                                       f"isRunningCheckField, isReadyCheckField);\n")
+                                       f"serverReadyStatusFld);\n")
                         output_str += f"                            if ({msg_name_used_in_abb_option_camel_cased}Url)"+" {\n"
                         output_str += (f"                                if (!isWebSocketAlive("
                                        f"{msg_name_used_in_abb_option_camel_cased}Socket))")+" {\n"
@@ -2289,7 +2266,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                    f"compareJSONObjects({dependent_message_camel_cased}, modifiedObj);\n")
             output_str += "        dispatch(setActiveChanges(changesDiff));\n\n"
         output_str += "        if (forceSave) {\n"
-        if layout_type != JsxFileGenPlugin.non_root_type:
+        if layout_type != JsxFileGenPlugin.non_root_type and layout_type != JsxFileGenPlugin.abbreviated_dependent_type:
             output_str += "            if (Object.keys(changesDiff).filter(key => key !== DB_ID).length === 1) {\n"
             output_str += "                onConfirmSave(null, null, null, true);\n"
             output_str += "            }\n"
@@ -2782,8 +2759,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 else:
                     output_str += f"        originalObj = {abbreviated_dependent_msg_camel_cased};\n"
                     output_str += f"        collectionList = dependentWidgetCollectionsDict['{abbreviated_dependent_msg_camel_cased}'];\n"
-                    output_str += (f"        modifiedObj = clearxpath(cloneDeep("
-                                   f"modified{self.abbreviated_dependent_message_name}));\n")
+                    # output_str += (f"        modifiedObj = clearxpath(cloneDeep("
+                    #                f"modified{self.abbreviated_dependent_message_name}));\n")
                 output_str += "        if (!modifiedObj) {\n"
                 for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
                     msg_name_used_in_abb_option_snake_cased = (

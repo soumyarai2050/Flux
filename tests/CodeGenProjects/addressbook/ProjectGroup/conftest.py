@@ -120,7 +120,7 @@ def market_depth_basemodel_list(request):
     position_lvl = getattr(request, "param", 5)
 
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
-        for side, px, qty, dev in [("BID", 99, 90, -1), ("ASK", 121, 70, 1)]:
+        for side, px, qty, dev in [("BID", 99.0, 90, -1), ("ASK", 121.0, 70, 1)]:
             for pos in range(position_lvl):
                 qty = qty+20 if pos == position_lvl-1 else (qty + 10 if pos % 2 != 0 else qty-20)
                 input_data.append(

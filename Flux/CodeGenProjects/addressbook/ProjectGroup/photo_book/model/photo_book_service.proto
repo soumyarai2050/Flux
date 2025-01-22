@@ -21,9 +21,6 @@ message StratView{
     PassStoredObjToPartialUpdatePostCallback: True,
     PassStoredObjToPartialUpdateAllPostCallback: True
   };
-  option (FluxMsgWidgetUIOption) = {
-    depending_proto_file_name: "email_book_service.proto",
-  };
   required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID", (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int32 strat_alert_count = 2;
   optional Severity strat_alert_aggregated_severity = 3 [default=Severity_UNSPECIFIED, (FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];

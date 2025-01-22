@@ -4,7 +4,6 @@ import re
 import threading
 from queue import Queue
 from typing import Set
-from datetime import timedelta
 import inspect
 
 # third-party imports
@@ -534,10 +533,10 @@ class PhoneBookBaseLogBook(AppLogBook):
         # else not required: if no pattern is matched ignoring this log_message
 
     def handle_tail_restart(self, log_detail: LogDetail):
-        system_datetime: pendulum.DateTime = (
-            log_detail.last_processed_utc_datetime.in_timezone(tz=pendulum.local_timezone()))
-        system_datetime += timedelta(milliseconds=1)
-        restart_datetime: str = system_datetime.format("YYYY-MM-DD HH:mm:ss,SSS")
+        # this start happens from same process of tail executor - shm is not required here - shm is used to get
+        # last processed timestamp when handled from outside tail executor process
+        processed_timestamp: DateTime = pendulum.parse(log_detail.processed_timestamp)
+        restart_datetime: str = PhoneBookBaseLogBook._get_restart_datetime_from_log_detail(processed_timestamp)
         logging.warning(f"Restarting tail for {log_detail.log_file_path=} from {restart_datetime=}")
         log_book_service_http_client.log_book_restart_tail_query_client(log_detail.log_file_path,
                                                                                 restart_datetime)

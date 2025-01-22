@@ -736,7 +736,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str = self.handle_underlying_POST_all_gen(**kwargs)
         output_str += "\n"
         if model_type == ModelType.Dataclass:
-            output_str += f'@{self.api_router_app_name}.post("/create_all-{message_name_snake_cased}' + \
+            output_str += f'@{self.api_router_app_name}.post("/create-all-{message_name_snake_cased}' + \
                           f'", status_code=201)\n'
             output_str += (f"async def create_all_{message_name_snake_cased}_http({message_name_snake_cased}_req: "
                            f"Request, return_obj_copy: bool | None = True):\n")
@@ -750,7 +750,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            "client call with exception: {e}')\n")
             output_str += f"        raise e\n"
         elif model_type == ModelType.Msgspec:
-            output_str += f'@{self.api_router_app_name}.post("/create_all-{message_name_snake_cased}' + \
+            output_str += f'@{self.api_router_app_name}.post("/create-all-{message_name_snake_cased}' + \
                           f'", status_code=201)\n'
             output_str += (f"async def create_all_{message_name_snake_cased}_http({message_name_snake_cased}_req: "
                            f"Request, return_obj_copy: bool | None = True):\n")
@@ -763,7 +763,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            "client call with exception: {e}')\n")
             output_str += f"        raise e\n"
         else:
-            output_str += f'@{self.api_router_app_name}.post("/create_all-{message_name_snake_cased}' + \
+            output_str += f'@{self.api_router_app_name}.post("/create-all-{message_name_snake_cased}' + \
                           f'", response_model=List[{message.proto.name}] | bool, status_code=201)\n'
             output_str += (f"async def create_all_{message_name_snake_cased}_http({message_name_snake_cased}_list: "
                            f"List[{message.proto.name}], return_obj_copy: bool | None = True) -> "
@@ -1569,7 +1569,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str = self.handle_underlying_PUT_all_gen(**kwargs)
         output_str += "\n"
         if model_type == ModelType.Dataclass:
-            output_str += f'@{self.api_router_app_name}.put("/put_all-{message_name_snake_cased}' + \
+            output_str += f'@{self.api_router_app_name}.put("/put-all-{message_name_snake_cased}' + \
                           f'", status_code=200)\n'
             output_str += (f"async def update_all_{message_name_snake_cased}_http({message_name_snake_cased}_update_req: "
                            f"Request, return_obj_copy: bool | None = True):\n")
@@ -1583,7 +1583,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            "client call with exception: {e}')\n")
             output_str += f"        raise e\n"
         elif model_type == ModelType.Msgspec:
-            output_str += f'@{self.api_router_app_name}.put("/put_all-{message_name_snake_cased}' + \
+            output_str += f'@{self.api_router_app_name}.put("/put-all-{message_name_snake_cased}' + \
                           f'", status_code=200)\n'
             output_str += (f"async def update_all_{message_name_snake_cased}_http({message_name_snake_cased}_update_req: "
                            f"Request, return_obj_copy: bool | None = True):\n")
@@ -1596,7 +1596,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            "client call with exception: {e}')\n")
             output_str += f"        raise e\n"
         else:
-            output_str += f'@{self.api_router_app_name}.put("/put_all-{message_name_snake_cased}' + \
+            output_str += f'@{self.api_router_app_name}.put("/put-all-{message_name_snake_cased}' + \
                           f'", response_model=List[{message.proto.name}] | bool, status_code=200)\n'
             output_str += (
                 f"async def update_all_{message_name_snake_cased}_http({message_name_snake_cased}_updated_list: "
@@ -2068,7 +2068,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
     def _handle_str_int_val_callable_generation(self, message: protogen.Message) -> str:
         if message in self._msg_already_generated_str_formatted_int_fields_handler_list:
-            # if handler function is already generated for this model for either patch or patch_all then
+            # if handler function is already generated for this model for either patch or patch-all then
             # avoiding duplicate function creation
             return ""
         # else not required: generating if not generated for this model already
@@ -2139,7 +2139,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                 indent_count += 1
                                 last_field_name = field
 
-            # adding msg to cache to be checked for another call from patch or patch_all to avoid
+            # adding msg to cache to be checked for another call from patch or patch-all to avoid
             # duplicate function creation
             self._msg_already_generated_str_formatted_int_fields_handler_list.append(message)
 
@@ -2253,8 +2253,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def _handle_missing_id_n_datetime_field_callable_generation(self, message: protogen.Message,
                                                                 model_type: bool) -> str:
         if message in self._msg_already_generated_id_n_date_time_fields_handler_list:
-            # if handler function is already generated for this model for either create, create_all,
-            # patch or patch_all then avoiding duplicate function creation
+            # if handler function is already generated for this model for either create, create-all,
+            # patch or patch-all then avoiding duplicate function creation
             return ""
         # else not required: generating if not generated for this model already
 
@@ -2317,7 +2317,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                 f"this model in proto file, one more fetch is done from db for "
                                                 f"stored obj list that will be used in\n\t{' ' * indent_count}# "
                                                 f"partial_update_all_{message_name_snake_cased}_post "
-                                                f"call - reason is, in generic patch_all stored obj list gets updated "
+                                                f"call - reason is, in generic patch-all stored obj list gets updated "
                                                 f"in\n\t{' ' * indent_count}# compare_n_patch. Since this includes "
                                                 f"extra load of fetching stored obj list again, so if not "
                                                 f"required\n\t{' ' * indent_count}# in this model then update "
@@ -2676,7 +2676,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str = self.handle_underlying_PATCH_all_gen(**kwargs)
         output_str += f"\n"
         if model_type == ModelType.Msgspec:
-            output_str += f'@{self.api_router_app_name}.patch("/patch_all-{message_name_snake_cased}' + \
+            output_str += f'@{self.api_router_app_name}.patch("/patch-all-{message_name_snake_cased}' + \
                           f'", status_code=200)\n'
             output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
                            f"update_req_body: Request, return_obj_copy: bool | None = True):\n")
@@ -2690,12 +2690,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f"        raise e\n"
         else:
             if model_type == ModelType.Dataclass:
-                output_str += f'@{self.api_router_app_name}.patch("/patch_all-{message_name_snake_cased}' + \
+                output_str += f'@{self.api_router_app_name}.patch("/patch-all-{message_name_snake_cased}' + \
                               f'", status_code=200)\n'
                 output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
                                f"update_req_body: Request, return_obj_copy: bool | None = True):\n")
             else:
-                output_str += f'@{self.api_router_app_name}.patch("/patch_all-{message_name_snake_cased}' + \
+                output_str += f'@{self.api_router_app_name}.patch("/patch-all-{message_name_snake_cased}' + \
                               f'", response_model=List[{message.proto.name}] | bool, status_code=200)\n'
                 output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
                                f"update_req_body: Request, return_obj_copy: bool | None = True"
@@ -3035,12 +3035,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str = self.handle_underlying_DELETE_all_gen(**kwargs)
         output_str += "\n"
         if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
-            output_str += (f'@{self.api_router_app_name}.delete("/delete_all-{message_name_snake_cased}/", '
+            output_str += (f'@{self.api_router_app_name}.delete("/delete-all-{message_name_snake_cased}/", '
                            f'status_code=200)\n')
             output_str += (f"async def delete_{message_name_snake_cased}_all_http(return_obj_copy: bool | None = True"
                            f"):\n")
         else:
-            output_str += (f'@{self.api_router_app_name}.delete("/delete_all-{message_name_snake_cased}/", '
+            output_str += (f'@{self.api_router_app_name}.delete("/delete-all-{message_name_snake_cased}/", '
                            f'response_model=DefaultPydanticWebResponse | bool, status_code=200)\n')
             output_str += (f"async def delete_{message_name_snake_cased}_all_http(return_obj_copy: bool | None = True"
                            f") -> DefaultPydanticWebResponse | bool:\n")
@@ -3054,6 +3054,221 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"return_obj_copy=return_obj_copy)\n")
         output_str += f"    except Exception as e:\n"
         output_str += (f"        logging.exception(f'delete_{message_name_snake_cased}_all_http failed in "
+                       "client call with exception: {e}')\n")
+        output_str += f"        raise e\n"
+        return output_str
+
+    def _handle_msgspec_common_underlying_delete_by_id_list_gen(self, message: protogen.Message, aggregation_type,
+                                                                msg_has_links, shared_lock_list, id_field_type) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = ""
+        if id_field_type is not None:
+            output_str += (f"async def _underlying_delete_by_id_list_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_id_list: List[{id_field_type}], "
+                           f"generic_callable: Callable[[...], Any] | None = None, "
+                           f"return_obj_copy: bool | None = True):\n")
+        else:
+            output_str += (f"async def _underlying_delete_by_id_list_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_id_list: List["
+                           f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}], "
+                           f"generic_callable: Callable[[...], Any] | None = None, "
+                           f"return_obj_copy: bool | None = True):\n")
+        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+        output_str += mutex_handling_str
+        output_str += " " * indent_count + f"    await callback_class.delete_by_id_list_{message_name_snake_cased}_pre(" \
+                                           f"{message_name_snake_cased}_id_list)\n"
+        match aggregation_type:
+            case FastapiHttpRoutesFileHandler.aggregation_type_filter | FastapiHttpRoutesFileHandler.aggregation_type_both:
+                err_str = "Filter Aggregation type is not supported in Delete operations, " \
+                          f"but aggregation type {aggregation_type} received in message {message.proto.name}"
+                logging.exception(err_str)
+                raise Exception(err_str)
+            case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                update_agg_pipeline_var_name = \
+                    self.get_simple_option_value_from_proto(message,
+                                                            FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                output_str += " " * indent_count + \
+                              (f"    delete_web_resp = await generic_callable({message.proto.name}, "
+                               f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                               f"{message.proto.name}BaseModel, {message_name_snake_cased}_id_list, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links})\n")
+            case other:
+                output_str += " " * indent_count + \
+                              f"    delete_web_resp = await generic_callable({message.proto.name}, " \
+                              f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                              f"{message.proto.name}BaseModel, {message_name_snake_cased}_id_list, " \
+                              f"has_links={msg_has_links})\n"
+        output_str += " " * indent_count + f"    await callback_class.delete_by_id_list_{message_name_snake_cased}_post(" \
+                                           f"delete_web_resp)\n"
+        output_str += " " * indent_count + f"    if return_obj_copy:\n"
+        output_str += " " * indent_count + f"        return delete_web_resp\n"
+        output_str += " " * indent_count + f"    else:\n"
+        output_str += " " * indent_count + f"        return True\n\n\n"
+        return output_str
+
+    def handle_underlying_DELETE_by_id_list_gen(self, **kwargs) -> str:
+        message, aggregation_type, id_field_type, shared_lock_list, model_type = (
+            self._unpack_kwargs_with_id_field_type(**kwargs))
+        msg_has_links: bool = message in self.message_to_link_messages_dict
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        if model_type == ModelType.Msgspec:
+            output_str = self._handle_msgspec_common_underlying_delete_by_id_list_gen(message, aggregation_type,
+                                                                                      msg_has_links,
+                                                                                      shared_lock_list, id_field_type)
+            output_str += f"@perf_benchmark\n"
+            if id_field_type is not None:
+                output_str += (f"async def underlying_delete_by_id_list_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id_list: List[{id_field_type}], "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += (f"async def underlying_delete_by_id_list_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id_list: List["
+                               f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}], "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Delete by id list route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_delete_by_id_list_http\n'
+            output_str += (f"    return_val = await _underlying_delete_by_id_list_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_id_list, generic_callable, return_obj_copy)\n")
+            output_str += "    return return_val\n\n\n"
+
+            output_str += f"@perf_benchmark\n"
+            if id_field_type is not None:
+                output_str += (f"async def underlying_delete_by_id_list_{message_name_snake_cased}_http_bytes("
+                               f"{message_name_snake_cased}_id_list_bytes: bytes, "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += (f"async def underlying_delete_by_id_list_{message_name_snake_cased}_http_bytes("
+                               f"{message_name_snake_cased}_id_list_bytes: bytes, "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True):\n")
+            output_str += f'    """\n'
+            output_str += f'    Delete by id list route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_delete_by_id_list_http\n'
+            output_str += (f'    {message_name_snake_cased}_id_list = orjson.loads('
+                           f'{message_name_snake_cased}_id_list_bytes)\n')
+            output_str += (f"    return_val = await _underlying_delete_by_id_list_{message_name_snake_cased}_http("
+                           f"{message_name_snake_cased}_id_list, generic_callable, return_obj_copy)\n")
+            output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
+            output_str += "    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
+        else:
+            output_str = f"@perf_benchmark\n"
+            if id_field_type is not None:
+                output_str += (f"async def underlying_delete_by_id_list_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id_list: List[{id_field_type}], "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True)")
+            else:
+                output_str += (f"async def underlying_delete_by_id_list_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id_list: List["
+                               f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}], "
+                               f"generic_callable: Callable[[...], Any] | None = None, "
+                               f"return_obj_copy: bool | None = True)")
+            output_str += " -> DefaultPydanticWebResponse | bool:\n"
+            output_str += f'    """\n'
+            output_str += f'    Delete by id list route for {message.proto.name}\n'
+            output_str += f'    """\n'
+            output_str += f'    if generic_callable is None:\n'
+            output_str += f'        generic_callable = generic_delete_by_id_list_http\n'
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+            output_str += mutex_handling_str
+            output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj_list = await generic_read_http(" \
+                                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                               f"{message_name_snake_cased}_id_list, has_links={msg_has_links})\n"
+            output_str += " " * indent_count + f"    await callback_class.delete_by_id_list_{message_name_snake_cased}_pre(" \
+                                               f"stored_{message_name_snake_cased}_obj_list)\n"
+            match aggregation_type:
+                case FastapiHttpRoutesFileHandler.aggregation_type_filter | FastapiHttpRoutesFileHandler.aggregation_type_both:
+                    err_str = "Filter Aggregation type is not supported in Delete operations, " \
+                              f"but aggregation type {aggregation_type} received in message {message.proto.name}"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+                case FastapiHttpRoutesFileHandler.aggregation_type_update:
+                    update_agg_pipeline_var_name = \
+                        self.get_simple_option_value_from_proto(message,
+                                                                FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      (f"    delete_web_resp = await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message.proto.name}BaseModel, {message_name_snake_cased}_id_list, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                    else:
+                        output_str += " " * indent_count + \
+                                      (f"    delete_web_resp = await generic_callable({message.proto.name}, "
+                                       f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
+                                       f"{message.proto.name}BaseModel, stored_{message_name_snake_cased}_obj_list, "
+                                       f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
+                                       f"return_obj_copy=return_obj_copy)\n")
+                case other:
+                    if model_type == ModelType.Dataclass:
+                        output_str += " " * indent_count + \
+                                      f"    delete_web_resp = await generic_callable({message.proto.name}, " \
+                                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message.proto.name}BaseModel, {message_name_snake_cased}_id_list, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+                    else:
+                        output_str += " " * indent_count + \
+                                      f"    delete_web_resp = await generic_callable({message.proto.name}, " \
+                                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                                      f"{message.proto.name}BaseModel, stored_{message_name_snake_cased}_obj_list, " \
+                                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+            output_str += " " * indent_count + f"    await callback_class.delete_by_id_list_{message_name_snake_cased}_post(" \
+                                               f"delete_web_resp)\n"
+            output_str += " " * indent_count + f"    return delete_web_resp\n"
+        output_str += "\n"
+        return output_str
+
+    def handle_DELETE_by_id_list_gen(self, **kwargs) -> str:
+        message, _, id_field_type, _, model_type = self._unpack_kwargs_with_id_field_type(**kwargs)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = self.handle_underlying_DELETE_by_id_list_gen(**kwargs)
+        output_str += "\n"
+        if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
+            output_str += (f'@{self.api_router_app_name}.delete("/delete-by-id-list-{message_name_snake_cased}", '
+                           f'status_code=200)\n')
+            if id_field_type is not None:
+                output_str += (f"async def delete_by_id_list_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id_list_req_body: Request, "
+                               f"return_obj_copy: bool | None = True):\n")
+            else:
+                output_str += (f"async def delete_by_id_list_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id_list_req_body: Request, "
+                               f"return_obj_copy: bool | None = True):\n")
+        else:
+            output_str += f'@{self.api_router_app_name}.delete("/delete-by-id-list-{message_name_snake_cased}/' + \
+                          '{' + f'{message_name_snake_cased}_id_list' + '}' + \
+                          f'", response_model=DefaultPydanticWebResponse | bool, status_code=200)\n'
+            if id_field_type is not None:
+                output_str += (f"async def delete_by_id_list_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id_list: List[{id_field_type}], "
+                               f"return_obj_copy: bool | None = True) -> DefaultPydanticWebResponse | bool:\n")
+            else:
+                output_str += (f"async def delete_by_id_list_{message_name_snake_cased}_http("
+                               f"{message_name_snake_cased}_id_list: List["
+                               f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}], "
+                               f"return_obj_copy: bool | None = True) -> DefaultPydanticWebResponse | bool:\n")
+        output_str += f"    try:\n"
+        if model_type == ModelType.Msgspec:
+            output_str += (f"        {message_name_snake_cased}_id_list_bytes = "
+                           f"await {message_name_snake_cased}_id_list_req_body.body()\n")
+            output_str += f"        return await underlying_delete_by_id_list_{message_name_snake_cased}_http_bytes(" \
+                          f"{message_name_snake_cased}_id_list_bytes, return_obj_copy=return_obj_copy)\n"
+        else:
+            output_str += f"        return await underlying_delete_by_id_list_{message_name_snake_cased}_http(" \
+                          f"{message_name_snake_cased}_id_list, return_obj_copy=return_obj_copy)\n"
+        output_str += f"    except Exception as e:\n"
+        output_str += (f"        logging.exception(f'delete_by_id_list_{message_name_snake_cased}_http failed in "
                        "client call with exception: {e}')\n")
         output_str += f"        raise e\n"
         return output_str
@@ -3616,7 +3831,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             FastapiHttpRoutesFileHandler.flux_json_root_patch_field: self.handle_PATCH_gen,
             FastapiHttpRoutesFileHandler.flux_json_root_patch_all_field: self.handle_PATCH_all_gen,
             FastapiHttpRoutesFileHandler.flux_json_root_delete_field: self.handle_DELETE_gen,
-            FastapiHttpRoutesFileHandler.flux_json_root_delete_all_field: self.handle_DELETE_all_gen
+            FastapiHttpRoutesFileHandler.flux_json_root_delete_all_field: self.handle_DELETE_all_gen,
+            FastapiHttpRoutesFileHandler.flux_json_root_delete_by_id_list_field: self.handle_DELETE_by_id_list_gen
         }
 
         if self.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root):

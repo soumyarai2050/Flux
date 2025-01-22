@@ -4,6 +4,8 @@
 #include "project_includes.h"
 #include "cpp_app_logger.h"
 
+#include <mongocxx/exception/exception.hpp>
+
 using namespace market_data_handler;
 
 namespace FluxCppCore {
@@ -19,7 +21,7 @@ namespace FluxCppCore {
         int32_t insert(const RootModelType &kr_root_model_type) {
             bsoncxx::builder::basic::document bson_doc;
             prepare_doc(kr_root_model_type, bson_doc);
-            auto new_generated_id = get_next_insert_id();
+            auto new_generated_id = kr_root_model_type.id_;
             update_id_in_document(bson_doc, new_generated_id);
             try {
                 auto client = m_sp_mongo_db_->get_pool_client();
@@ -32,11 +34,43 @@ namespace FluxCppCore {
                 } else {
                     LOG_WARNING_IMPL(GetCppAppLogger(), "Some error occured while inserting: {};;; doc: {}",
                         get_root_model_name(), bsoncxx::to_json(bson_doc.view()));
+                    return -1;
                 }
-            } catch (const std::exception& qe) {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while inserting data to collection: {}, document: {}, "
-                                                  "error reason: {}", get_root_model_name(),
-                                                  bsoncxx::to_json(bson_doc.view()), qe.what());
+            } catch (const mongocxx::exception& qe) {
+                if (qe.code().value() == 11000) {
+                    // Extract the `_id` from the error message
+                    std::string error_message = qe.what();
+                    std::string duplicate_key = "dup key: { _id: ";
+                    size_t start_pos = error_message.find(duplicate_key);
+                    int extracted_id = -1;
+
+                    if (start_pos != std::string::npos) {
+                        start_pos += duplicate_key.size();
+                        size_t end_pos = error_message.find(" }", start_pos);
+                        if (end_pos != std::string::npos) {
+                            std::string id_str = error_message.substr(start_pos, end_pos - start_pos);
+                            extracted_id = std::stoi(id_str); // Convert to integer
+                        }
+                    }
+
+                    RootModelType root_model_obj;
+                    get_data_by_id_from_collection(root_model_obj, extracted_id);
+                    boost::json::object json_obj;
+                    if (MarketDataObjectToJson::object_to_json(root_model_obj, json_obj)) {
+                        std::string err_msg = std::format(
+                            "Error while inserting data to collection: {}, _id: {} document: {}, "
+                            "existing document: {};;; error reason: {}",
+                            get_root_model_name(), new_generated_id, bsoncxx::to_json(bson_doc.view()),
+                            boost::json::serialize(json_obj), qe.what()
+                        );
+                        LOG_ERROR_IMPL(GetCppAppLogger(), err_msg);
+                    }
+                } else {
+                    std::string err_msg = std::format(
+                        "Error while inserting data to collection: {}, _id: {} document: {};;; error reason: {}",
+                        get_root_model_name(), new_generated_id, bsoncxx::to_json(bson_doc.view()), qe.what()
+                    );
+                }
                 new_generated_id = -1;
             }
             return -1;
@@ -45,7 +79,7 @@ namespace FluxCppCore {
 
         bool insert(bsoncxx::builder::basic::document &r_bson_doc, const std::string &kr_root_model_key,
                     int32_t &r_new_generated_id_out) {
-            r_new_generated_id_out = get_next_insert_id();
+            // r_new_generated_id_out = get_next_insert_id();
             update_id_in_document(r_bson_doc, r_new_generated_id_out);
             try {
                 auto client = m_sp_mongo_db_->get_pool_client();
@@ -56,18 +90,24 @@ namespace FluxCppCore {
                 m_root_model_key_to_db_id[kr_root_model_key] = r_new_generated_id_out;
                 return (inserted_id == r_new_generated_id_out);
             } catch (const std::exception& qe) {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while inserting data to collection: {}, document: {}, "
-                                                  "error reason: {}", get_root_model_name(),
-                                                  bsoncxx::to_json(r_bson_doc.view()), qe.what());
-                r_new_generated_id_out = -1;
+                RootModelType root_model_obj;
+                get_data_by_id_from_collection(root_model_obj, r_new_generated_id_out);
+                boost::json::object json_obj;
+                if (MarketDataObjectToJson::object_to_json(root_model_obj, json_obj)) {
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Error while inserting data to collection: {}, _id: {} document: {}, "
+                                                  "existing document: {};;; error reason: {}", get_root_model_name(),
+                                                  r_new_generated_id_out, bsoncxx::to_json(bson_doc.view()),
+                                                  boost::json::serialize(json_obj), qe.what());
+                    r_new_generated_id_out = -1;
+                }
                 return false;
             }
         }
 
-        int32_t insert_or_update(RootModelType &kr_root_model_obj) {
+        int32_t insert_or_update(const RootModelType &kr_root_model_obj) {
     	    int32_t r_new_generated_id_out{-1};
             std::string root_model_key;
-    	    kr_root_model_obj.id_ = r_new_generated_id_out;
+    	    r_new_generated_id_out = kr_root_model_obj.id_;
             MarketDataKeyHandler::get_key_out(kr_root_model_obj, root_model_key);
         	insert_or_update(kr_root_model_obj, root_model_key, r_new_generated_id_out);
             return r_new_generated_id_out; // not initialized or missing required fields
@@ -115,7 +155,10 @@ namespace FluxCppCore {
 
             for (size_t i = 0; i < bson_doc_list.size(); ++i) {
                 auto inserted_id = insert_results->inserted_ids().at(i).get_int32().value;
-                assert(inserted_id == r_new_generated_id_list_out[i]);
+                if (inserted_id != r_new_generated_id_list_out[i]) {
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Mismatch in inserted ID: Expected {}, but got {}. Key: {}",
+                        r_new_generated_id_list_out[i], inserted_id, kr_root_model_key_list[i]);
+                }
                 m_root_model_key_to_db_id[kr_root_model_key_list[i]] = r_new_generated_id_list_out[i];
             }
 
@@ -211,15 +254,45 @@ namespace FluxCppCore {
                     auto m_mongo_db_collection_ = db[get_root_model_name()];
                     auto result = m_mongo_db_collection_.update_one(
                         update_filter.view(), update_document.view());
+                    if (result->modified_count() > 0) {
+                        return true;
+                    } else {
+                        return false;
+                    }
                 }
 
             } catch (const std::exception& qe) {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error while updating data to collection: {}, document: {}, "
-                                                  "error message: {}", get_root_model_name(),
+                auto err = std::format("Error while updating data to collection: {}, _id: {}, document: {}, "
+                                                  "error message: {}", get_root_model_name(), kr_model_doc_id,
                                                   bsoncxx::to_json(update_document.view()), qe.what());
+                LOG_ERROR_IMPL(GetCppAppLogger(), err);
                 return false;
             }
-            return true;
+        }
+
+        bool patch(const int32_t &kr_model_doc_id, const boost::json::object &kr_json_object) const {
+            auto update_filter = FluxCppCore::make_document(FluxCppCore::kvp("_id", kr_model_doc_id));
+            auto update_document = FluxCppCore::make_document(
+                    FluxCppCore::kvp("$set", bsoncxx::from_json(boost::json::serialize(kr_json_object))));
+
+            try {
+                {
+                    auto client = m_sp_mongo_db_->get_pool_client();
+                    mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                    auto m_mongo_db_collection_ = db[get_root_model_name()];
+                    auto result = m_mongo_db_collection_.update_one(
+                        update_filter.view(), update_document.view());
+
+                    return result->modified_count() > 0;
+                }
+
+            } catch (const std::exception& qe) {
+                auto err = std::format("Error while updating data to collection: {}, _id: {}, document: {}, "
+                                                  "error message: {}", get_root_model_name(), kr_model_doc_id,
+                                                  bsoncxx::to_json(update_document.view()), qe.what());
+                LOG_ERROR_IMPL(GetCppAppLogger(), err);
+                return false;
+            }
         }
 
         // Bulk patch the data (update specific documents)
@@ -295,10 +368,15 @@ namespace FluxCppCore {
                 all_data_from_db_json_string += "]";
 
                 if (!all_data_from_db_json_string.empty()) {
-                    MarketDataJsonToObject::json_to_object(all_data_from_db_json_string, r_root_model_list_obj_out);
+                    return MarketDataJsonToObject::json_to_object(all_data_from_db_json_string, r_root_model_list_obj_out);
+                } else {
+                    LOG_INFO_IMPL(GetCppAppLogger(), "Databse is empty for collection: {} ", get_root_model_name());
                 }
             } catch (const std::exception& e) {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error {}, function{}", e.what(), __func__);
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Exception caught in function '{}'. Error: '{}'. "
+                                                  "Possible issues: database connection failure, "
+                                                  "malformed data in the collection '{}'",
+                    __func__, e.what(), get_root_model_name());
             }
             return false;
         }
@@ -310,7 +388,9 @@ namespace FluxCppCore {
                 mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
                 auto m_mongo_db_collection_ = db[get_root_model_name()];
                 mongocxx::options::find find_options;
-                find_options.sort(bsoncxx::builder::basic::make_document(bsoncxx::builder::basic::kvp("_id", -1)));
+                if (limit < 0) {
+                    find_options.sort(bsoncxx::builder::basic::make_document(bsoncxx::builder::basic::kvp("_id", -1)));
+                }
                 find_options.limit(std::abs(limit));
                 auto cursor = m_mongo_db_collection_.find({}, find_options);
                 all_data_from_db_json_string += "[";
@@ -321,13 +401,6 @@ namespace FluxCppCore {
                     }
 
                     std::string doc_view = bsoncxx::to_json(new_doc.view());
-                    // size_t pos = doc_view.find("_id");
-                    // while (pos != std::string::npos) {
-                    //     if (!isalpha(doc_view[pos - 1])) {
-                    //         doc_view.erase(pos, 1);
-                    //     }
-                    //     pos = doc_view.find("_id", pos + 1);
-                    // }
 
                     all_data_from_db_json_string += doc_view;
                     all_data_from_db_json_string += ",";
@@ -340,10 +413,13 @@ namespace FluxCppCore {
                 all_data_from_db_json_string += "]";
 
                 if (!all_data_from_db_json_string.empty()) {
-                    MarketDataJsonToObject::json_to_object(all_data_from_db_json_string, r_root_model_list_obj_out);
+                    return MarketDataJsonToObject::json_to_object(all_data_from_db_json_string, r_root_model_list_obj_out);
                 }
             } catch (const std::exception& e) {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error {}, function{}", e.what(), __func__);
+                LOG_ERROR_IMPL(GetCppAppLogger(),
+                    "Exception caught in function '{}'. Error: '{}'. Possible issues: database connection failure, "
+                    "invalid limit value '{}', malformed data in the collection '{}'",
+                    __func__, e.what(), limit, get_root_model_name());
             }
             return false;
         }
@@ -374,7 +450,10 @@ namespace FluxCppCore {
                 auto matched_count = result->matched_count();
                 return (modified_count == matched_count); // Return true only if all updates were successful
             } else {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Bulk update failed {}", __func__);
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Bulk update failed in function '{}'. Collection: '{}', Document "
+                                                  "IDs count: {}, BSON documents count: {}.",
+                                                  __func__, get_root_model_name(), kr_model_doc_ids.size(),
+                                                  kr_bson_doc_list.size());
                 return false;
             }
         }
@@ -396,10 +475,12 @@ namespace FluxCppCore {
                     }
 
                     std::string new_bson_doc = bsoncxx::to_json(new_doc.view());
-                    MarketDataJsonToObject::json_to_object(new_bson_doc, r_root_model_obj_out);
+                    return MarketDataJsonToObject::json_to_object(new_bson_doc, r_root_model_obj_out);
                 }
             } catch (const std::exception& e) {
-                LOG_ERROR_IMPL(GetCppAppLogger(), "Error {}, function {}", e.what(), __func__);
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Exception caught in function '{}'. Error: '{}'. Collection: '{}', "
+                                                  "Document ID: '{}'.", __func__, e.what(),
+                                                  get_root_model_name(), kr_root_model_doc_id);
             }
             return status;
         }
@@ -449,7 +530,7 @@ namespace FluxCppCore {
                 result = m_mongo_db_collection_.delete_one(
                     bsoncxx::builder::stream::document{} << "_id" << kr_model_doc_id << bsoncxx::builder::stream::finalize);
             }
-            return result ? true : false;
+            return result->deleted_count() > 0;
         }
 
         size_t get_md_key_to_db_id_size() const {
@@ -507,10 +588,11 @@ namespace FluxCppCore {
             r_bson_doc.append(kvp("_id", new_generated_id));
         }
 
+    public:
         int32_t get_next_insert_id() {
             return ++m_max_id_;
         }
-
+    protected:
         std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db_;
         RootModelType root_model_type_;
         static inline int32_t c_cur_unused_max_id_ = 1;

@@ -24,15 +24,12 @@ def _place_sanity_complete_buy_sell_pair_chores_with_pair_strat(
                                            expected_strat_status_, symbol_overview_obj_list,
                                            last_barter_fixture_list, market_depth_basemodel_list))
 
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -56,7 +53,7 @@ def _place_sanity_complete_buy_sell_pair_chores_with_pair_strat(
                 last_barter_fixture_list[0]["market_barter_volume"]["participation_period_last_barter_qty_sum"] = leg1_last_barter.market_barter_volume.participation_period_last_barter_qty_sum
             if leg2_last_barter is not None:
                 last_barter_fixture_list[1]["market_barter_volume"]["participation_period_last_barter_qty_sum"] = leg2_last_barter.market_barter_volume.participation_period_last_barter_qty_sum
-            leg1_last_barter, leg2_last_barter = run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
+            leg1_last_barter, leg2_last_barter = run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port,
                                                               create_counts_per_side=10)
 
             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, 98, 20, executor_web_client,
@@ -141,7 +138,7 @@ def test_place_sanity_parallel_buy_sell_pair_chores_to_check_strat_view(
                  f"{expected_balance_notional}, found {strat_view.balance_notional}")
 
 
-def _create_infinite_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client):
+def _create_infinite_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, cpp_port: int):
     leg1_last_barter: LastBarterBaseModel | None = None
     leg2_last_barter: LastBarterBaseModel | None = None
     while True:
@@ -152,7 +149,7 @@ def _create_infinite_last_barter(buy_symbol, sell_symbol, last_barter_fixture_li
             last_barter_fixture_list[1]["market_barter_volume"][
                 "participation_period_last_barter_qty_sum"] = leg2_last_barter.market_barter_volume.participation_period_last_barter_qty_sum
         leg1_last_barter, leg2_last_barter = (
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, cpp_port,
                            create_counts_per_side=10, gap_secs=0.001))
 
 
@@ -171,16 +168,13 @@ def _place_sanity_complete_buy_sell_pair_chores_with_pair_strat_and_parallel_mar
                                            last_barter_fixture_list, market_depth_basemodel_list))
 
     threading.Thread(target=_create_infinite_last_barter, args=(buy_symbol, sell_symbol, last_barter_fixture_list,
-                                                               executor_web_client, ), daemon=True).start()
+                                                               active_pair_strat.cpp_port, ), daemon=True).start()
     time.sleep(10)
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
 
     try:
         # updating yaml_configs according to this test
@@ -312,7 +306,7 @@ def _place_sanity_complete_buy_chores_with_pair_strat(
         expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
     try:
         # updating yaml_configs according to this test
@@ -335,7 +329,7 @@ def _place_sanity_complete_buy_chores_with_pair_strat(
             last_barter_fixture["qty"] = 500
 
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
 
             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client,
                                                            buy_inst_type)
@@ -394,7 +388,7 @@ def _place_sanity_complete_buy_chores(buy_symbol, sell_symbol, pair_strat_,
             last_barter_fixture["qty"] = 500
 
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port,
                            create_counts_per_side=10)
 
             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client,
@@ -420,14 +414,10 @@ def _place_sanity_complete_buy_chores(buy_symbol, sell_symbol, pair_strat_,
 def _place_sanity_complete_sell_chores(buy_symbol, sell_symbol, created_pair_strat,
                                        last_barter_fixture_list, max_loop_count_per_side, executor_web_client):
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
-    buy_inst_type: InstrumentType = InstrumentType.CB if (
-            created_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
-
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, created_pair_strat)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, created_pair_strat)
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
@@ -449,7 +439,7 @@ def _place_sanity_complete_sell_chores(buy_symbol, sell_symbol, created_pair_str
             last_barter_fixture["qty"] = 500
 
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, executor_web_client,
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port,
                            create_counts_per_side=10)
             sell_chore: ChoreJournal = place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client,
                                                        sell_inst_type)

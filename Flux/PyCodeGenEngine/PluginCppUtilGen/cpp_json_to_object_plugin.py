@@ -115,14 +115,16 @@ class CppJsonToObjectPlugin(BaseProtoPlugin):
                             elif fld.enum is not None and enum_dict.get(fld.enum.proto.name) is None:
                                 enum_dict[fld.enum.proto.name] = fld.enum
 
-        output_content += "\tstatic void parse_string_to_json(const std::string& kr_str, boost::json::object& r_json_out) {\n"
+        output_content += "\tstatic bool parse_string_to_json(const std::string& kr_str, boost::json::object& r_json_out) {\n"
         output_content += "\t\ttry{\n"
-        output_content += '\t\tboost::json::value parsed_value = boost::json::parse(kr_str);\n'
-        output_content += '\t\tif (parsed_value.is_object()) {\n'
-        output_content += '\t\t\tr_json_out = parsed_value.as_object();\n'
-        output_content += '\t\t}\n'
+        output_content += '\t\t\tboost::json::value parsed_value = boost::json::parse(kr_str);\n'
+        output_content += '\t\t\tif (parsed_value.is_object()) {\n'
+        output_content += '\t\t\t\tr_json_out = parsed_value.as_object();\n'
+        output_content += '\t\t\t}\n'
+        output_content += "\t\t\treturn true;\n"
         output_content += "\t\t} catch (const boost::json::system_error& e) {\n"
-        output_content += '\t\t\tLOG_ERROR_IMPL(GetCppAppLogger(), "Error parsing JSON: {}", e.what());\n\t\t}\n\t}\n\n'
+        output_content += ('\t\t\tLOG_ERROR_IMPL(GetCppAppLogger(), "Error parsing JSON in function {}. Input string: '
+                           '{}. Error: {}", __func__, kr_str, e.what());\n\t\t\treturn false;\n\t\t}\n\t}\n\n')
 
         def process_message(name, message, indent=1):
             """Recursively processes a message to generate the JSON to object conversion code."""
@@ -146,30 +148,72 @@ class CppJsonToObjectPlugin(BaseProtoPlugin):
 
                 if fld_kind != "message":
                     # Non-message types (handle optional/repeated cases)
-                    if fld_cardinality in {"optional", "repeated"}:
-                        if fld_kind != "float":
-                            val = f'{name_lower}_json["{fld_name}"].as_{kind}();' if fld_kind == "int32" else f'{name_lower}_json["{fld_name}"].as_{kind}();'
-                            output.append(f'{tab}if ({name_lower}_json.if_contains("{fld_name}")) {{')
-                            output.append(f'{tab}\tr_{name_lower}.{fld_name}_ = {val};')
-                            output.append(f'{tab}\tr_{name_lower}.is_{fld_name}_set_ = true;')
-                            output.append(f"{tab}}}")
-                        else:
-                            val = (f'{name_lower}_json["{fld_name}"].if_double() ? r_{name_lower}.{fld_name}_ = '
-                                   f'{name_lower}_json["{fld_name}"].as_double() : r_{name_lower}.{fld_name}_ = '
-                                   f'{name_lower}_json["{fld_name}"].as_int64();')
-                            # val = f'{name_lower}_json["{fld_name}"].as_{kind}();' if fld_kind == "int32" else f'{name_lower}_json["{fld_name}"].as_{kind}();'
-                            output.append(f'{tab}if ({name_lower}_json.if_contains("{fld_name}")) {{')
-                            output.append(f'{tab}\t{val}')
-                            # output.append(f'{tab}\tr_{name_lower}.{fld_name}_ = {val};')
-                            output.append(f'{tab}\tr_{name_lower}.is_{fld_name}_set_ = true;')
-                            output.append(f"{tab}}}")
+                    if self.is_option_enabled(fld, self.flux_fld_val_is_datetime):
+                        output.append(f'{tab}if ({name_lower}_json.if_contains("{fld_name}")) {{')
+                        output.append(f'{tab}\ttry {{')
+                        output.append(f'{tab}\t\tr_{name_lower}.{fld_name}_ = {name_lower}_json["{fld_name}"].as_{kind}();')
+                        # output.append(f'{tab}\t\tr_{name_lower}.is_{fld_name}_set_ = true;')
+                        output.append(f'{tab}\t}} catch (std::exception& e) {{')
+                        output.append(f'{tab}\t\tthrow std::invalid_argument(std::format("Error processing `{fld_name}`: {{}}", e.what()));')
+                        output.append(f'{tab}\t}}')
+                        output.append(f"{tab}}} else {{")
+                        output.append(f"{tab}\tr_{name_lower}.{fld_name}_ = FluxCppCore::get_local_time_microseconds<"
+                                      f"int64_t>();\n")
+                        output.append(f"{tab}}}\n")
                     else:
-                        if fld_name == "id":
-                            val = f'{name_lower}_json["_{fld_name}"].as_{kind}();' if fld_kind == "int32" and fld_name == "id" else f'{name_lower}_json["_{fld_name}"].as_{kind}();'
-                            output.append(f'{tab}r_{name_lower}.{fld_name}_ = {val};')
+                        if fld_cardinality in {"optional", "repeated"}:
+                            if fld_kind != "float":
+                                val = f'{name_lower}_json["{fld_name}"].as_{kind}();' if fld_kind == "int32" else f'{name_lower}_json["{fld_name}"].as_{kind}();'
+                                output.append(f'{tab}if ({name_lower}_json.if_contains("{fld_name}")) {{')
+                                output.append(f'{tab}\ttry {{')
+                                output.append(f'{tab}\t\tr_{name_lower}.{fld_name}_ = {val};')
+                                output.append(f'{tab}\t\tr_{name_lower}.is_{fld_name}_set_ = true;')
+                                output.append(f'{tab}\t}} catch (std::exception& e) {{')
+                                output.append(f'{tab}\t\tthrow std::invalid_argument(std::format("Error processing `{fld_name}`: {{}}", e.what()));')
+                                output.append(f'{tab}\t}}')
+                                output.append(f"{tab}}}")
+                            else:
+                                val = (f'{name_lower}_json["{fld_name}"].if_double() ? r_{name_lower}.{fld_name}_ = '
+                                       f'{name_lower}_json["{fld_name}"].as_double() : r_{name_lower}.{fld_name}_ = '
+                                       f'{name_lower}_json["{fld_name}"].as_int64();')
+                                # val = f'{name_lower}_json["{fld_name}"].as_{kind}();' if fld_kind == "int32" else f'{name_lower}_json["{fld_name}"].as_{kind}();'
+                                output.append(f'{tab}if ({name_lower}_json.if_contains("{fld_name}")) {{')
+                                output.append(f'{tab}\ttry {{')
+                                output.append(f'{tab}\t\t{val}')
+                                # output.append(f'{tab}\tr_{name_lower}.{fld_name}_ = {val};')
+                                output.append(f'{tab}\t\tr_{name_lower}.is_{fld_name}_set_ = true;')
+                                output.append(f'{tab}\t}} catch (std::exception& e) {{')
+                                output.append(f'{tab}\t\tthrow std::invalid_argument(std::format("Error processing `{fld_name}`: {{}}", e.what()));')
+                                output.append(f'{tab}\t}}')
+                                output.append(f"{tab}}}")
                         else:
-                            val = f'{name_lower}_json["_{fld_name}"].as_{kind}();' if fld_kind == "int32" and fld_name == "id" else f'{name_lower}_json["{fld_name}"].as_{kind}();'
-                            output.append(f'{tab}r_{name_lower}.{fld_name}_ = {val};')
+                            if fld_name == "id":
+                                val = f'{name_lower}_json["_{fld_name}"].as_{kind}();' if fld_kind == "int32" and fld_name == "id" else f'{name_lower}_json["_{fld_name}"].as_{kind}();'
+                                output.append(f'{tab}try {{')
+                                output.append(f'{tab}\tr_{name_lower}.{fld_name}_ = {val};')
+                                output.append(f'{tab}}} catch (std::exception& e) {{')
+                                output.append(f'{tab}\tthrow std::invalid_argument(std::format("Error processing `_{fld_name}`: {{}}", e.what()));')
+                                output.append(f'{tab}}}')
+                            else:
+                                if fld_kind == "float":
+                                    output.append(f'{tab}try {{')
+                                    output.append(f'{tab}\t{name_lower}_json["{fld_name}"].if_double() ? '
+                                                  f'r_{name_lower}.{fld_name}_ = {name_lower}_json["{fld_name}"'
+                                                  f'].get_double() : r_{name_lower}.px_ = {name_lower}_json["{fld_name}'
+                                                  f'"].get_int64();')
+                                    output.append(f'{tab}}} catch (std::exception& e) {{')
+                                    output.append(f'{tab}\tthrow std::invalid_argument(std::format("Error processing `{fld_name}`: {{}}", e.what()));')
+                                    output.append(f'{tab}}}')
+                                else:
+                                    val = f'{name_lower}_json["_{fld_name}"].as_{kind}();' if (fld_kind == "int32" and
+                                                                                               fld_name == "id") else \
+                                        f'{name_lower}_json["{fld_name}"].as_{kind}();'
+                                    output.append(f'{tab}try {{')
+                                    output.append(f'{tab}\tr_{name_lower}.{fld_name}_ = {val};')
+                                    output.append(f'{tab}}} catch (std::exception& e) {{')
+                                    output.append(f'{tab}\tthrow std::invalid_argument(std::format("Error processing `{fld_name}`: {{}}", e.what()));')
+                                    output.append(f'{tab}}}')
+
                 else:
                     if fld_cardinality == "optional":
                         # Recursive case: Handle message fields
@@ -213,14 +257,18 @@ class CppJsonToObjectPlugin(BaseProtoPlugin):
 
         for name, message in struct_dict.items():
             name_lower = convert_camel_case_to_specific_case(name)
-            output_content += (f"\tstatic void json_to_object(const std::string& kr_json_str, "
+            output_content += (f"\tstatic bool json_to_object(const std::string& kr_json_str, "
                                f"{name}& r_{name_lower}) {{\n")
             output_content += (f"\t\tboost::json::object {name_lower}_json;\n")
-            output_content += (f"\t\tparse_string_to_json(kr_json_str, {name_lower}_json);\n")
-            output_content += process_message(name, message, 2)
+            output_content += (f"\t\tif (parse_string_to_json(kr_json_str, {name_lower}_json)) {{\n")
+            output_content += process_message(name, message, 3)
+            output_content += "\n\t\t\treturn true;\n"
+            output_content += f"\t\t}} else {{\n"
+            output_content += f'\t\t\treturn false;\n'
+            output_content += f"\t\t}}\n"
             output_content += (f"\n\t}}\n\n")
 
-            output_content += (f"\tstatic void json_to_object(const std::string& kr_json_str, "
+            output_content += (f"\tstatic bool json_to_object(const std::string& kr_json_str, "
                                f"{name}List& r_{name_lower}_list) {{\n")
             output_content += f'\t\tconst auto& {name_lower}_parse = boost::json::parse(kr_json_str);\n'
             output_content += f'\t\tif ({name_lower}_parse.is_array()) {{\n'
@@ -228,10 +276,14 @@ class CppJsonToObjectPlugin(BaseProtoPlugin):
             output_content += f'\t\t\tr_{name_lower}_list.{name_lower}_.reserve({name_lower}_list_json.size());\n'
             output_content += f'\t\t\tfor (const auto& {name_lower}_json : {name_lower}_list_json) {{\n'
             output_content += f'\t\t\t\t{name} r_{name_lower}{{}};\n'
-            output_content += f'\t\t\t\tjson_to_object(boost::json::serialize({name_lower}_json), r_{name_lower});\n'
-            output_content += f'\t\t\t\tr_{name_lower}_list.{name_lower}_.emplace_back(std::move(r_{name_lower}));\n'
+            output_content += f'\t\t\t\tif (!json_to_object(boost::json::serialize({name_lower}_json), r_{name_lower})) {{\n'
+            output_content += f'\t\t\t\t\treturn false;\n'
+            output_content += f'\t\t\t\t}} else {{\n'
+            output_content += f'\t\t\t\t\tr_{name_lower}_list.{name_lower}_.emplace_back(std::move(r_{name_lower}));\n'
+            output_content += f'\t\t\t\t}}\n'
             output_content += f'\t\t\t}}\n'
             output_content += f'\t\t}}\n'
+            output_content += f'\t\treturn true;\n'
             output_content += f'\t}}\n\n'
         output_content += "};\n\n"
 

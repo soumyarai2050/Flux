@@ -1,9 +1,9 @@
 #include "mobile_book_publisher.h"
 
+#include "cpp_app_shared_resource.h"
 #include "../include/md_utility_functions.h"
 
 void MobileBookPublisher::cleanup() {
-    m_shutdown_flag_ = true;
 	switch (mr_config_.m_market_depth_level_) {
 	    case 1: {
 	        static_cast<SharedMemoryManager<ShmSymbolCache<1>>*>(m_shm_manager_)->clean_shm();
@@ -31,14 +31,8 @@ void MobileBookPublisher::cleanup() {
             break;
 	    }
 	}
-    if (m_top_of_book_web_socket_server_) {
-    	m_top_of_book_web_socket_server_.value().clean_ws();
-    }
-    if (m_market_depth_web_socket_server_) {
-        m_market_depth_web_socket_server_.value().clean_ws();
-    }
-    if (m_last_barter_web_socket_server_) {
-        m_last_barter_web_socket_server_.value().clean_ws();
+    if (m_web_socket_server_) {
+    	m_web_socket_server_.value().clean_ws();
     }
 }
 
@@ -140,11 +134,23 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
 
     // Update market depth database if PRE policy
     if (mr_config_.m_market_depth_db_update_publish_policy_ == PublishPolicy::PRE) {
-        m_market_depth_codec_.insert_or_update(market_depth);
+        std::string md_key;
+        MobileBookKeyHandler::get_key_out(market_depth, md_key);
+        auto found = m_market_depth_codec_.m_root_model_key_to_db_id.find(md_key);
+        if (found == m_market_depth_codec_.m_root_model_key_to_db_id.end()) {
+            market_depth.id_ = m_market_depth_codec_.get_next_insert_id();
+            m_market_depth_codec_.insert(market_depth);
+            m_market_depth_codec_.m_root_model_key_to_db_id[md_key] = market_depth.id_;
+        } else {
+            market_depth.id_ = found->second;
+            m_market_depth_codec_.patch(market_depth);
+        }
+        // m_market_depth_codec_.insert_or_update(market_depth);
     }
 
     // Handle top of book for first position
     if (market_depth.position_ == 0) {
+        auto time = FluxCppCore::get_local_time_microseconds<int64_t>();
         TopOfBook top_of_book;
         top_of_book.id_ = market_depth.id_;
         top_of_book.symbol_ = market_depth.symbol_;
@@ -167,19 +173,36 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
         }
 
         if (mr_config_.m_top_of_book_db_update_publish_policy_ == PublishPolicy::PRE) {
-            m_top_of_book_codec_.insert_or_update(top_of_book);
+            std::string tob_key;
+            MobileBookKeyHandler::get_key_out(top_of_book, tob_key);
+            auto found = m_top_of_book_codec_.m_root_model_key_to_db_id.find(tob_key);
+            if (found == m_top_of_book_codec_.m_root_model_key_to_db_id.end()) {
+                top_of_book.id_ = m_top_of_book_codec_.get_next_insert_id();
+                m_top_of_book_codec_.insert(top_of_book);
+                m_top_of_book_codec_.m_root_model_key_to_db_id[tob_key] = top_of_book.id_;
+            } else {
+                top_of_book.id_ = found->second;
+                m_top_of_book_codec_.patch(top_of_book);
+            }
+            // m_top_of_book_codec_.insert_or_update(top_of_book);
         }
 
         if (mr_config_.m_top_of_book_http_update_publish_policy_ == PublishPolicy::PRE) {
             auto db_id = m_top_of_book_codec_.get_db_id_from_root_model_obj(top_of_book);
             if (db_id == -1) {
-                assert(m_tob_web_client_.value().create_client(top_of_book));
+                if (!m_tob_web_client_.value().create_client(top_of_book)) {
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to crerate client top_of_book;;; id: {}, symbol: {}",
+                        top_of_book.id_, top_of_book.symbol_);
+                }
                 std::string tob_key;
                 MobileBookKeyHandler::get_key_out(top_of_book, tob_key);
                 m_top_of_book_codec_.m_root_model_key_to_db_id[tob_key] = top_of_book.id_;
             } else {
                 top_of_book.id_ = db_id;
-                assert(m_tob_web_client_.value().patch_client(top_of_book));
+                if (!m_tob_web_client_.value().patch_client(top_of_book)) {
+                   LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to patch client top_of_book;;; id: {}, symbol: {}",
+                       top_of_book.id_, top_of_book.symbol_);
+                }
             }
             // if (m_top_of_book_codec_.m_root_model_key_to_db_id.find())
         }
@@ -189,7 +212,14 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
             top_of_book.id_ = db_id;
             top_of_book.market_barter_volume_.clear();
             m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
-            m_top_of_book_web_socket_server_.value().publish(top_of_book);
+            boost::json::object tob_json;
+            if (MobileBookObjectToJson::object_to_json(top_of_book, tob_json)) {
+                m_web_socket_server_.value().publish_to_route(mr_config_.m_top_of_book_ws_route_,
+                    boost::json::serialize(tob_json));
+            } else {
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize top_of_book;;; id: {}, symbol: {}",
+                    top_of_book.id_, top_of_book.symbol_);
+            }
         }
     }
 
@@ -285,6 +315,38 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
             }
         }
 	}
+}
+
+void MobileBookPublisher::process_market_depth(const MarketDepth& kr_market_depth) {
+    MarketDepthQueueElement market_depth_queue_element{
+			.id_ = kr_market_depth.id_,
+			.side_ = kr_market_depth.side_[0],
+			.px_ = kr_market_depth.px_,
+			.is_px_set_ = kr_market_depth.is_px_set_,
+			.qty_ = kr_market_depth.qty_,
+			.is_qty_set_ = kr_market_depth.is_qty_set_,
+			.position_ = kr_market_depth.position_,
+			.is_smart_depth_ = kr_market_depth.is_smart_depth_,
+			.is_is_smart_depth_set_ = kr_market_depth.is_is_smart_depth_set_,
+			.cumulative_notional_ = kr_market_depth.cumulative_notional_,
+			.is_cumulative_notional_set_ = kr_market_depth.is_cumulative_notional_set_,
+			.cumulative_qty_ = kr_market_depth.cumulative_qty_,
+			.is_cumulative_qty_set_ = kr_market_depth.is_cumulative_qty_set_,
+			.cumulative_avg_px_ = kr_market_depth.cumulative_avg_px_,
+			.is_cumulative_avg_px_set_ = kr_market_depth.is_cumulative_avg_px_set_,
+		};
+
+    market_depth_queue_element.exch_time_ = kr_market_depth.exch_time_;
+
+    market_depth_queue_element.arrival_time_ = kr_market_depth.arrival_time_;
+
+	FluxCppCore::StringUtil::setString(market_depth_queue_element.symbol_, kr_market_depth.symbol_);
+	if (kr_market_depth.is_market_maker_set_) {
+		FluxCppCore::StringUtil::setString(market_depth_queue_element.market_maker_, kr_market_depth.market_maker_);
+		market_depth_queue_element.is_market_maker_set_ = true;
+	}
+
+	process_market_depth(market_depth_queue_element);
 }
 
 void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_last_barter_queue_element) {
@@ -409,18 +471,29 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
     }
 
     if (mr_config_.m_last_barter_db_update_publish_policy_ == PublishPolicy::PRE) {
-        auto db_id = m_last_barter_codec_.insert(last_barter);
-        last_barter.id_ = db_id;
+        last_barter.id_ = m_last_barter_codec_.get_next_insert_id();
+        m_last_barter_codec_.insert(last_barter);
     }
 
     if (mr_config_.m_last_barter_ws_update_publish_policy_ == PublishPolicy::PRE) {
-        m_last_barter_web_socket_server_.value().publish(last_barter);
+        boost::json::object last_barter_json;
+        if (MobileBookObjectToJson::object_to_json(last_barter, last_barter_json)) {
+            m_web_socket_server_.value().publish_to_route(mr_config_.m_last_barter_ws_route_,
+                boost::json::serialize(last_barter_json));
+        } else {
+            LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize last barter;;; id: {}, symbol: {}", last_barter.id_,
+                last_barter.symbol_n_exch_id_.symbol_);
+        }
     }
 
     if (mr_config_.m_last_barter_http_update_publish_policy_ == PublishPolicy::PRE) {
-        assert(m_lt_web_client_.value().create_client(last_barter));
+        if(!m_lt_web_client_.value().create_client(last_barter)) {
+            LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to create client last_barter;;; id: {}, symbol: {}",
+                last_barter.id_, last_barter.symbol_n_exch_id_.symbol_);
+        }
     }
 
+    auto time = FluxCppCore::get_local_time_microseconds<int64_t>();
     TopOfBook top_of_book;
     top_of_book.id_ = last_barter.id_;
     top_of_book.symbol_ = last_barter.symbol_n_exch_id_.symbol_;
@@ -445,7 +518,17 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
     }
 
     if (mr_config_.m_top_of_book_db_update_publish_policy_  == PublishPolicy::PRE) {
-        m_top_of_book_codec_.insert_or_update(top_of_book);
+        std::string tob_key;
+        MobileBookKeyHandler::get_key_out(top_of_book, tob_key);
+        auto found = m_top_of_book_codec_.m_root_model_key_to_db_id.find(tob_key);
+        if (found == m_top_of_book_codec_.m_root_model_key_to_db_id.end()) {
+            top_of_book.id_ = m_top_of_book_codec_.get_next_insert_id();
+            m_top_of_book_codec_.insert(top_of_book);
+            m_top_of_book_codec_.m_root_model_key_to_db_id[tob_key] = top_of_book.id_;
+        } else {
+            top_of_book.id_ = found->second;
+            m_top_of_book_codec_.patch(top_of_book);
+        }
     }
 
     if (mr_config_.m_top_of_book_ws_update_publish_policy_ == PublishPolicy::PRE) {
@@ -453,19 +536,32 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
         top_of_book.id_ = db_id;
         top_of_book.market_barter_volume_.clear();
         m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
-        m_top_of_book_web_socket_server_.value().publish(top_of_book);
+        boost::json::object tob_json;
+        if (MobileBookObjectToJson::object_to_json(top_of_book, tob_json)) {
+            m_web_socket_server_.value().publish_to_route(mr_config_.m_top_of_book_ws_route_,
+                boost::json::serialize(tob_json));
+        } else {
+            LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize top_of_book;;; id: {}, symbol: {}", top_of_book.id_,
+                top_of_book.symbol_);
+        }
     }
 
     if (mr_config_.m_top_of_book_http_update_publish_policy_ == PublishPolicy::PRE) {
         auto db_id = m_top_of_book_codec_.get_db_id_from_root_model_obj(top_of_book);
         if (db_id == -1) {
-            assert(m_tob_web_client_.value().create_client(top_of_book));
+            if(!m_tob_web_client_.value().create_client(top_of_book)) {
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to create client top_of_book;;; id: {}, symbol: {}",
+                    top_of_book.id_, top_of_book.symbol_);
+            }
             std::string tob_key;
             MobileBookKeyHandler::get_key_out(top_of_book, tob_key);
             m_top_of_book_codec_.m_root_model_key_to_db_id[tob_key] = top_of_book.id_;
         } else {
             top_of_book.id_ = db_id;
-            assert(m_tob_web_client_.value().patch_client(top_of_book));
+            if (!m_tob_web_client_.value().patch_client(top_of_book)) {
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to patch client top_of_book;;; id: {}, symbol: {}",
+                    top_of_book.id_, top_of_book.symbol_);
+            }
         }
         // if (m_top_of_book_codec_.m_root_model_key_to_db_id.find())
     }
@@ -477,6 +573,41 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
 
 		m_last_barter_monitor_.push(kr_last_barter_queue_element);
 	}
+}
+
+void MobileBookPublisher::process_last_barter(const LastBarter& kr_last_barter) {
+    LastBarterQueueElement last_barter{};
+
+    last_barter.id_ = kr_last_barter.id_;
+	FluxCppCore::StringUtil::setString(last_barter.symbol_n_exch_id_.symbol_, kr_last_barter.symbol_n_exch_id_.symbol_);
+	FluxCppCore::StringUtil::setString(last_barter.symbol_n_exch_id_.exch_id_, kr_last_barter.symbol_n_exch_id_.exch_id_);
+    last_barter.exch_time_ = kr_last_barter.exch_time_;
+    last_barter.arrival_time_ = kr_last_barter.arrival_time_;
+
+    last_barter.px_ = kr_last_barter.px_;
+    last_barter.qty_ = kr_last_barter.qty_;
+
+    if (kr_last_barter.is_premium_set_) {
+        last_barter.premium_ = kr_last_barter.premium_;
+        last_barter.is_premium_set_ = true;
+    }
+
+	if (kr_last_barter.is_market_barter_volume_set_) {
+		FluxCppCore::StringUtil::setString(last_barter.market_barter_volume_.id_, kr_last_barter.market_barter_volume_.id_);
+        if (kr_last_barter.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_) {
+            last_barter.market_barter_volume_.participation_period_last_barter_qty_sum_ =
+                kr_last_barter.market_barter_volume_.participation_period_last_barter_qty_sum_;
+            last_barter.market_barter_volume_.is_participation_period_last_barter_qty_sum_set_ = true;
+        }
+
+		if (kr_last_barter.market_barter_volume_.is_applicable_period_seconds_set_) {
+            last_barter.market_barter_volume_.applicable_period_seconds_ = kr_last_barter.market_barter_volume_.applicable_period_seconds_;
+            last_barter.market_barter_volume_.is_applicable_period_seconds_set_ = true;
+        }
+	    last_barter.is_market_barter_volume_set_ = true;
+	}
+
+    process_last_barter(last_barter);
 }
 
 template<size_t N>
@@ -573,10 +704,13 @@ void MobileBookPublisher::update_last_barter_cache(const LastBarterQueueElement&
 void MobileBookPublisher::populate_market_depth(
     const MarketDepthQueueElement& kr_market_depth_queue_element, MarketDepth& r_market_depth) {
 
+    auto time = FluxCppCore::get_local_time_microseconds<int64_t>();
     r_market_depth.id_ = kr_market_depth_queue_element.id_;
     r_market_depth.symbol_ = kr_market_depth_queue_element.symbol_;
-    r_market_depth.exch_time_  = kr_market_depth_queue_element.exch_time_;
+    r_market_depth.exch_time_ = kr_market_depth_queue_element.exch_time_;
+
     r_market_depth.arrival_time_ = kr_market_depth_queue_element.arrival_time_;
+
     if (kr_market_depth_queue_element.side_ == 'B') {
         r_market_depth.side_ = "BID";
     } else {
@@ -645,27 +779,15 @@ void MobileBookPublisher::update_top_of_book_db_cache() {
 
 void MobileBookPublisher::initialize_websocket_servers() {
     if (mr_config_.m_market_depth_ws_update_publish_policy_ != PublishPolicy::OFF) {
-        m_market_depth_web_socket_server_.emplace(m_market_depth_list_, m_market_depth_codec_, mobile_book_handler::host,
-            mr_config_.m_market_depth_ws_port_,
-            std::chrono::seconds(mobile_book_handler::connection_timeout));
-    }
-
-    if (mr_config_.m_last_barter_ws_update_publish_policy_ != PublishPolicy::OFF) {
-        m_last_barter_web_socket_server_.emplace(m_last_barter_, m_last_barter_codec_, mobile_book_handler::host,
-            mr_config_.m_last_barter_ws_port_,
-            std::chrono::seconds(mobile_book_handler::connection_timeout));
-    }
-
-    if (mr_config_.m_top_of_book_ws_update_publish_policy_ != PublishPolicy::OFF) {
-        m_top_of_book_web_socket_server_.emplace(m_top_of_book_, m_top_of_book_codec_, mobile_book_handler::host,
-            mr_config_.m_top_of_book_ws_port_,
+        m_web_socket_server_.emplace(mobile_book_handler::host,
+            mr_config_.m_ws_port_,
             std::chrono::seconds(mobile_book_handler::connection_timeout));
     }
 }
 
 void MobileBookPublisher::market_depth_consumer() {
     std::vector<MarketDepthQueueElement> market_depth_queue_element_list;
-    while (!m_shutdown_flag_) {
+    while (keepRunning) {
         auto status = m_market_depth_monitor_.pop(market_depth_queue_element_list, std::chrono::milliseconds(
             mobile_book_handler::connection_timeout));
 
@@ -717,25 +839,43 @@ void MobileBookPublisher::market_depth_consumer() {
                 populate_market_depth(market_depth_queue_element, market_depth);
 
                 if (mr_config_.m_market_depth_db_update_publish_policy_ == PublishPolicy::POST) {
-                    auto db_id  = m_market_depth_codec_.insert_or_update(market_depth);
-                    market_depth.id_ = db_id;
+                    std::string md_key;
+                    MobileBookKeyHandler::get_key_out(market_depth, md_key);
+                    auto found = m_market_depth_codec_.m_root_model_key_to_db_id.find(md_key);
+                    if (found == m_market_depth_codec_.m_root_model_key_to_db_id.end()) {
+                        market_depth.id_ = m_market_depth_codec_.get_next_insert_id();
+                        m_market_depth_codec_.insert(market_depth);
+                        m_market_depth_codec_.m_root_model_key_to_db_id[md_key] = market_depth.id_;
+                    } else {
+                        market_depth.id_ = found->second;
+                        m_market_depth_codec_.patch(market_depth);
+                    }
+                    // auto db_id  = m_market_depth_codec_.insert_or_update(market_depth);
+                    // market_depth.id_ = db_id;
                 }
                 m_market_depth_list_.market_depth_.push_back(market_depth);
 
                 if (mr_config_.m_market_depth_http_update_publish_policy_ == PublishPolicy::POST) {
                     auto db_id = m_market_depth_codec_.get_db_id_from_root_model_obj(market_depth);
                     if (db_id == -1) {
-                        assert(m_md_http_client_.value().create_client(market_depth));
+                        if(!m_md_http_client_.value().create_client(market_depth)) {
+                            LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to create client market_depth;;; id: {}, "
+                                                              "symbol: {}", market_depth.id_, market_depth.symbol_);
+                        }
                         std::string md_key;
                         MobileBookKeyHandler::get_key_out(market_depth, md_key);
                         m_market_depth_codec_.m_root_model_key_to_db_id[md_key] = db_id;
                     } else {
                         market_depth.id_ = db_id;
-                        assert(m_md_http_client_.value().patch_client(market_depth));
+                        if(!m_md_http_client_.value().patch_client(market_depth)) {
+                            LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to patch client market_depth;;; id: {}, "
+                                                              "symbol: {}", market_depth.id_, market_depth.symbol_);
+                        }
                     }
                 }
 
                 if (market_depth.position_ == 0) {
+                    auto time = FluxCppCore::get_local_time_microseconds<int64_t>();
                     TopOfBook top_of_book;
                     top_of_book.id_ = market_depth.id_;
                     top_of_book.symbol_ = market_depth.symbol_;
@@ -759,19 +899,35 @@ void MobileBookPublisher::market_depth_consumer() {
                     top_of_book.is_market_barter_volume_set_ = false;
 
                     if (mr_config_.m_top_of_book_db_update_publish_policy_ == PublishPolicy::POST) {
-                        m_top_of_book_codec_.insert_or_update(top_of_book);
+                        std::string tob_key;
+                        MobileBookKeyHandler::get_key_out(top_of_book, tob_key);
+                        auto found = m_top_of_book_codec_.m_root_model_key_to_db_id.find(tob_key);
+                        if (found == m_top_of_book_codec_.m_root_model_key_to_db_id.end()) {
+                            top_of_book.id_ = m_top_of_book_codec_.get_next_insert_id();
+                            m_top_of_book_codec_.insert(top_of_book);
+                            m_top_of_book_codec_.m_root_model_key_to_db_id[tob_key] = top_of_book.id_;
+                        } else {
+                            top_of_book.id_ = found->second;
+                            m_top_of_book_codec_.patch(top_of_book);
+                        }
                     }
 
                     if (mr_config_.m_top_of_book_http_update_publish_policy_ == PublishPolicy::POST) {
                         auto db_id = m_top_of_book_codec_.get_db_id_from_root_model_obj(top_of_book);
                         if (db_id == -1) {
-                            assert(m_tob_web_client_.value().create_client(top_of_book));
+                            if(!m_tob_web_client_.value().create_client(top_of_book)) {
+                                LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to create client top_of_book;;; id: {}, "
+                                                                  "symbol: {}", top_of_book.id_, top_of_book.symbol_);
+                            }
                             std::string tob_key;
                             MobileBookKeyHandler::get_key_out(top_of_book, tob_key);
                             m_top_of_book_codec_.m_root_model_key_to_db_id[tob_key] = top_of_book.id_;
                         } else {
                             top_of_book.id_ = db_id;
-                            assert(m_tob_web_client_.value().patch_client(top_of_book));
+                            if(!m_tob_web_client_.value().patch_client(top_of_book)) {
+                                LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to patch client top_of_book;;; id: {}, "
+                                                                  "symbol: {}", top_of_book.id_, top_of_book.symbol_);
+                            }
                         }
                         // if (m_top_of_book_codec_.m_root_model_key_to_db_id.find())
                     }
@@ -781,13 +937,27 @@ void MobileBookPublisher::market_depth_consumer() {
                         top_of_book.id_ = db_id;
                         top_of_book.market_barter_volume_.clear();
                         m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
-                        m_top_of_book_web_socket_server_.value().publish(top_of_book);
+                        boost::json::object tob_json;
+                        if (MobileBookObjectToJson::object_to_json(top_of_book, tob_json)) {
+                            m_web_socket_server_.value().publish_to_route(mr_config_.m_top_of_book_ws_route_,
+                                boost::json::serialize(tob_json));
+                        } else {
+                            LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize top_of_book to json;;; id: {}, "
+                                                              "symbol: {}, ", top_of_book.id_, top_of_book.symbol_);
+                        }
                     }
                 }
             }
 
             if (mr_config_.m_market_depth_ws_update_publish_policy_ == PublishPolicy::POST) {
-                m_market_depth_web_socket_server_.value().publish(m_market_depth_list_);
+                boost::json::object md_json;
+                if (MobileBookObjectToJson::object_to_json(m_market_depth_list_, md_json)) {
+                    m_web_socket_server_.value().publish_to_route(mr_config_.m_market_depth_ws_route_,
+                        boost::json::serialize(md_json["market_depth"].get_array()));
+                } else {
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize market_depth to json;;; id: {}, symbol: {}, "
+                                                      "", m_market_depth.id_, m_market_depth.symbol_);
+                }
                 m_market_depth_list_.market_depth_.clear();
             }
         }
@@ -796,7 +966,7 @@ void MobileBookPublisher::market_depth_consumer() {
 
 void MobileBookPublisher::last_barter_consumer() {
     LastBarterQueueElement last_barter_queue_element;
-    while (!m_shutdown_flag_) {
+    while (keepRunning) {
         auto status = m_last_barter_monitor_.pop(last_barter_queue_element, std::chrono::milliseconds(100));
         if (status == FluxCppCore::QueueStatus::DATA_CONSUMED) {
             if (last_barter_queue_element.symbol_n_exch_id_.symbol_!= mr_config_.m_leg_1_symbol_ &&
@@ -910,18 +1080,29 @@ void MobileBookPublisher::last_barter_consumer() {
             }
 
             if (mr_config_.m_last_barter_db_update_publish_policy_ == PublishPolicy::POST) {
-                auto db_id = m_last_barter_codec_.insert(last_barter);
-                last_barter.id_ = db_id;
+                last_barter.id_ = m_last_barter_codec_.get_next_insert_id();
+                m_last_barter_codec_.insert(last_barter);
             }
 
             if (mr_config_.m_last_barter_http_update_publish_policy_ == PublishPolicy::POST) {
-                assert(m_lt_web_client_.value().create_client(last_barter));
+                if (!m_lt_web_client_.value().create_client(last_barter)) {
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to create client last_barter;;; id: {}, symbol: {}",
+                        last_barter.id_, last_barter.symbol_n_exch_id_.symbol_);
+                }
             }
 
             if (mr_config_.m_last_barter_ws_update_publish_policy_ == PublishPolicy::POST) {
-                m_last_barter_web_socket_server_.value().publish(last_barter);
+                boost::json::object lt_json;
+                if (MobileBookObjectToJson::object_to_json(last_barter, lt_json)) {
+                    m_web_socket_server_.value().publish_to_route(mr_config_.m_last_barter_ws_route_,
+                        boost::json::serialize(lt_json));
+                } else {
+                    LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize last_barter to json;;; id: {}, symbol: {}",
+                        last_barter.id_, last_barter.symbol_n_exch_id_.symbol_);
+                }
             }
 
+            auto time = FluxCppCore::get_local_time_microseconds<int64_t>();
             TopOfBook top_of_book;
             top_of_book.id_ = last_barter.id_;
             top_of_book.symbol_ = last_barter.symbol_n_exch_id_.symbol_;
@@ -945,19 +1126,35 @@ void MobileBookPublisher::last_barter_consumer() {
             }
 
             if (mr_config_.m_top_of_book_db_update_publish_policy_ == PublishPolicy::POST) {
-                m_top_of_book_codec_.insert_or_update(top_of_book);
+                std::string tob_key;
+                MobileBookKeyHandler::get_key_out(top_of_book, tob_key);
+                auto found = m_top_of_book_codec_.m_root_model_key_to_db_id.find(tob_key);
+                if (found == m_top_of_book_codec_.m_root_model_key_to_db_id.end()) {
+                    top_of_book.id_ = m_top_of_book_codec_.get_next_insert_id();
+                    m_top_of_book_codec_.insert(top_of_book);
+                    m_top_of_book_codec_.m_root_model_key_to_db_id[tob_key] = top_of_book.id_;
+                } else {
+                    top_of_book.id_ = found->second;
+                    m_top_of_book_codec_.patch(top_of_book);
+                }
             }
 
             if (mr_config_.m_top_of_book_http_update_publish_policy_ == PublishPolicy::POST) {
                 auto db_id = m_top_of_book_codec_.get_db_id_from_root_model_obj(top_of_book);
                 if (db_id == -1) {
-                    assert(m_tob_web_client_.value().create_client(top_of_book));
+                    if (!m_tob_web_client_.value().create_client(top_of_book)) {
+                        LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to create client top_of_book;;; id: {}, symbol: {}",
+                            top_of_book.id_, top_of_book.symbol_);
+                    }
                     std::string tob_key;
                     MobileBookKeyHandler::get_key_out(top_of_book, tob_key);
                     m_top_of_book_codec_.m_root_model_key_to_db_id[tob_key] = top_of_book.id_;
                 } else {
                     top_of_book.id_ = db_id;
-                    assert(m_tob_web_client_.value().patch_client(top_of_book));
+                    if(!m_tob_web_client_.value().patch_client(top_of_book)) {
+                        LOG_ERROR_IMPL(GetCppAppLogger(), "Fliled to patch client top_of_book;;; id: {}, symbol: {}",
+                            top_of_book.id_, top_of_book.symbol_);
+                    }
                 }
                 // if (m_top_of_book_codec_.m_root_model_key_to_db_id.find())
             }
@@ -967,7 +1164,10 @@ void MobileBookPublisher::last_barter_consumer() {
                 top_of_book.market_barter_volume_.clear();
                 top_of_book.id_ = db_id;
                 m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
-                m_top_of_book_web_socket_server_.value().publish(top_of_book);
+                boost::json::object tob_json;
+                MobileBookObjectToJson::object_to_json(top_of_book, tob_json);
+                m_web_socket_server_.value().publish_to_route(mr_config_.m_top_of_book_ws_route_,
+                    boost::json::serialize(tob_json));
             }
         }
     }

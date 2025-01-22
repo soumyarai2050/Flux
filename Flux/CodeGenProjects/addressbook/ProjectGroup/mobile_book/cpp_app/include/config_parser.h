@@ -72,12 +72,10 @@ struct Config
         }
         m_log_directory_ = getenv("LOG_DIR_PATH");
         m_binary_log_path_ = m_log_directory_ + "/bin_" + m_db_name_ + ".bin";
+        m_swagger_ui_json_path_ = get_value_of.template operator()<std::string>("swagger_ui_json_path",
+            true).value_or(std::string{});
 
-        m_top_of_book_ws_port_ = get_value_of.template operator()<int32_t>("top_of_book_ws_port",
-            false).value_or(0);
-        m_market_depth_ws_port_ = get_value_of.template operator()<int32_t>("market_depth_ws_port",
-            false).value_or(0);
-        m_last_barter_ws_port_ = get_value_of.template operator()<int32_t>("last_barter_ws_port",
+        m_ws_port_ = get_value_of.template operator()<int32_t>("cpp_ws_port",
             false).value_or(0);
         m_http_server_port_ = get_value_of.template operator()<int32_t>("cpp_http_port", true).value_or(0);
         m_market_depth_level_ = get_value_of.template operator()<size_t>("market_depth_level", true).value_or(0);
@@ -146,10 +144,12 @@ struct Config
     std::string m_log_directory_;
     std::string m_binary_log_path_;
     std::string m_raw_log_path_;
+    std::string m_swagger_ui_json_path_;
+    std::string m_top_of_book_ws_route_{"/get-all-top_of_book-ws"};
+    std::string m_market_depth_ws_route_{"/get-all-market_depth-ws"};
+    std::string m_last_barter_ws_route_{"/get-all-last_barter-ws"};
 
-    int32_t m_top_of_book_ws_port_;
-    int32_t m_market_depth_ws_port_;
-    int32_t m_last_barter_ws_port_;
+    int32_t m_ws_port_;
     int32_t m_http_server_port_;
     size_t m_market_depth_level_;
 

@@ -60,12 +60,14 @@ message MessageJsonRoot{
   optional AggregateType PatchAllOp = 7;
   optional AggregateType DeleteOp = 8;
   optional AggregateType DeleteAllOp = 9;
-  optional AggregateType ReadByIDWebSocketOp = 10;
-  optional bool SetReentrantLock = 11 [default=true];
-  optional bool PassStoredObjToUpdatePrePostCallback = 12 [default=false];
-  optional bool PassStoredObjToUpdateAllPrePostCallback = 13 [default=false];
-  optional bool PassStoredObjToPartialUpdatePostCallback = 14 [default=false];
-  optional bool PassStoredObjToPartialUpdateAllPostCallback = 15 [default=false];
+  optional AggregateType DeleteByIdListOp = 10;
+  optional AggregateType ReadByIDWebSocketOp = 11;
+  optional bool SetReentrantLock = 12 [default=true];
+  optional bool PassStoredObjToUpdatePrePostCallback = 13 [default=false];
+  optional bool PassStoredObjToUpdateAllPrePostCallback = 14 [default=false];
+  optional bool PassStoredObjToPartialUpdatePostCallback = 15 [default=false];
+  optional bool PassStoredObjToPartialUpdateAllPostCallback = 16 [default=false];
+  optional bool IncludeDataframeClients = 17 [default=false];
 }
 
 enum TimeSeriesGranularityType{
@@ -86,13 +88,15 @@ message MessageJsonRootTimeSeries{
   optional AggregateType PatchOp = 9;
   optional AggregateType PatchAllOp = 10;
   optional AggregateType DeleteOp = 11;
+  optional AggregateType DeleteByIdListOp = 12;
 
-  optional TimeSeriesGranularityType Granularity = 12 [default=Sec];
-  optional int64 ExpireAfterSeconds = 13;
-  optional string SecondaryField = 14;  // not supported yet
-  optional bool SetReentrantLock = 15 [default=true];
-  optional bool PassStoredObjToUpdatePrePostCallback = 16 [default=false];
-  optional bool PassStoredObjToUpdateAllPrePostCallback = 17 [default=false];
+  optional TimeSeriesGranularityType Granularity = 13 [default=Sec];
+  optional int64 ExpireAfterSeconds = 14;
+  optional string SecondaryField = 15;  // not supported yet
+  optional bool SetReentrantLock = 16 [default=true];
+  optional bool PassStoredObjToUpdatePrePostCallback = 17 [default=false];
+  optional bool PassStoredObjToUpdateAllPrePostCallback = 18 [default=false];
+  optional bool IncludeDataframeClients = 19 [default=false];
 }
 
 message FileUploadOptions{
@@ -132,6 +136,7 @@ message MessageJsonQuery{
   optional QueryTypeEnum QueryType = 5 [default=HTTP];
   optional QueryRouteTypeEnum QueryRouteType = 6 [default=GET];
   optional bool RequireJsSliceChanges = 7 [default=false];
+  optional bool IncludeDataframeClients = 8[default=false];
 }
 
 
@@ -182,6 +187,7 @@ extend google.protobuf.MessageOptions
   optional string FluxMsgRootId = 51152;
   optional string FluxMsgPrefixPrepend = 51153;//Inline expansion will cause prefix prepend(tion)
   optional int64 FluxMsgStringLength = 51154;
+  optional bool FluxMsgIsCppWebServerModel = 51155;
 
   //DB Options - 52
   optional string FluxMsgTbl = 52151;
@@ -252,6 +258,7 @@ extend google.protobuf.MessageOptions
   optional MessageJsonRootTimeSeries FluxMsgJsonRootTimeSeries = 55259;
   optional WidgetUIOption FluxMsgWidgetUIOption = 55260; // Use this to populate ui widget data for layout messages
   repeated MessageButtonQuery FluxMsgButtonQuery = 55261;   // adds file query for message
+  optional MessageJsonRoot FluxMsgCppJsonRoot = 55262;
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;

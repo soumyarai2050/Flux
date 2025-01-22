@@ -377,7 +377,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
             # making strat state non-running - required for UI to know it is not running anymore and
             # avoid connections
-            if pair_strat.is_executor_running or pair_strat.is_partially_running or pair_strat.port is not None:
+            if pair_strat.server_ready_state > 0 or pair_strat.port is not None:
                 # If pair strat already exists and executor already have run before
                 await (EmailBookServiceRoutesCallbackBaseNativeOverride.
                        underlying_update_pair_strat_to_non_running_state_query_http(pair_strat.id))
@@ -495,9 +495,10 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                 pair_strat_json = {
                                     "_id": pair_strat.id,
                                     "strat_state": StratState.StratState_ERROR,
-                                    "is_partially_running": False,
-                                    "is_executor_running": False,
+                                    "server_ready_state": 0,
                                     "port": None,
+                                    "cpp_port": None,
+                                    "cpp_ws_port": None
                                 }
 
                                 await (EmailBookServiceRoutesCallbackBaseNativeOverride.
@@ -749,8 +750,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         pair_strat_obj.last_active_date_time = DateTime.utcnow()
 
         pair_strat_obj.host = street_book_config_yaml_dict.get("server_host")
-        pair_strat_obj.is_executor_running = False
-        pair_strat_obj.is_partially_running = False
+        pair_strat_obj.server_ready_state = 0
 
         # creating strat_view object for this start
         self.create_strat_view_for_strat(pair_strat_obj)
@@ -971,45 +971,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             self.port_to_executor_http_client_dict[port] = (
                 StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, port))
 
-    def _set_strat_company(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat | Dict) -> None:
-        is_executor_running: bool
-        if isinstance(updated_pair_strat_obj, dict):
-            is_executor_running = updated_pair_strat_obj.get("is_executor_running")
-        else:
-            is_executor_running = updated_pair_strat_obj.is_executor_running
-
-        if is_executor_running:
-            # update only if strat company is not set for either leg1 or leg2
-            if stored_pair_strat_obj.pair_strat_params.strat_leg1.company is None or (
-                    stored_pair_strat_obj.pair_strat_params.strat_leg2.company is None):
-                sec_id: str = stored_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id
-                side: Side = stored_pair_strat_obj.pair_strat_params.strat_leg1.side
-                if stored_pair_strat_obj.port is not None:
-                    strat_web_client: StreetBookServiceHttpClient = (
-                        StreetBookServiceHttpClient.set_or_get_if_instance_exists(stored_pair_strat_obj.host,
-                                                                                     stored_pair_strat_obj.port))
-                    symbol_overview_list: List[SymbolOverviewBaseModel] = (
-                        strat_web_client.get_all_symbol_overview_client())
-                    strat_leg1_company: str | None = None
-                    strat_leg2_company: str | None = None
-                    for symbol_overview in symbol_overview_list:
-                        if symbol_overview.symbol == stored_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id:
-                            strat_leg1_company = symbol_overview.company
-                        elif symbol_overview.symbol == stored_pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id:
-                            strat_leg2_company = symbol_overview.company
-                    if isinstance(updated_pair_strat_obj, dict):
-                        updated_pair_strat_obj["pair_strat_params"]["strat_leg1"]["company"] = strat_leg1_company
-                        updated_pair_strat_obj["pair_strat_params"]["strat_leg2"]["company"] = strat_leg2_company
-                    else:
-                        updated_pair_strat_obj.pair_strat_params.strat_leg1.company = strat_leg1_company
-                        updated_pair_strat_obj.pair_strat_params.strat_leg2.company = strat_leg2_company
-                else:
-                    err_str_ = (f"_set_strat_company failed. no port found for pair_strat with symbol_side_key: "
-                                f"{get_symbol_side_key([(sec_id, side)])}")
-                    logging.error(err_str_)
-            # else not required - company already set
-        # else not required - pair strat executor is not running yet
-
     async def update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
@@ -1020,7 +981,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
-        self._set_strat_company(stored_pair_strat_obj, updated_pair_strat_obj)
         if updated_pair_strat_obj.frequency is None:
             updated_pair_strat_obj.frequency = 0
         updated_pair_strat_obj.frequency += 1
@@ -1045,8 +1005,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
     async def _partial_update_pair_strat(self, stored_pair_strat_obj_dict: Dict, updated_pair_strat_obj_dict: Dict):
         stored_pair_strat_obj = PairStrat.from_dict(stored_pair_strat_obj_dict)
-
-        self._set_strat_company(stored_pair_strat_obj, updated_pair_strat_obj_dict)
         updated_pair_strat_obj_dict["frequency"] = stored_pair_strat_obj.frequency + 1
 
         if updated_pair_strat_obj_dict.get("pair_strat_params") is not None:
@@ -1166,12 +1124,10 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                                                pair_strat_id: int):
         pair_strat_json = {
             "_id": pair_strat_id,
-            "is_partially_running": False,
-            "is_executor_running": False,
+            "server_ready_state": 0,
             "port": None,
-            "top_of_book_port": None,
-            "market_depth_port": None,
-            "last_barter_port": None
+            "cpp_port": None,
+            "cpp_ws_port": None
         }
 
         update_pair_strat = \
@@ -1440,6 +1396,15 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                 f"{pair_strat=}")
                             logging.error(err_str_)
                             raise HTTPException(status_code=500, detail=err_str_)
+
+                        pair_strat_json = {
+                            "_id": pair_strat_id,
+                            "strat_state": StratState.StratState_SNOOZED
+                        }
+                        pair_strat_obj = (
+                            await EmailBookServiceRoutesCallbackBaseNativeOverride.
+                            underlying_partial_update_pair_strat_http(pair_strat_json))
+
                         self._close_executor_server(pair_strat.id)    # closing executor
                     else:
                         err_str_ = (f"Unloading strat with strat_state: {pair_strat.strat_state} is not supported,"
@@ -1447,14 +1412,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                     f"{get_pair_strat_log_key(pair_strat)};;; {pair_strat=}")
                         logging.error(err_str_)
                         raise Exception(err_str_)
-
-                    pair_strat_json = {
-                        "_id": pair_strat_id,
-                        "strat_state": StratState.StratState_SNOOZED
-                    }
-                    pair_strat_obj = (
-                        await EmailBookServiceRoutesCallbackBaseNativeOverride.
-                        underlying_partial_update_pair_strat_http(pair_strat_json))
 
                     logging.warning(f"ResetLogBookCache;;;pair_strat_log_key: "
                                     f"{get_reset_log_book_cache_wrapper_pattern()}"

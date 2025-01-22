@@ -240,7 +240,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
                 pair_strat_obj: PairStratBaseModel = self._get_pair_strat_obj_from_symbol_side(symbol, Side(side))
                 if pair_strat_obj is None:
                     raise Exception(f"No pair strat found for symbol_side: {symbol_side}")
-                if not pair_strat_obj.is_executor_running:
+                if pair_strat_obj.server_ready_state < 2:
                     raise Exception(f"StreetBook Server not running for {strat_id=}")
 
                 strat_id = pair_strat_obj.id
@@ -341,7 +341,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
                 except Exception as e:
                     raise Exception(f"get_pair_strat_client failed: Can't find pair_start with id: {strat_id}")
                 else:
-                    if not pair_strat.is_executor_running:
+                    if pair_strat.server_ready_state < 2:
                         raise Exception(f"StartExecutor Server not running for pair_strat: {pair_strat}")
 
                 update_strat_alert_cache(strat_id, self.strat_alert_cache_dict_by_strat_id_dict,

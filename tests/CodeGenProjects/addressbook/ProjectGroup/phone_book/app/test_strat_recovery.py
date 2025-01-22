@@ -18,6 +18,60 @@ def restart_phone_book():
                                           cwd=PAIR_STRAT_ENGINE_DIR / "scripts")
 
 
+def _verify_server_ready_state_in_recovered_strat(strat_state_to_handle: StratState, pair_strat_id: int):
+    for _ in range(30):
+        # checking server_ready_state of executor
+        try:
+            updated_pair_strat = (
+                email_book_service_native_web_client.get_pair_strat_client(pair_strat_id))
+            if strat_state_to_handle != StratState.StratState_SNOOZED:
+                if strat_state_to_handle in [StratState.StratState_ACTIVE, StratState.StratState_PAUSED,
+                                             StratState.StratState_ERROR]:
+                    if updated_pair_strat.server_ready_state == 3:
+                        break
+                else:
+                    if updated_pair_strat.server_ready_state == 2:
+                        break
+            else:
+                # if strat_state to check is SNOOZED then after recovery server_ready_state will not get
+                # set to more than 1 since it is set only if SNOOZED is converted to READY
+                if updated_pair_strat.server_ready_state == 1:
+                    break
+            time.sleep(1)
+        except:  # no handling required: if error occurs retry
+            pass
+    else:
+        pair_strat = (
+            email_book_service_native_web_client.get_pair_strat_client(pair_strat_id))
+        assert False, f"mismatched server_ready_state state, {strat_state_to_handle=}, {pair_strat=}"
+    return updated_pair_strat
+
+
+def _handle_process_kill(port: int):
+    for _ in range(10):
+        p_id: int = get_pid_from_port(port)
+        if p_id is not None:
+            os.kill(p_id, signal.SIGKILL)
+            print(f"Killed process: {p_id}, port: {port}")
+            break
+        else:
+            print("get_pid_from_port return None instead of pid")
+        time.sleep(2)
+    else:
+        assert False, f"Unexpected: Can't kill process - Can't find any pid from port {port}"
+
+
+def _check_new_executor_has_new_port(old_port: int, pair_strat_id: int):
+    for _ in range(10):
+        pair_strat = email_book_service_native_web_client.get_pair_strat_client(pair_strat_id)
+        if pair_strat.port is not None and pair_strat.port != old_port:
+            return pair_strat
+        time.sleep(1)
+    else:
+        assert False, (f"PairStrat not found with updated port of recovered executor: "
+                       f"pair_strat_id: {pair_strat_id}, old_port: {old_port}")
+
+
 def _test_executor_crash_recovery(
         buy_symbol, sell_symbol, pair_strat_,
         expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
@@ -37,7 +91,8 @@ def _test_executor_crash_recovery(
 
     if strat_state_to_handle != StratState.StratState_ACTIVE:
         update_pair_strat_dict = PairStratBaseModel.from_kwargs(_id=created_pair_strat.id,
-                                           strat_state=strat_state_to_handle).to_dict(exclude_none=True)
+                                                                strat_state=strat_state_to_handle
+                                                                ).to_dict(exclude_none=True)
         created_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(update_pair_strat_dict)
         if strat_state_to_handle == StratState.StratState_SNOOZED:
             # deleting all symbol_overview in strat which needs to check StratState_SNOOZED - now after recovery
@@ -46,9 +101,7 @@ def _test_executor_crash_recovery(
             for symbol_overview in symbol_overview_list:
                 executor_web_client.delete_symbol_overview_client(symbol_overview.id)
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -62,54 +115,18 @@ def _test_executor_crash_recovery(
         if strat_state_to_handle == StratState.StratState_ACTIVE:
             total_chore_count_for_each_side = 1
             place_sanity_chores_for_executor(
-                buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+                buy_symbol, sell_symbol, created_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
                 residual_wait_sec, executor_web_client)
         port: int = created_pair_strat.port
-
-        for _ in range(10):
-            p_id: int = get_pid_from_port(port)
-            if p_id is not None:
-                os.kill(p_id, signal.SIGKILL)
-                print(f"Killed executor process: {p_id}, port: {port}")
-                break
-            else:
-                print("get_pid_from_port return None instead of pid")
-            time.sleep(2)
-        else:
-            assert False, f"Unexpected: Can't kill executor - Can't find any pid from port {port}"
+        _handle_process_kill(port)      # asserts implicitly
 
         time.sleep(residual_wait_sec)
 
-        old_port = port
-        for _ in range(10):
-            pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-            if pair_strat.port is not None and pair_strat.port != old_port:
-                break
-            time.sleep(1)
-        else:
-            assert False, (f"PairStrat not found with updated port of recovered executor: "
-                           f"pair_strat_id: {created_pair_strat.id}, old_port: {old_port}")
-
-        for _ in range(30):
-            # checking is_executor_running of executor
-            try:
-                updated_pair_strat = (
-                    email_book_service_native_web_client.get_pair_strat_client(pair_strat.id))
-                if strat_state_to_handle != StratState.StratState_SNOOZED:
-                    if updated_pair_strat.is_partially_running and updated_pair_strat.is_executor_running:
-                        break
-                else:
-                    # if strat_state to check is SNOOZED then after recovery is_executor_running will not get
-                    # set since it is set only if SNOOZED is converted to READY
-                    if updated_pair_strat.is_partially_running:
-                        break
-                time.sleep(1)
-            except:  # no handling required: if error occurs retry
-                pass
-        else:
-            assert False, (f"is_executor_running state must be True, found false, "
-                           f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+        _check_new_executor_has_new_port(old_port=port, pair_strat_id=created_pair_strat.id)
         time.sleep(residual_wait_sec)
+
+        # checking server_ready_state in recovered_strat
+        updated_pair_strat = _verify_server_ready_state_in_recovered_strat(strat_state_to_handle, created_pair_strat.id)
 
         # checking if state stays same as before recovery
         pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
@@ -126,6 +143,7 @@ def _test_executor_crash_recovery(
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
+    new_pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
     if strat_state_to_handle == StratState.StratState_ACTIVE:
         new_executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
             updated_pair_strat.host, updated_pair_strat.port)
@@ -142,11 +160,11 @@ def _test_executor_crash_recovery(
 
             new_executor_web_client.barter_simulator_reload_config_query_client()
 
-            update_market_depth(new_executor_web_client)
+            update_market_depth(new_pair_strat.cpp_port)
 
             total_chore_count_for_each_side = 1
             place_sanity_chores_for_executor(
-                buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+                buy_symbol, sell_symbol, new_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
                 residual_wait_sec, new_executor_web_client, place_after_recovery=True)
         except AssertionError as e:
             raise AssertionError(e)
@@ -211,9 +229,7 @@ def _activate_pair_strat_n_place_sanity_chores(
             for symbol_overview in symbol_overview_list:
                 executor_web_client.delete_symbol_overview_client(symbol_overview.id)
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -226,7 +242,7 @@ def _activate_pair_strat_n_place_sanity_chores(
 
         if strat_state_to_handle == StratState.StratState_ACTIVE:
             place_sanity_chores_for_executor(
-                buy_symbol, sell_symbol, total_chore_count_for_each_side_, last_barter_fixture_list,
+                buy_symbol, sell_symbol, created_pair_strat, total_chore_count_for_each_side_, last_barter_fixture_list,
                 residual_wait_sec, executor_web_client)
     except AssertionError as e_:
         raise AssertionError(e_)
@@ -244,9 +260,7 @@ def _check_place_chores_post_pair_strat_n_executor_recovery(
         updated_pair_strat: PairStratBaseModel,
         last_barter_fixture_list, refresh_sec, total_chore_count_for_each_side=2):
     residual_wait_sec = 4 * refresh_sec
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{updated_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(updated_pair_strat.id)
 
     buy_symbol = updated_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
     sell_symbol = updated_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
@@ -261,10 +275,10 @@ def _check_place_chores_post_pair_strat_n_executor_recovery(
 
         new_executor_web_client.barter_simulator_reload_config_query_client()
 
-        update_market_depth(new_executor_web_client)
+        update_market_depth(updated_pair_strat.cpp_port)
 
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, updated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, new_executor_web_client, place_after_recovery=True)
     except AssertionError as e:
         raise AssertionError(e)
@@ -336,18 +350,7 @@ def _kill_executors_n_phone_book(activated_strat_n_strat_state_tuple_list, resid
         pair_strat_n_strat_state_list.append((activated_strat, strat_state_to_handle))
 
     for port in port_list:
-        for _ in range(10):
-            p_id: int = get_pid_from_port(port)
-            print(f"{port} -- {p_id}")
-            if p_id is not None:
-                os.kill(p_id, signal.SIGKILL)
-                print(f"Killed process: {p_id}, port: {port}")
-                break
-            else:
-                print("get_pid_from_port return None instead of pid")
-            time.sleep(2)
-        else:
-            assert False, f"Unexpected: Can't kill process - Can't find any pid from port {port}"
+        _handle_process_kill(port)  # asserts implicitly
 
     restart_phone_book()
     time.sleep(residual_wait_sec * 2)
@@ -363,24 +366,9 @@ def _kill_executors_n_phone_book(activated_strat_n_strat_state_tuple_list, resid
             assert False, (f"PairStrat not found with updated port of recovered executor, {old_pair_strat_.port=}, "
                            f"{old_pair_strat_.id=}")
 
-        for _ in range(30):
-            # checking is_executor_running of executor
-            try:
-                updated_pair_strat = (
-                    email_book_service_native_web_client.get_pair_strat_client(pair_strat.id))
-                if strat_state_to_handle != StratState.StratState_SNOOZED:
-                    if updated_pair_strat.is_partially_running and updated_pair_strat.is_executor_running:
-                        break
-                else:
-                    # if strat_state to check is SNOOZED then after recovery is_executor_running will not get
-                    # set since it is set only if SNOOZED is converted to READY
-                    if updated_pair_strat.is_partially_running:
-                        break
-            except:  # no handling required: if error occurs retry
-                pass
-        else:
-            assert False, (f"is_executor_running state must be True, found false, "
-                           f"pair_strat_params: {old_pair_strat_.pair_strat_params}")
+        # checking server_ready_state in recovered_strat
+        updated_pair_strat = _verify_server_ready_state_in_recovered_strat(strat_state_to_handle, pair_strat.id)
+
         updated_pair_strat_n_strat_state_list.append((updated_pair_strat, strat_state_to_handle))
     time.sleep(residual_wait_sec)
     return updated_pair_strat_n_strat_state_list
@@ -517,6 +505,7 @@ def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
 
     # activating all strats
     recovered_active_strat_list: List = []
+    activated_pair_strat_n_strat_state_tuple_list = []
     for pair_strat, strat_state_to_handle in pair_strat_n_strat_state_tuple_list:
         if strat_state_to_handle != StratState.StratState_ACTIVE:
             active_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
@@ -526,6 +515,7 @@ def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
         # else all are already active
         recovered_active_strat = email_book_service_native_web_client.get_pair_strat_client(pair_strat.id)
         recovered_active_strat_list.append(recovered_active_strat)
+        activated_pair_strat_n_strat_state_tuple_list.append((recovered_active_strat, StratState.StratState_ACTIVE))
 
     total_chore_count_for_each_side = 1
     time.sleep(10)
@@ -540,7 +530,7 @@ def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
                 raise Exception(future.exception())
 
     pair_strat_n_strat_state_tuple_list = (
-        _kill_executors_n_phone_book(pair_strat_n_strat_state_tuple_list, residual_wait_sec))
+        _kill_executors_n_phone_book(activated_pair_strat_n_strat_state_tuple_list, residual_wait_sec))
 
     # checking all cache computes
     check_all_cache(pair_strat_n_strat_state_tuple_list)
@@ -554,7 +544,7 @@ def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
-                raise Exception(future.exception())
+                raise future.exception()
 
 
 @pytest.mark.recovery
@@ -579,12 +569,10 @@ def test_recover_snoozed_n_activate_strat_after_recovery(
         symbol_overview_obj_list, expected_strat_limits_, expected_strat_status_)
 
     # running Last Barter
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, executor_web_client)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_strat.cpp_port)
     print(f"LastBarter created: buy_symbol: {leg1_symbol}, sell_symbol: {leg2_symbol}")
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_strat.id)
 
     try:
         # updating yaml_configs according to this test
@@ -597,7 +585,7 @@ def test_recover_snoozed_n_activate_strat_after_recovery(
 
         total_chore_count_for_each_side_ = 1
         place_sanity_chores_for_executor(
-            leg1_symbol, leg2_symbol, total_chore_count_for_each_side_, last_barter_fixture_list,
+            leg1_symbol, leg2_symbol, active_strat, total_chore_count_for_each_side_, last_barter_fixture_list,
             residual_wait_sec, executor_web_client)
     except AssertionError as e_:
         raise AssertionError(e_)
@@ -613,9 +601,7 @@ def _test_post_pair_strat_crash_recovery(updated_pair_strat: PairStratBaseModel,
                                          last_barter_fixture_list, refresh_sec):
     residual_wait_sec = 4 * refresh_sec
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{updated_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(updated_pair_strat.id)
 
     buy_symbol = updated_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
     sell_symbol = updated_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
@@ -633,7 +619,7 @@ def _test_post_pair_strat_crash_recovery(updated_pair_strat: PairStratBaseModel,
 
         total_chore_count_for_each_side = 2
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, updated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_web_client, place_after_recovery=True)
 
         new_portfolio_status: PortfolioStatusBaseModel = (
@@ -707,18 +693,7 @@ def test_pair_strat_crash_recovery(
         pair_strat_n_strat_state_list.append((activated_strat, strat_state_to_handle))
 
     pair_strat_port: int = email_book_service_native_web_client.port
-
-    for _ in range(10):
-        p_id: int = get_pid_from_port(pair_strat_port)
-        if p_id is not None:
-            os.kill(p_id, signal.SIGKILL)
-            print(f"Killed process: {p_id}, port: {pair_strat_port}")
-            break
-        else:
-            print("get_pid_from_port return None instead of pid")
-        time.sleep(2)
-    else:
-        assert False, f"Unexpected: Can't kill process - Can't find any pid from port {pair_strat_port}"
+    _handle_process_kill(pair_strat_port)  # asserts implicitly
 
     restart_phone_book()
     time.sleep(residual_wait_sec * 2)
@@ -731,25 +706,13 @@ def test_pair_strat_crash_recovery(
         else:
             assert False, f"PairStrat not found with existing port after recovered pair_strat"
 
-        for _ in range(30):
-            # checking is_executor_running of executor
-            try:
-                updated_pair_strat = (
-                    email_book_service_native_web_client.get_pair_strat_client(pair_strat.id))
-                if strat_state_to_handle != StratState.StratState_SNOOZED:
-                    if updated_pair_strat.is_partially_running and updated_pair_strat.is_executor_running:
-                        break
-                else:
-                    # if strat_state to check is SNOOZED then after recovery is_executor_running will not get
-                    # set since it is set only if SNOOZED is converted to READY
-                    if updated_pair_strat.is_partially_running:
-                        break
-                time.sleep(1)
-            except:  # no handling required: if error occurs retry
-                pass
-        else:
-            assert False, (f"is_executor_running state must be True, found false, "
-                           f"pair_strat_params: {old_pair_strat.pair_strat_params}")
+        # checking server_ready_state - since strats are converted to specific states after activating and executors
+        # are not killed only phone_book is killed, strats will still have server_ready_state = 3
+        expected_server_ready_state = 3
+        assert pair_strat.server_ready_state == expected_server_ready_state, \
+            (f"Mismatched server_ready_state in pair_strat, {expected_server_ready_state=}, "
+             f"received {pair_strat.server_ready_state}")
+
     time.sleep(residual_wait_sec)
 
     active_pair_strat_id = None
@@ -798,17 +761,7 @@ def _test_update_pair_strat_from_pair_strat_log_book(
 
     time.sleep(5)
 
-    for _ in range(10):
-        p_id: int = get_pid_from_port(email_book_service_native_web_client.port)
-        if p_id is not None:
-            os.kill(p_id, signal.SIGKILL)
-            print(f"Killed process: {p_id}, port: {email_book_service_native_web_client.port}")
-            break
-        else:
-            print("get_pid_from_port return None instead pid")
-        time.sleep(2)
-    else:
-        assert False, f"Unexpected: Can't kill process - Can't find any pid from port {activated_pair_strat.port}"
+    _handle_process_kill(email_book_service_native_web_client.port)  # asserts implicitly
 
     # updating pair_buy_side_bartering_brief.consumable_notional to be lower than min_tradable_notional
     strat_brief_ = executor_web_client.get_strat_brief_client(activated_pair_strat.id)
@@ -819,7 +772,7 @@ def _test_update_pair_strat_from_pair_strat_log_book(
 
     total_chore_count_for_each_side = 1
     place_sanity_chores_for_executor(
-        leg1_symbol, leg2_symbol, total_chore_count_for_each_side, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, activated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
         residual_wait_sec, executor_web_client, place_after_recovery=True,
         expect_no_chore=True)
 
@@ -831,6 +784,236 @@ def _test_update_pair_strat_from_pair_strat_log_book(
     assert updated_pair_strat.strat_state == StratState.StratState_PAUSED, \
         (f"Mismatched: StratState must be PAUSE after update when phone_book was down, "
          f"found: {updated_pair_strat.strat_state}")
+
+
+def _place_chore_n_kill_executor_n_verify_post_recovery(
+        leg1_symbol, leg2_symbol, activated_pair_strat, last_barter_fixture_list,
+        executor_web_client, residual_wait_sec, expected_chore_event, check_fulfilled: bool = False):
+    bid_buy_top_market_depth, ask_sell_top_market_depth = (
+        get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, activated_pair_strat))
+
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_pair_strat.cpp_port)
+    time.sleep(1)
+    update_tob_through_market_depth_to_place_buy_chore(activated_pair_strat.cpp_port, bid_buy_top_market_depth,
+                                                       ask_sell_top_market_depth)
+
+    ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(expected_chore_event,
+                                                                       leg1_symbol, executor_web_client)
+
+    if check_fulfilled:
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_web_client)
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
+            f"Mismatched chore_status: expected {ChoreStatusType.OE_FILLED}, found: {chore_snapshot.chore_status}"
+        assert chore_snapshot.cxled_qty == 0, \
+            f"Mismatched cxled_qty: expected 0, received {chore_snapshot.cxled_qty}"
+        assert chore_snapshot.filled_qty == ack_chore_journal.chore.qty, \
+            f"Mismatched filled_qty: expected {ack_chore_journal.chore.qty}, received {chore_snapshot.cxled_qty}"
+
+    port: int = activated_pair_strat.port
+    _handle_process_kill(port)  # asserts implicitly
+    time.sleep(residual_wait_sec)
+
+    _check_new_executor_has_new_port(old_port=port, pair_strat_id=activated_pair_strat.id)
+    time.sleep(residual_wait_sec)
+
+    # checking server_ready_state in recovered_strat
+    updated_pair_strat = _verify_server_ready_state_in_recovered_strat(StratState.StratState_ACTIVE,
+                                                                       activated_pair_strat.id)
+
+    new_executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
+        updated_pair_strat.host, updated_pair_strat.port)
+
+    cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(
+        ChoreEventType.OE_CXL_ACK, leg1_symbol, new_executor_web_client,
+        expect_no_chore=True if check_fulfilled else False)
+    return ack_chore_journal, new_executor_web_client
+
+
+def test_verify_placed_chores_get_cxled_after_recovery1(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+    """
+    checks if chores that got placed before crash gets cxled after recovery for being residual
+    Places chore with 50% fill and just after that kills executor to verify if recovered executor
+    cxl chore for residual
+    """
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
+
+    # create pair_strat
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    activated_pair_strat, executor_web_client = create_n_activate_strat(
+        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+        symbol_overview_obj_list, market_depth_basemodel_list)
+
+    time.sleep(5)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_strat.id)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        executor_web_client.barter_simulator_reload_config_query_client()
+
+        ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
+            leg1_symbol, leg2_symbol, activated_pair_strat, last_barter_fixture_list,
+            executor_web_client, residual_wait_sec, ChoreEventType.OE_ACK)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
+            f"Mismatched chore_status: expected {ChoreStatusType.OE_DOD}, found: {chore_snapshot.chore_status}"
+        # below logic is required for handling odd chore qty: expected_cxled_qty = chore_qty - filled_qty
+        expected_cxled_qty = ack_chore_journal.chore.qty - int(ack_chore_journal.chore.qty / 2)
+        assert chore_snapshot.cxled_qty == expected_cxled_qty, \
+            f"Mismatched cxled_qty: expected {expected_cxled_qty}, received {chore_snapshot.cxled_qty}"
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+def test_verify_placed_chores_get_cxled_after_recovery2(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+    """
+    checks if chores that got placed before crash gets cxled after recovery for being residual
+    Places acked chore with no fill and just after that kills executor to verify if recovered executor
+    cxl chore for residual
+    """
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
+
+    # create pair_strat
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    activated_pair_strat, executor_web_client = create_n_activate_strat(
+        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+        symbol_overview_obj_list, market_depth_basemodel_list)
+
+    time.sleep(5)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_strat.id)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["simulate_avoid_fill_after_ack"] = True
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        executor_web_client.barter_simulator_reload_config_query_client()
+
+        ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
+            leg1_symbol, leg2_symbol, activated_pair_strat, last_barter_fixture_list,
+            executor_web_client, residual_wait_sec, ChoreEventType.OE_ACK)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
+            f"Mismatched chore_status: expected {ChoreStatusType.OE_DOD}, found: {chore_snapshot.chore_status}"
+        assert chore_snapshot.cxled_qty == ack_chore_journal.chore.qty, \
+            f"Mismatched cxled_qty: expected {ack_chore_journal.chore.qty}, received {chore_snapshot.cxled_qty}"
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+def test_verify_placed_chores_get_cxled_after_recovery3(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+    """
+    checks if chores that got placed before crash gets cxled after recovery for being residual
+    Places un-acked chore and just after that kills executor to verify if recovered executor
+    cxl chore for residual
+    """
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
+
+    # create pair_strat
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    activated_pair_strat, executor_web_client = create_n_activate_strat(
+        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+        symbol_overview_obj_list, market_depth_basemodel_list)
+
+    try:
+        ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
+            leg1_symbol, leg2_symbol, activated_pair_strat, last_barter_fixture_list,
+            executor_web_client, residual_wait_sec, ChoreEventType.OE_NEW)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
+            f"Mismatched chore_status: expected {ChoreStatusType.OE_DOD}, found: {chore_snapshot.chore_status}"
+        assert chore_snapshot.cxled_qty == ack_chore_journal.chore.qty, \
+            f"Mismatched cxled_qty: expected {ack_chore_journal.chore.qty}, received {chore_snapshot.cxled_qty}"
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+
+
+def test_verify_placed_chores_get_cxled_after_recovery4(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+    """
+    checks if chores that got placed before crash gets cxled after recovery for being residual
+    Places un-acked chore and just after that kills executor to verify if recovered executor
+    cxl chore for residual
+    """
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
+
+    # create pair_strat
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    activated_pair_strat, executor_web_client = create_n_activate_strat(
+        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+        symbol_overview_obj_list, market_depth_basemodel_list)
+
+    time.sleep(5)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_strat.id)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 100
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        executor_web_client.barter_simulator_reload_config_query_client()
+
+        ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
+            leg1_symbol, leg2_symbol, activated_pair_strat, last_barter_fixture_list,
+            executor_web_client, residual_wait_sec, ChoreEventType.OE_ACK, check_fulfilled=True)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
+            f"Mismatched chore_status: expected {ChoreStatusType.OE_FILLED}, found: {chore_snapshot.chore_status}"
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
 @pytest.mark.recovery
@@ -854,18 +1037,7 @@ def test_recover_kill_switch_when_bartering_server_has_enabled(
         email_book_service_native_web_client.log_simulator_reload_config_query_client()
 
         pair_strat_port: int = email_book_service_native_web_client.port
-
-        for _ in range(10):
-            p_id: int = get_pid_from_port(pair_strat_port)
-            if p_id is not None:
-                os.kill(p_id, signal.SIGKILL)
-                print(f"Killed process: {p_id}, port: {pair_strat_port}")
-                break
-            else:
-                print("get_pid_from_port return None instead of pid")
-            time.sleep(2)
-        else:
-            assert False, f"Unexpected: Can't kill process - Can't find any pid from port {pair_strat_port}"
+        _handle_process_kill(pair_strat_port)  # asserts implicitly
 
         restart_phone_book()
         time.sleep(residual_wait_sec * 2)
@@ -920,18 +1092,7 @@ def test_recover_kill_switch_when_bartering_server_has_disabled(
         email_book_service_native_web_client.log_simulator_reload_config_query_client()
 
         pair_strat_port: int = email_book_service_native_web_client.port
-
-        for _ in range(10):
-            p_id: int = get_pid_from_port(pair_strat_port)
-            if p_id is not None:
-                os.kill(p_id, signal.SIGKILL)
-                print(f"Killed process: {p_id}, port: {pair_strat_port}")
-                break
-            else:
-                print("get_pid_from_port return None instead of pid")
-            time.sleep(2)
-        else:
-            assert False, f"Unexpected: Can't kill process - Can't find any pid from port {pair_strat_port}"
+        _handle_process_kill(pair_strat_port)  # asserts implicitly
 
         restart_phone_book()
         time.sleep(residual_wait_sec * 2)

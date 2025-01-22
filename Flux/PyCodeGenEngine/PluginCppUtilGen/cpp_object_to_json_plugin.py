@@ -75,6 +75,7 @@ class CppObjectToJsonPlugin(BaseProtoPlugin):
         output_content += "#include <iostream>\n"
         output_content += "#include <string>\n\n"
         output_content += "#include <boost/json.hpp>\n\n"
+        output_content += '#include "cpp_app_logger.h"\n'
         output_content += '#include "../CppDataStructures/market_data_service.h"\n\n'
         output_content += "using namespace std;\n\n"
 
@@ -136,7 +137,12 @@ class CppObjectToJsonPlugin(BaseProtoPlugin):
                 }.get(fld_kind, "")
 
                 if fld_kind != "message":
-                    # Non-message types (handle optional/repeated cases)
+                    # if self.is_option_enabled(fld, self.flux_fld_val_is_datetime):
+                    #     output.append(f'{tab}if (kr_{name_lower}.is_{fld_name}_set_) {{')
+                    #     output.append(f'{tab}\tr_{name_lower}_json_out["{fld_name}"] = kr_{name_lower}.{fld_name}_;')
+                    #     output.append(f"{tab}}}")
+                    # else:
+                        # Non-message types (handle optional/repeated cases)
                     if fld_cardinality in {"optional", "repeated"}:
                         output.append(f'{tab}if (kr_{name_lower}.is_{fld_name}_set_) {{')
                         output.append(f'{tab}\tr_{name_lower}_json_out["{fld_name}"] = kr_{name_lower}.{fld_name}_;')
@@ -187,19 +193,31 @@ class CppObjectToJsonPlugin(BaseProtoPlugin):
 
         for name, message in struct_dict.items():
             name_lower = convert_camel_case_to_specific_case(name)
-            output_content += (f"static void object_to_json(const {name}& kr_{name_lower}, boost::json::object& "
+            output_content += (f"static bool object_to_json(const {name}& kr_{name_lower}, boost::json::object& "
                                f"r_{name_lower}_json_out) {{\n")
-            output_content += process_message(name, message, 1)
+            output_content += '\ttry {\n'
+            output_content += process_message(name, message, 2)
+            output_content += '\t\treturn true;\n'
+            output_content += '\n\t} catch (std::exception& e) {\n'
+            output_content += (f'\t\tLOG_ERROR_IMPL(GetCppAppLogger(), "Error serializing {name} object to JSON: '
+                               f'Exception: {{}}", e.what());\n')
+            output_content += '\t\treturn false;\n'
+            output_content += '\t}\n'
             output_content += (f"\n}}\n\n")
-            output_content += (f'static void object_to_json(const {name}List& kr_{name_lower}_list, '
+            output_content += (f'static bool object_to_json(const {name}List& kr_{name_lower}_list, '
                                f'boost::json::object& r_{name_lower}_json_out) {{\n')
             output_content += f'\tboost::json::array json_array;\n'
             output_content += f'\tfor (const auto& kr_{name_lower} : kr_{name_lower}_list.{name_lower}_) {{\n'
             output_content += f'\t\tboost::json::object json_obj;\n'
-            output_content += f'\t\tobject_to_json(kr_{name_lower}, json_obj);\n'
+            output_content += f'\t\tif (!object_to_json(kr_{name_lower}, json_obj)) {{\n'
+            output_content += (f'\t\t\tLOG_ERROR_IMPL(GetCppAppLogger(), "Error serializing a {name} object in the '
+                               f'list. ID: {{}}", kr_{name_lower}.id_);\n')
+            output_content += f'\t\t\treturn false;\n'
+            output_content += f'\t\t}}\n'
             output_content += f'\t\tjson_array.push_back(json_obj);\n'
             output_content += f'\t}}\n'
             output_content += f'\tr_{name_lower}_json_out["{name_lower}"] = json_array;\n'
+            output_content += f'\treturn true;\n'
             output_content += f'}}\n\n'
         output_content += "};\n\n"
 

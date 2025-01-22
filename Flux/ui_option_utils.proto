@@ -90,17 +90,19 @@ message WidgetUIDataElement {
   repeated WidgetUIData widget_ui_data = 13;
   repeated ChartData chart_data = 14;
   repeated UIFilter filters = 15;
-  optional string depending_proto_file_name = 16;  // other project's proto file name on which current model is dependent
-  optional string depending_proto_model_name = 17;   // other project's proto model name present in proto_file_name
+  optional string depending_proto_model_name = 16;   // other project's proto model name present in proto_file_name
                                           // on which current model is dependent
-  optional bool depends_on_other_model_for_id = 18 [default=false];
-  optional bool depends_on_other_model_for_dynamic_url = 19 [default=false];
-  optional bool depends_on_model_name_for_port = 20 [default=false];
-  repeated OverrideDefaultCRUD override_default_crud = 21;
-  optional bool is_model_alert_type = 22;
-  optional JoinSort join_sort = 23;
-  optional bool is_read_only = 24;
-  optional int32 default_rows_per_page = 25;  // supported values = 25, 50
+  optional bool depends_on_other_model_for_id = 17 [default=false];
+  optional string depending_proto_model_field_name_for_host = 18;
+  optional string depending_proto_model_field_name_for_port = 19;
+  optional string depending_proto_model_field_name_for_ws_port  = 20;
+  optional bool depending_proto_model_for_cpp_port = 21;
+  repeated OverrideDefaultCRUD override_default_crud = 22;
+  optional bool is_model_alert_type = 23;
+  optional JoinSort join_sort = 24;
+  optional bool is_read_only = 25;
+  optional int32 default_rows_per_page = 26;  // supported values = 25, 50
+  optional int32 server_running_status_lvl = 27;
 }
 
 message WidgetUIOption {

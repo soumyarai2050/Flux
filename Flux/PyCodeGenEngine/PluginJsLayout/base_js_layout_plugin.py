@@ -238,6 +238,16 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
             logging.exception(err_str)
             raise Exception(err_str)
 
+    def is_model_from_another_project(self, message: protogen.Message) -> bool:
+        if self.proto_file_name_to_message_list_dict:
+            for file_name, message_list in self.proto_file_name_to_message_list_dict.items():
+                if (file_name != self.current_proto_file_name and
+                        file_name not in self.file_name_to_dependency_file_names_dict[self.current_proto_file_name]):
+                    if message in message_list:
+                        return True
+        # message if not from another project for all other cases
+        return False
+
     def _get_ui_msg_dependent_msg_name_from_another_proto(self, message: protogen.Message) -> str | None:
         """
         :param message: msg type to check
@@ -245,31 +255,27 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                  msg name on which it depends from another proto file and if msg is from another
                  proto file but is not dependent on any other message then returns empty str ''
         """
-        if self.proto_file_name_to_message_list_dict:
-            for file_name, message_list in self.proto_file_name_to_message_list_dict.items():
-                if (file_name != self.current_proto_file_name and
-                        file_name not in self.file_name_to_dependency_file_names_dict[self.current_proto_file_name]):
-                    if message in message_list:
-                        if BaseJSLayoutPlugin.is_option_enabled(message,
-                                                                BaseJSLayoutPlugin.flux_msg_widget_ui_data_element):
-                            option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
-                                message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-                            dependent_model_name = (
-                                option_dict.get(BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_field))
-                            if dependent_model_name is None:
-                                return ""
-                            else:
-                                return dependent_model_name
-                        elif BaseJSLayoutPlugin.is_option_enabled(message,
-                                                                  BaseJSLayoutPlugin.flux_msg_widget_ui_option):
-                            return ""
+        if self.is_model_from_another_project(message):
+            if BaseJSLayoutPlugin.is_option_enabled(message,
+                                                    BaseJSLayoutPlugin.flux_msg_widget_ui_data_element):
+                option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+                    message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+                dependent_model_name = (
+                    option_dict.get(BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_field))
+                if dependent_model_name is None:
+                    return ""
+                else:
+                    return dependent_model_name
+            elif BaseJSLayoutPlugin.is_option_enabled(message,
+                                                      BaseJSLayoutPlugin.flux_msg_widget_ui_option):
+                return ""
         return None
 
     def _get_abb_option_vals_cleaned_message_n_field_list(self, field: protogen.Field) -> List[str]:
         abbreviated_option_val = (
             BaseJSLayoutPlugin.get_simple_option_value_from_proto(field, BaseJSLayoutPlugin.flux_fld_abbreviated))
         abbreviated_option_val_check_str_list: List[str] = []
-        if "^" in abbreviated_option_val:
+        if abbreviated_option_val and "^" in abbreviated_option_val:
             abbreviated_option_val_caret_sep = abbreviated_option_val.split("^")
             for abbreviated_option_val_caret_sep_line in abbreviated_option_val_caret_sep:
                 if "-" in abbreviated_option_val_caret_sep:
@@ -291,12 +297,25 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                     else:
                         abbreviated_option_val_check_str_list.append(
                             abbreviated_option_val_caret_sep_line)
+
+        alert_bubble_source_option_val = (
+            BaseJSLayoutPlugin.get_simple_option_value_from_proto(field, BaseJSLayoutPlugin.flux_fld_alert_bubble_source))
+        if alert_bubble_source_option_val:
+            abbreviated_option_val_check_str_list.append(alert_bubble_source_option_val)
+
+        alert_bubble_color_option_val = (
+            BaseJSLayoutPlugin.get_simple_option_value_from_proto(field, BaseJSLayoutPlugin.flux_fld_alert_bubble_color))
+        if alert_bubble_color_option_val:
+            abbreviated_option_val_check_str_list.append(alert_bubble_color_option_val)
+
         return abbreviated_option_val_check_str_list
 
     def _get_msg_names_list_used_in_abb_option_val(self, message: protogen.Message) -> List[str]:
         msg_list = []
         for field in message.fields:
-            if self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_abbreviated):
+            if (self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_abbreviated) or
+                    self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_alert_bubble_source),
+                    self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_alert_bubble_color)):
                 msg_n_field_list: List[str] = self._get_abb_option_vals_cleaned_message_n_field_list(field)
 
                 for msg_n_field_str in msg_n_field_list:

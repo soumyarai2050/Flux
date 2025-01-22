@@ -80,8 +80,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                     self.repeated_layout_msg_name_list.append(message.proto.name)
 
             for field in message.fields:
-                if field.message is not None and \
-                        self.is_option_enabled(field.message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element):
+                if (field.message is not None and
+                        self.is_option_enabled(field.message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element) and
+                        not self.is_option_enabled(field.message, JsSliceFileGenPlugin.flux_msg_json_root)):
                     # If field of message datatype of this message is found having widget_ui_data option
                     # with layout field then collecting those messages in dependent_message_list
                     widget_ui_data_option_value_dict = \
@@ -90,9 +91,10 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                     widget_ui_data_list = (
                         widget_ui_data_option_value_dict.get(
                             BaseJSLayoutPlugin.flux_msg_widget_ui_data_element_widget_ui_data_field))
+
                     if widget_ui_data_list is not None and widget_ui_data_list:
                         widget_ui_data_dict = widget_ui_data_list[0]
-                        if "view_layout" in widget_ui_data_dict:
+                        if "view_layout" in widget_ui_data_dict:    # fixme
                             self.dependent_message_list.append(message)
                             break
                         # else not required: Avoid if any field of message type doesn't contain view_layout options
@@ -211,7 +213,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                       " async (payload, { rejectWithValue }) => " + "{\n"
 
         if (not self.current_message_is_dependent and
-                self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
+                self.is_model_from_another_project(message)):
             widget_ui_option_value = JsSliceFileGenPlugin.get_complex_option_value_from_proto(
                 message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element)
             get_all_override_default_crud = self._get_override_default_get_all_crud(widget_ui_option_value)
@@ -263,7 +265,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const get{message_name} = createAsyncThunk('{message_name_camel_cased}/get', " \
                      "async (payload, { rejectWithValue }) => " + "{\n"
-        if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
+        if self.is_model_from_another_project(message):
             output_str += "    const { url, id } = payload;\n"
             output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
             output_str += "    return axios.get(`${serverUrl}/" + f"get-{message_name_snake_cased}"+"/${id}`)\n"
@@ -281,7 +283,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         if not self.current_message_is_dependent:
             output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/create', " \
                          "async (payload, { rejectWithValue }) => " + "{\n"
-            if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
+            if self.is_model_from_another_project(message):
                 output_str += "    const { url, data } = payload;\n"
                 output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
                 output_str += "    return axios.post(`${serverUrl}/create-" + f"{message_name_snake_cased}" + \
@@ -332,7 +334,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         option_val_dict = self.get_complex_option_value_from_proto(message, JsSliceFileGenPlugin.flux_msg_json_root)
         if JsSliceFileGenPlugin.flux_json_root_patch_field in option_val_dict:
             if (not self.current_message_is_dependent and
-                    self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
+                    self.is_model_from_another_project(message)):
                 output_str += "    const { url, data } = payload;\n"
                 output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
                 output_str += ("    return axios.patch(`${serverUrl}/patch-" +
@@ -343,7 +345,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                                f"{message_name_snake_cased}"+"`, payload)\n")
         else:
             if (not self.current_message_is_dependent and
-                    self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
+                    self.is_model_from_another_project(message)):
                 output_str += "    const { url, data } = payload;\n"
                 output_str += ("    return axios.put(`${url}/put-" +
                                f"{message_name_snake_cased}"+"`, data)\n")
@@ -371,9 +373,10 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        },\n"
         output_str += f"        [getAll{message_name}.fulfilled]: (state, action) => " + "{\n"
         if not self.current_message_is_dependent and message_name not in self.repeated_layout_msg_name_list:
-            if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
+            if self.is_model_from_another_project(message):
                 if (option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field) and
-                        option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_dynamic_url_field)):
+                        option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depending_proto_model_field_name_for_host) and
+                        option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depending_proto_model_field_name_for_port)):
                     output_str += (f"            const updatedArray = state.{message_name_camel_cased}Array.filter(obj => "
                                    "action.payload[0][DB_ID] !== obj[DB_ID]);\n")
                     output_str += (f"            state.{message_name_camel_cased}Array = [...updatedArray, "
@@ -638,7 +641,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    openFormValidationPopup: false\n"
         else:
             if (not self.current_message_is_dependent and
-                    self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
+                    self.is_model_from_another_project(message)):
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                     message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
                 if option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
@@ -668,7 +671,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                         self.if_msg_used_in_abb_option_value(message)):
                     output_str += "            const { data } = action.payload;\n"
                     output_str += "            // deleted objects are already filtered in the array received\n"
-                    output_str += f"            state.{message_name_camel_cased}Array = data;\n"
+                    output_str += f"            state.{message_name_camel_cased}Array = data || [];\n"
                 else:
                     output_str += f"            const dict = action.payload;\n"
                     output_str += f"            let updatedArray = state.{message_name_camel_cased}Array;\n"
@@ -819,7 +822,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                                    f"initialState.{message_name_camel_cased};\n")
                     output_str += "            }\n"
             if (not self.current_message_is_dependent and
-                    self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
+                    self.is_model_from_another_project(message)):
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                     message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
                 if option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
@@ -849,7 +852,6 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        setSelected{message_name}Id: (state, action) => " + "{\n"
             output_str += f"            state.selected{message_name}Id = action.payload;\n"
             output_str += "        },\n"
-            # if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
             output_str += (f"        reset{message_name}: (state, action) => "
                            "{\n")
             output_str += (f"            state.{message_name_camel_cased}Array = "
@@ -903,7 +905,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            state.openFormValidationPopup = action.payload;\n"
             output_str += "        },\n"
         else:
-            if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
+            if self.is_model_from_another_project(message):
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                     message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
                 if option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
@@ -936,7 +938,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += (", setMode, setCreateMode, setFormValidation, setOpenConfirmSavePopup, "
                                "setOpenFormValidationPopup")
             else:
-                if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
+                if self.is_model_from_another_project(message):
                     option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                         message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
                     if option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):

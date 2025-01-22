@@ -31,7 +31,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
     log_book_service_http_client, post_book_service_http_client, get_default_max_notional,
     get_default_max_open_single_leg_notional, get_default_max_net_filled_notional,
     get_simulator_config_file_path)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import ( EXECUTOR_PROJECT_DIR,
     host, EXECUTOR_PROJECT_DATA_DIR, executor_config_yaml_dict, main_config_yaml_path, EXECUTOR_PROJECT_SCRIPTS_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import OTHER_TERMINAL_STATES, \
     NON_FILLED_TERMINAL_STATES, get_pair_strat_id_from_cmd_argv
@@ -256,10 +256,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.leg2_symbol_cache: SymbolCache | None = None  # will be set by once all_service_up test passes
         # restricted variable: don't overuse this will be extended to multi-currency support
         self.port: int | None = None  # will be set by app_launch_pre
-        self.cpp_http_url: str | None = None  # will be set by app_launch_pre
         self.updated_simulator_config_file = False
         self.web_client = None
         self.project_config_yaml_path = main_config_yaml_path
+        self.mobile_book_swagger_ui_json_path = (EXECUTOR_PROJECT_DIR.parent / "mobile_book" /
+                                                 "generated" / "CppSwggerUiJson" / "mobile_book_swagger.json")
         self.executor_config_yaml_dict = executor_config_yaml_dict
         self.config_yaml_last_modified_timestamp = os.path.getmtime(self.project_config_yaml_path)
         self.total_barter_qty_by_aggregated_window_first_n_lst_barters: bool = (
@@ -270,10 +271,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.exch_to_market_depth_lvl_dict = executor_config_yaml_dict.get("exch_to_market_depth_lvl", {})
         self.ports_cache_file_path: PurePath | None = EXECUTOR_PROJECT_DATA_DIR / "ports_cache_file.txt"
         self.ports_cache_lock_file_path: PurePath | None = EXECUTOR_PROJECT_DATA_DIR / "ports_cache_lock_file.txt.lock"
-        self.top_of_book_ws_port: int | None = None
-        self.market_depth_ws_port: int | None = None
-        self.last_barter_ws_port: int | None = None
-        self.cpp_http_port: int | None = None
+        self.cpp_port: int | None = None
+        self.cpp_ws_port: int | None = None
 
     def set_log_simulator_file_name_n_path(self):
         self.simulate_config_yaml_file_path = (get_simulator_config_file_path(self.pair_strat_id))
@@ -372,9 +371,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 BarteringLinkBase.reload_executor_configs()
 
                                 # setting partial_run to True and assigning port to pair_strat
-                                if not pair_strat.is_partially_running:
-                                    pair_strat.is_partially_running = True
-                                    pair_strat.port = self.port
+                                pair_strat.port = self.port
+                                pair_strat.server_ready_state = 1   # indicates to ui - executor server has started
 
                                 try:
                                     updated_pair_strat = email_book_service_http_client.put_pair_strat_client(pair_strat)
@@ -397,8 +395,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     self.bartering_data_manager = BarteringDataManager(StreetBook.executor_trigger,
                                                                                    self.strat_cache)
                                     logging.debug(f"Created bartering_data_manager for {strat_key=};;;{pair_strat=}")
-                                # else not required: not updating if already is_executor_running
-                                logging.debug(f"Marked pair_strat.is_partially_running True for {strat_key=}")
+                                logging.debug(f"Marked pair_strat.server_ready_state to 1 for {strat_key=}")
 
                                 self.all_services_up = True
                                 logging.debug(f"Marked all_services_up True for {strat_key=}")
@@ -555,17 +552,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             simulate_config_yaml_file_data = YAMLConfigurationManager.load_yaml_configurations(
                 self.simulate_config_yaml_file_path, load_as_str=True)
             with FileLock(self.ports_cache_lock_file_path):
-                self.top_of_book_ws_port = self.get_free_port_for_md()
-                self.market_depth_ws_port = self.get_free_port_for_md()
-                self.last_barter_ws_port = self.get_free_port_for_md()
-                self.cpp_http_port = self.get_free_port_for_md()
-            self.cpp_http_url = f"http://127.0.0.1:{self.cpp_http_port}/"
+                self.cpp_ws_port = self.get_free_port_for_md()
+                self.cpp_port = self.get_free_port_for_md()
             simulate_config_yaml_file_data += "\n\n"
             simulate_config_yaml_file_data += f"leg_1_symbol: {self.strat_leg_1.sec.sec_id}\n"
             simulate_config_yaml_file_data += f"leg_1_feed_code: {self.strat_leg_1.exch_id}\n"
             simulate_config_yaml_file_data += f"leg_2_symbol: {self.strat_leg_2.sec.sec_id}\n"
             simulate_config_yaml_file_data += f"leg_2_feed_code: {self.strat_leg_2.exch_id}\n\n"
             simulate_config_yaml_file_data += f"mongo_server: {mongo_server}\n"
+            simulate_config_yaml_file_data += f"http_ip: 127.0.0.1\n"
+            simulate_config_yaml_file_data += f"swagger_ui_json_path: {str(self.mobile_book_swagger_ui_json_path)}\n"
             simulate_config_yaml_file_data += f"market_depth_level: {self.exch_to_market_depth_lvl_dict.get(self.strat_leg_1.exch_id)}\n"
             simulate_config_yaml_file_data += f"db_name: {self.db_name}\n\n"
 
@@ -575,10 +571,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             # 2: Post(cpp starts new thread and returns control back immediately,
             #    operation on which it is set is handled by the different thread)
             if not executor_config_yaml_dict.get("avoid_cpp_ws_update"):
-                simulate_config_yaml_file_data += f"top_of_book_ws_port: {self.top_of_book_ws_port}\n"
-                simulate_config_yaml_file_data += f"market_depth_ws_port: {self.market_depth_ws_port}\n"
-                simulate_config_yaml_file_data += f"last_barter_ws_port: {self.last_barter_ws_port}\n"
-                simulate_config_yaml_file_data += f"cpp_http_port: {self.cpp_http_port}\n"
+                simulate_config_yaml_file_data += f"cpp_ws_port: {self.cpp_ws_port}\n"
+                simulate_config_yaml_file_data += f"cpp_http_port: {self.cpp_port}\n"
                 simulate_config_yaml_file_data += f"market_depth_ws_update_publish_policy: 2\n"
                 simulate_config_yaml_file_data += f"top_of_book_ws_update_publish_policy: 2\n"
                 simulate_config_yaml_file_data += f"last_barter_ws_update_publish_policy: 2\n"
@@ -607,10 +601,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             BarteringLinkBase.reload_executor_configs()
 
             # Setting MobileBookCache instances for this symbol pair
-            pair_strat.top_of_book_port = self.top_of_book_ws_port
-            pair_strat.last_barter_port = self.last_barter_ws_port
-            pair_strat.market_depth_port = self.market_depth_ws_port
-            pair_strat.cpp_http_port = self.cpp_http_port
+            pair_strat.cpp_ws_port = self.cpp_ws_port
+            pair_strat.cpp_port = self.cpp_port
 
             self.updated_simulator_config_file = True   # setting it true avoid updating config file again
 
@@ -639,7 +631,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     def app_launch_post(self):
         logging.debug(f"Triggered server launch post override for executor {self.port=}")
 
-        # making pair_strat is_executor_running field to False
+        # making pair_strat server_ready_state field to 0
         try:
             # email_book_service_http_client.update_pair_strat_to_non_running_state_query_client(self.pair_strat_id)
             guaranteed_call_pair_strat_client(
@@ -666,10 +658,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 err_str_ = f"Something went wrong while deleting so shell script, exception: {e}"
                 logging.exception(err_str_)
 
-            # renaming simulator log file
-            if os.path.exists(self.log_simulator_file_path):
-                datetime_str = datetime.datetime.now().strftime("%Y%m%d.%H%M%S")
-                os.rename(self.log_simulator_file_path, f"{self.log_simulator_file_path}.{datetime_str}")
 
     @staticmethod
     def create_n_run_so_shell_script(pair_strat):
@@ -1202,8 +1190,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 pair_strat_tuple = self.strat_cache.get_pair_strat()
                 if pair_strat_tuple is not None:
                     pair_strat, _ = pair_strat_tuple
-                    if not pair_strat.is_executor_running:
-                        pair_strat.is_executor_running = True
+                    if pair_strat.server_ready_state < 2:
+                        pair_strat.server_ready_state = 2   # indicates to ui that executor server is ready
 
                         self.update_simulate_config_yaml(pair_strat)
 
@@ -1213,14 +1201,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             # strat_state = StratState.StratState_READY
                         # else not required: If it's not startup for reload or new strat creation then avoid
 
+                        # setting pair_strat's legs' company name
+                        pair_strat.pair_strat_params.strat_leg1.company = self.leg1_symbol_cache.so.company
+                        pair_strat.pair_strat_params.strat_leg2.company = self.leg2_symbol_cache.so.company
+
                         try:
                             email_book_service_http_client.put_pair_strat_client(pair_strat)
-                            logging.debug(f"pair_strat's is_executor_running set to True, {pair_strat = }")
+                            logging.debug(f"pair_strat's server_ready_state set to 2, {pair_strat=}")
                             return True
                         except Exception as e:
-                            logging.exception("patch_pair_strat_client failed while setting is_executor_running "
-                                              f"to true, retrying in next startup refresh: exception: {e}")
-                    # else not required: not updating if already is_executor_running
+                            logging.exception("patch_pair_strat_client failed while setting server_ready_state "
+                                              f"to 2, retrying in next startup refresh: exception: {e}")
+                    # else not required: not updating if already server_ready_state == 2
                 else:
                     err_str_ = ("Unexpected: Can't find pair_strat object in strat_cache - "
                                 "retrying in next startup refresh")
@@ -2950,6 +2942,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 open_qty = fetched_open_qty
                                 open_notional = fetched_open_notional
 
+
                                 if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
                                     available_qty = self.get_valid_available_fill_qty(chore_snapshot)
                                     extra_fill_qty = chore_snapshot.filled_qty - available_qty
@@ -4004,122 +3997,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                  updated_strat_status_obj.total_fill_sell_notional)
         logging.db(log_str)
 
-    def cpp_market_depth_client(self, market_depth_json: Dict):
-        market_depth_url = self.cpp_http_url + "market_depth"
-        response = requests.post(market_depth_url, json=market_depth_json)
-        status_code, response_json = handle_http_response(response)
-        expected_status_code = 201
-        if status_code != expected_status_code:
-            raise Exception(f"failed for cpp url: {market_depth_url}, http_request_type: {str(HTTPRequestType.POST)} "
-                            f"http_error: {response_json}, status_code: {status_code}")
-
-    def cpp_last_barter_client(self, last_barter_json: Dict):
-        last_barter_url = self.cpp_http_url + "last_barter"
-        response = requests.post(last_barter_url, json=last_barter_json)
-        status_code, response_json = handle_http_response(response)
-        expected_status_code = 201
-        if status_code != expected_status_code:
-            raise Exception(f"failed for cpp url: {last_barter_url}, http_request_type: {str(HTTPRequestType.POST)} "
-                            f"http_error: {response_json}, status_code: {status_code}")
-
-    def _call_cpp_mobile_book_updater_from_market_depth(self, market_depth: MarketDepth):
-        json_data = generic_encoder(market_depth, MarketDepth.enc_hook, by_alias=True)
-        self._call_cpp_mobile_book_updater_from_market_depth_json(json_data)
-
-    def _call_cpp_mobile_book_updater_from_market_depth_json(self, market_depth_json: Dict):
-        symbol = market_depth_json.get("symbol")
-        if symbol is None:
-            market_depth_json["symbol"] = ""
-
-        market_maker = market_depth_json.get("market_maker")
-        px = market_depth_json.get("px")
-        market_depth_json["px"] = float(px)
-        if market_maker is None:
-            market_depth_json["market_maker"] = ""
-        # Convert to bytes (for char* arguments)
-        exch_time: DateTime | int = market_depth_json.get("exch_time")
-        if exch_time is not None:
-            if isinstance(exch_time, DateTime):
-                market_depth_json["exch_time"] = get_epoch_from_pendulum_dt(exch_time)
-            else:
-                market_depth_json["exch_time"] = exch_time
-        else:
-            market_depth_json["exch_time"] = 0
-        arrival_time: DateTime | int = market_depth_json.get("arrival_time")
-        if arrival_time is not None:
-            if isinstance(exch_time, DateTime):
-                market_depth_json["arrival_time"] = get_epoch_from_pendulum_dt(arrival_time)
-            else:
-                market_depth_json["arrival_time"] = arrival_time
-        else:
-            market_depth_json["arrival_time"] = 0
-        is_smart_depth = market_depth_json.get("is_smart_depth")
-        market_depth_json["is_smart_depth"] = True if is_smart_depth is not None else False
-        cumulative_notional = market_depth_json.get("cumulative_notional")
-        market_depth_json["cumulative_notional"] = cumulative_notional if cumulative_notional else 0.0
-        cumulative_qty = market_depth_json.get("cumulative_qty")
-        market_depth_json["cumulative_qty"] = cumulative_qty if cumulative_qty else 0
-        cumulative_avg_px = market_depth_json.get("cumulative_avg_px")
-        market_depth_json["cumulative_avg_px"] = cumulative_avg_px if cumulative_avg_px else 0.0
-
-        if market_depth_json.get("update_id"):
-            del market_depth_json["update_id"]
-        # market_depth_json['id'] = market_depth_json['_id']
-        # del market_depth_json['_id']
-        self.cpp_market_depth_client(market_depth_json)
-
-    def _call_cpp_mobile_book_updater_from_last_barter(self, last_barter: LastBarter):
-        json_data = last_barter.to_dict()
-        # json_data['id'] = json_data['_id']
-        # del json_data['_id']
-        if json_data.get("update_id"):
-            del json_data["update_id"]
-
-        json_data["premium"] = last_barter.premium if last_barter.premium else 0.0
-        if last_barter.market_barter_volume is not None:
-            json_data["market_barter_volume"]["_id"] = last_barter.market_barter_volume.id if last_barter.market_barter_volume.id else ""
-            # if json_data["market_barter_volume"].get("_id") is not None:
-            #     del json_data["market_barter_volume"]["_id"]
-        json_data["participation_period_last_barter_qty_sum"] = last_barter.market_barter_volume.participation_period_last_barter_qty_sum if last_barter.market_barter_volume.participation_period_last_barter_qty_sum else 0
-        json_data["applicable_period_seconds"] = last_barter.market_barter_volume.applicable_period_seconds if last_barter.market_barter_volume.applicable_period_seconds else 0
-        json_data["exch_time"] = get_epoch_from_pendulum_dt(json_data["exch_time"])
-        json_data["arrival_time"] = get_epoch_from_pendulum_dt(json_data["arrival_time"])
-        self.cpp_last_barter_client(json_data)
-
-    async def create_market_depth_pre(self, market_depth_obj: MarketDepth):
-        self._call_cpp_mobile_book_updater_from_market_depth(market_depth_obj)
-
-    async def create_all_market_depth_pre(self, market_depth_obj_list: List[MarketDepth]):
-        for market_depth_obj in market_depth_obj_list:
-            self._call_cpp_mobile_book_updater_from_market_depth(market_depth_obj)
-
-    async def update_market_depth_pre(self, updated_market_depth_obj: MarketDepth):
-        self._call_cpp_mobile_book_updater_from_market_depth(updated_market_depth_obj)
-        return updated_market_depth_obj
-
-    async def update_all_market_depth_pre(self, updated_market_depth_obj_list: List[MarketDepth]):
-        for updated_market_depth_obj in updated_market_depth_obj_list:
-            self._call_cpp_mobile_book_updater_from_market_depth(updated_market_depth_obj)
-        return updated_market_depth_obj_list
-
-    async def partial_update_market_depth_pre(self, stored_market_depth_obj_json: Dict[str, Any], 
-                                              updated_market_depth_obj_json: Dict[str, Any]):
-        self._call_cpp_mobile_book_updater_from_market_depth_json(updated_market_depth_obj_json)
-        return updated_market_depth_obj_json
-
-    async def partial_update_all_market_depth_pre(self, stored_market_depth_dict_list: List[Dict[str, Any]],
-                                                  updated_market_depth_dict_list: List[Dict[str, Any]]):
-        for updated_market_depth_obj_json in updated_market_depth_dict_list:
-            self._call_cpp_mobile_book_updater_from_market_depth_json(updated_market_depth_obj_json)
-        return updated_market_depth_dict_list
-
-    async def create_last_barter_pre(self, last_barter_obj: LastBarter):
-        self._call_cpp_mobile_book_updater_from_last_barter(last_barter_obj)
-
-    async def create_all_last_barter_pre(self, last_barter_obj_list: List[LastBarter]):
-        for last_barter_obj in last_barter_obj_list:
-            self._call_cpp_mobile_book_updater_from_last_barter(last_barter_obj)
-
     @staticmethod
     def validate_single_id_per_symbol(stored_tobs: List[TopOfBookBaseModel | TopOfBookBaseModel],
                                       cmp_tob: TopOfBookBaseModel):
@@ -4177,6 +4054,139 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                  strat_limits_obj.max_single_leg_notional)
         logging.db(log_str)
 
+    async def _update_strat_brief_consumables_based_on_strat_limit_updates(
+            self, stored_strat_limits_obj: Dict | StratLimits, updated_strat_limits_obj: StratLimits):
+
+        strat_brief_patch_dict = {"_id": updated_strat_limits_obj.id,
+                                  "pair_buy_side_bartering_brief": {},
+                                  "pair_sell_side_bartering_brief": {}}    # will keep updating based on updates found
+        do_strat_brief_update = False
+
+        async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
+            # taking journal_shared_lock since in some updates open and filled qty too is involved
+            async with StratBrief.reentrant_lock:
+                stored_strat_brief_tuple = self.strat_cache.get_strat_brief()
+                if stored_strat_brief_tuple is not None:
+                    stored_strat_brief, _ = stored_strat_brief_tuple
+
+                    # checking max_single_leg_notional and updating consumable_notional on both legs if updated
+                    if isinstance(stored_strat_limits_obj, dict):
+                        stored_max_single_leg_notional = stored_strat_limits_obj.get("max_single_leg_notional")
+                    else:
+                        stored_max_single_leg_notional = stored_strat_limits_obj.max_single_leg_notional
+                    if stored_max_single_leg_notional != updated_strat_limits_obj.max_single_leg_notional:
+                        updated_max_single_leg_notional_delta = (
+                            updated_strat_limits_obj.max_single_leg_notional - stored_max_single_leg_notional)
+                        strat_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_notional"] = (
+                            stored_strat_brief.pair_buy_side_bartering_brief.consumable_notional +
+                            updated_max_single_leg_notional_delta)
+                        strat_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_notional"] = (
+                            stored_strat_brief.pair_sell_side_bartering_brief.consumable_notional +
+                            updated_max_single_leg_notional_delta)
+                        do_strat_brief_update = True
+                    # else not required: max_single_leg_notional not updated - no extra handling required
+
+                    # checking max_open_single_leg_notional and updating consumable_open_notional on both legs if updated
+                    if isinstance(stored_strat_limits_obj, dict):
+                        stored_max_open_single_leg_notional = stored_strat_limits_obj.get("max_open_single_leg_notional")
+                    else:
+                        stored_max_open_single_leg_notional = stored_strat_limits_obj.max_open_single_leg_notional
+                    if stored_max_open_single_leg_notional != updated_strat_limits_obj.max_open_single_leg_notional:
+                        updated_max_open_single_leg_notional_delta = (
+                            updated_strat_limits_obj.max_open_single_leg_notional - stored_max_open_single_leg_notional)
+                        strat_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_open_notional"] = (
+                            stored_strat_brief.pair_buy_side_bartering_brief.consumable_open_notional +
+                            updated_max_open_single_leg_notional_delta)
+                        strat_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_open_notional"] = (
+                            stored_strat_brief.pair_sell_side_bartering_brief.consumable_open_notional +
+                            updated_max_open_single_leg_notional_delta)
+                        do_strat_brief_update = True
+                    # else not required: max_open_single_leg_notional not updated - no extra handling required
+
+                    # checking max_open_chores_per_side and updating consumable_open_chores on both legs if updated
+                    if isinstance(stored_strat_limits_obj, dict):
+                        stored_max_open_chores_per_side = stored_strat_limits_obj.get(
+                            "max_open_chores_per_side")
+                    else:
+                        stored_max_open_chores_per_side = stored_strat_limits_obj.max_open_chores_per_side
+                    if stored_max_open_chores_per_side != updated_strat_limits_obj.max_open_chores_per_side:
+                        updated_max_open_chores_per_side_delta = (
+                            updated_strat_limits_obj.max_open_chores_per_side - stored_max_open_chores_per_side)
+                        strat_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_open_chores"] = (
+                            stored_strat_brief.pair_buy_side_bartering_brief.consumable_open_chores +
+                            updated_max_open_chores_per_side_delta)
+                        strat_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_open_chores"] = (
+                            stored_strat_brief.pair_sell_side_bartering_brief.consumable_open_chores +
+                            updated_max_open_chores_per_side_delta)
+                        do_strat_brief_update = True
+
+                    # else not required: max_open_chores_per_side not updated - no extra handling required
+
+                    # checking max_concentration and updating consumable_open_chores on both legs if updated
+                    if isinstance(stored_strat_limits_obj, dict):
+                        stored_max_concentration = stored_strat_limits_obj.get(
+                            "max_concentration")
+                    else:
+                        stored_max_concentration = stored_strat_limits_obj.max_concentration
+                    if stored_max_concentration != updated_strat_limits_obj.max_concentration:
+                        # Formula used to compute consumable_concentration is:
+                        # consumable_concentration = int((security_float / 100) * strat_limits.max_concentration -
+                        #                                     (total_open_qty + total_filled_qty))
+                        # (total_open_qty + total_filled_qty) =
+                        #           int((security_float / 100) * strat_limits.max_concentration - consumable_concentration)
+
+                        # Finding value for (total_open_qty + total_filled_qty) based on current
+                        # consumable_concentration to compute consumable_concentration based on new max_concentration
+
+                        security_float = self.static_data.get_security_float_from_ticker(
+                            stored_strat_brief.pair_buy_side_bartering_brief.security.sec_id)
+                        if security_float is not None:
+                            open_n_filled_qty_sum = int((security_float / 100) * stored_max_concentration -
+                                                        stored_strat_brief.pair_buy_side_bartering_brief.consumable_concentration)
+                            updated_consumable_concentration = (
+                                int((security_float / 100) * updated_strat_limits_obj.max_concentration -
+                                    open_n_filled_qty_sum))
+                            strat_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_concentration"] = updated_consumable_concentration
+
+                            open_n_filled_qty_sum = int((security_float / 100) * stored_max_concentration -
+                                                        stored_strat_brief.pair_sell_side_bartering_brief.consumable_concentration)
+                            updated_consumable_concentration = (
+                                int((security_float / 100) * updated_strat_limits_obj.max_concentration -
+                                    open_n_filled_qty_sum))
+                            strat_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_concentration"] = updated_consumable_concentration
+                            do_strat_brief_update = True
+                        # else not required: consumable_concentration is 0 when security_float is found None
+                    # else not required: max_concentration not updated - no extra handling required
+
+                    # checking max_net_filled_notional and updating consumable_nett_filled_notional on both legs if updated
+                    if isinstance(stored_strat_limits_obj, dict):
+                        stored_max_net_filled_notional = stored_strat_limits_obj.get(
+                            "max_net_filled_notional")
+                    else:
+                        stored_max_net_filled_notional = stored_strat_limits_obj.max_net_filled_notional
+                    if stored_max_net_filled_notional != updated_strat_limits_obj.max_net_filled_notional:
+                        updated_max_net_filled_notional_delta = (
+                                updated_strat_limits_obj.max_net_filled_notional - stored_max_net_filled_notional)
+                        strat_brief_patch_dict["consumable_nett_filled_notional"] = (
+                                stored_strat_brief.consumable_nett_filled_notional +
+                                updated_max_net_filled_notional_delta)
+                        do_strat_brief_update = True
+                    # else not required: max_concentration not updated - no extra handling required
+
+                    if do_strat_brief_update:
+                        # cleaning strat_brief_patch_dict
+                        if not strat_brief_patch_dict["pair_buy_side_bartering_brief"]:
+                            del strat_brief_patch_dict["pair_buy_side_bartering_brief"]
+                        if not strat_brief_patch_dict["pair_sell_side_bartering_brief"]:
+                            del strat_brief_patch_dict["pair_sell_side_bartering_brief"]
+
+                        await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_strat_brief_http(
+                            strat_brief_patch_dict)
+                    # else not required: if no limit having corresponding consumable is updated
+                    # then avoiding any strat_brief update
+                # else not required: strat_brief doesn't exist - when created will use updated limit values
+                # for setting consumables
+
     async def _update_strat_limits_post(self, stored_strat_limits_obj: StratLimits | Dict,
                                         updated_strat_limits_obj: StratLimits):
         # updating bartering_data_manager's strat_cache
@@ -4199,6 +4209,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             cmd: List[str] = ["python", script_path, f"{updated_strat_limits_obj.id}", "&"]
             launcher: subprocess.Popen = subprocess.Popen(cmd)
             logging.warning(f"Triggered eqt_sod_disable event at {DateTime.utcnow()};;;{cmd=}, {launcher=}")
+
+        # updating all consumables if any corresponding limit is updated
+        await self._update_strat_brief_consumables_based_on_strat_limit_updates(stored_strat_limits_obj,
+                                                                                updated_strat_limits_obj)
 
     async def update_strat_limits_post(self, stored_strat_limits_obj: StratLimits,
                                        updated_strat_limits_obj: StratLimits):
@@ -4504,10 +4518,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
             # removing current strat's ports from cached ports
             remove_port_list = [
-                self.top_of_book_ws_port,
-                self.last_barter_ws_port,
-                self.market_depth_ws_port,
-                self.cpp_http_port
+                self.cpp_ws_port,
+                self.cpp_port
             ]
             with FileLock(self.ports_cache_lock_file_path):
                 with open(self.ports_cache_file_path, 'w+') as f:

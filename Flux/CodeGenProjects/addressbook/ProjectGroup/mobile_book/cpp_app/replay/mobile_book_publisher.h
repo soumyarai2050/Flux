@@ -11,7 +11,7 @@
 #include "mongo_db_codec.h"
 #include "shared_memory_manager.h"
 #include "../include/config_parser.h"
-#include "mobile_book_web_socket_server.h"
+#include "web_socket_server.h"
 #include "queue_handler.h"
 #include "mobile_book_service_shared_data_structure.h"
 #include "../include/md_utility_functions.h"
@@ -32,6 +32,12 @@ public:
         update_top_of_book_db_cache();
     	initialize_webclient();
         initialize_websocket_servers();
+    	m_web_socket_server_.value().register_route_handler(std::make_shared<FluxCppCore::MarketDepthRouteHandler>(
+    		mr_config_.m_market_depth_ws_route_, m_market_depth_codec_));
+    	m_web_socket_server_.value().register_route_handler(std::make_shared<FluxCppCore::LastBarterRouteHandler>(
+    		mr_config_.m_last_barter_ws_route_, m_last_barter_codec_));
+    	m_web_socket_server_.value().register_route_handler(std::make_shared<FluxCppCore::TopOfBookRouteHandler>(
+    		mr_config_.m_top_of_book_ws_route_, m_top_of_book_codec_));
         start_monitor_threads();
     }
 
@@ -40,6 +46,10 @@ public:
     void process_market_depth(const MarketDepthQueueElement& r_market_depth_queue_element);
 
     void process_last_barter(const LastBarterQueueElement& kr_last_barter_queue_element);
+
+	void process_market_depth(const MarketDepth& kr_market_depth);
+
+	void process_last_barter(const LastBarter& kr_last_barter);
 
 	void init_shared_memory() {
 		switch (mr_config_.m_market_depth_level_) {
@@ -117,7 +127,6 @@ public:
 
 
 protected:
-    std::atomic<bool> m_shutdown_flag_{false};
     FluxCppCore::Monitor<LastBarterQueueElement> m_last_barter_monitor_{};
     FluxCppCore::Monitor<std::vector<MarketDepthQueueElement>> m_market_depth_monitor_{};
     MarketDepthList m_market_depth_list_{};
@@ -125,9 +134,11 @@ protected:
     LastBarter m_last_barter_{};
     Config& mr_config_;
     std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db_handler_;
+public:
     FluxCppCore::MongoDBCodec<MarketDepth, MarketDepthList> m_market_depth_codec_;
     FluxCppCore::MongoDBCodec<LastBarter, LastBarterList> m_last_barter_codec_;
     FluxCppCore::MongoDBCodec<TopOfBook, TopOfBookList> m_top_of_book_codec_;
+protected:
     FluxCppCore::MongoDBCodec<RawMarketDepthHistory, RawMarketDepthHistoryList> m_raw_market_depth_history_codec_;
     FluxCppCore::MongoDBCodec<RawLastBarterHistory, RawLastBarterHistoryList> m_raw_last_barter_history_codec_;
     void* m_shm_symbol_cache_{};
@@ -136,9 +147,8 @@ public:
     RawLastBarterHistoryList m_raw_last_barter_history_list_{};
     RawMarketDepthHistoryList m_raw_market_depth_history_list_{};
 protected:
-    std::optional<mobile_book_handler::MobileBookMarketDepthListWebSocketServer<MarketDepthList>> m_market_depth_web_socket_server_{std::nullopt};
-    std::optional<mobile_book_handler::MobileBookLastBarterWebSocketServer<LastBarter>> m_last_barter_web_socket_server_{std::nullopt};
-    std::optional<mobile_book_handler::MobileBookTopOfBookWebSocketServer<TopOfBook>> m_top_of_book_web_socket_server_{std::nullopt};
+
+	std::optional<FluxCppCore::WebSocketServer> m_web_socket_server_{std::nullopt};
 
 	std::optional<FluxCppCore::RootModelWebClient<MarketDepth>> m_md_http_client_;
 	std::optional<FluxCppCore::RootModelWebClient<TopOfBook>> m_tob_web_client_;
@@ -154,7 +164,7 @@ protected:
 
 	template<size_t N>
     void update_last_barter_cache(const LastBarterQueueElement& kr_last_barter_queue_element,
-	MDContainer<N>& r_mobile_book_cache_out) const ;
+	MDContainer<N>& r_mobile_book_cache_out) const;
 
      static void populate_market_depth(const MarketDepthQueueElement& kr_market_depth_queue_element,
         MarketDepth& r_market_depth);
